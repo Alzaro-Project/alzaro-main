@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alzaro TyreOps — Tyre Management Software for UK Garages</title>
+  <meta name="description" content="FIFO inventory tracking, VAT margin scheme, invoicing & more. Built for UK tyre garages. Start your 14-day free trial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #0a0a0b;
+      --surface: #131316;
+      --surface2: #1a1a1f;
+      --surface3: #222228;
+      --border: rgba(255,255,255,0.08);
+      --border-light: rgba(255,255,255,0.12);
+      --text: #f5f5f4;
+      --text2: #a1a1a1;
+      --text3: #666;
+      --accent: #f5c842;
+      --accent-light: #ffd966;
+      --accent-glow: rgba(245,200,66,0.35);
+      --accent-subtle: rgba(245,200,66,0.08);
+      --green: #3dd68c;
+      --blue: #60a5fa;
+      --teal: #2dd4bf;
+      --red: #ff5f5f;
+      --purple: #a78bfa;
+    }
+    
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* ===== SCROLL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-left.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-right.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-scale {
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-scale.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    /* Stagger delays for grid items */
+    .stagger-1 { transition-delay: 0.1s; }
+    .stagger-2 { transition-delay: 0.2s; }
+    .stagger-3 { transition-delay: 0.3s; }
+    .stagger-4 { transition-delay: 0.4s; }
+    .stagger-5 { transition-delay: 0.5s; }
+    .stagger-6 { transition-delay: 0.6s; }
+    
+    a { color: inherit; text-decoration: none; }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ===== NAVBAR ===== */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 0;
+      transition: all 0.3s ease;
+    }
+    
+    nav.scrolled {
+      background: rgba(10,10,11,0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      cursor: pointer;
+    }
+    
+    .logo span { color: var(--accent); }
+    
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 8px;
+    }
+    
+    .nav-center a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 8px 18px;
+      border-radius: 100px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    
+    .nav-center a:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    
+    .nav-center a.active {
+      color: var(--text);
+      background: var(--surface3);
+    }
+    
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+    }
+    
+    .btn-ghost:hover {
+      color: var(--text);
+    }
+    
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--surface3);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+    
+    .btn-primary:hover {
+      background: var(--accent-light);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--accent-glow);
+    }
+    
+    .btn-large {
+      padding: 16px 32px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 0 100px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Grid background */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(245,200,66,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,200,66,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 70%);
+    }
+    
+    /* Floating glow orbs */
+    .hero-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+    }
+    
+    .hero-glow-1 {
+      width: 600px;
+      height: 600px;
+      top: -20%;
+      left: -10%;
+      background: var(--accent-subtle);
+      animation: float1 20s ease-in-out infinite;
+    }
+    
+    .hero-glow-2 {
+      width: 400px;
+      height: 400px;
+      bottom: -10%;
+      right: -5%;
+      background: rgba(61,214,140,0.04);
+      animation: float2 15s ease-in-out infinite;
+    }
+    
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(40px, 30px); }
+    }
+    
+    @keyframes float2 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-30px, -20px); }
+    }
+    
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+    }
+    
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid rgba(245,200,66,0.25);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    
+    .hero h1 {
+      font-size: clamp(44px, 6vw, 76px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -3px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+    
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #ffeb99 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-desc {
+      font-size: 19px;
+      color: var(--text2);
+      line-height: 1.7;
+      max-width: 580px;
+      margin: 0 auto 40px;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+    
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 64px;
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+    
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 64px;
+      animation: fadeUp 0.6s ease 0.4s both;
+    }
+    
+    .hero-stat {
+      text-align: center;
+    }
+    
+    .hero-stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 36px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    
+    .hero-stat-label {
+      font-size: 13px;
+      color: var(--text3);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== TYRE TYPES MARQUEE ===== */
+    .types-bar {
+      padding: 20px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    
+    .types-track {
+      display: flex;
+      gap: 48px;
+      animation: scroll 25s linear infinite;
+      width: max-content;
+    }
+    
+    .type-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+    
+    .type-icon {
+      font-size: 18px;
+    }
+    
+    @keyframes scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* ===== FEATURES - ALTERNATING ROWS ===== */
+    .features {
+      padding: 120px 0;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 80px;
+    }
+    
+    .section-tag {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+    
+    .section-desc {
+      font-size: 17px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+    
+    .feature-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-bottom: 100px;
+    }
+    
+    .feature-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .feature-row.reverse .feature-text {
+      order: 2;
+    }
+    
+    .feature-row.reverse .feature-visual {
+      order: 1;
+    }
+    
+    .feature-text {
+      max-width: 480px;
+    }
+    
+    .feature-number {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    
+    .feature-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-desc {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+    
+    .feature-list {
+      list-style: none;
+    }
+    
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .feature-list li::before {
+      content: '✓';
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--accent-subtle);
+      border-radius: 50%;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    
+    .feature-tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 100px;
+    }
+    
+    .feature-tag.gold {
+      background: rgba(245,200,66,0.15);
+      color: var(--accent);
+    }
+    
+    .feature-tag.silver {
+      background: rgba(192,192,192,0.12);
+      color: #c0c0c0;
+    }
+    
+    /* Feature visual cards */
+    .feature-visual {
+      position: relative;
+    }
+    
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    }
+    
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .feature-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    
+    .feature-card-body {
+      padding: 20px;
+    }
+    
+    /* Inventory preview card */
+    .inventory-preview {
+      background: var(--surface2);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .inventory-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      align-items: center;
+    }
+    
+    .inventory-row:last-child { border-bottom: none; }
+    
+    .inventory-row.header {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text3);
+      background: rgba(255,255,255,0.02);
+    }
+    
+    .inventory-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    
+    .inventory-badge.ok { background: rgba(61,214,140,0.15); color: var(--green); }
+    .inventory-badge.low { background: rgba(245,200,66,0.15); color: var(--accent); }
+
+    /* Stats card */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    
+    .stat-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text3);
+    }
+    
+    .stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 8px;
+    }
+    
+    .stat-value.green { color: var(--green); }
+    .stat-value.blue { color: var(--blue); }
+
+    /* ===== MORE FEATURES GRID ===== */
+    .more-features {
+      padding: 80px 0 120px;
+      background: linear-gradient(180deg, transparent 0%, var(--accent-subtle) 50%, transparent 100%);
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    
+    .mini-feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: all 0.3s ease;
+    }
+    
+    .mini-feature:hover {
+      border-color: rgba(245,200,66,0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    
+    .mini-feature-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+    }
+    
+    .mini-feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .mini-feature-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    /* ===== PRICING ===== */
+    .pricing-section {
+      padding: 120px 0;
+    }
+    
+    .pricing-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+      transform: translateY(-4px);
+    }
+    
+    .pricing-card.featured {
+      border-color: var(--accent);
+      box-shadow: 0 0 60px var(--accent-glow);
+    }
+    
+    .pricing-card.featured::before {
+      content: 'Most Popular';
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 20px;
+    }
+    
+    .pricing-tier {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .pricing-tier-icon {
+      font-size: 24px;
+    }
+    
+    .pricing-price {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .pricing-amount {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 42px;
+      font-weight: 600;
+    }
+    
+    .pricing-period {
+      font-size: 14px;
+      color: var(--text3);
+    }
+    
+    .pricing-desc {
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 28px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 28px;
+    }
+    
+    .pricing-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14px;
+      margin-bottom: 14px;
+      color: var(--text2);
+    }
+    
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    
+    .pricing-features li.disabled {
+      color: var(--text3);
+      opacity: 0.5;
+    }
+    
+    .pricing-features li.disabled::before {
+      content: '—';
+      color: var(--text3);
+    }
+    
+    .pricing-card .btn {
+      width: 100%;
+    }
+
+    /* ===== HOW IT WORKS ===== */
+    .how-section {
+      padding: 120px 0;
+    }
+    
+    .steps-container {
+      max-width: 700px;
+      margin: 60px auto 0;
+    }
+    
+    .step {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 48px;
+      position: relative;
+    }
+    
+    .step:last-child { margin-bottom: 0; }
+    
+    .step::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 60px;
+      bottom: -48px;
+      width: 2px;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--border) 100%);
+    }
+    
+    .step:last-child::before { display: none; }
+    
+    .step-number {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-subtle);
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .step-content {
+      padding-top: 8px;
+    }
+    
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .step-desc {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    /* ===== TESTIMONIAL ===== */
+    .testimonial-section {
+      padding: 80px 0;
+    }
+    
+    .testimonial-card {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px;
+      text-align: center;
+    }
+    
+    .testimonial-quote {
+      font-size: 22px;
+      font-style: italic;
+      line-height: 1.7;
+      margin-bottom: 32px;
+      color: var(--text);
+    }
+    
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    
+    .testimonial-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      color: #000;
+    }
+    
+    .testimonial-name {
+      font-weight: 600;
+    }
+    
+    .testimonial-role {
+      font-size: 14px;
+      color: var(--text3);
+    }
+
+    /* ===== CTA ===== */
+    .cta-section {
+      padding: 140px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, var(--accent-subtle) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+    
+    .cta-title {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+    
+    .cta-desc {
+      font-size: 18px;
+      color: var(--text2);
+      margin-bottom: 36px;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    /* ===== LEGAL PAGES ===== */
+    .page {
+      display: none;
+    }
+    
+    .page.active {
+      display: block;
+    }
+    
+    .legal-page {
+      padding: 140px 0 100px;
+      min-height: 100vh;
+    }
+    
+    .legal-container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    .legal-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .legal-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-meta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    
+    .legal-content {
+      color: var(--text2);
+      line-height: 1.8;
+    }
+    
+    .legal-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 44px;
+      margin-bottom: 16px;
+    }
+    
+    .legal-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-content p {
+      margin-bottom: 16px;
+    }
+    
+    .legal-content ul {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+    
+    .legal-content li {
+      margin-bottom: 10px;
+    }
+    
+    .legal-content strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    
+    .legal-content a {
+      color: var(--accent);
+      transition: color 0.2s;
+    }
+    
+    .legal-content a:hover {
+      color: var(--accent-light);
+      text-decoration: underline;
+    }
+    
+    .legal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    
+    .legal-box p {
+      margin-bottom: 0;
+    }
+    
+    .legal-box.warning {
+      border-color: rgba(245,200,66,0.3);
+      background: var(--accent-subtle);
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 32px;
+      transition: color 0.2s;
+    }
+    
+    .back-link:hover {
+      color: var(--accent);
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+    
+    .footer-links a {
+      font-size: 14px;
+      color: var(--text3);
+      transition: color 0.2s;
+      cursor: pointer;
+    }
+    
+    .footer-links a:hover { color: var(--text); }
+    
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text3);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .feature-row {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      
+      .feature-row.reverse .feature-text,
+      .feature-row.reverse .feature-visual {
+        order: unset;
+      }
+      
+      .feature-text {
+        max-width: 100%;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      
+      .pricing-cards {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .nav-center {
+        display: none;
+      }
+      
+      .hero h1 {
+        letter-spacing: -2px;
+      }
+      
+      .hero-stats {
+        flex-direction: column;
+        gap: 24px;
+      }
+      
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .inventory-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      
+      .inventory-row.header {
+        display: none;
+      }
+      
+      .step {
+        gap: 20px;
+      }
+      
+      .footer-content {
+        flex-direction: column;
+        gap: 24px;
+        text-align: center;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav id="nav">
+    <div class="container">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>TyreOps</span></a>
+      <div class="nav-center">
+        <a href="#features" onclick="scrollToSection(event, 'features')" class="active">Features</a>
+        <a href="#pricing" onclick="scrollToSection(event, 'pricing')">Pricing</a>
+        <a href="#how" onclick="scrollToSection(event, 'how')">How it works</a>
+      </div>
+      <div class="nav-right">
+        <a href="/tyreops/login" class="btn btn-ghost">Login</a>
+        <a href="/tyreops/register" class="btn btn-primary">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          🇬🇧 Built for UK Tyre Garages
+        </div>
+        
+        <h1>
+          Stop losing money on<br>
+          <span class="gradient">tyre inventory</span>
+        </h1>
+        
+        <p class="hero-desc">
+          FIFO batch tracking, VAT margin scheme, instant invoicing. Everything you need to run a profitable tyre garage — finally in one place.
+        </p>
+        
+        <div class="hero-actions">
+          <a href="/tyreops/register" class="btn btn-primary btn-large">
+            Start 14-Day Free Trial →
+          </a>
+          <a href="#features" onclick="scrollToSection(event, 'features')" class="btn btn-secondary btn-large">
+            See How It Works
+          </a>
+        </div>
+        
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-value">14</div>
+            <div class="hero-stat-label">Day Trial</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">£0</div>
+            <div class="hero-stat-label">Setup Fee</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">2 min</div>
+            <div class="hero-stat-label">To Get Started</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TYRE TYPES MARQUEE -->
+  <section class="types-bar">
+    <div class="types-track">
+      <div class="type-item"><span class="type-icon">🚗</span> Car Tyres</div>
+      <div class="type-item"><span class="type-icon">🚐</span> Van Tyres</div>
+      <div class="type-item"><span class="type-icon">🏎️</span> Performance Tyres</div>
+      <div class="type-item"><span class="type-icon">🚛</span> 4x4 Tyres</div>
+      <div class="type-item"><span class="type-icon">❄️</span> Winter Tyres</div>
+      <div class="type-item"><span class="type-icon">☀️</span> Summer Tyres</div>
+      <div class="type-item"><span class="type-icon">♻️</span> Used Tyres</div>
+      <div class="type-item"><span class="type-icon">🏷️</span> Budget Tyres</div>
+      <div class="type-item"><span class="type-icon">⭐</span> Premium Tyres</div>
+      <div class="type-item"><span class="type-icon">🔧</span> Run-Flat Tyres</div>
+      <!-- Duplicate for seamless scroll -->
+      <div class="type-item"><span class="type-icon">🚗</span> Car Tyres</div>
+      <div class="type-item"><span class="type-icon">🚐</span> Van Tyres</div>
+      <div class="type-item"><span class="type-icon">🏎️</span> Performance Tyres</div>
+      <div class="type-item"><span class="type-icon">🚛</span> 4x4 Tyres</div>
+      <div class="type-item"><span class="type-icon">❄️</span> Winter Tyres</div>
+      <div class="type-item"><span class="type-icon">☀️</span> Summer Tyres</div>
+      <div class="type-item"><span class="type-icon">♻️</span> Used Tyres</div>
+      <div class="type-item"><span class="type-icon">🏷️</span> Budget Tyres</div>
+      <div class="type-item"><span class="type-icon">⭐</span> Premium Tyres</div>
+      <div class="type-item"><span class="type-icon">🔧</span> Run-Flat Tyres</div>
+    </div>
+  </section>
+
+  <!-- FEATURES - ALTERNATING ROWS -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">Built for how tyre garages actually work</h2>
+        <p class="section-desc">
+          Not another generic inventory system. Every feature designed specifically for UK tyre retailers.
+        </p>
+      </div>
+      
+      <!-- Feature 1: FIFO Tracking -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">01</div>
+          <h3 class="feature-title">FIFO Batch Tracking</h3>
+          <p class="feature-desc">
+            Each purchase batch tracked separately. Oldest stock sells first automatically. Know your true cost on every single sale — no more guesswork.
+          </p>
+          <ul class="feature-list">
+            <li>Automatic cost calculation per sale</li>
+            <li>Batch-level profit tracking</li>
+            <li>Supplier price history</li>
+            <li>Real-time margin visibility</li>
+          </ul>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Stock Overview</span>
+              <span style="font-size:12px;color:var(--green);">● Live</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-label">Revenue</div>
+                  <div class="stat-value">£4,280</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Profit</div>
+                  <div class="stat-value green">£1,842</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Stock Value</div>
+                  <div class="stat-value blue">£6,120</div>
+                </div>
+              </div>
+              <div class="inventory-preview">
+                <div class="inventory-row header">
+                  <div>Tyre</div>
+                  <div>FIFO Cost</div>
+                  <div>Stock</div>
+                  <div>Status</div>
+                </div>
+                <div class="inventory-row">
+                  <div><strong>Michelin</strong> Pilot Sport 4</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">£89.00</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">18</div>
+                  <div><span class="inventory-badge ok">OK</span></div>
+                </div>
+                <div class="inventory-row">
+                  <div><strong>Continental</strong> PremiumContact</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">£62.00</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">12</div>
+                  <div><span class="inventory-badge ok">OK</span></div>
+                </div>
+                <div class="inventory-row">
+                  <div><strong>Pirelli</strong> Cinturato P7</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">£58.00</div>
+                  <div style="font-family: 'IBM Plex Mono', monospace;">1</div>
+                  <div><span class="inventory-badge low">LOW</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 2: Used Tyre Management -->
+      <div class="feature-row reverse">
+        <div class="feature-text reveal-right">
+          <div class="feature-number">02</div>
+          <h3 class="feature-title">Used Tyre Management</h3>
+          <p class="feature-desc">
+            Part-exchange and used stock with full traceability. Track source customer, tread depth, and margin on every used tyre you buy and sell.
+          </p>
+          <ul class="feature-list">
+            <li>Part-exchange tracking</li>
+            <li>Tread depth records</li>
+            <li>Source customer linking</li>
+            <li>Used tyre margin reports</li>
+          </ul>
+          <span class="feature-tag silver">Silver+</span>
+        </div>
+        <div class="feature-visual reveal-left">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Used Stock</span>
+              <span style="font-size:12px;color:var(--text3);">8 items</span>
+            </div>
+            <div class="feature-card-body">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">Goodyear Eagle F1 • 225/45R17</div>
+                    <div style="font-size:12px;color:var(--text3);">Tread: 5mm • From: Mr. Jones</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£35</div>
+                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£20 margin</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">Bridgestone Turanza • 205/55R16</div>
+                    <div style="font-size:12px;color:var(--text3);">Tread: 4mm • From: Mrs. Patel</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£28</div>
+                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£18 margin</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">Michelin CrossClimate • 215/60R16</div>
+                    <div style="font-size:12px;color:var(--text3);">Tread: 6mm • From: ABC Motors</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£42</div>
+                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£25 margin</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 3: VAT Margin Scheme -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">03</div>
+          <h3 class="feature-title">VAT Margin Scheme</h3>
+          <p class="feature-desc">
+            Automatic VAT calculation for used tyres. Pay VAT only on profit margin, not the full sale price. Compliant with HMRC requirements.
+          </p>
+          <ul class="feature-list">
+            <li>Automatic margin scheme calculations</li>
+            <li>HMRC-compliant records</li>
+            <li>One-click VAT reports</li>
+            <li>Separate used/new VAT tracking</li>
+          </ul>
+          <span class="feature-tag gold">Gold</span>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">VAT Summary</span>
+              <span style="font-size:12px;color:var(--text3);">Q1 2026</span>
+            </div>
+            <div class="feature-card-body">
+              <div style="display:flex;flex-direction:column;gap:16px;">
+                <div style="background:var(--surface2);padding:20px;border-radius:12px;">
+                  <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Standard VAT (New Tyres)</div>
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--text);">£2,840</div>
+                    <div style="font-size:12px;color:var(--text3);">Output VAT</div>
+                  </div>
+                </div>
+                <div style="background:var(--accent-subtle);padding:20px;border-radius:12px;border:1px solid rgba(245,200,66,0.2);">
+                  <div style="font-size:12px;color:var(--accent);margin-bottom:8px;">Margin Scheme (Used Tyres)</div>
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--accent);">£186</div>
+                    <div style="font-size:12px;color:var(--accent);">VAT on margin only</div>
+                  </div>
+                </div>
+                <div style="text-align:center;padding-top:8px;border-top:1px solid var(--border);">
+                  <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">Saved with Margin Scheme</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:var(--green);">£412 this quarter</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MORE FEATURES GRID -->
+  <section class="more-features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="mini-feature reveal stagger-1">
+          <div class="mini-feature-icon">🧾</div>
+          <h4 class="mini-feature-title">Instant Invoicing</h4>
+          <p class="mini-feature-desc">Create professional invoices in seconds. Email directly to customers. Track cash, card, or bank transfer payments.</p>
+        </div>
+        <div class="mini-feature reveal stagger-2">
+          <div class="mini-feature-icon">👥</div>
+          <h4 class="mini-feature-title">Customer Database</h4>
+          <p class="mini-feature-desc">Store customer details, vehicle reg, and full purchase history. See lifetime value at a glance.</p>
+        </div>
+        <div class="mini-feature reveal stagger-3">
+          <div class="mini-feature-icon">⚠️</div>
+          <h4 class="mini-feature-title">Low Stock Alerts</h4>
+          <p class="mini-feature-desc">Set reorder points per SKU. Never miss a sale because you're out of a popular size.</p>
+        </div>
+        <div class="mini-feature reveal stagger-4">
+          <div class="mini-feature-icon">📊</div>
+          <h4 class="mini-feature-title">P&L Dashboard</h4>
+          <p class="mini-feature-desc">See your real margins, best sellers, and slowest movers. Make smarter buying decisions.</p>
+        </div>
+        <div class="mini-feature reveal stagger-5">
+          <div class="mini-feature-icon">📱</div>
+          <h4 class="mini-feature-title">Works on Mobile</h4>
+          <p class="mini-feature-desc">Full access from your phone. Check stock, create invoices, and track payments on the go.</p>
+        </div>
+        <div class="mini-feature reveal stagger-6">
+          <div class="mini-feature-icon">📤</div>
+          <h4 class="mini-feature-title">CSV Export</h4>
+          <p class="mini-feature-desc">Export reports for your accountant in one click. Works with any accounting software.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing-section" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Pricing</div>
+        <h2 class="section-title">Simple, transparent pricing</h2>
+        <p class="section-desc">
+          Start free for 14 days. No credit card required. Cancel anytime.
+        </p>
+      </div>
+      
+      <div class="pricing-cards">
+        <div class="pricing-card reveal stagger-1">
+          <div class="pricing-tier">
+            <span class="pricing-tier-icon">🥉</span>
+            Bronze
+          </div>
+          <div class="pricing-price">
+            <span class="pricing-amount">£60</span>
+            <span class="pricing-period">/month</span>
+          </div>
+          <p class="pricing-desc">For small garages just getting started</p>
+          <ul class="pricing-features">
+            <li>50 invoices/month</li>
+            <li>Basic inventory</li>
+            <li>FIFO automatic pricing</li>
+            <li>1 user</li>
+            <li class="disabled">Used tyre tracking</li>
+            <li class="disabled">VAT margin scheme</li>
+          </ul>
+          <a href="/tyreops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card featured reveal stagger-2">
+          <div class="pricing-tier">
+            <span class="pricing-tier-icon">🥈</span>
+            Silver
+          </div>
+          <div class="pricing-price">
+            <span class="pricing-amount">£75</span>
+            <span class="pricing-period">/month</span>
+          </div>
+          <p class="pricing-desc">For growing garages with used stock</p>
+          <ul class="pricing-features">
+            <li>Unlimited invoices</li>
+            <li>Batch override control</li>
+            <li>Supplier tracking</li>
+            <li>Used tyre management</li>
+            <li>VAT reports</li>
+            <li>2 users</li>
+          </ul>
+          <a href="/tyreops/register" class="btn btn-primary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card reveal stagger-3">
+          <div class="pricing-tier">
+            <span class="pricing-tier-icon">🥇</span>
+            Gold
+          </div>
+          <div class="pricing-price">
+            <span class="pricing-amount">£90</span>
+            <span class="pricing-period">/month</span>
+          </div>
+          <p class="pricing-desc">Full power for serious operators</p>
+          <ul class="pricing-features">
+            <li>Everything in Silver</li>
+            <li>Full P&L dashboard</li>
+            <li>VAT Margin Scheme</li>
+            <li>Reports & CSV export</li>
+            <li>Unlimited users</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="/tyreops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section" id="how">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">How It Works</div>
+        <h2 class="section-title">Up and running in minutes</h2>
+        <p class="section-desc">
+          No complicated setup. No training required. Just sign up and go.
+        </p>
+      </div>
+      
+      <div class="steps-container">
+        <div class="step reveal">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3 class="step-title">Sign up</h3>
+            <p class="step-desc">Create your account in 2 minutes. No credit card needed to start your free trial.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3 class="step-title">Add your stock</h3>
+            <p class="step-desc">Enter your SKUs and log your first purchase batch. Import existing data or start fresh.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3 class="step-title">Create invoices</h3>
+            <p class="step-desc">Sell tyres, FIFO cost auto-calculates, and stock updates automatically.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3 class="step-title">Track profit</h3>
+            <p class="step-desc">See your margins, P&L, and VAT reports in real-time. Make smarter decisions.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIAL -->
+  <section class="testimonial-section">
+    <div class="container">
+      <div class="testimonial-card reveal-scale">
+        <p class="testimonial-quote">
+          "Finally, software that understands how tyre garages work. The FIFO tracking alone has saved us hours every week — and we're actually making more money now we can see our real margins."
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">JT</div>
+          <div>
+            <div class="testimonial-name">James Thompson</div>
+            <div class="testimonial-role">Owner, Smith Tyres MK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-content reveal">
+      <h2 class="cta-title">Ready to take control of your garage?</h2>
+      <p class="cta-desc">Start your 14-day free trial today. No credit card required.</p>
+      <div class="cta-buttons">
+        <a href="/tyreops/register" class="btn btn-primary btn-large">Start Free Trial →</a>
+        <a href="mailto:hello@tyreops.co.uk" class="btn btn-secondary btn-large">Contact Sales</a>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+  <!-- PRIVACY PAGE -->
+  <div id="page-privacy" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Privacy Policy</h1>
+          <p class="legal-meta">Last updated: 21 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> We collect only what we need to provide Alzaro TyreOps services. We never sell your data. Your garage data belongs to you.</p>
+          </div>
+
+          <h2>1. Who we are</h2>
+          <p>Alzaro TyreOps ("we", "us", "our") is a tyre management software platform operated in the United Kingdom. We are committed to protecting your privacy and handling your data in accordance with UK GDPR and the Data Protection Act 2018.</p>
+          <p><strong>Contact:</strong> <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a></p>
+
+          <h2>2. What data we collect</h2>
+          
+          <h3>Account information</h3>
+          <ul>
+            <li>Email address</li>
+            <li>Password (encrypted)</li>
+            <li>Garage name and contact details</li>
+          </ul>
+
+          <h3>Business data you enter</h3>
+          <ul>
+            <li>Inventory records (SKUs, batches, stock levels)</li>
+            <li>Customer information (names, emails, phone numbers, vehicle registrations)</li>
+            <li>Invoice and payment records</li>
+            <li>Supplier information</li>
+          </ul>
+
+          <h3>Automatically collected</h3>
+          <ul>
+            <li>IP address and browser type</li>
+            <li>Usage analytics (pages visited, features used)</li>
+            <li>Error logs for troubleshooting</li>
+          </ul>
+
+          <h2>3. How we use your data</h2>
+          <p>We use your data to:</p>
+          <ul>
+            <li>Provide and maintain Alzaro TyreOps services</li>
+            <li>Process your subscription payments</li>
+            <li>Send service-related emails (password resets, subscription updates)</li>
+            <li>Improve our software based on usage patterns</li>
+            <li>Comply with legal obligations (e.g., tax records)</li>
+          </ul>
+
+          <h2>4. Data storage and security</h2>
+          <p>Your data is stored securely using <strong>Supabase</strong>, with servers located in the European Union. We implement:</p>
+          <ul>
+            <li>Encryption in transit (TLS/SSL)</li>
+            <li>Encryption at rest</li>
+            <li>Row-level security ensuring garage data isolation</li>
+            <li>Regular security audits</li>
+          </ul>
+
+          <h2>5. Data sharing</h2>
+          <p>We <strong>never sell</strong> your data. We only share data with:</p>
+          <ul>
+            <li><strong>Supabase</strong> — database hosting (EU servers)</li>
+            <li><strong>Stripe</strong> — payment processing</li>
+            <li><strong>Vercel</strong> — application hosting</li>
+          </ul>
+          <p>All third parties are GDPR-compliant and process data only as necessary to provide their services.</p>
+
+          <h2>6. Your rights</h2>
+          <p>Under UK GDPR, you have the right to:</p>
+          <ul>
+            <li><strong>Access</strong> — request a copy of your data</li>
+            <li><strong>Rectification</strong> — correct inaccurate data</li>
+            <li><strong>Erasure</strong> — request deletion of your data</li>
+            <li><strong>Portability</strong> — export your data in a standard format</li>
+            <li><strong>Object</strong> — opt out of certain processing</li>
+          </ul>
+          <p>To exercise these rights, email us at <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a>.</p>
+
+          <h2>7. Data retention</h2>
+          <p>We retain your data for as long as your account is active. Upon account deletion:</p>
+          <ul>
+            <li>Business data is deleted within 30 days</li>
+            <li>Backup copies are purged within 90 days</li>
+            <li>Anonymised analytics may be retained indefinitely</li>
+          </ul>
+
+          <h2>8. Cookies</h2>
+          <p>We use essential cookies only:</p>
+          <ul>
+            <li><strong>Authentication cookies</strong> — to keep you logged in</li>
+            <li><strong>Session cookies</strong> — to maintain your session state</li>
+          </ul>
+          <p>We do not use advertising or tracking cookies.</p>
+
+          <h2>9. Changes to this policy</h2>
+          <p>We may update this policy from time to time. We will notify you of significant changes via email or in-app notification.</p>
+
+          <h2>10. Contact us</h2>
+          <p>For privacy-related questions or concerns:</p>
+          <p>
+            <strong>Email:</strong> <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a><br>
+            <strong>Address:</strong> Alzaro TyreOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TERMS PAGE -->
+  <div id="page-terms" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Terms of Service</h1>
+          <p class="legal-meta">Last updated: 21 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> Use Alzaro TyreOps lawfully and responsibly. Pay your subscription on time. We'll provide reliable software and protect your data. Your business data belongs to you.</p>
+          </div>
+
+          <h2>1. Agreement to terms</h2>
+          <p>By accessing or using Alzaro TyreOps ("the Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.</p>
+          <p>These terms constitute a legally binding agreement between you ("User", "you") and Alzaro TyreOps ("we", "us", "our").</p>
+
+          <h2>2. Description of service</h2>
+          <p>Alzaro TyreOps is a cloud-based tyre management software platform designed for UK tyre garages. The Service includes:</p>
+          <ul>
+            <li>Inventory management with FIFO batch tracking</li>
+            <li>Invoice creation and management</li>
+            <li>Customer database</li>
+            <li>VAT reporting tools</li>
+            <li>Business analytics and reporting</li>
+          </ul>
+
+          <h2>3. Account registration</h2>
+          <p>To use Alzaro TyreOps, you must:</p>
+          <ul>
+            <li>Provide accurate and complete registration information</li>
+            <li>Be at least 18 years old</li>
+            <li>Have authority to bind your business to these terms</li>
+            <li>Keep your login credentials secure</li>
+          </ul>
+          <p>You are responsible for all activity under your account. Notify us immediately if you suspect unauthorised access.</p>
+
+          <h2>4. Subscription and payment</h2>
+          
+          <h3>Free trial</h3>
+          <p>New users receive a 14-day free trial with full access to Gold tier features. No credit card is required to start the trial.</p>
+          
+          <h3>Pricing tiers</h3>
+          <ul>
+            <li><strong>Bronze:</strong> £60/month</li>
+            <li><strong>Silver:</strong> £75/month</li>
+            <li><strong>Gold:</strong> £90/month</li>
+          </ul>
+          
+          <h3>Billing</h3>
+          <ul>
+            <li>Subscriptions are billed monthly in advance</li>
+            <li>Payments are processed via Stripe</li>
+            <li>Prices are exclusive of VAT where applicable</li>
+            <li>We reserve the right to change pricing with 30 days notice</li>
+          </ul>
+          
+          <h3>Failed payments</h3>
+          <p>If payment fails, we will attempt to process it again. After 7 days of failed payments, your account may be suspended until payment is received.</p>
+
+          <h2>5. Cancellation and refunds</h2>
+          <ul>
+            <li>You may cancel your subscription at any time</li>
+            <li>Cancellation takes effect at the end of your current billing period</li>
+            <li>No refunds are provided for partial months</li>
+            <li>Upon cancellation, you retain read-only access for 30 days to export your data</li>
+          </ul>
+
+          <h2>6. Your data</h2>
+          
+          <h3>Ownership</h3>
+          <p><strong>Your business data belongs to you.</strong> This includes inventory records, customer information, invoices, and all other data you enter into Alzaro TyreOps.</p>
+          
+          <h3>Data export</h3>
+          <p>You may export your data at any time via CSV export features. Upon request, we will provide a complete data export within 7 days.</p>
+          
+          <h3>Data protection</h3>
+          <p>We handle your data in accordance with our <a href="#" onclick="showPage('privacy'); return false;">Privacy Policy</a> and UK data protection law.</p>
+
+          <h2>7. Acceptable use</h2>
+          <p>You agree NOT to:</p>
+          <ul>
+            <li>Use the Service for any unlawful purpose</li>
+            <li>Share your account with unauthorised users</li>
+            <li>Attempt to access other users' data</li>
+            <li>Reverse engineer or attempt to extract source code</li>
+            <li>Use automated systems to scrape or overload the Service</li>
+            <li>Upload malicious code or content</li>
+            <li>Resell or redistribute the Service without permission</li>
+          </ul>
+
+          <div class="legal-box warning">
+            <p><strong>Warning:</strong> Violation of acceptable use policies may result in immediate account termination without refund.</p>
+          </div>
+
+          <h2>8. Service availability</h2>
+          <p>We strive to maintain 99.9% uptime but do not guarantee uninterrupted service. We may temporarily suspend the Service for:</p>
+          <ul>
+            <li>Scheduled maintenance (with advance notice where possible)</li>
+            <li>Emergency security updates</li>
+            <li>Circumstances beyond our reasonable control</li>
+          </ul>
+
+          <h2>9. Intellectual property</h2>
+          <p>Alzaro TyreOps and its original content, features, and functionality are owned by us and protected by UK and international copyright, trademark, and other intellectual property laws.</p>
+          <p>You retain all rights to your business data. By using the Service, you grant us a limited licence to process your data solely to provide the Service.</p>
+
+          <h2>10. Limitation of liability</h2>
+          <p>To the maximum extent permitted by law:</p>
+          <ul>
+            <li>Alzaro TyreOps is provided "as is" without warranties of any kind</li>
+            <li>We are not liable for indirect, incidental, or consequential damages</li>
+            <li>Our total liability is limited to the amount you paid us in the 12 months preceding the claim</li>
+            <li>We are not responsible for your compliance with tax, VAT, or other regulations</li>
+          </ul>
+
+          <h2>11. Indemnification</h2>
+          <p>You agree to indemnify and hold harmless Alzaro TyreOps from any claims, damages, or expenses arising from your use of the Service or violation of these terms.</p>
+
+          <h2>12. Changes to terms</h2>
+          <p>We may modify these terms at any time. We will provide notice of material changes via email or in-app notification at least 30 days before they take effect.</p>
+          <p>Continued use of the Service after changes take effect constitutes acceptance of the new terms.</p>
+
+          <h2>13. Termination</h2>
+          <p>We may terminate or suspend your account immediately if you:</p>
+          <ul>
+            <li>Violate these terms</li>
+            <li>Engage in fraudulent activity</li>
+            <li>Fail to pay after repeated notices</li>
+          </ul>
+          <p>Upon termination, your right to use the Service ceases immediately. We will retain your data for 30 days to allow export, then delete it.</p>
+
+          <h2>14. Governing law</h2>
+          <p>These terms are governed by the laws of England and Wales. Any disputes shall be subject to the exclusive jurisdiction of the courts of England and Wales.</p>
+
+          <h2>15. Contact</h2>
+          <p>For questions about these terms:</p>
+          <p>
+            <strong>Email:</strong> <a href="mailto:legal@tyreops.co.uk">legal@tyreops.co.uk</a><br>
+            <strong>Address:</strong> Alzaro TyreOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>TyreOps</span></a>
+        <div class="footer-links">
+          <a href="#features" onclick="scrollToSection(event, 'features')">Features</a>
+          <a href="#pricing" onclick="scrollToSection(event, 'pricing')">Pricing</a>
+          <a href="mailto:hello@tyreops.co.uk">Contact</a>
+          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        </div>
+        <div class="footer-copy">© 2026 Alzaro TyreOps. Built in the UK 🇬🇧</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Page navigation
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+      });
+      
+      const targetPage = document.getElementById('page-' + pageName);
+      if (targetPage) {
+        targetPage.classList.add('active');
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      if (pageName === 'home') {
+        history.pushState(null, '', window.location.pathname);
+      } else {
+        history.pushState(null, '', '#' + pageName);
+      }
+      
+      // Show/hide nav links on legal pages
+      const navLinks = document.querySelector('.nav-center');
+      if (navLinks) {
+        navLinks.style.display = (pageName === 'home') ? 'flex' : 'none';
+      }
+    }
+    
+    // Scroll to section (works from any page)
+    function scrollToSection(event, sectionId) {
+      event.preventDefault();
+      const homePage = document.getElementById('page-home');
+      
+      if (!homePage.classList.contains('active')) {
+        showPage('home');
+        setTimeout(() => {
+          const target = document.getElementById(sectionId);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      } else {
+        const target = document.getElementById(sectionId);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+    
+    // Navbar scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+    
+    // Scroll reveal animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.15
+    };
+    
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+    
+    // Observe all reveal elements
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
+      revealObserver.observe(el);
+    });
+    
+    // Handle initial page load from hash
+    window.addEventListener('load', () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'privacy' || hash === 'terms') {
+        showPage(hash);
+      }
+    });
+  </script>
+</body>
+</html>
