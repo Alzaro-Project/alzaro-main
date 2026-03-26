@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alzaro StoreOps - Manage Your Stock With Ease</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --purple-100: #F3E8FF;
+      --purple-200: #E9D5FF;
+      --purple-300: #D8B4FE;
+      --purple-400: #C084FC;
+      --purple-500: #A855F7;
+      --purple-600: #9333EA;
+      --purple-700: #7C3AED;
+      --purple-800: #6B21A8;
+      --purple-900: #581C87;
+      --dark-bg: #0D0A1A;
+      --dark-surface: #1A1428;
+      --dark-card: #241B3A;
+      --pink-accent: #EC4899;
+      --cyan-accent: #22D3EE;
+      --text-primary: #FFFFFF;
+      --text-secondary: #A78BFA;
+      --text-muted: #8B7AA8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--dark-bg);
+      color: var(--text-primary);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* Animated Background */
+    .bg-gradient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+      background: 
+        radial-gradient(ellipse 80% 60% at 50% -20%, rgba(147, 51, 234, 0.3) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 60%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 50% at 20% 80%, rgba(124, 58, 237, 0.1) 0%, transparent 50%),
+        var(--dark-bg);
+    }
+
+    /* Floating Orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: -1;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 400px;
+      height: 400px;
+      background: rgba(147, 51, 234, 0.2);
+      top: 10%;
+      left: -10%;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 300px;
+      height: 300px;
+      background: rgba(236, 72, 153, 0.15);
+      top: 60%;
+      right: -5%;
+      animation-delay: -7s;
+    }
+
+    .orb-3 {
+      width: 250px;
+      height: 250px;
+      background: rgba(124, 58, 237, 0.2);
+      bottom: 10%;
+      left: 30%;
+      animation-delay: -14s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -30px) scale(1.05); }
+      50% { transform: translate(-20px, 20px) scale(0.95); }
+      75% { transform: translate(20px, 30px) scale(1.02); }
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      background: rgba(13, 10, 26, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .nav-logo span {
+      color: var(--purple-400);
+    }
+
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--dark-surface);
+      border: 1px solid rgba(168, 85, 247, 0.15);
+      border-radius: 100px;
+      padding: 6px 8px;
+      list-style: none;
+    }
+
+    .nav-center a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+      padding: 8px 18px;
+      border-radius: 100px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-center a:hover {
+      color: var(--text-primary);
+      background: var(--dark-card);
+    }
+
+    .nav-center a.active {
+      color: var(--text-primary);
+      background: var(--dark-card);
+    }
+
+    .nav-cta {
+      padding: 0.75rem 1.75rem;
+      background: linear-gradient(135deg, var(--purple-600), var(--purple-700));
+      border: none;
+      border-radius: 50px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(147, 51, 234, 0.4);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .nav-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(147, 51, 234, 0.6);
+      color: white;
+    }
+
+    .pricing-cta {
+      text-decoration: none;
+      display: block;
+      text-align: center;
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 8rem 5% 4rem;
+      position: relative;
+    }
+
+    .hero-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .hero-text {
+      opacity: 0;
+      transform: translateY(40px);
+      animation: fadeUp 1s ease forwards;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 50px;
+      font-size: 0.875rem;
+      color: var(--purple-300);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-badge::before {
+      content: '✨';
+    }
+
+    .hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #FFFFFF 0%, var(--purple-200) 50%, var(--purple-400) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+      max-width: 500px;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      padding: 1rem 2.5rem;
+      background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+      border: none;
+      border-radius: 50px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 25px rgba(147, 51, 234, 0.5);
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .btn-primary:hover::before {
+      left: 100%;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 35px rgba(147, 51, 234, 0.6);
+    }
+
+    .btn-secondary {
+      padding: 1rem 2.5rem;
+      background: transparent;
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      border-radius: 50px;
+      color: var(--purple-300);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(168, 85, 247, 0.1);
+      border-color: var(--purple-400);
+      transform: translateY(-3px);
+    }
+
+    .hero-visual {
+      position: relative;
+      opacity: 0;
+      transform: translateY(40px) scale(0.95);
+      animation: fadeUp 1s ease forwards 0.3s;
+    }
+
+    .hero-mockup {
+      background: linear-gradient(145deg, rgba(36, 27, 58, 0.9), rgba(26, 20, 40, 0.8));
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 
+        0 25px 80px rgba(147, 51, 234, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      animation: heroFloat 6s ease-in-out infinite;
+    }
+
+    .hero-mockup-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+    }
+
+    .hero-mockup-header .mockup-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .hero-mockup-header .mockup-dot.red { background: #ff5f57; }
+    .hero-mockup-header .mockup-dot.yellow { background: #ffbd2e; }
+    .hero-mockup-header .mockup-dot.green { background: #28ca41; }
+
+    .mockup-title {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .hero-mockup-body {
+      padding: 24px;
+    }
+
+    .hero-stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .hero-stat-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .hero-stat-icon {
+      font-size: 28px;
+    }
+
+    .hero-stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hero-stat-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .hero-chart {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      height: 120px;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 14px;
+    }
+
+    .hero-chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--purple-400), var(--purple-600));
+      border-radius: 6px 6px 0 0;
+      animation: barGrow 1s ease forwards;
+      transform-origin: bottom;
+    }
+
+    @keyframes barGrow {
+      from { transform: scaleY(0); }
+      to { transform: scaleY(1); }
+    }
+
+    @keyframes heroFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120%;
+      height: 120%;
+      background: radial-gradient(circle, rgba(147, 51, 234, 0.3) 0%, transparent 60%);
+      filter: blur(60px);
+      z-index: -1;
+    }
+
+    @keyframes fadeUp {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Stats Section */
+    .stats {
+      padding: 4rem 5%;
+      border-top: 1px solid rgba(168, 85, 247, 0.1);
+      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+      background: rgba(26, 20, 40, 0.5);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .stat-item {
+      text-align: center;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .stat-item.visible {
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    .stat-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-300), var(--pink-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Features Section */
+    .features {
+      padding: 8rem 5%;
+      position: relative;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 5rem;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .section-header.visible {
+      animation: fadeUp 0.8s ease forwards;
+    }
+
+    .section-tag {
+      display: inline-block;
+      padding: 0.5rem 1.25rem;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 50px;
+      font-size: 0.875rem;
+      color: var(--purple-300);
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .section-header h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 1.125rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: linear-gradient(145deg, rgba(36, 27, 58, 0.8), rgba(26, 20, 40, 0.6));
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 24px;
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.4s ease;
+    }
+
+    .feature-card.visible {
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-10px);
+      border-color: rgba(168, 85, 247, 0.5);
+      box-shadow: 0 20px 50px rgba(147, 51, 234, 0.2);
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--purple-500), var(--pink-accent), var(--purple-500));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, var(--purple-600), var(--purple-800));
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      font-size: 2rem;
+      box-shadow: 0 10px 30px rgba(147, 51, 234, 0.3);
+    }
+
+    .feature-card h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .feature-card .learn-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      color: var(--purple-400);
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card .learn-more:hover {
+      color: var(--purple-300);
+      gap: 0.75rem;
+    }
+
+    /* Dashboard Preview Section */
+    .dashboard-preview {
+      padding: 8rem 5%;
+      background: linear-gradient(180deg, transparent, rgba(26, 20, 40, 0.8), transparent);
+    }
+
+    .dashboard-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .dashboard-text {
+      opacity: 0;
+      transform: translateX(-40px);
+    }
+
+    .dashboard-text.visible {
+      animation: slideRight 0.8s ease forwards;
+    }
+
+    @keyframes slideRight {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .dashboard-text h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      line-height: 1.2;
+    }
+
+    .dashboard-text p {
+      color: var(--text-muted);
+      font-size: 1.125rem;
+      margin-bottom: 2rem;
+    }
+
+    .dashboard-features {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .dashboard-feature {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: rgba(168, 85, 247, 0.1);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .dashboard-feature:hover {
+      background: rgba(168, 85, 247, 0.2);
+      transform: translateX(10px);
+    }
+
+    .dashboard-feature-icon {
+      width: 45px;
+      height: 45px;
+      background: linear-gradient(135deg, var(--purple-600), var(--purple-700));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .dashboard-feature span {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .dashboard-mockup {
+      position: relative;
+      opacity: 0;
+      transform: translateX(40px);
+    }
+
+    .dashboard-mockup.visible {
+      animation: slideLeft 0.8s ease forwards 0.2s;
+    }
+
+    @keyframes slideLeft {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .mockup-container {
+      background: linear-gradient(145deg, var(--dark-card), var(--dark-surface));
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 20px;
+      padding: 1.5rem;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+    }
+
+    .mockup-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .mockup-dot:nth-child(1) { background: #EF4444; }
+    .mockup-dot:nth-child(2) { background: #F59E0B; }
+    .mockup-dot:nth-child(3) { background: #22C55E; }
+
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .mockup-stat {
+      background: rgba(168, 85, 247, 0.1);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .mockup-stat-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--purple-300);
+    }
+
+    .mockup-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .mockup-chart {
+      grid-column: span 3;
+      background: rgba(168, 85, 247, 0.05);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      height: 120px;
+      gap: 0.75rem;
+    }
+
+    .chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--purple-500), var(--purple-700));
+      border-radius: 6px 6px 0 0;
+      animation: growBar 1s ease forwards;
+      transform-origin: bottom;
+    }
+
+    @keyframes growBar {
+      from { transform: scaleY(0); }
+      to { transform: scaleY(1); }
+    }
+
+    /* Pricing Section */
+    .pricing {
+      padding: 8rem 5%;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: linear-gradient(145deg, rgba(36, 27, 58, 0.8), rgba(26, 20, 40, 0.6));
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 24px;
+      padding: 3rem 2.5rem;
+      text-align: center;
+      position: relative;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.4s ease;
+    }
+
+    .pricing-card.visible {
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    .pricing-card.featured {
+      border-color: var(--purple-500);
+      background: linear-gradient(145deg, rgba(147, 51, 234, 0.2), rgba(36, 27, 58, 0.8));
+      transform: scale(1.05);
+    }
+
+    .pricing-card.featured.visible {
+      animation: fadeUp 0.6s ease forwards;
+      transform: scale(1.05);
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-10px);
+    }
+
+    .pricing-card.featured:hover {
+      transform: scale(1.05) translateY(-10px);
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.5rem 1.5rem;
+      background: linear-gradient(90deg, var(--purple-500), var(--pink-accent));
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .pricing-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .pricing-price {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--purple-300);
+      margin: 1.5rem 0;
+    }
+
+    .pricing-price span {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .pricing-features {
+      list-style: none;
+      margin: 2rem 0;
+      text-align: left;
+    }
+
+    .pricing-features li {
+      padding: 0.75rem 0;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+    }
+
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--purple-400);
+      font-weight: 700;
+    }
+
+    .pricing-cta {
+      width: 100%;
+      padding: 1rem;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    /* Testimonials */
+    .testimonials {
+      padding: 8rem 5%;
+      background: linear-gradient(180deg, transparent, rgba(26, 20, 40, 0.5), transparent);
+    }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .testimonial-card {
+      background: linear-gradient(145deg, rgba(36, 27, 58, 0.8), rgba(26, 20, 40, 0.6));
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 20px;
+      padding: 2rem;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.4s ease;
+    }
+
+    .testimonial-card.visible {
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    .testimonial-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .testimonial-stars {
+      color: #FBBF24;
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .testimonial-text {
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.8;
+      margin-bottom: 1.5rem;
+    }
+
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .testimonial-avatar {
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(135deg, var(--purple-500), var(--pink-accent));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.25rem;
+    }
+
+    .testimonial-info h4 {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .testimonial-info span {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* CTA Section */
+    .cta-section {
+      padding: 8rem 5%;
+      text-align: center;
+    }
+
+    .cta-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: linear-gradient(145deg, rgba(147, 51, 234, 0.2), rgba(36, 27, 58, 0.8));
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 30px;
+      padding: 5rem 3rem;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    .cta-container.visible {
+      animation: fadeUp 0.8s ease forwards;
+    }
+
+    .cta-container::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(147, 51, 234, 0.1) 0%, transparent 50%);
+      animation: rotateBg 20s linear infinite;
+    }
+
+    @keyframes rotateBg {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .cta-container h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    .cta-container p {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+
+    .cta-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    /* Footer */
+    footer {
+      padding: 4rem 5% 2rem;
+      border-top: 1px solid rgba(168, 85, 247, 0.1);
+      background: rgba(13, 10, 26, 0.9);
+    }
+
+    .footer-content {
+      display: grid;
+      grid-template-columns: 2fr repeat(3, 1fr);
+      gap: 3rem;
+      max-width: 1400px;
+      margin: 0 auto 3rem;
+    }
+
+    .footer-brand p {
+      color: var(--text-muted);
+      margin-top: 1rem;
+      max-width: 300px;
+      line-height: 1.7;
+    }
+
+    .footer-links h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+
+    .footer-links ul {
+      list-style: none;
+    }
+
+    .footer-links li {
+      margin-bottom: 0.75rem;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--purple-400);
+    }
+
+    .footer-bottom {
+      text-align: center;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(168, 85, 247, 0.1);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .hero-content {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .hero p {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .hero-buttons {
+        justify-content: center;
+      }
+
+      .hero-image {
+        order: -1;
+      }
+
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .dashboard-content {
+        grid-template-columns: 1fr;
+      }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+      }
+
+      .pricing-card.featured {
+        transform: none;
+      }
+
+      .testimonials-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-content {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-center {
+        display: none;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-content {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .footer-brand p {
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Elements -->
+  <div class="bg-gradient"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Navigation -->
+  <nav>
+    <a href="#" class="nav-logo" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">
+      Alzaro <span>StoreOps</span>
+    </a>
+    <div class="nav-center">
+      <a href="#features" class="active">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#testimonials">Reviews</a>
+    </div>
+    <a href="/storeops/register" class="nav-cta">Get Started</a>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-text">
+        <div class="hero-badge">Inventory Management Reimagined</div>
+        <h1>Manage Your Stock With Ease</h1>
+        <p>Take complete control of your inventory with Alzaro StoreOps. Real-time tracking, smart alerts, and powerful analytics — all in one beautiful dashboard.</p>
+        <div class="hero-buttons">
+          <a href="/storeops/register" class="btn-primary">Start Free Trial</a>
+          <a href="#dashboard" class="btn-secondary">Watch Demo</a>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-glow"></div>
+        <div class="hero-mockup">
+          <div class="hero-mockup-header">
+            <span class="mockup-dot red"></span>
+            <span class="mockup-dot yellow"></span>
+            <span class="mockup-dot green"></span>
+            <span class="mockup-title">StoreOps Dashboard</span>
+          </div>
+          <div class="hero-mockup-body">
+            <div class="hero-stat-row">
+              <div class="hero-stat-card">
+                <div class="hero-stat-icon">📦</div>
+                <div class="hero-stat-info">
+                  <span class="hero-stat-value">2,847</span>
+                  <span class="hero-stat-label">Total SKUs</span>
+                </div>
+              </div>
+              <div class="hero-stat-card">
+                <div class="hero-stat-icon">💷</div>
+                <div class="hero-stat-info">
+                  <span class="hero-stat-value">£142K</span>
+                  <span class="hero-stat-label">Stock Value</span>
+                </div>
+              </div>
+            </div>
+            <div class="hero-chart">
+              <div class="hero-chart-bar" style="height: 40%;"></div>
+              <div class="hero-chart-bar" style="height: 65%;"></div>
+              <div class="hero-chart-bar" style="height: 55%;"></div>
+              <div class="hero-chart-bar" style="height: 80%;"></div>
+              <div class="hero-chart-bar" style="height: 70%;"></div>
+              <div class="hero-chart-bar" style="height: 95%;"></div>
+              <div class="hero-chart-bar" style="height: 75%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-number">10K+</div>
+        <div class="stat-label">Active Businesses</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">50M+</div>
+        <div class="stat-label">Items Tracked</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">99.9%</div>
+        <div class="stat-label">Uptime</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">4.9★</div>
+        <div class="stat-label">User Rating</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <div class="section-header">
+      <span class="section-tag">Features</span>
+      <h2>Everything You Need to Manage Stock</h2>
+      <p>Powerful tools designed for businesses of all sizes. From small shops to large warehouses.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📦</div>
+        <h3>Stock Control</h3>
+        <p>Track every item in real-time. Know exactly what you have, where it is, and when to reorder. Automated stock counting saves hours.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏭</div>
+        <h3>Warehouse Storage</h3>
+        <p>Organize your warehouse with smart location tracking. Assign bins, shelves, and zones. Find any item in seconds.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Inventory Analytics</h3>
+        <p>Understand your inventory like never before. Track turnover rates, identify slow movers, and optimize your stock levels.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚠️</div>
+        <h3>Low Stock Alerts</h3>
+        <p>Never run out of stock again. Set custom thresholds and get instant notifications when items are running low.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <h3>Admin Reports</h3>
+        <p>Generate comprehensive reports in seconds. Stock valuations, movement history, supplier performance — all at your fingertips.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3>Multi-Location Sync</h3>
+        <p>Manage multiple warehouses from one dashboard. Transfer stock between locations and keep everything in perfect sync.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>Barcode Scanning</h3>
+        <p>Speed up operations with barcode and QR code scanning. Works with any device camera — no special hardware needed.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛒</div>
+        <h3>Purchase Orders</h3>
+        <p>Create and manage purchase orders effortlessly. Track supplier deliveries, partial shipments, and pending orders.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔐</div>
+        <h3>User Permissions</h3>
+        <p>Control who sees what with granular permissions. Set roles for managers, staff, and viewers with complete audit trails.</p>
+        <a href="#" class="learn-more">Learn more →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard Preview -->
+  <section class="dashboard-preview" id="dashboard">
+    <div class="dashboard-content">
+      <div class="dashboard-text">
+        <span class="section-tag">Dashboard</span>
+        <h2>Powerful Insights at a Glance</h2>
+        <p>Your command center for inventory management. See everything that matters in one beautiful, intuitive dashboard.</p>
+        <div class="dashboard-features">
+          <div class="dashboard-feature">
+            <div class="dashboard-feature-icon">📈</div>
+            <span>Real-time stock levels and trends</span>
+          </div>
+          <div class="dashboard-feature">
+            <div class="dashboard-feature-icon">🔔</div>
+            <span>Instant low-stock notifications</span>
+          </div>
+          <div class="dashboard-feature">
+            <div class="dashboard-feature-icon">💰</div>
+            <span>Stock valuation tracking</span>
+          </div>
+          <div class="dashboard-feature">
+            <div class="dashboard-feature-icon">📊</div>
+            <span>Sales and movement analytics</span>
+          </div>
+        </div>
+      </div>
+      <div class="dashboard-mockup">
+        <div class="mockup-container">
+          <div class="mockup-header">
+            <span class="mockup-dot"></span>
+            <span class="mockup-dot"></span>
+            <span class="mockup-dot"></span>
+          </div>
+          <div class="mockup-grid">
+            <div class="mockup-stat">
+              <div class="mockup-stat-value">2,847</div>
+              <div class="mockup-stat-label">Total SKUs</div>
+            </div>
+            <div class="mockup-stat">
+              <div class="mockup-stat-value">£142K</div>
+              <div class="mockup-stat-label">Stock Value</div>
+            </div>
+            <div class="mockup-stat">
+              <div class="mockup-stat-value">23</div>
+              <div class="mockup-stat-label">Low Stock Items</div>
+            </div>
+            <div class="mockup-chart">
+              <div class="chart-bars">
+                <div class="chart-bar" style="height: 45%; animation-delay: 0.1s;"></div>
+                <div class="chart-bar" style="height: 65%; animation-delay: 0.2s;"></div>
+                <div class="chart-bar" style="height: 55%; animation-delay: 0.3s;"></div>
+                <div class="chart-bar" style="height: 80%; animation-delay: 0.4s;"></div>
+                <div class="chart-bar" style="height: 70%; animation-delay: 0.5s;"></div>
+                <div class="chart-bar" style="height: 90%; animation-delay: 0.6s;"></div>
+                <div class="chart-bar" style="height: 75%; animation-delay: 0.7s;"></div>
+                <div class="chart-bar" style="height: 85%; animation-delay: 0.8s;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Section -->
+  <section class="pricing" id="pricing">
+    <div class="section-header">
+      <span class="section-tag">Pricing</span>
+      <h2>Simple, Transparent Pricing</h2>
+      <p>Choose the plan that fits your business. No hidden fees, no surprises.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-name">Starter</div>
+        <div class="pricing-price">£29<span>/month</span></div>
+        <ul class="pricing-features">
+          <li>Up to 500 SKUs</li>
+          <li>1 Warehouse location</li>
+          <li>2 User accounts</li>
+          <li>Basic reports</li>
+          <li>Email support</li>
+        </ul>
+        <a href="/storeops/register" class="pricing-cta btn-secondary">Get Started</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-name">Professional</div>
+        <div class="pricing-price">£79<span>/month</span></div>
+        <ul class="pricing-features">
+          <li>Up to 5,000 SKUs</li>
+          <li>3 Warehouse locations</li>
+          <li>10 User accounts</li>
+          <li>Advanced analytics</li>
+          <li>Priority support</li>
+          <li>API access</li>
+        </ul>
+        <a href="/storeops/register" class="pricing-cta btn-primary">Get Started</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-name">Enterprise</div>
+        <div class="pricing-price">£199<span>/month</span></div>
+        <ul class="pricing-features">
+          <li>Unlimited SKUs</li>
+          <li>Unlimited locations</li>
+          <li>Unlimited users</li>
+          <li>Custom integrations</li>
+          <li>Dedicated support</li>
+          <li>On-premise option</li>
+        </ul>
+        <a href="mailto:sales@alzaro.co.uk" class="pricing-cta btn-secondary">Contact Sales</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials" id="testimonials">
+    <div class="section-header">
+      <span class="section-tag">Testimonials</span>
+      <h2>Loved by Businesses Everywhere</h2>
+      <p>See what our customers have to say about StoreOps.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"StoreOps transformed how we manage our warehouse. We've cut stock-outs by 80% and saved countless hours on inventory counts."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">JM</div>
+          <div class="testimonial-info">
+            <h4>James Mitchell</h4>
+            <span>Warehouse Manager, TechSupply Ltd</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"The low stock alerts alone have saved us thousands. We never miss a sale due to inventory issues anymore. Absolutely brilliant!"</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">SP</div>
+          <div class="testimonial-info">
+            <h4>Sarah Parker</h4>
+            <span>Owner, Parker's Hardware</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Finally, a stock management system that's actually easy to use. Our team was up and running in a day. The support team is fantastic too."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">DK</div>
+          <div class="testimonial-info">
+            <h4>David Kim</h4>
+            <span>Operations Director, FreshGoods Co</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section">
+    <div class="cta-container">
+      <h2>Ready to Transform Your Inventory?</h2>
+      <p>Join thousands of businesses managing their stock smarter with Alzaro StoreOps.</p>
+      <div class="cta-buttons">
+        <a href="/storeops/register" class="btn-primary">Start Your Free Trial</a>
+        <a href="mailto:sales@alzaro.co.uk" class="btn-secondary">Schedule a Demo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div class="footer-brand">
+        <a href="#" class="nav-logo" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">
+          Alzaro <span>StoreOps</span>
+        </a>
+        <p>Alzaro StoreOps helps businesses of all sizes manage their inventory with ease. From small shops to large warehouses.</p>
+      </div>
+      <div class="footer-links">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#">Features</a></li>
+          <li><a href="#">Pricing</a></li>
+          <li><a href="#">Integrations</a></li>
+          <li><a href="#">API</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About Us</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="#">Help Centre</a></li>
+          <li><a href="#">Documentation</a></li>
+          <li><a href="#">Status</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Alzaro Labs. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Scroll Animation Script -->
+  <script>
+    // Intersection Observer for scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, index) => {
+        if (entry.isIntersecting) {
+          // Add staggered delay based on element index within its group
+          const siblings = Array.from(entry.target.parentElement.children);
+          const siblingIndex = siblings.indexOf(entry.target);
+          entry.target.style.animationDelay = `${siblingIndex * 0.1}s`;
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+
+    // Observe all animatable elements
+    document.querySelectorAll('.stat-item, .feature-card, .pricing-card, .testimonial-card, .section-header, .dashboard-text, .dashboard-mockup, .cta-container').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Navbar background on scroll
+    window.addEventListener('scroll', () => {
+      const nav = document.querySelector('nav');
+      if (window.scrollY > 50) {
+        nav.style.background = 'rgba(13, 10, 26, 0.95)';
+        nav.style.boxShadow = '0 4px 30px rgba(0, 0, 0, 0.3)';
+      } else {
+        nav.style.background = 'rgba(13, 10, 26, 0.8)';
+        nav.style.boxShadow = 'none';
+      }
+    });
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // Button hover ripple effect
+    document.querySelectorAll('.btn-primary, .btn-secondary').forEach(btn => {
+      btn.addEventListener('mouseenter', function(e) {
+        this.style.transform = 'translateY(-3px)';
+      });
+      btn.addEventListener('mouseleave', function(e) {
+        this.style.transform = 'translateY(0)';
+      });
+    });
+
+    // Parallax effect for orbs
+    window.addEventListener('mousemove', (e) => {
+      const orbs = document.querySelectorAll('.orb');
+      const x = e.clientX / window.innerWidth;
+      const y = e.clientY / window.innerHeight;
+      
+      orbs.forEach((orb, index) => {
+        const speed = (index + 1) * 20;
+        orb.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+      });
+    });
+  </script>
+</body>
+</html>

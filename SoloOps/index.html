@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alzaro SoloOps — Simple Business Tools for UK Sole Traders</title>
+  <meta name="description" content="Invoicing, expense tracking, mileage logs & tax estimates for freelancers and sole traders. Built in the UK. Start your 14-day free trial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #0a0908;
+      --surface: #121110;
+      --surface2: #1a1816;
+      --surface3: #23201d;
+      --border: rgba(255,255,255,0.06);
+      --border-light: rgba(255,255,255,0.1);
+      --text: #faf9f7;
+      --text2: #a8a29e;
+      --text3: #68635d;
+      --orange: #f97316;
+      --orange-light: #fb923c;
+      --orange-dark: #c2410c;
+      --orange-glow: rgba(249,115,22,0.35);
+      --orange-subtle: rgba(249,115,22,0.08);
+      --amber: #f59e0b;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+    
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: 'Manrope', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* ===== SCROLL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-left.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-right.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-scale {
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-scale.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    .stagger-1 { transition-delay: 0.1s; }
+    .stagger-2 { transition-delay: 0.2s; }
+    .stagger-3 { transition-delay: 0.3s; }
+    .stagger-4 { transition-delay: 0.4s; }
+    .stagger-5 { transition-delay: 0.5s; }
+    .stagger-6 { transition-delay: 0.6s; }
+    
+    a { color: inherit; text-decoration: none; }
+    
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ===== NAVBAR ===== */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 18px 0;
+      transition: all 0.3s ease;
+    }
+    
+    nav.scrolled {
+      background: rgba(10,9,8,0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    
+    .logo span { color: var(--orange); }
+    
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 8px;
+    }
+    
+    .nav-center a {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text2);
+      padding: 8px 18px;
+      border-radius: 100px;
+      transition: all 0.2s;
+    }
+    
+    .nav-center a:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    
+    .nav-center a.active {
+      color: var(--text);
+      background: var(--surface3);
+    }
+    
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+    }
+    
+    .btn-ghost:hover {
+      color: var(--text);
+    }
+    
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--surface3);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--amber) 100%);
+      color: #000;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--orange-glow);
+    }
+    
+    .btn-large {
+      padding: 16px 32px;
+      font-size: 15px;
+      border-radius: 12px;
+    }
+
+    /* ===== HERO - SINGLE COLUMN CENTERED ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 0 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Warm gradient background */
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 140%;
+      height: 80%;
+      background: radial-gradient(ellipse at center, var(--orange-subtle) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    /* Floating shapes */
+    .hero-shape {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    
+    .hero-shape-1 {
+      width: 300px;
+      height: 300px;
+      top: 15%;
+      left: 10%;
+      background: linear-gradient(135deg, var(--orange-subtle) 0%, transparent 70%);
+      animation: float1 18s ease-in-out infinite;
+    }
+    
+    .hero-shape-2 {
+      width: 200px;
+      height: 200px;
+      bottom: 20%;
+      right: 15%;
+      background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, transparent 70%);
+      animation: float2 15s ease-in-out infinite;
+    }
+    
+    .hero-shape-3 {
+      width: 150px;
+      height: 150px;
+      top: 40%;
+      right: 10%;
+      background: linear-gradient(135deg, rgba(234,179,8,0.06) 0%, transparent 70%);
+      animation: float1 20s ease-in-out infinite reverse;
+    }
+    
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      50% { transform: translate(30px, 20px) rotate(5deg); }
+    }
+    
+    @keyframes float2 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-20px, -30px); }
+    }
+    
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+    }
+    
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    
+    .hero-eyebrow span {
+      color: var(--orange);
+    }
+    
+    .hero h1 {
+      font-size: clamp(48px, 7vw, 80px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -3px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+    
+    .hero h1 .highlight {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--yellow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-tagline {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.15s both;
+    }
+    
+    .tagline-item {
+      font-family: 'Fira Code', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--orange-light);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    
+    .hero-desc {
+      font-size: 18px;
+      color: var(--text2);
+      line-height: 1.8;
+      max-width: 560px;
+      margin: 0 auto 40px;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+    
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 60px;
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+    
+    /* Hero mini dashboard */
+    .hero-dashboard {
+      max-width: 500px;
+      margin: 0 auto;
+      animation: fadeUp 0.8s ease 0.4s both;
+    }
+    
+    .dash-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    
+    .dash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .dash-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    
+    .dash-dots {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .dash-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .dash-dot:nth-child(1) { background: #ff5f57; }
+    .dash-dot:nth-child(2) { background: #ffbd2e; }
+    .dash-dot:nth-child(3) { background: #28ca41; }
+    
+    .dash-body {
+      padding: 20px;
+    }
+    
+    .dash-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .dash-stat {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    
+    .dash-stat-value {
+      font-family: 'Fira Code', monospace;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .dash-stat-value.orange { color: var(--orange-light); }
+    .dash-stat-value.green { color: var(--green); }
+    .dash-stat-value.blue { color: var(--blue); }
+    
+    .dash-stat-label {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .dash-progress {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    
+    .dash-progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    
+    .dash-progress-label {
+      font-size: 12px;
+      color: var(--text2);
+    }
+    
+    .dash-progress-value {
+      font-family: 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--orange-light);
+    }
+    
+    .dash-progress-bar {
+      height: 6px;
+      background: var(--surface3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .dash-progress-fill {
+      height: 100%;
+      width: 68%;
+      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 100%);
+      border-radius: 3px;
+    }
+    
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== BENEFITS BAR ===== */
+    .benefits-bar {
+      padding: 24px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .benefits-grid {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+    }
+    
+    .benefit-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    
+    .benefit-icon {
+      font-size: 18px;
+    }
+
+    /* ===== FEATURES - 2x2 GRID WITH ICONS ===== */
+    .features {
+      padding: 120px 0;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 580px;
+      margin: 0 auto 72px;
+    }
+    
+    .section-tag {
+      display: inline-block;
+      font-family: 'Fira Code', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--orange);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+    
+    .section-desc {
+      font-size: 17px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .feature-card:hover {
+      border-color: rgba(249,115,22,0.3);
+      transform: translateY(-4px);
+    }
+    
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+    
+    .feature-icon-wrap {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--orange-subtle);
+      border-radius: 14px;
+      font-size: 26px;
+      margin-bottom: 24px;
+    }
+    
+    .feature-icon-wrap.blue { background: rgba(59,130,246,0.1); }
+    .feature-icon-wrap.green { background: rgba(34,197,94,0.1); }
+    .feature-icon-wrap.amber { background: rgba(245,158,11,0.1); }
+    
+    .feature-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    
+    .feature-desc {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+    
+    .feature-list {
+      list-style: none;
+    }
+    
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 8px;
+    }
+    
+    .feature-list li::before {
+      content: '→';
+      color: var(--orange);
+      font-weight: 700;
+    }
+    
+    .feature-tag {
+      display: inline-block;
+      margin-top: 12px;
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: rgba(245,158,11,0.12);
+      color: var(--amber);
+    }
+
+    /* ===== WHY SOLO SECTION ===== */
+    .why-section {
+      padding: 100px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+      margin-top: 60px;
+    }
+    
+    .why-card {
+      text-align: center;
+      padding: 24px 16px;
+    }
+    
+    .why-number {
+      font-family: 'Fira Code', monospace;
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--orange);
+      margin-bottom: 8px;
+    }
+    
+    .why-label {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    /* ===== PRICING ===== */
+    .pricing {
+      padding: 120px 0;
+    }
+    
+    .pricing-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 1000px;
+      margin: 60px auto 0;
+    }
+    
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 28px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+      transform: translateY(-4px);
+    }
+    
+    .pricing-card.featured {
+      border-color: var(--orange);
+      box-shadow: 0 0 60px var(--orange-subtle);
+    }
+    
+    .pricing-card.featured::before {
+      content: 'Most Popular';
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--orange) 0%, var(--amber) 100%);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 100px;
+    }
+    
+    .pricing-tier {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .pricing-amount {
+      font-family: 'Fira Code', monospace;
+      font-size: 44px;
+      font-weight: 700;
+    }
+    
+    .pricing-period {
+      font-size: 14px;
+      color: var(--text3);
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 28px;
+    }
+    
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+    }
+    
+    .pricing-features li.disabled {
+      color: var(--text3);
+      opacity: 0.5;
+    }
+    
+    .pricing-features li.disabled::before {
+      content: '—';
+      color: var(--text3);
+    }
+    
+    .pricing-card .btn {
+      width: 100%;
+    }
+
+    /* ===== HOW IT WORKS ===== */
+    .how-section {
+      padding: 120px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .steps-row {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin-top: 60px;
+    }
+    
+    .steps-row::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: 15%;
+      right: 15%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 50%, var(--yellow) 100%);
+      opacity: 0.3;
+    }
+    
+    .step {
+      flex: 1;
+      text-align: center;
+      position: relative;
+      padding: 0 16px;
+    }
+    
+    .step-icon {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      background: var(--bg);
+      border: 2px solid var(--orange);
+      border-radius: 50%;
+      font-size: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .step-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .step-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+      max-width: 180px;
+      margin: 0 auto;
+    }
+
+    /* ===== CTA ===== */
+    .cta-section {
+      padding: 140px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, var(--orange-subtle) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+    
+    .cta-title {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+    
+    .cta-desc {
+      font-size: 18px;
+      color: var(--text2);
+      margin-bottom: 36px;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    /* ===== LEGAL PAGES ===== */
+    .page {
+      display: none;
+    }
+    
+    .page.active {
+      display: block;
+    }
+    
+    .legal-page {
+      padding: 140px 0 100px;
+      min-height: 100vh;
+    }
+    
+    .legal-container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    .legal-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .legal-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-meta {
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    
+    .legal-content {
+      color: var(--text2);
+      line-height: 1.8;
+    }
+    
+    .legal-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 44px;
+      margin-bottom: 16px;
+    }
+    
+    .legal-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-content p {
+      margin-bottom: 16px;
+    }
+    
+    .legal-content ul {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+    
+    .legal-content li {
+      margin-bottom: 10px;
+    }
+    
+    .legal-content strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    
+    .legal-content a {
+      color: var(--orange-light);
+      transition: color 0.2s;
+    }
+    
+    .legal-content a:hover {
+      color: var(--orange);
+      text-decoration: underline;
+    }
+    
+    .legal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    
+    .legal-box p {
+      margin-bottom: 0;
+    }
+    
+    .legal-box.warning {
+      border-color: rgba(249,115,22,0.3);
+      background: var(--orange-subtle);
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 32px;
+      transition: color 0.2s;
+    }
+    
+    .back-link:hover {
+      color: var(--orange-light);
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+    
+    .footer-links a {
+      font-size: 14px;
+      color: var(--text3);
+      transition: color 0.2s;
+    }
+    
+    .footer-links a:hover { color: var(--text); }
+    
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text3);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .why-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .pricing-cards {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+      }
+      
+      .steps-row {
+        flex-direction: column;
+        gap: 40px;
+      }
+      
+      .steps-row::before { display: none; }
+    }
+    
+    @media (max-width: 768px) {
+      .nav-center { display: none; }
+      
+      .hero { padding: 120px 0 60px; }
+      
+      .hero-tagline {
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .hero-actions .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+      
+      .benefits-grid {
+        flex-direction: column;
+        gap: 16px;
+      }
+      
+      .why-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      
+      .footer-content {
+        flex-direction: column;
+        gap: 24px;
+        text-align: center;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav id="nav">
+    <div class="container">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>SoloOps</span></a>
+      <div class="nav-center">
+        <a href="#features" class="active">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="nav-right">
+        <a href="/soloops/login" class="btn btn-ghost">Login</a>
+        <a href="/soloops/register" class="btn btn-primary">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-shape hero-shape-1"></div>
+    <div class="hero-shape hero-shape-2"></div>
+    <div class="hero-shape hero-shape-3"></div>
+    
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-eyebrow">
+          🇬🇧 <span>Built for UK Sole Traders</span>
+        </div>
+        
+        <h1>
+          Your business,<br>
+          <span class="highlight">simplified</span>
+        </h1>
+        
+        <div class="hero-tagline">
+          <span class="tagline-item">Track</span>
+          <span class="tagline-item">Earn</span>
+          <span class="tagline-item">Grow</span>
+        </div>
+        
+        <p class="hero-desc">
+          Invoicing, expenses, mileage tracking, and tax estimates — everything a sole trader needs to stay organised and stress-free at tax time.
+        </p>
+        
+        <div class="hero-actions">
+          <a href="/soloops/register" class="btn btn-primary btn-large">
+            Start 14-Day Free Trial →
+          </a>
+          <a href="#features" class="btn btn-secondary btn-large">
+            See Features
+          </a>
+        </div>
+        
+        <div class="hero-dashboard">
+          <div class="dash-card">
+            <div class="dash-header">
+              <span class="dash-title">This Tax Year</span>
+              <div class="dash-dots">
+                <span class="dash-dot"></span>
+                <span class="dash-dot"></span>
+                <span class="dash-dot"></span>
+              </div>
+            </div>
+            <div class="dash-body">
+              <div class="dash-stats">
+                <div class="dash-stat">
+                  <div class="dash-stat-value orange">£24,850</div>
+                  <div class="dash-stat-label">Income</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="dash-stat-value green">£8,420</div>
+                  <div class="dash-stat-label">Expenses</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="dash-stat-value blue">£3,286</div>
+                  <div class="dash-stat-label">Tax Est.</div>
+                </div>
+              </div>
+              <div class="dash-progress">
+                <div class="dash-progress-header">
+                  <span class="dash-progress-label">Tax year progress</span>
+                  <span class="dash-progress-value">68%</span>
+                </div>
+                <div class="dash-progress-bar">
+                  <div class="dash-progress-fill"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENEFITS BAR -->
+  <section class="benefits-bar">
+    <div class="container">
+      <div class="benefits-grid">
+        <div class="benefit-item">
+          <span class="benefit-icon">⚡</span>
+          No accountant needed
+        </div>
+        <div class="benefit-item">
+          <span class="benefit-icon">📱</span>
+          Works on any device
+        </div>
+        <div class="benefit-item">
+          <span class="benefit-icon">🔒</span>
+          Bank-level security
+        </div>
+        <div class="benefit-item">
+          <span class="benefit-icon">🇬🇧</span>
+          HMRC ready
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">Everything you need, nothing you don't</h2>
+        <p class="section-desc">
+          Built specifically for sole traders. Simple tools that save you hours every month.
+        </p>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card reveal stagger-1">
+          <div class="feature-icon-wrap">🧾</div>
+          <h3 class="feature-title">Simple Invoicing</h3>
+          <p class="feature-desc">
+            Create professional invoices in seconds. Send via email, track payment status, and get automatic reminders for overdue invoices.
+          </p>
+          <ul class="feature-list">
+            <li>Customise with your logo</li>
+            <li>Automatic invoice numbering</li>
+            <li>Payment tracking</li>
+            <li>Send reminders in one click</li>
+          </ul>
+        </div>
+        
+        <div class="feature-card reveal stagger-2">
+          <div class="feature-icon-wrap blue">📊</div>
+          <h3 class="feature-title">Expense Tracking</h3>
+          <p class="feature-desc">
+            Snap receipts with your phone, categorise expenses, and watch your deductibles add up. Tax time becomes a breeze.
+          </p>
+          <ul class="feature-list">
+            <li>Photo receipt capture</li>
+            <li>Auto-categorisation</li>
+            <li>HMRC categories built-in</li>
+            <li>Export for tax return</li>
+          </ul>
+          <span class="feature-tag">Silver+</span>
+        </div>
+        
+        <div class="feature-card reveal stagger-3">
+          <div class="feature-icon-wrap green">🚗</div>
+          <h3 class="feature-title">Mileage Tracking</h3>
+          <p class="feature-desc">
+            Log business journeys manually or let GPS do it automatically. Calculate your mileage allowance at current HMRC rates.
+          </p>
+          <ul class="feature-list">
+            <li>GPS auto-tracking</li>
+            <li>Current HMRC rates</li>
+            <li>Journey notes & clients</li>
+            <li>Annual mileage reports</li>
+          </ul>
+          <span class="feature-tag">Silver+</span>
+        </div>
+        
+        <div class="feature-card reveal stagger-4">
+          <div class="feature-icon-wrap amber">💰</div>
+          <h3 class="feature-title">Tax Estimates</h3>
+          <p class="feature-desc">
+            See your estimated tax bill in real-time. No nasty surprises in January. Set aside the right amount each month.
+          </p>
+          <ul class="feature-list">
+            <li>Real-time tax calculator</li>
+            <li>Income Tax + NI estimates</li>
+            <li>Payment on Account reminders</li>
+            <li>Tax year summary export</li>
+          </ul>
+          <span class="feature-tag">Gold</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY SOLOOPS -->
+  <section class="why-section">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Why SoloOps</div>
+        <h2 class="section-title">Built by sole traders, for sole traders</h2>
+        <p class="section-desc">
+          We know the pain of spreadsheets, shoebox receipts, and tax deadline panic. SoloOps fixes all of it.
+        </p>
+      </div>
+      
+      <div class="why-grid">
+        <div class="why-card reveal stagger-1">
+          <div class="why-number">5</div>
+          <div class="why-label">Minutes to send<br>your first invoice</div>
+        </div>
+        <div class="why-card reveal stagger-2">
+          <div class="why-number">10+</div>
+          <div class="why-label">Hours saved<br>per month</div>
+        </div>
+        <div class="why-card reveal stagger-3">
+          <div class="why-number">£0</div>
+          <div class="why-label">Accountant fees<br>for basic taxes</div>
+        </div>
+        <div class="why-card reveal stagger-4">
+          <div class="why-number">0</div>
+          <div class="why-label">Tax deadline<br>panic attacks</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Pricing</div>
+        <h2 class="section-title">Simple pricing for simple businesses</h2>
+        <p class="section-desc">
+          14-day free trial on all plans. No credit card required.
+        </p>
+      </div>
+      
+      <div class="pricing-cards">
+        <div class="pricing-card reveal stagger-1">
+          <div class="pricing-tier">🥉 Bronze</div>
+          <div class="pricing-amount">£40</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Unlimited invoices</li>
+            <li>Customer database</li>
+            <li>Basic income tracking</li>
+            <li>Email support</li>
+            <li class="disabled">Expense tracking</li>
+            <li class="disabled">Mileage logs</li>
+          </ul>
+          <a href="/soloops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card featured reveal stagger-2">
+          <div class="pricing-tier">🥈 Silver</div>
+          <div class="pricing-amount">£55</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Everything in Bronze</li>
+            <li>Expense tracking</li>
+            <li>Receipt scanning</li>
+            <li>Mileage logging</li>
+            <li>Basic reports</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="/soloops/register" class="btn btn-primary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card reveal stagger-3">
+          <div class="pricing-tier">🥇 Gold</div>
+          <div class="pricing-amount">£70</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Everything in Silver</li>
+            <li>Real-time tax estimates</li>
+            <li>Tax year reports</li>
+            <li>HMRC-ready exports</li>
+            <li>Accountant access</li>
+            <li>Phone support</li>
+          </ul>
+          <a href="/soloops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section" id="how">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">How It Works</div>
+        <h2 class="section-title">Get started in minutes</h2>
+        <p class="section-desc">
+          No training needed. No complex setup. Just sign up and go.
+        </p>
+      </div>
+      
+      <div class="steps-row">
+        <div class="step reveal stagger-1">
+          <div class="step-icon">📝</div>
+          <h3 class="step-title">Sign Up</h3>
+          <p class="step-desc">Create your account in 2 minutes. No credit card needed.</p>
+        </div>
+        <div class="step reveal stagger-2">
+          <div class="step-icon">⚙️</div>
+          <h3 class="step-title">Add Your Details</h3>
+          <p class="step-desc">Business name, logo, and bank details for invoices.</p>
+        </div>
+        <div class="step reveal stagger-3">
+          <div class="step-icon">🧾</div>
+          <h3 class="step-title">Send Invoices</h3>
+          <p class="step-desc">Create and send your first invoice in under 5 minutes.</p>
+        </div>
+        <div class="step reveal stagger-4">
+          <div class="step-icon">📈</div>
+          <h3 class="step-title">Track & Grow</h3>
+          <p class="step-desc">Log expenses, track income, and watch your business grow.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-content reveal-scale">
+        <h2 class="cta-title">Ready to simplify your business?</h2>
+        <p class="cta-desc">Join thousands of UK sole traders already using SoloOps.</p>
+        <div class="cta-buttons">
+          <a href="/soloops/register" class="btn btn-primary btn-large">Start Your Free Trial →</a>
+          <a href="mailto:hello@alzaro.co.uk" class="btn btn-secondary btn-large">Talk to Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- End HOME PAGE -->
+
+  <!-- PRIVACY PAGE -->
+  <div id="page-privacy" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Privacy Policy</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> We collect only what we need to provide the service. We don't sell your data. Your business information stays yours. We use industry-standard security.</p>
+          </div>
+
+          <h2>1. Who we are</h2>
+          <p>Alzaro SoloOps ("we", "us", "our") is business management software for sole traders, operated by Alzaro Group, based in Milton Keynes, United Kingdom.</p>
+
+          <h2>2. What data we collect</h2>
+          
+          <h3>Account information</h3>
+          <ul>
+            <li>Name and email address</li>
+            <li>Business name</li>
+            <li>Phone number (optional)</li>
+            <li>Payment information (via Stripe)</li>
+          </ul>
+          
+          <h3>Business data</h3>
+          <ul>
+            <li>Invoices and income records</li>
+            <li>Expenses and receipts</li>
+            <li>Mileage logs</li>
+            <li>Customer information</li>
+          </ul>
+          
+          <h3>Technical data</h3>
+          <ul>
+            <li>IP address, browser type, device info</li>
+            <li>Usage patterns</li>
+            <li>Location data (only for mileage tracking, with permission)</li>
+          </ul>
+
+          <h2>3. How we use your data</h2>
+          <ul>
+            <li>Provide the SoloOps service</li>
+            <li>Process payments</li>
+            <li>Send service updates</li>
+            <li>Provide support</li>
+            <li>Improve our software</li>
+            <li>Comply with legal obligations</li>
+          </ul>
+
+          <h2>4. Data sharing</h2>
+          <p><strong>We do not sell your data.</strong></p>
+          <p>We share data only with:</p>
+          <ul>
+            <li><strong>Stripe:</strong> Payment processing</li>
+            <li><strong>Cloud providers:</strong> Secure storage</li>
+            <li><strong>Legal authorities:</strong> When required by law</li>
+          </ul>
+
+          <h2>5. Data security</h2>
+          <ul>
+            <li>SSL/TLS encryption</li>
+            <li>Encrypted storage</li>
+            <li>Regular security audits</li>
+            <li>Daily backups</li>
+          </ul>
+
+          <h2>6. Your rights</h2>
+          <p>Under UK GDPR: access, correct, delete, export, or object to processing of your data.</p>
+          <p>Contact: <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a></p>
+
+          <h2>7. Contact</h2>
+          <p>
+            <strong>Email:</strong> <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a><br>
+            <strong>Address:</strong> Alzaro SoloOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TERMS PAGE -->
+  <div id="page-terms" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Terms of Service</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> Use SoloOps lawfully. Pay your subscription. We provide reliable software and protect your data. Your business data belongs to you.</p>
+          </div>
+
+          <h2>1. Agreement</h2>
+          <p>By using Alzaro SoloOps, you agree to these terms.</p>
+
+          <h2>2. Service description</h2>
+          <p>SoloOps is cloud-based business software for UK sole traders, including:</p>
+          <ul>
+            <li>Invoicing</li>
+            <li>Expense tracking</li>
+            <li>Mileage logging</li>
+            <li>Tax estimates</li>
+            <li>Business reporting</li>
+          </ul>
+
+          <h2>3. Account requirements</h2>
+          <ul>
+            <li>Accurate registration info</li>
+            <li>18 years or older</li>
+            <li>Keep credentials secure</li>
+          </ul>
+
+          <h2>4. Pricing</h2>
+          <ul>
+            <li><strong>Bronze:</strong> £40/month</li>
+            <li><strong>Silver:</strong> £55/month</li>
+            <li><strong>Gold:</strong> £70/month</li>
+          </ul>
+          <p>14-day free trial. Billed monthly via Stripe.</p>
+
+          <h2>5. Cancellation</h2>
+          <p>Cancel anytime. 30 days to export data after cancellation.</p>
+
+          <h2>6. Your data</h2>
+          <p><strong>Your business data belongs to you.</strong> Export anytime.</p>
+
+          <h2>7. Acceptable use</h2>
+          <p>Don't use SoloOps for illegal purposes, share accounts, or attempt to access others' data.</p>
+
+          <div class="legal-box warning">
+            <p><strong>Warning:</strong> Violations may result in account termination.</p>
+          </div>
+
+          <h2>8. Tax disclaimer</h2>
+          <p><strong>SoloOps provides estimates only.</strong> We are not accountants or tax advisors. Always verify with HMRC or a qualified professional. We are not responsible for your tax compliance.</p>
+
+          <h2>9. Liability</h2>
+          <p>Service provided "as is". Liability limited to 12 months of payments.</p>
+
+          <h2>10. Governing law</h2>
+          <p>Laws of England and Wales apply.</p>
+
+          <h2>11. Contact</h2>
+          <p>
+            <strong>Email:</strong> <a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a><br>
+            <strong>Address:</strong> Alzaro SoloOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>SoloOps</span></a>
+        <div class="footer-links">
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="mailto:hello@alzaro.co.uk">Contact</a>
+          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        </div>
+        <div class="footer-copy">© 2026 Alzaro SoloOps. Built in the UK 🇬🇧</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Page navigation
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+      });
+      
+      const targetPage = document.getElementById('page-' + pageName);
+      if (targetPage) {
+        targetPage.classList.add('active');
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      if (pageName === 'home') {
+        history.pushState(null, '', window.location.pathname);
+      } else {
+        history.pushState(null, '', '#' + pageName);
+      }
+      
+      const navLinks = document.querySelector('.nav-center');
+      if (navLinks) {
+        navLinks.style.display = (pageName === 'home') ? 'flex' : 'none';
+      }
+    }
+    
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        if (href.length > 1 && !this.getAttribute('onclick')) {
+          e.preventDefault();
+          const homePage = document.getElementById('page-home');
+          if (!homePage.classList.contains('active')) {
+            showPage('home');
+            setTimeout(() => {
+              const target = document.querySelector(href);
+              if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          } else {
+            const target = document.querySelector(href);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
+    });
+    
+    // Navbar scroll
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+    
+    // Scroll reveal
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.15 });
+    
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
+      revealObserver.observe(el);
+    });
+    
+    // Handle hash
+    window.addEventListener('load', () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'privacy' || hash === 'terms') showPage(hash);
+    });
+    
+    window.addEventListener('popstate', () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'privacy' || hash === 'terms') showPage(hash);
+      else showPage('home');
+    });
+  </script>
+</body>
+</html>

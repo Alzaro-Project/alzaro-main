@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alzaro ServiceOps — Job Management for UK Tradespeople</title>
+  <meta name="description" content="Quotes, invoices, job scheduling & customer management for plumbers, electricians, builders and trades. Built in the UK. Start your 14-day free trial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #050a08;
+      --surface: #0a120e;
+      --surface2: #0f1a14;
+      --surface3: #152119;
+      --border: rgba(255,255,255,0.06);
+      --border-light: rgba(255,255,255,0.1);
+      --text: #f0f5f3;
+      --text2: #94a89e;
+      --text3: #56695e;
+      --green: #22c55e;
+      --green-light: #4ade80;
+      --green-dark: #15803d;
+      --green-glow: rgba(34,197,94,0.35);
+      --green-subtle: rgba(34,197,94,0.08);
+      --teal: #14b8a6;
+      --lime: #84cc16;
+      --emerald: #10b981;
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+    
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* ===== SCROLL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-left.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-right.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-scale {
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-scale.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    /* Stagger delays for grid items */
+    .stagger-1 { transition-delay: 0.1s; }
+    .stagger-2 { transition-delay: 0.2s; }
+    .stagger-3 { transition-delay: 0.3s; }
+    .stagger-4 { transition-delay: 0.4s; }
+    .stagger-5 { transition-delay: 0.5s; }
+    .stagger-6 { transition-delay: 0.6s; }
+    
+    a { color: inherit; text-decoration: none; }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ===== NAVBAR - MINIMAL TOP BAR ===== */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 0;
+      transition: all 0.3s ease;
+    }
+    
+    nav.scrolled {
+      background: rgba(5,10,8,0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    
+    .logo span { color: var(--green); }
+    
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 8px;
+    }
+    
+    .nav-center a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 8px 18px;
+      border-radius: 100px;
+      transition: all 0.2s;
+    }
+    
+    .nav-center a:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    
+    .nav-center a.active {
+      color: var(--text);
+      background: var(--surface3);
+    }
+    
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+    }
+    
+    .btn-ghost:hover {
+      color: var(--text);
+    }
+    
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--surface3);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+    }
+    
+    .btn-primary:hover {
+      background: var(--green-light);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--green-glow);
+    }
+    
+    .btn-large {
+      padding: 16px 32px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+
+    /* ===== HERO - CENTERED WITH FLOATING ELEMENTS ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 0 100px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Grid background */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(34,197,94,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,197,94,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 70%);
+    }
+    
+    /* Floating glow orbs */
+    .hero-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+    }
+    
+    .hero-glow-1 {
+      width: 600px;
+      height: 600px;
+      top: -20%;
+      left: -10%;
+      background: var(--green-subtle);
+      animation: float1 20s ease-in-out infinite;
+    }
+    
+    .hero-glow-2 {
+      width: 400px;
+      height: 400px;
+      bottom: -10%;
+      right: -5%;
+      background: rgba(20,184,166,0.06);
+      animation: float2 15s ease-in-out infinite;
+    }
+    
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(40px, 30px); }
+    }
+    
+    @keyframes float2 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-30px, -20px); }
+    }
+    
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+    }
+    
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--green-light);
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    
+    .hero-badge svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .hero h1 {
+      font-size: clamp(44px, 6vw, 76px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -3px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+    
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--green) 0%, var(--teal) 50%, var(--lime) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-desc {
+      font-size: 19px;
+      color: var(--text2);
+      line-height: 1.7;
+      max-width: 580px;
+      margin: 0 auto 40px;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+    
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 64px;
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+    
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 64px;
+      animation: fadeUp 0.6s ease 0.4s both;
+    }
+    
+    .hero-stat {
+      text-align: center;
+    }
+    
+    .hero-stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 36px;
+      font-weight: 600;
+      color: var(--green-light);
+    }
+    
+    .hero-stat-label {
+      font-size: 13px;
+      color: var(--text3);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== TRADES MARQUEE ===== */
+    .trades-bar {
+      padding: 20px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    
+    .trades-track {
+      display: flex;
+      gap: 48px;
+      animation: scroll 25s linear infinite;
+      width: max-content;
+    }
+    
+    .trade-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+    
+    .trade-icon {
+      font-size: 18px;
+    }
+    
+    @keyframes scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* ===== FEATURES - ALTERNATING ROWS ===== */
+    .features {
+      padding: 120px 0;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 80px;
+    }
+    
+    .section-tag {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+    
+    .section-desc {
+      font-size: 17px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+    
+    .feature-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-bottom: 100px;
+    }
+    
+    .feature-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .feature-row.reverse .feature-text {
+      order: 2;
+    }
+    
+    .feature-row.reverse .feature-visual {
+      order: 1;
+    }
+    
+    .feature-text {
+      max-width: 480px;
+    }
+    
+    .feature-number {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--green);
+      margin-bottom: 16px;
+    }
+    
+    .feature-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-desc {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+    
+    .feature-list {
+      list-style: none;
+    }
+    
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .feature-list li::before {
+      content: '✓';
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--green-subtle);
+      border-radius: 50%;
+      font-size: 11px;
+      color: var(--green);
+      font-weight: 700;
+    }
+    
+    .feature-tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 100px;
+      background: rgba(245,158,11,0.12);
+      color: var(--amber);
+    }
+    
+    /* Feature visual cards */
+    .feature-visual {
+      position: relative;
+    }
+    
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    }
+    
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .feature-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    
+    .feature-card-body {
+      padding: 20px;
+    }
+    
+    /* Quote preview card */
+    .quote-preview {
+      background: var(--surface2);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    
+    .quote-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+    
+    .quote-to {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    
+    .quote-to strong {
+      display: block;
+      font-size: 15px;
+      color: var(--text);
+      margin-top: 4px;
+    }
+    
+    .quote-amount {
+      text-align: right;
+    }
+    
+    .quote-amount span {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    
+    .quote-amount strong {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 24px;
+      color: var(--green-light);
+    }
+    
+    .quote-items {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+    
+    .quote-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 8px;
+    }
+    
+    .quote-item:last-child { margin-bottom: 0; }
+    
+    .quote-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .quote-actions .btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 13px;
+    }
+    
+    /* Schedule card */
+    .schedule-day {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .schedule-day:last-child { margin-bottom: 0; }
+    
+    .schedule-time {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--text3);
+      width: 60px;
+      flex-shrink: 0;
+      padding-top: 12px;
+    }
+    
+    .schedule-job {
+      flex: 1;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--green);
+    }
+    
+    .schedule-job.teal { border-left-color: var(--teal); }
+    .schedule-job.amber { border-left-color: var(--amber); }
+    
+    .schedule-job-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .schedule-job-meta {
+      font-size: 12px;
+      color: var(--text3);
+    }
+
+    /* ===== MORE FEATURES GRID ===== */
+    .more-features {
+      padding: 80px 0 120px;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    
+    .mini-feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      transition: all 0.3s ease;
+    }
+    
+    .mini-feature:hover {
+      border-color: rgba(34,197,94,0.3);
+      transform: translateY(-4px);
+    }
+    
+    .mini-feature-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--green-subtle);
+      border-radius: 10px;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    
+    .mini-feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .mini-feature-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    /* ===== PRICING - HORIZONTAL COMPARISON ===== */
+    .pricing {
+      padding: 120px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 1000px;
+      margin: 60px auto 0;
+    }
+    
+    .pricing-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 28px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+      transform: translateY(-4px);
+    }
+    
+    .pricing-card.featured {
+      border-color: var(--green);
+      box-shadow: 0 0 60px var(--green-subtle);
+    }
+    
+    .pricing-card.featured::before {
+      content: 'Best Value';
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 100px;
+    }
+    
+    .pricing-tier {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .pricing-amount {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 44px;
+      font-weight: 700;
+    }
+    
+    .pricing-period {
+      font-size: 14px;
+      color: var(--text3);
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 28px;
+    }
+    
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+    }
+    
+    .pricing-features li.disabled {
+      color: var(--text3);
+      opacity: 0.5;
+    }
+    
+    .pricing-features li.disabled::before {
+      content: '—';
+      color: var(--text3);
+    }
+    
+    .pricing-card .btn {
+      width: 100%;
+    }
+
+    /* ===== HOW IT WORKS - VERTICAL STEPS ===== */
+    .how-section {
+      padding: 120px 0;
+    }
+    
+    .steps-container {
+      max-width: 700px;
+      margin: 60px auto 0;
+    }
+    
+    .step {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 48px;
+      position: relative;
+    }
+    
+    .step:last-child { margin-bottom: 0; }
+    
+    .step::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 60px;
+      bottom: -48px;
+      width: 2px;
+      background: linear-gradient(180deg, var(--green) 0%, var(--border) 100%);
+    }
+    
+    .step:last-child::before { display: none; }
+    
+    .step-number {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--green-subtle);
+      border: 2px solid var(--green);
+      border-radius: 50%;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--green);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .step-content {
+      padding-top: 8px;
+    }
+    
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .step-desc {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    /* ===== CTA ===== */
+    .cta-section {
+      padding: 140px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, var(--green-subtle) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+    
+    .cta-title {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+    
+    .cta-desc {
+      font-size: 18px;
+      color: var(--text2);
+      margin-bottom: 36px;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    /* ===== LEGAL PAGES ===== */
+    .page {
+      display: none;
+    }
+    
+    .page.active {
+      display: block;
+    }
+    
+    .legal-page {
+      padding: 140px 0 100px;
+      min-height: 100vh;
+    }
+    
+    .legal-container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    .legal-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .legal-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-meta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    
+    .legal-content {
+      color: var(--text2);
+      line-height: 1.8;
+    }
+    
+    .legal-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 44px;
+      margin-bottom: 16px;
+    }
+    
+    .legal-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-content p {
+      margin-bottom: 16px;
+    }
+    
+    .legal-content ul {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+    
+    .legal-content li {
+      margin-bottom: 10px;
+    }
+    
+    .legal-content strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    
+    .legal-content a {
+      color: var(--green-light);
+      transition: color 0.2s;
+    }
+    
+    .legal-content a:hover {
+      color: var(--green);
+      text-decoration: underline;
+    }
+    
+    .legal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    
+    .legal-box p {
+      margin-bottom: 0;
+    }
+    
+    .legal-box.warning {
+      border-color: rgba(34,197,94,0.3);
+      background: var(--green-subtle);
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 32px;
+      transition: color 0.2s;
+    }
+    
+    .back-link:hover {
+      color: var(--green-light);
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+    
+    .footer-links a {
+      font-size: 14px;
+      color: var(--text3);
+      transition: color 0.2s;
+    }
+    
+    .footer-links a:hover { color: var(--text); }
+    
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text3);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .feature-row {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      
+      .feature-row.reverse .feature-text,
+      .feature-row.reverse .feature-visual {
+        order: unset;
+      }
+      
+      .feature-text {
+        max-width: 100%;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      
+      .pricing-cards {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .nav-center { display: none; }
+      
+      .hero { padding: 120px 0 80px; }
+      
+      .hero-stats {
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .hero-actions .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .step {
+        gap: 20px;
+      }
+      
+      .step::before {
+        left: 23px;
+      }
+      
+      .step-number {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+      }
+      
+      .footer-content {
+        flex-direction: column;
+        gap: 24px;
+        text-align: center;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav id="nav">
+    <div class="container">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>ServiceOps</span></a>
+      <div class="nav-center">
+        <a href="#features" class="active">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="nav-right">
+        <a href="/serviceops/login" class="btn btn-ghost">Login</a>
+        <a href="/serviceops/register" class="btn btn-primary">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4"/>
+            <circle cx="12" cy="12" r="10"/>
+          </svg>
+          Made for UK Tradespeople
+        </div>
+        
+        <h1>
+          Run your trade<br>
+          <span class="gradient">business smarter</span>
+        </h1>
+        
+        <p class="hero-desc">
+          Quotes, invoices, job scheduling, and customer management — built specifically for plumbers, electricians, builders, and every trade in between.
+        </p>
+        
+        <div class="hero-actions">
+          <a href="/serviceops/register" class="btn btn-primary btn-large">
+            Start 14-Day Free Trial →
+          </a>
+          <a href="#features" class="btn btn-secondary btn-large">
+            See How It Works
+          </a>
+        </div>
+        
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-value">14</div>
+            <div class="hero-stat-label">Day Trial</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">£0</div>
+            <div class="hero-stat-label">Setup Fee</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">5 min</div>
+            <div class="hero-stat-label">To First Quote</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRADES MARQUEE -->
+  <section class="trades-bar">
+    <div class="trades-track">
+      <div class="trade-item"><span class="trade-icon">🔧</span> Plumbers</div>
+      <div class="trade-item"><span class="trade-icon">⚡</span> Electricians</div>
+      <div class="trade-item"><span class="trade-icon">🧱</span> Builders</div>
+      <div class="trade-item"><span class="trade-icon">🔥</span> Gas Engineers</div>
+      <div class="trade-item"><span class="trade-icon">❄️</span> HVAC</div>
+      <div class="trade-item"><span class="trade-icon">🪟</span> Window Fitters</div>
+      <div class="trade-item"><span class="trade-icon">🎨</span> Painters</div>
+      <div class="trade-item"><span class="trade-icon">🪵</span> Carpenters</div>
+      <div class="trade-item"><span class="trade-icon">🏠</span> Roofers</div>
+      <div class="trade-item"><span class="trade-icon">🚿</span> Bathroom Fitters</div>
+      <!-- Duplicate for seamless scroll -->
+      <div class="trade-item"><span class="trade-icon">🔧</span> Plumbers</div>
+      <div class="trade-item"><span class="trade-icon">⚡</span> Electricians</div>
+      <div class="trade-item"><span class="trade-icon">🧱</span> Builders</div>
+      <div class="trade-item"><span class="trade-icon">🔥</span> Gas Engineers</div>
+      <div class="trade-item"><span class="trade-icon">❄️</span> HVAC</div>
+      <div class="trade-item"><span class="trade-icon">🪟</span> Window Fitters</div>
+      <div class="trade-item"><span class="trade-icon">🎨</span> Painters</div>
+      <div class="trade-item"><span class="trade-icon">🪵</span> Carpenters</div>
+      <div class="trade-item"><span class="trade-icon">🏠</span> Roofers</div>
+      <div class="trade-item"><span class="trade-icon">🚿</span> Bathroom Fitters</div>
+    </div>
+  </section>
+
+  <!-- FEATURES - ALTERNATING ROWS -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">Everything you need to run your trade</h2>
+        <p class="section-desc">
+          Stop juggling spreadsheets, WhatsApp messages, and paper invoices. ServiceOps brings it all together.
+        </p>
+      </div>
+      
+      <!-- Feature 1: Quotes -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">01</div>
+          <h3 class="feature-title">Professional Quotes in Minutes</h3>
+          <p class="feature-desc">
+            Create detailed, professional quotes on-site or back at the office. Add materials, labour, and your markup. Send to customers instantly via email or SMS.
+          </p>
+          <ul class="feature-list">
+            <li>Pre-saved materials and pricing</li>
+            <li>Custom branding on every quote</li>
+            <li>One-click convert to invoice</li>
+            <li>Track quote acceptance rates</li>
+          </ul>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Quote #247</span>
+              <span style="font-size:12px;color:var(--green);">● Sent</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="quote-preview">
+                <div class="quote-header">
+                  <div class="quote-to">
+                    <span>Quote for</span>
+                    <strong>Mrs. Sarah Johnson</strong>
+                  </div>
+                  <div class="quote-amount">
+                    <span>Total</span>
+                    <strong>£1,240</strong>
+                  </div>
+                </div>
+                <div class="quote-items">
+                  <div class="quote-item"><span>Boiler replacement</span><span>£890</span></div>
+                  <div class="quote-item"><span>Labour (4 hrs)</span><span>£280</span></div>
+                  <div class="quote-item"><span>Parts & fittings</span><span>£70</span></div>
+                </div>
+              </div>
+              <div class="quote-actions">
+                <button class="btn btn-secondary">Edit</button>
+                <button class="btn btn-primary">Convert to Invoice</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 2: Scheduling -->
+      <div class="feature-row reverse">
+        <div class="feature-text reveal-right">
+          <div class="feature-number">02</div>
+          <h3 class="feature-title">Job Scheduling That Works</h3>
+          <p class="feature-desc">
+            See your week at a glance. Drag and drop to reschedule. Get reminders before each job. Never double-book or miss an appointment again.
+          </p>
+          <ul class="feature-list">
+            <li>Calendar sync with Google/Outlook</li>
+            <li>Automatic customer reminders</li>
+            <li>Travel time estimates</li>
+            <li>Team scheduling (Silver+)</li>
+          </ul>
+          <span class="feature-tag">Silver+</span>
+        </div>
+        <div class="feature-visual reveal-left">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Today's Schedule</span>
+              <span style="font-size:12px;color:var(--text3);">Tue, 25 Mar</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="schedule-day">
+                <div class="schedule-time">09:00</div>
+                <div class="schedule-job">
+                  <div class="schedule-job-title">Boiler Service</div>
+                  <div class="schedule-job-meta">15 Oak Lane, MK4 • Mr. Thompson</div>
+                </div>
+              </div>
+              <div class="schedule-day">
+                <div class="schedule-time">11:30</div>
+                <div class="schedule-job teal">
+                  <div class="schedule-job-title">Leak Repair</div>
+                  <div class="schedule-job-meta">42 High St, MK2 • Mrs. Patel</div>
+                </div>
+              </div>
+              <div class="schedule-day">
+                <div class="schedule-time">14:00</div>
+                <div class="schedule-job amber">
+                  <div class="schedule-job-title">Quote: Bathroom Refit</div>
+                  <div class="schedule-job-meta">8 Mill Road, MK7 • Mr. Davies</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 3: Invoicing -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">03</div>
+          <h3 class="feature-title">Get Paid Faster</h3>
+          <p class="feature-desc">
+            Send invoices the moment you finish a job. Track who's paid, who hasn't, and send automatic reminders. Accept card payments online.
+          </p>
+          <ul class="feature-list">
+            <li>One-tap invoice from job or quote</li>
+            <li>Online card payments</li>
+            <li>Automatic payment reminders</li>
+            <li>VAT-ready reports</li>
+          </ul>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Recent Invoices</span>
+              <span style="font-size:12px;color:var(--text3);">This Week</span>
+            </div>
+            <div class="feature-card-body">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">INV-0089</div>
+                    <div style="font-size:12px;color:var(--text3);">Mrs. Johnson</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£1,240</div>
+                    <div style="font-size:11px;color:var(--green);font-weight:600;">PAID</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">INV-0088</div>
+                    <div style="font-size:12px;color:var(--text3);">Mr. Thompson</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£185</div>
+                    <div style="font-size:11px;color:var(--amber);font-weight:600;">PENDING</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;">INV-0087</div>
+                    <div style="font-size:12px;color:var(--text3);">ABC Lettings</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£420</div>
+                    <div style="font-size:11px;color:var(--green);font-weight:600;">PAID</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MORE FEATURES GRID -->
+  <section class="more-features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="mini-feature reveal stagger-1">
+          <div class="mini-feature-icon">👥</div>
+          <h4 class="mini-feature-title">Customer Database</h4>
+          <p class="mini-feature-desc">All your customers, their properties, and job history in one searchable place.</p>
+        </div>
+        <div class="mini-feature reveal stagger-2">
+          <div class="mini-feature-icon">📊</div>
+          <h4 class="mini-feature-title">Business Reports</h4>
+          <p class="mini-feature-desc">See your revenue, best customers, and busiest periods at a glance.</p>
+        </div>
+        <div class="mini-feature reveal stagger-3">
+          <div class="mini-feature-icon">📱</div>
+          <h4 class="mini-feature-title">Works on Mobile</h4>
+          <p class="mini-feature-desc">Full access from your phone. Create quotes and invoices on-site.</p>
+        </div>
+        <div class="mini-feature reveal stagger-4">
+          <div class="mini-feature-icon">🧾</div>
+          <h4 class="mini-feature-title">VAT Ready</h4>
+          <p class="mini-feature-desc">Track VAT automatically. Export reports for your accountant in one click.</p>
+        </div>
+        <div class="mini-feature reveal stagger-5">
+          <div class="mini-feature-icon">📧</div>
+          <h4 class="mini-feature-title">Email & SMS</h4>
+          <p class="mini-feature-desc">Send quotes, invoices, and reminders directly to customers.</p>
+        </div>
+        <div class="mini-feature reveal stagger-6">
+          <div class="mini-feature-icon">🔒</div>
+          <h4 class="mini-feature-title">Secure & Backed Up</h4>
+          <p class="mini-feature-desc">Your data is encrypted and backed up daily. Sleep easy.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Pricing</div>
+        <h2 class="section-title">Simple pricing, no surprises</h2>
+        <p class="section-desc">
+          14-day free trial on all plans. No credit card required.
+        </p>
+      </div>
+      
+      <div class="pricing-cards">
+        <div class="pricing-card reveal stagger-1">
+          <div class="pricing-tier">🥉 Bronze</div>
+          <div class="pricing-amount">£60</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>30 quotes/month</li>
+            <li>Unlimited invoices</li>
+            <li>Customer database</li>
+            <li>Basic scheduling</li>
+            <li class="disabled">Team access</li>
+            <li class="disabled">VAT reports</li>
+          </ul>
+          <a href="/serviceops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card featured reveal stagger-2">
+          <div class="pricing-tier">🥈 Silver</div>
+          <div class="pricing-amount">£75</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Unlimited quotes</li>
+            <li>Team scheduling</li>
+            <li>Online payments</li>
+            <li>Materials library</li>
+            <li>Basic reports</li>
+            <li>2 users</li>
+          </ul>
+          <a href="/serviceops/register" class="btn btn-primary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card reveal stagger-3">
+          <div class="pricing-tier">🥇 Gold</div>
+          <div class="pricing-amount">£90</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Everything in Silver</li>
+            <li>Full business reports</li>
+            <li>VAT tracking & export</li>
+            <li>Custom branding</li>
+            <li>Unlimited users</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="/serviceops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section" id="how">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">How It Works</div>
+        <h2 class="section-title">From sign-up to first invoice</h2>
+        <p class="section-desc">
+          Get started in minutes, not hours. No training required.
+        </p>
+      </div>
+      
+      <div class="steps-container">
+        <div class="step reveal stagger-1">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3 class="step-title">Create Your Account</h3>
+            <p class="step-desc">Sign up with your email. Add your business name, logo, and contact details. Takes about 2 minutes.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-2">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3 class="step-title">Add Your Services</h3>
+            <p class="step-desc">Set up your common services and materials with default pricing. Makes quoting lightning-fast.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-3">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3 class="step-title">Create Your First Quote</h3>
+            <p class="step-desc">Add a customer, select services, adjust pricing, and send. Professional quote out the door in minutes.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-4">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3 class="step-title">Do the Job, Get Paid</h3>
+            <p class="step-desc">Convert accepted quotes to invoices with one click. Track payments and send reminders automatically.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-content reveal-scale">
+        <h2 class="cta-title">Ready to work smarter?</h2>
+        <p class="cta-desc">Join hundreds of UK tradespeople already using ServiceOps.</p>
+        <div class="cta-buttons">
+          <a href="/serviceops/register" class="btn btn-primary btn-large">Start Your Free Trial →</a>
+          <a href="mailto:hello@alzaro.co.uk" class="btn btn-secondary btn-large">Talk to Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- End HOME PAGE -->
+
+  <!-- PRIVACY PAGE -->
+  <div id="page-privacy" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Privacy Policy</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> We collect only what we need to provide the service. We don't sell your data. Your business information stays yours. We use industry-standard security.</p>
+          </div>
+
+          <h2>1. Who we are</h2>
+          <p>Alzaro ServiceOps ("we", "us", "our") is a job management software service for tradespeople, operated by Alzaro Group, based in Milton Keynes, United Kingdom.</p>
+          <p>We are committed to protecting your privacy and handling your data transparently.</p>
+
+          <h2>2. What data we collect</h2>
+          
+          <h3>Account information</h3>
+          <ul>
+            <li>Name and email address</li>
+            <li>Business name and address</li>
+            <li>Phone number</li>
+            <li>Payment information (processed securely via Stripe)</li>
+          </ul>
+          
+          <h3>Business data you enter</h3>
+          <ul>
+            <li>Customer information</li>
+            <li>Quotes and invoices</li>
+            <li>Job schedules and records</li>
+            <li>Materials and pricing</li>
+          </ul>
+          
+          <h3>Technical data</h3>
+          <ul>
+            <li>IP address and browser type</li>
+            <li>Device information</li>
+            <li>Usage patterns within the application</li>
+          </ul>
+
+          <h2>3. How we use your data</h2>
+          <ul>
+            <li>Provide and maintain the ServiceOps service</li>
+            <li>Process your subscription payments</li>
+            <li>Send important service updates</li>
+            <li>Provide customer support</li>
+            <li>Improve our software</li>
+            <li>Comply with legal obligations</li>
+          </ul>
+
+          <h2>4. Data sharing</h2>
+          <p><strong>We do not sell your data. Ever.</strong></p>
+          <p>We only share data with:</p>
+          <ul>
+            <li><strong>Stripe:</strong> For payment processing</li>
+            <li><strong>Cloud hosting providers:</strong> For secure storage</li>
+            <li><strong>Legal authorities:</strong> Only when required by law</li>
+          </ul>
+
+          <h2>5. Data security</h2>
+          <ul>
+            <li>SSL/TLS encryption for all data transmission</li>
+            <li>Encrypted database storage</li>
+            <li>Regular security audits</li>
+            <li>Access controls and authentication</li>
+            <li>Daily backups</li>
+          </ul>
+
+          <h2>6. Your rights</h2>
+          <p>Under UK GDPR, you have the right to:</p>
+          <ul>
+            <li>Access your personal data</li>
+            <li>Correct inaccurate data</li>
+            <li>Delete your data</li>
+            <li>Export your data</li>
+            <li>Object to certain processing</li>
+            <li>Withdraw consent</li>
+          </ul>
+          <p>Contact us at <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a></p>
+
+          <h2>7. Data retention</h2>
+          <p>We retain your data while your account is active. After closure:</p>
+          <ul>
+            <li>30 days to export your data</li>
+            <li>Deletion within 90 days</li>
+            <li>Some data retained for legal compliance</li>
+          </ul>
+
+          <h2>8. Cookies</h2>
+          <p>We use essential cookies only for login and preferences. No advertising or tracking cookies.</p>
+
+          <h2>9. Contact</h2>
+          <p>
+            <strong>Email:</strong> <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a><br>
+            <strong>Address:</strong> Alzaro ServiceOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TERMS PAGE -->
+  <div id="page-terms" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Terms of Service</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> Use ServiceOps lawfully and responsibly. Pay your subscription on time. We'll provide reliable software and protect your data. Your business data belongs to you.</p>
+          </div>
+
+          <h2>1. Agreement to terms</h2>
+          <p>By using Alzaro ServiceOps ("the Service"), you agree to these Terms. If you do not agree, do not use the Service.</p>
+
+          <h2>2. Description of service</h2>
+          <p>ServiceOps is a cloud-based job management platform for UK tradespeople. Features include:</p>
+          <ul>
+            <li>Quote and invoice creation</li>
+            <li>Job scheduling</li>
+            <li>Customer database</li>
+            <li>Payment tracking</li>
+            <li>Business reporting</li>
+          </ul>
+
+          <h2>3. Account registration</h2>
+          <ul>
+            <li>Provide accurate registration information</li>
+            <li>Be at least 18 years old</li>
+            <li>Keep login credentials secure</li>
+            <li>You're responsible for all account activity</li>
+          </ul>
+
+          <h2>4. Subscription and payment</h2>
+          
+          <h3>Free trial</h3>
+          <p>14-day free trial with Gold tier access. No credit card required.</p>
+          
+          <h3>Pricing</h3>
+          <ul>
+            <li><strong>Bronze:</strong> £60/month</li>
+            <li><strong>Silver:</strong> £75/month</li>
+            <li><strong>Gold:</strong> £90/month</li>
+          </ul>
+          
+          <h3>Billing</h3>
+          <ul>
+            <li>Billed monthly in advance via Stripe</li>
+            <li>Prices exclude VAT where applicable</li>
+            <li>30 days notice for price changes</li>
+          </ul>
+
+          <h2>5. Cancellation</h2>
+          <ul>
+            <li>Cancel anytime, effective end of billing period</li>
+            <li>No partial refunds</li>
+            <li>30 days read-only access to export data</li>
+          </ul>
+
+          <h2>6. Your data</h2>
+          <p><strong>Your business data belongs to you.</strong> We only use it to provide the Service.</p>
+          <p>Export your data anytime via CSV export or request a full export within 7 days.</p>
+
+          <h2>7. Acceptable use</h2>
+          <p>You agree NOT to:</p>
+          <ul>
+            <li>Use the Service unlawfully</li>
+            <li>Share accounts with unauthorised users</li>
+            <li>Access other users' data</li>
+            <li>Reverse engineer the software</li>
+            <li>Upload malicious content</li>
+          </ul>
+
+          <div class="legal-box warning">
+            <p><strong>Warning:</strong> Violations may result in immediate account termination without refund.</p>
+          </div>
+
+          <h2>8. Service availability</h2>
+          <p>We target 99.9% uptime but don't guarantee uninterrupted service. Maintenance will be notified in advance when possible.</p>
+
+          <h2>9. Limitation of liability</h2>
+          <ul>
+            <li>Service provided "as is"</li>
+            <li>Not liable for indirect damages</li>
+            <li>Total liability limited to 12 months of payments</li>
+            <li>Not responsible for your tax/VAT compliance</li>
+          </ul>
+
+          <h2>10. Governing law</h2>
+          <p>These terms are governed by the laws of England and Wales.</p>
+
+          <h2>11. Contact</h2>
+          <p>
+            <strong>Email:</strong> <a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a><br>
+            <strong>Address:</strong> Alzaro ServiceOps, Milton Keynes, United Kingdom
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>ServiceOps</span></a>
+        <div class="footer-links">
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="mailto:hello@alzaro.co.uk">Contact</a>
+          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        </div>
+        <div class="footer-copy">© 2026 Alzaro ServiceOps. Built in the UK 🇬🇧</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Page navigation
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+      });
+      
+      const targetPage = document.getElementById('page-' + pageName);
+      if (targetPage) {
+        targetPage.classList.add('active');
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      if (pageName === 'home') {
+        history.pushState(null, '', window.location.pathname);
+      } else {
+        history.pushState(null, '', '#' + pageName);
+      }
+      
+      // Show/hide nav links on legal pages
+      const navLinks = document.querySelector('.nav-center');
+      if (navLinks) {
+        navLinks.style.display = (pageName === 'home') ? 'flex' : 'none';
+      }
+    }
+    
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        if (href.length > 1 && !href.includes('page') && !this.getAttribute('onclick')) {
+          e.preventDefault();
+          const homePage = document.getElementById('page-home');
+          if (!homePage.classList.contains('active')) {
+            showPage('home');
+            setTimeout(() => {
+              const target = document.querySelector(href);
+              if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }, 100);
+          } else {
+            const target = document.querySelector(href);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        }
+      });
+    });
+    
+    // Navbar scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+    
+    // Scroll reveal animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.15
+    };
+    
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+    
+    // Observe all reveal elements
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
+      revealObserver.observe(el);
+    });
+    
+    // Handle initial hash
+    window.addEventListener('load', () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'privacy' || hash === 'terms') {
+        showPage(hash);
+      }
+    });
+    
+    // Handle back/forward
+    window.addEventListener('popstate', () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'privacy' || hash === 'terms') {
+        showPage(hash);
+      } else {
+        showPage('home');
+      }
+    });
+  </script>
+</body>
+</html>

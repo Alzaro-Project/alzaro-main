@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alzaro PropertyOps — Property Management Software for UK Landlords</title>
+  <meta name="description" content="Tenant management, rent collection, maintenance tracking & compliance for UK landlords. Manage 1 property or 100. Start your 14-day free trial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #0a0a0b;
+      --surface: #111113;
+      --surface2: #18181b;
+      --surface3: #1f1f23;
+      --border: rgba(255,255,255,0.06);
+      --border-light: rgba(255,255,255,0.1);
+      --text: #fafafa;
+      --text2: #a1a1aa;
+      --text3: #52525b;
+      --gold: #eab308;
+      --gold-light: #facc15;
+      --gold-dark: #a16207;
+      --gold-glow: rgba(234,179,8,0.3);
+      --gold-subtle: rgba(234,179,8,0.08);
+      --amber: #f59e0b;
+      --emerald: #10b981;
+      --blue: #3b82f6;
+      --rose: #f43f5e;
+    }
+    
+    html { scroll-behavior: smooth; }
+    
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* ===== SCROLL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-left.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(50px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-right.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .reveal-scale {
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    .reveal-scale.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    .stagger-1 { transition-delay: 0.1s; }
+    .stagger-2 { transition-delay: 0.2s; }
+    .stagger-3 { transition-delay: 0.3s; }
+    .stagger-4 { transition-delay: 0.4s; }
+    .stagger-5 { transition-delay: 0.5s; }
+    .stagger-6 { transition-delay: 0.6s; }
+    
+    a { color: inherit; text-decoration: none; }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ===== NAVBAR ===== */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 0;
+      transition: all 0.3s ease;
+    }
+    
+    nav.scrolled {
+      background: rgba(10,10,11,0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    
+    .logo span { color: var(--gold); }
+    
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 8px;
+    }
+    
+    .nav-center a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 8px 18px;
+      border-radius: 100px;
+      transition: all 0.2s;
+    }
+    
+    .nav-center a:hover {
+      color: var(--text);
+      background: var(--surface2);
+    }
+    
+    .nav-center a.active {
+      color: var(--text);
+      background: var(--surface3);
+    }
+    
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+    }
+    
+    .btn-ghost:hover {
+      color: var(--text);
+    }
+    
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--surface3);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: var(--gold);
+      color: #000;
+      font-weight: 700;
+    }
+    
+    .btn-primary:hover {
+      background: var(--gold-light);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--gold-glow);
+    }
+    
+    .btn-large {
+      padding: 16px 32px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 0 100px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+    }
+    
+    .hero-glow-1 {
+      width: 600px;
+      height: 600px;
+      top: -15%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--gold-subtle);
+      animation: pulse 8s ease-in-out infinite;
+    }
+    
+    .hero-glow-2 {
+      width: 400px;
+      height: 400px;
+      bottom: 10%;
+      right: 10%;
+      background: rgba(16,185,129,0.04);
+      animation: pulse 10s ease-in-out infinite reverse;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
+    }
+    
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+    }
+    
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gold-light);
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+    
+    .hero h1 {
+      font-size: clamp(44px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -3px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+    
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--amber) 50%, var(--gold-light) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-desc {
+      font-size: 18px;
+      color: var(--text2);
+      line-height: 1.8;
+      max-width: 600px;
+      margin: 0 auto 40px;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+    
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 64px;
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+    
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 56px;
+      animation: fadeUp 0.6s ease 0.4s both;
+    }
+    
+    .hero-stat {
+      text-align: center;
+    }
+    
+    .hero-stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--gold-light);
+    }
+    
+    .hero-stat-label {
+      font-size: 13px;
+      color: var(--text3);
+      margin-top: 4px;
+    }
+    
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== TRUST BAR ===== */
+    .trust-bar {
+      padding: 24px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .trust-items {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+    }
+    
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+    }
+    
+    .trust-icon {
+      font-size: 18px;
+    }
+
+    /* ===== FEATURES - ALTERNATING ROWS ===== */
+    .features {
+      padding: 120px 0;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 80px;
+    }
+    
+    .section-tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+    
+    .section-desc {
+      font-size: 17px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+    
+    .feature-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-bottom: 100px;
+    }
+    
+    .feature-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .feature-row.reverse .feature-text {
+      order: 2;
+    }
+    
+    .feature-row.reverse .feature-visual {
+      order: 1;
+    }
+    
+    .feature-text {
+      max-width: 480px;
+    }
+    
+    .feature-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+    
+    .feature-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-desc {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+    
+    .feature-list {
+      list-style: none;
+    }
+    
+    .feature-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .feature-list li::before {
+      content: '✓';
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      background: var(--gold-subtle);
+      border-radius: 50%;
+      font-size: 11px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    
+    .feature-tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 100px;
+      background: rgba(234,179,8,0.12);
+      color: var(--gold);
+    }
+    
+    /* Feature cards */
+    .feature-visual {
+      position: relative;
+    }
+    
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    }
+    
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .feature-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    
+    .feature-card-body {
+      padding: 20px;
+    }
+    
+    /* Property list */
+    .property-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .property-item:last-child { margin-bottom: 0; }
+    
+    .property-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface3);
+      border-radius: 10px;
+      font-size: 20px;
+    }
+    
+    .property-info {
+      flex: 1;
+    }
+    
+    .property-address {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .property-meta {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    
+    .property-rent {
+      text-align: right;
+    }
+    
+    .property-rent-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    
+    .property-rent-label {
+      font-size: 11px;
+      color: var(--text3);
+    }
+    
+    .property-status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .status-let { background: rgba(16,185,129,0.15); color: var(--emerald); }
+    .status-vacant { background: rgba(244,63,94,0.15); color: var(--rose); }
+    .status-ending { background: rgba(234,179,8,0.15); color: var(--gold); }
+    
+    /* Tenant row */
+    .tenant-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .tenant-avatar {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gold-subtle);
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    
+    .tenant-info { flex: 1; }
+    
+    .tenant-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .tenant-property {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    
+    .tenant-rent {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    
+    /* Maintenance items */
+    .maintenance-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .maintenance-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface3);
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    
+    .maintenance-info { flex: 1; }
+    
+    .maintenance-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .maintenance-property {
+      font-size: 11px;
+      color: var(--text3);
+    }
+    
+    .maintenance-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    
+    .m-urgent { background: rgba(244,63,94,0.15); color: var(--rose); }
+    .m-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .m-done { background: rgba(16,185,129,0.15); color: var(--emerald); }
+
+    /* ===== MORE FEATURES GRID ===== */
+    .more-features {
+      padding: 80px 0 120px;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    
+    .mini-feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      transition: all 0.3s ease;
+    }
+    
+    .mini-feature:hover {
+      border-color: rgba(234,179,8,0.3);
+      transform: translateY(-4px);
+    }
+    
+    .mini-feature-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gold-subtle);
+      border-radius: 10px;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    
+    .mini-feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .mini-feature-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    /* ===== PRICING ===== */
+    .pricing {
+      padding: 120px 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 1000px;
+      margin: 60px auto 0;
+    }
+    
+    .pricing-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 28px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+      transform: translateY(-4px);
+    }
+    
+    .pricing-card.featured {
+      border-color: var(--gold);
+      box-shadow: 0 0 60px var(--gold-subtle);
+    }
+    
+    .pricing-card.featured::before {
+      content: 'Most Popular';
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--gold);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 100px;
+    }
+    
+    .pricing-tier {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .pricing-properties {
+      font-size: 13px;
+      color: var(--text3);
+      margin-bottom: 12px;
+    }
+    
+    .pricing-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 44px;
+      font-weight: 700;
+    }
+    
+    .pricing-period {
+      font-size: 14px;
+      color: var(--text3);
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 28px;
+    }
+    
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--emerald);
+      font-weight: 700;
+    }
+    
+    .pricing-features li.disabled {
+      color: var(--text3);
+      opacity: 0.5;
+    }
+    
+    .pricing-features li.disabled::before {
+      content: '—';
+      color: var(--text3);
+    }
+    
+    .pricing-card .btn {
+      width: 100%;
+    }
+
+    /* ===== HOW IT WORKS ===== */
+    .how-section {
+      padding: 120px 0;
+    }
+    
+    .steps-container {
+      max-width: 700px;
+      margin: 60px auto 0;
+    }
+    
+    .step {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 48px;
+      position: relative;
+    }
+    
+    .step:last-child { margin-bottom: 0; }
+    
+    .step::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 60px;
+      bottom: -48px;
+      width: 2px;
+      background: linear-gradient(180deg, var(--gold) 0%, var(--border) 100%);
+    }
+    
+    .step:last-child::before { display: none; }
+    
+    .step-number {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gold-subtle);
+      border: 2px solid var(--gold);
+      border-radius: 50%;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gold);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .step-content {
+      padding-top: 8px;
+    }
+    
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .step-desc {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    /* ===== CTA ===== */
+    .cta-section {
+      padding: 140px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, var(--gold-subtle) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+    
+    .cta-title {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+    
+    .cta-desc {
+      font-size: 18px;
+      color: var(--text2);
+      margin-bottom: 36px;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    /* ===== LEGAL PAGES ===== */
+    .page { display: none; }
+    .page.active { display: block; }
+    
+    .legal-page {
+      padding: 140px 0 100px;
+      min-height: 100vh;
+    }
+    
+    .legal-container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    .legal-header {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .legal-header h1 {
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 12px;
+    }
+    
+    .legal-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    
+    .legal-content {
+      color: var(--text2);
+      line-height: 1.8;
+    }
+    
+    .legal-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 44px;
+      margin-bottom: 16px;
+    }
+    
+    .legal-content p { margin-bottom: 16px; }
+    .legal-content ul { margin-bottom: 16px; padding-left: 24px; }
+    .legal-content li { margin-bottom: 10px; }
+    .legal-content strong { color: var(--text); font-weight: 600; }
+    
+    .legal-content a {
+      color: var(--gold-light);
+      transition: color 0.2s;
+    }
+    
+    .legal-content a:hover {
+      color: var(--gold);
+      text-decoration: underline;
+    }
+    
+    .legal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    
+    .legal-box.warning {
+      border-color: rgba(234,179,8,0.3);
+      background: var(--gold-subtle);
+    }
+    
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 32px;
+      transition: color 0.2s;
+    }
+    
+    .back-link:hover { color: var(--gold-light); }
+
+    /* ===== FOOTER ===== */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+    }
+    
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+    
+    .footer-links a {
+      font-size: 14px;
+      color: var(--text3);
+      transition: color 0.2s;
+    }
+    
+    .footer-links a:hover { color: var(--text); }
+    
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text3);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .feature-row {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      
+      .feature-row.reverse .feature-text,
+      .feature-row.reverse .feature-visual {
+        order: unset;
+      }
+      
+      .feature-text { max-width: 100%; }
+      
+      .features-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      
+      .pricing-cards {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .nav-center { display: none; }
+      
+      .hero { padding: 120px 0 80px; }
+      
+      .hero-stats {
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .hero-actions .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .trust-items {
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+      
+      .step { gap: 20px; }
+      .step::before { left: 23px; }
+      .step-number { width: 48px; height: 48px; font-size: 18px; }
+      
+      .footer-content {
+        flex-direction: column;
+        gap: 24px;
+        text-align: center;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav id="nav">
+    <div class="container">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>PropertyOps</span></a>
+      <div class="nav-center">
+        <a href="#features" class="active">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="nav-right">
+        <a href="/propertyops/login" class="btn btn-ghost">Login</a>
+        <a href="/propertyops/register" class="btn btn-primary">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          🏠 Built for UK Landlords
+        </div>
+        
+        <h1>
+          Simplify your<br>
+          <span class="gradient">property management</span>
+        </h1>
+        
+        <p class="hero-desc">
+          Tenant management, rent collection, maintenance tracking, and compliance — everything you need to manage your properties professionally. Whether you have 1 or 100.
+        </p>
+        
+        <div class="hero-actions">
+          <a href="/propertyops/register" class="btn btn-primary btn-large">
+            Start 14-Day Free Trial →
+          </a>
+          <a href="#features" class="btn btn-secondary btn-large">
+            Explore Features
+          </a>
+        </div>
+        
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-value">14</div>
+            <div class="hero-stat-label">Day Free Trial</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">£0</div>
+            <div class="hero-stat-label">Setup Fee</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">5 min</div>
+            <div class="hero-stat-label">To Add First Property</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST BAR -->
+  <section class="trust-bar">
+    <div class="container">
+      <div class="trust-items">
+        <div class="trust-item">
+          <span class="trust-icon">🔒</span>
+          Bank-level security
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon">📱</span>
+          Works on any device
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon">🇬🇧</span>
+          UK compliance ready
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon">👥</span>
+          Tenant portal included
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">Everything you need to manage property</h2>
+        <p class="section-desc">
+          Purpose-built for UK landlords. From a single buy-to-let to a growing portfolio.
+        </p>
+      </div>
+      
+      <!-- Feature 1: Property Portfolio -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">01</div>
+          <h3 class="feature-title">Your Entire Portfolio in One Place</h3>
+          <p class="feature-desc">
+            Add all your properties with full details — addresses, values, mortgage info, purchase dates. See your entire portfolio at a glance with real-time occupancy and income.
+          </p>
+          <ul class="feature-list">
+            <li>Property details & photos</li>
+            <li>Occupancy tracking</li>
+            <li>Rental yield calculations</li>
+            <li>Document storage per property</li>
+          </ul>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">My Properties</span>
+              <span style="font-size:12px;color:var(--text3);">3 total</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="property-item">
+                <div class="property-icon">🏠</div>
+                <div class="property-info">
+                  <div class="property-address">42 Victoria Road</div>
+                  <div class="property-meta">3 bed semi • Milton Keynes</div>
+                </div>
+                <div class="property-rent">
+                  <div class="property-rent-amount">£1,450</div>
+                  <div class="property-rent-label">/month</div>
+                </div>
+              </div>
+              <div class="property-item">
+                <div class="property-icon">🏢</div>
+                <div class="property-info">
+                  <div class="property-address">15 High Street, Flat 4</div>
+                  <div class="property-meta">1 bed flat • Bedford</div>
+                </div>
+                <div class="property-rent">
+                  <div class="property-rent-amount">£850</div>
+                  <div class="property-rent-label">/month</div>
+                </div>
+              </div>
+              <div class="property-item">
+                <div class="property-icon">🏘️</div>
+                <div class="property-info">
+                  <div class="property-address">8 Oak Lane</div>
+                  <div class="property-meta">4 bed detached • Northampton</div>
+                </div>
+                <span class="property-status status-vacant">Vacant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 2: Tenant Management -->
+      <div class="feature-row reverse">
+        <div class="feature-text reveal-right">
+          <div class="feature-number">02</div>
+          <h3 class="feature-title">Tenant Management Made Easy</h3>
+          <p class="feature-desc">
+            Store tenant details, track tenancy dates, and keep all documents in one place. Your tenants get their own portal to pay rent and report issues.
+          </p>
+          <ul class="feature-list">
+            <li>Tenant profiles & contacts</li>
+            <li>Tenancy agreement tracking</li>
+            <li>Right to Rent checks</li>
+            <li>Tenant portal access</li>
+          </ul>
+          <span class="feature-tag">Professional+</span>
+        </div>
+        <div class="feature-visual reveal-left">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Current Tenants</span>
+              <span style="font-size:12px;color:var(--emerald);">● All paid</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="tenant-item">
+                <div class="tenant-avatar">JS</div>
+                <div class="tenant-info">
+                  <div class="tenant-name">James Smith</div>
+                  <div class="tenant-property">42 Victoria Road</div>
+                </div>
+                <div class="tenant-rent">£1,450</div>
+              </div>
+              <div class="tenant-item">
+                <div class="tenant-avatar">SP</div>
+                <div class="tenant-info">
+                  <div class="tenant-name">Sarah Patel</div>
+                  <div class="tenant-property">15 High Street, Flat 4</div>
+                </div>
+                <div class="tenant-rent">£850</div>
+              </div>
+              <div class="tenant-item">
+                <div class="tenant-avatar">MJ</div>
+                <div class="tenant-info">
+                  <div class="tenant-name">Michael Jones</div>
+                  <div class="tenant-property">27 Station Road</div>
+                </div>
+                <div class="tenant-rent">£1,200</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Feature 3: Maintenance -->
+      <div class="feature-row">
+        <div class="feature-text reveal-left">
+          <div class="feature-number">03</div>
+          <h3 class="feature-title">Maintenance Tracking</h3>
+          <p class="feature-desc">
+            Tenants report issues through their portal. You track, assign contractors, and resolve — all with a full audit trail. Never lose a maintenance request again.
+          </p>
+          <ul class="feature-list">
+            <li>Tenant issue reporting</li>
+            <li>Contractor assignment</li>
+            <li>Photo documentation</li>
+            <li>Cost tracking & history</li>
+          </ul>
+          <span class="feature-tag">Professional+</span>
+        </div>
+        <div class="feature-visual reveal-right">
+          <div class="feature-card">
+            <div class="feature-card-header">
+              <span class="feature-card-title">Maintenance Requests</span>
+              <span style="font-size:12px;color:var(--text3);">3 open</span>
+            </div>
+            <div class="feature-card-body">
+              <div class="maintenance-item">
+                <div class="maintenance-icon">🚰</div>
+                <div class="maintenance-info">
+                  <div class="maintenance-title">Leaking tap — kitchen</div>
+                  <div class="maintenance-property">42 Victoria Road</div>
+                </div>
+                <span class="maintenance-status m-urgent">Urgent</span>
+              </div>
+              <div class="maintenance-item">
+                <div class="maintenance-icon">🔌</div>
+                <div class="maintenance-info">
+                  <div class="maintenance-title">Socket not working</div>
+                  <div class="maintenance-property">15 High Street, Flat 4</div>
+                </div>
+                <span class="maintenance-status m-progress">In Progress</span>
+              </div>
+              <div class="maintenance-item">
+                <div class="maintenance-icon">🚪</div>
+                <div class="maintenance-info">
+                  <div class="maintenance-title">Door hinge repair</div>
+                  <div class="maintenance-property">27 Station Road</div>
+                </div>
+                <span class="maintenance-status m-done">Complete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MORE FEATURES -->
+  <section class="more-features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="mini-feature reveal stagger-1">
+          <div class="mini-feature-icon">📋</div>
+          <h4 class="mini-feature-title">Compliance Tracking</h4>
+          <p class="mini-feature-desc">Gas safety, EPC, electrical certificates — track expiry dates and get reminders.</p>
+        </div>
+        <div class="mini-feature reveal stagger-2">
+          <div class="mini-feature-icon">💷</div>
+          <h4 class="mini-feature-title">Rent Collection</h4>
+          <p class="mini-feature-desc">See who's paid at a glance. Send automatic reminders for late payments.</p>
+        </div>
+        <div class="mini-feature reveal stagger-3">
+          <div class="mini-feature-icon">📄</div>
+          <h4 class="mini-feature-title">Document Storage</h4>
+          <p class="mini-feature-desc">Tenancy agreements, certificates, photos — all stored securely in the cloud.</p>
+        </div>
+        <div class="mini-feature reveal stagger-4">
+          <div class="mini-feature-icon">📊</div>
+          <h4 class="mini-feature-title">Financial Reports</h4>
+          <p class="mini-feature-desc">Income, expenses, profit by property. Export for your accountant.</p>
+        </div>
+        <div class="mini-feature reveal stagger-5">
+          <div class="mini-feature-icon">📅</div>
+          <h4 class="mini-feature-title">Tenancy Timeline</h4>
+          <p class="mini-feature-desc">See rent reviews, lease renewals, and notice periods at a glance.</p>
+        </div>
+        <div class="mini-feature reveal stagger-6">
+          <div class="mini-feature-icon">📱</div>
+          <h4 class="mini-feature-title">Mobile Ready</h4>
+          <p class="mini-feature-desc">Full access from phone or tablet. Manage your portfolio on the go.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">Pricing</div>
+        <h2 class="section-title">Scales with your portfolio</h2>
+        <p class="section-desc">
+          14-day free trial on all plans. No credit card required.
+        </p>
+      </div>
+      
+      <div class="pricing-cards">
+        <div class="pricing-card reveal stagger-1">
+          <div class="pricing-tier">🥉 Starter</div>
+          <div class="pricing-properties">Up to 3 properties</div>
+          <div class="pricing-amount">£35</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Property records</li>
+            <li>Basic tenant info</li>
+            <li>Rent tracking</li>
+            <li>Document storage (1GB)</li>
+            <li class="disabled">Tenant portal</li>
+            <li class="disabled">Maintenance tracking</li>
+          </ul>
+          <a href="/propertyops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card featured reveal stagger-2">
+          <div class="pricing-tier">🥈 Professional</div>
+          <div class="pricing-properties">Up to 15 properties</div>
+          <div class="pricing-amount">£65</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Everything in Starter</li>
+            <li>Tenant portal</li>
+            <li>Maintenance tracking</li>
+            <li>Compliance reminders</li>
+            <li>Auto rent reminders</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="/propertyops/register" class="btn btn-primary">Start Free Trial</a>
+        </div>
+        
+        <div class="pricing-card reveal stagger-3">
+          <div class="pricing-tier">🥇 Portfolio</div>
+          <div class="pricing-properties">Unlimited properties</div>
+          <div class="pricing-amount">£120</div>
+          <div class="pricing-period">per month</div>
+          <ul class="pricing-features">
+            <li>Everything in Professional</li>
+            <li>Financial reports</li>
+            <li>Multi-user access</li>
+            <li>Accountant export</li>
+            <li>API access</li>
+            <li>Dedicated support</li>
+          </ul>
+          <a href="/propertyops/register" class="btn btn-secondary">Start Free Trial</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section" id="how">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-tag">How It Works</div>
+        <h2 class="section-title">Get started in minutes</h2>
+        <p class="section-desc">
+          No complicated setup. Add your first property today.
+        </p>
+      </div>
+      
+      <div class="steps-container">
+        <div class="step reveal stagger-1">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3 class="step-title">Create Your Account</h3>
+            <p class="step-desc">Sign up with your email. Add your name and contact details. Takes 2 minutes.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-2">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3 class="step-title">Add Your Properties</h3>
+            <p class="step-desc">Enter property details, upload photos, and add key documents like EPCs.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-3">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3 class="step-title">Add Your Tenants</h3>
+            <p class="step-desc">Link tenants to properties. Store contact details, tenancy dates, and rent amounts.</p>
+          </div>
+        </div>
+        <div class="step reveal stagger-4">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3 class="step-title">Manage & Track</h3>
+            <p class="step-desc">Track rent payments, handle maintenance, and stay on top of compliance. All in one place.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-content reveal-scale">
+        <h2 class="cta-title">Ready to simplify your portfolio?</h2>
+        <p class="cta-desc">Join UK landlords already using PropertyOps to manage their properties professionally.</p>
+        <div class="cta-buttons">
+          <a href="/propertyops/register" class="btn btn-primary btn-large">Start Your Free Trial →</a>
+          <a href="mailto:hello@alzaro.co.uk" class="btn btn-secondary btn-large">Talk to Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- End HOME PAGE -->
+
+  <!-- PRIVACY PAGE -->
+  <div id="page-privacy" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Privacy Policy</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> We collect only what we need. We don't sell your data. Your property and tenant information stays yours. Bank-level security.</p>
+          </div>
+
+          <h2>1. Who we are</h2>
+          <p>Alzaro PropertyOps is property management software for UK landlords, operated by Alzaro Group, Milton Keynes, United Kingdom.</p>
+
+          <h2>2. What data we collect</h2>
+          <ul>
+            <li>Account information (name, email, phone)</li>
+            <li>Property details you enter</li>
+            <li>Tenant information (names, contact details, tenancy data)</li>
+            <li>Financial records (rent, expenses)</li>
+            <li>Documents you upload</li>
+            <li>Technical data (IP, browser, device)</li>
+          </ul>
+
+          <h2>3. Tenant data</h2>
+          <p>You are the data controller for tenant information. We process it on your behalf under our data processing agreement.</p>
+
+          <h2>4. Data sharing</h2>
+          <p><strong>We do not sell your data.</strong> We share only with Stripe (payments) and cloud providers (storage).</p>
+
+          <h2>5. Security</h2>
+          <p>SSL encryption, encrypted storage, daily backups, regular security audits.</p>
+
+          <h2>6. Your rights</h2>
+          <p>Under UK GDPR: access, correct, delete, export your data. Contact: <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a></p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TERMS PAGE -->
+  <div id="page-terms" class="page">
+    <section class="legal-page">
+      <div class="legal-container">
+        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
+        
+        <div class="legal-header">
+          <h1>Terms of Service</h1>
+          <p class="legal-meta">Last updated: 25 March 2026</p>
+        </div>
+
+        <div class="legal-content">
+          <div class="legal-box">
+            <p><strong>Summary:</strong> Use PropertyOps lawfully. Pay your subscription. Your property and tenant data belongs to you.</p>
+          </div>
+
+          <h2>1. Agreement</h2>
+          <p>By using Alzaro PropertyOps, you agree to these terms.</p>
+
+          <h2>2. Service</h2>
+          <p>PropertyOps is property management software including tenant management, rent tracking, maintenance, compliance tracking, and reporting.</p>
+
+          <h2>3. Pricing</h2>
+          <ul>
+            <li><strong>Starter:</strong> £35/month (up to 3 properties)</li>
+            <li><strong>Professional:</strong> £65/month (up to 15 properties)</li>
+            <li><strong>Portfolio:</strong> £120/month (unlimited)</li>
+          </ul>
+          <p>14-day free trial. Billed monthly via Stripe.</p>
+
+          <h2>4. Your responsibilities</h2>
+          <ul>
+            <li>Ensure tenant data is accurate and lawfully obtained</li>
+            <li>Comply with landlord obligations and data protection law</li>
+            <li>Keep login credentials secure</li>
+          </ul>
+
+          <h2>5. Data ownership</h2>
+          <p><strong>Your property and tenant data belongs to you.</strong> Export anytime.</p>
+
+          <h2>6. Compliance disclaimer</h2>
+          <div class="legal-box warning">
+            <p><strong>Important:</strong> PropertyOps is management software, not legal advice. Compliance tracking is a convenience feature — you remain responsible for meeting all landlord obligations including gas safety, electrical inspections, EPC requirements, and Right to Rent checks.</p>
+          </div>
+
+          <h2>7. Liability</h2>
+          <p>Service provided "as is". Liability limited to 12 months of payments.</p>
+
+          <h2>8. Governing law</h2>
+          <p>Laws of England and Wales.</p>
+
+          <h2>9. Contact</h2>
+          <p><a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a> • Alzaro PropertyOps, Milton Keynes, UK</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>PropertyOps</span></a>
+        <div class="footer-links">
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="mailto:hello@alzaro.co.uk">Contact</a>
+          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        </div>
+        <div class="footer-copy">© 2026 Alzaro PropertyOps. Built in the UK 🇬🇧</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Page navigation
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('page-' + pageName);
+      if (target) target.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      history.pushState(null, '', pageName === 'home' ? window.location.pathname : '#' + pageName);
+      const navLinks = document.querySelector('.nav-center');
+      if (navLinks) navLinks.style.display = pageName === 'home' ? 'flex' : 'none';
+    }
+    
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        if (href.length > 1 && !this.getAttribute('onclick')) {
+          e.preventDefault();
+          const home = document.getElementById('page-home');
+          if (!home.classList.contains('active')) {
+            showPage('home');
+            setTimeout(() => {
+              const t = document.querySelector(href);
+              if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          } else {
+            const t = document.querySelector(href);
+            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
+    });
+    
+    // Navbar scroll
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+    
+    // Scroll reveal
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.15 });
+    
+    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
+      revealObserver.observe(el);
+    });
+    
+    // Hash handling
+    window.addEventListener('load', () => {
+      const h = window.location.hash.slice(1);
+      if (h === 'privacy' || h === 'terms') showPage(h);
+    });
+    
+    window.addEventListener('popstate', () => {
+      const h = window.location.hash.slice(1);
+      showPage(h === 'privacy' || h === 'terms' ? h : 'home');
+    });
+  </script>
+</body>
+</html>
