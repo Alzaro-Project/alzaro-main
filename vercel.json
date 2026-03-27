@@ -3,11 +3,51 @@
   "outputDirectory": ".",
   "rewrites": [
     {
-      "source": "/tyreops",
+      "source": "/tyreops/login",
       "destination": "/TyreOps/dist/index.html"
     },
     {
-      "source": "/tyreops/(.*)",
+      "source": "/tyreops/register",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/reset-password",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/dashboard",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/invoices",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/inventory",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/customers",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/purchases",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/reports",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/vat",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/settings",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/admin",
       "destination": "/TyreOps/dist/index.html"
     }
   ]
