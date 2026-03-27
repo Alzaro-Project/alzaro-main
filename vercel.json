@@ -3,6 +3,10 @@
   "outputDirectory": ".",
   "rewrites": [
     {
+      "source": "/tyreops",
+      "destination": "/TyreOps/landing.html"
+    },
+    {
       "source": "/tyreops/login",
       "destination": "/TyreOps/dist/index.html"
     },
