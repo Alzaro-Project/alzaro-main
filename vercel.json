@@ -1,14 +1,24 @@
 {
+  "buildCommand": "cd TyreOps && npm install && npm run build",
+  "outputDirectory": "TyreOps/dist",
   "rewrites": [
     {
-      "source": "/tyreops/(.*)",
-      "destination": "/TyreOps/dist/index.html"
+      "source": "/tyreops",
+      "destination": "/tyreops/index.html"
     },
     {
-      "source": "/tyreops",
-      "destination": "/TyreOps/dist/index.html"
+      "source": "/tyreops/(.*)",
+      "destination": "/tyreops/index.html"
     }
   ],
-  "buildCommand": "cd TyreOps && npm install && npm run build",
-  "outputDirectory": "."
+  "routes": [
+    {
+      "src": "/tyreops/(.*)",
+      "dest": "/TyreOps/dist/index.html"
+    },
+    {
+      "src": "/tyreops",
+      "dest": "/TyreOps/dist/index.html"
+    }
+  ]
 }
