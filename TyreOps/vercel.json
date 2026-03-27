@@ -1,1 +1,14 @@
-{"rewrites": [{"source": "/(.*)", "destination": "/"}]}
+{
+  "buildCommand": "cd TyreOps && npm install && npm run build",
+  "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/tyreops",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/(.*)",
+      "destination": "/TyreOps/dist/index.html"
+    }
+  ]
+}
