@@ -13,6 +13,7 @@
     { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
     { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/register", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/forgot-password", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/reset-password", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/dashboard", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/invoices", "destination": "/TyreOps/dist/index.html" },
