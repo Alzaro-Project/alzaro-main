@@ -2,8 +2,8 @@
   "buildCommand": "cd TyreOps && npm install && npm run build",
   "outputDirectory": ".",
   "rewrites": [
-    { "source": "/tyreops", "destination": "/TyreOps/index.html" },
-    { "source": "/TyreOps", "destination": "/TyreOps/index.html" },
+    { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
+    { "source": "/TyreOps", "destination": "/TyreOps/landing.html" },
     { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/register", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/reset-password", "destination": "/TyreOps/dist/index.html" },
