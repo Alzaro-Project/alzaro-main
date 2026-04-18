@@ -2,9 +2,7 @@
   "buildCommand": "cd TyreOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
-    { "source": "/TyreOps", "destination": "/tyreops", "permanent": true },
-    { "source": "/TyreOps/:path*", "destination": "/tyreops/:path*", "permanent": true }
-  ],
+
   "rewrites": [
     { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
     { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
