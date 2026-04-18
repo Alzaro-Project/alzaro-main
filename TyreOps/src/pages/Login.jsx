@@ -208,7 +208,7 @@ export default function Login() {
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>
                 <button 
-                  onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
+                  onClick={() => navigate('/reset-password')}
                   style={{ 
                     background: 'none', 
                     border: 'none', 
