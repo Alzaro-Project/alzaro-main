@@ -14,6 +14,7 @@ import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
+import ForgotPassword from './pages/ForgotPassword'
 
 // Mobile breakpoint
 const MOBILE_BREAKPOINT = 768
@@ -167,6 +168,7 @@ export default function App() {
     <BrowserRouter basename="/tyreops">
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/*" element={user ? <AppLayout /> : <Navigate to="/login" />} />
       </Routes>
