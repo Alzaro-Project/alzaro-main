@@ -2,57 +2,34 @@
   "buildCommand": "cd TyreOps && npm install && npm run build",
   "outputDirectory": ".",
   "rewrites": [
-    {
-      "source": "/tyreops",
-      "destination": "/TyreOps/landing.html"
-    },
-    {
-      "source": "/tyreops/login",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/register",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/reset-password",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/dashboard",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/invoices",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/inventory",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/customers",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/purchases",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/reports",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/vat",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/settings",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/admin",
-      "destination": "/TyreOps/dist/index.html"
-    }
+    { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
+    { "source": "/TyreOps", "destination": "/TyreOps/landing.html" },
+    { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/register", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/reset-password", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/dashboard", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/invoices", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/inventory", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/customers", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/purchases", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/reports", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/vat", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/settings", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/admin", "destination": "/TyreOps/dist/index.html" },
+
+    { "source": "/garageops", "destination": "/GarageOps/index.html" },
+    { "source": "/GarageOps", "destination": "/GarageOps/index.html" },
+
+    { "source": "/serviceops", "destination": "/ServiceOps/index.html" },
+    { "source": "/ServiceOps", "destination": "/ServiceOps/index.html" },
+
+    { "source": "/soloops", "destination": "/SoloOps/index.html" },
+    { "source": "/SoloOps", "destination": "/SoloOps/index.html" },
+
+    { "source": "/propertyops", "destination": "/PropertyOps/index.html" },
+    { "source": "/PropertyOps", "destination": "/PropertyOps/index.html" },
+
+    { "source": "/stockops", "destination": "/StockOps/index.html" },
+    { "source": "/StockOps", "destination": "/StockOps/index.html" }
   ]
 }
