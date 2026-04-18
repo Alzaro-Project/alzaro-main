@@ -106,7 +106,7 @@ export default function Login() {
           <>
             <div style={{ marginBottom: '20px' }}>
               <button 
-                onClick={() => navigate('/reset-password')}
+                onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
                 style={{ 
                   background: 'none', 
                   border: 'none', 
