@@ -228,20 +228,32 @@
     }
   </style>
 </head>
+  <script>
+  function scrollToSection(e, id) {
+    e.preventDefault();
+    if (id) {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+</script>
 <body>
 
 <nav id="nav">
   <div class="container">
-    <a class="nav-logo" href="#">ALZARO<span>.</span></a>
+    <a class="nav-logo" href="#" onclick="scrollToSection(event, null)">ALZARO<span>.</span></a>
     <div class="nav-links">
-      <a href="#platforms">Platforms</a>
-      <a href="#about">About</a>
-      <a href="#how">How It Works</a>
-      <a href="#platforms" class="btn-cta">Explore Services →</a>
+      <a href="#platforms" onclick="scrollToSection(event, 'platforms')">Platforms</a>
+      <a href="#about" onclick="scrollToSection(event, 'about')">About</a>
+      <a href="#how" onclick="scrollToSection(event, 'how')">How It Works</a>
+      <a href="#platforms" class="btn-cta" onclick="scrollToSection(event, 'platforms')">Explore Services →</a>
     </div>
   </div>
 </nav>
-
+  
 <!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
