@@ -56,7 +56,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
       {/* Logo - hidden on mobile (shown in header) */}
       {!isMobile && (
         <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '21px', fontWeight: 800 }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 800 }}>
             Alzaro<span style={{ color: 'var(--accent)' }}>TyreOps</span>
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
