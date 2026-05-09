@@ -64,8 +64,10 @@ export default function Login() {
         }
       })
       if (err) throw err
-      login(email)
-      navigate('/dashboard')
+      setSuccess('Check your email to confirm your account, then log in.')
+      setTab('login')
+      setGarageName('')
+      setPassword('')
     } catch (err) {
       setError(err.message || 'Registration failed')
     }
