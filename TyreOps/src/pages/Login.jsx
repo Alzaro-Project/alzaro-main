@@ -53,18 +53,17 @@ export default function Login() {
     if (password.length < 6) return setError('Password must be at least 6 characters')
     setLoading(true); setError(''); setSuccess('')
     try {
-      const { error: err } = await supabase.auth.signUp({ email, password })
+      const { error: err } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            garage_name: garageName.trim(),
+            product: 'tyreops'
+          }
+        }
+      })
       if (err) throw err
-      const { data: garage, error: gErr } = await supabase
-        .from('garages').insert({ 
-          name: garageName.trim(),
-          email: email.trim().toLowerCase(),
-          tier: 'gold',
-          status: 'trial',
-          trial_ends: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        }).select().single()
-      if (gErr) throw gErr
-      await supabase.from('garage_users').insert({ garage_id: garage.id, email, role: 'owner' })
       login(email)
       navigate('/dashboard')
     } catch (err) {
