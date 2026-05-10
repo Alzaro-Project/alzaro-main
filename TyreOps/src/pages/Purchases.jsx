@@ -1,11 +1,16 @@
-import { useState } from 'react'
-import { useStore } from '../store/useStore'
+import { useState, useRef } from 'react'
+import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
+import { supabase } from '../lib/supabase'
 
 export default function Purchases() {
-  const { skus, batches, usedTyres } = useStore()
+  const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, garageId } = useStore()
   const [search, setSearch] = useState('')
+  const [showBatch, setShowBatch] = useState(false)
+  const [showUsed, setShowUsed] = useState(false)
+
+  const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
 
   const skuLabel = sk => `${sk.brand} ${sk.model} ${sk.w}/${sk.p}R${sk.r}`
 
@@ -38,7 +43,10 @@ export default function Purchases() {
 
   return (
     <div>
-      <PageHeader title="Purchase History" subtitle="All supplier batches and part-exchange records" />
+      <PageHeader title="Purchase History" subtitle="All supplier batches and part-exchange records">
+        {isSilverPlus && <Btn variant="teal" onClick={() => setShowUsed(true)}>♻ Add Used</Btn>}
+        <Btn variant="primary" onClick={() => setShowBatch(true)}>+ Purchase Batch</Btn>
+      </PageHeader>
 
       {/* Global Search */}
       <div style={{ marginBottom: '16px' }}>
