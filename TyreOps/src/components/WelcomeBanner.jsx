@@ -31,10 +31,10 @@ export default function WelcomeBanner() {
   const invoiceDone = invoices.length > 0
 
   const steps = [
-    { id: 'settings', label: 'Set up your garage details', done: settingsDone, path: '/tyreops/settings' },
-    { id: 'customer', label: 'Add your first customer', done: customerDone, path: '/tyreops/customers' },
-    { id: 'purchase', label: 'Record a stock purchase', done: purchaseDone, path: '/tyreops/purchases' },
-    { id: 'invoice', label: 'Create your first invoice', done: invoiceDone, path: '/tyreops/invoices' },
+    { id: 'settings', label: 'Set up your garage details', done: settingsDone, path: '/settings' },
+    { id: 'customer', label: 'Add your first customer', done: customerDone, path: '/customers' },
+    { id: 'purchase', label: 'Record a stock purchase', done: purchaseDone, path: '/purchases' },
+    { id: 'invoice', label: 'Create your first invoice', done: invoiceDone, path: '/invoices' },
   ]
 
   const completedCount = steps.filter(s => s.done).length
