@@ -43,8 +43,6 @@ export default function Inventory() {
   return (
     <div>
       <PageHeader title="Tyre Inventory" subtitle="FIFO batch tracking · New & used stock">
-        {isSilverPlus && <Btn variant="teal" onClick={() => { setShowUsed(true) }}>♻ Add Used</Btn>}
-        <Btn variant="secondary" onClick={() => { setPreSkuId(''); setShowBatch(true) }}>+ Purchase Batch</Btn>
         <Btn variant="primary" onClick={() => { setEditingSKU(null); setShowSKU(true) }}>+ New SKU</Btn>
       </PageHeader>
 
