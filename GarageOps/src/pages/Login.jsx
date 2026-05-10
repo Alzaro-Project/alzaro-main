@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
 import { checkIsAdmin } from '../lib/db'
+import garageOpsIcon from '../assets/alzaro-garageops-icon.jpg'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
