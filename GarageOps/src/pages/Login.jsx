@@ -197,7 +197,7 @@ export default function Login() {
           marginBottom: '20px',
         }}>
           <img
-            src="/garageops/alzaro-garageops-icon.jpg"
+            src="/alzaro-garageops-icon.jpg"
             alt="Alzaro GarageOps"
             style={{
               width: '200px',
