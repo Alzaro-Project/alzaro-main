@@ -68,6 +68,7 @@ export const useStore = create(
       garageStatus: null,
       trialEnds: null,
       product: 'tyreops',  // NEW: 'tyreops' | 'garageops' — drives UI and which data to load
+      welcomeBannerDismissed: false,  // Onboarding banner dismissal flag
 
       // --------------------------------------------------------
       // SHARED DATA STATE (both products)
@@ -612,6 +613,7 @@ export const useStore = create(
       // --------------------------------------------------------
       setDashPeriod: (period) => set({ dashPeriod: period }),
       setDashWidgets: (widgets) => set({ dashWidgets: widgets }),
+      dismissWelcomeBanner: () => set({ welcomeBannerDismissed: true }),
 
       // --------------------------------------------------------
       // FIFO HELPERS (TyreOps)
@@ -1082,10 +1084,11 @@ export const useStore = create(
         tier: state.tier,
         isAdmin: state.isAdmin,
         garageId: state.garageId,
-        product: state.product,  // NEW: remember which product on reload
+        product: state.product,
         settings: state.settings,
         dashPeriod: state.dashPeriod,
         dashWidgets: state.dashWidgets,
+        welcomeBannerDismissed: state.welcomeBannerDismissed,
         // Don't persist data — it comes from Supabase on login
       }),
     }
