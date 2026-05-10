@@ -30,6 +30,7 @@
     { "source": "/tyreops/vat", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/settings", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/admin", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin).+\\..+)", "destination": "/TyreOps/dist/:file" },
 
     { "source": "/garageops", "destination": "/GarageOps/landing.html" },
     { "source": "/garageops/login", "destination": "/GarageOps/dist/index.html" },
@@ -42,6 +43,7 @@
     { "source": "/garageops/reports", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/settings", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/admin", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)", "destination": "/GarageOps/dist/:file" },
 
     { "source": "/serviceops", "destination": "/ServiceOps/index.html" },
     { "source": "/ServiceOps", "destination": "/ServiceOps/index.html" },
