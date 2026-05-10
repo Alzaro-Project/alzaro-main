@@ -118,6 +118,172 @@ export default function Purchases() {
           </table>
         </div>
       </Card>
+
+      {/* Add Batch Modal */}
+      {showBatch && <BatchModal skus={skus} preSkuId="" garageId={garageId} onClose={() => setShowBatch(false)} onSave={(data) => {
+        addBatch({ id: 'B' + Date.now(), ...data, remaining: data.qty })
+        setShowBatch(false)
+      }} />}
+
+      {/* Add Used Tyre Modal */}
+      {showUsed && <UsedModal onClose={() => setShowUsed(false)} onSave={(data) => {
+        addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
+        setShowUsed(false)
+      }} />}
+    </div>
+  )
+}
+function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
+  const [form, setForm] = useState({ skuId: preSkuId || '', date: new Date().toISOString().split('T')[0], qty: '', cost: '', supplier: '', ref: '', notes: '' })
+  const [invoiceFile, setInvoiceFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef(null)
+
+  const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError('Please upload a PDF or image file (JPG, PNG, WebP)')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('File too large. Maximum size is 5MB')
+        return
+      }
+      setInvoiceFile(file)
+      setUploadError('')
+    }
+  }
+
+  const uploadInvoice = async () => {
+    if (!invoiceFile || !garageId) return null
+    setUploading(true)
+    try {
+      const fileExt = invoiceFile.name.split('.').pop()
+      const fileName = `${garageId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const { error } = await supabase.storage.from('purchase-invoices').upload(fileName, invoiceFile)
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('purchase-invoices').getPublicUrl(fileName)
+      setUploading(false)
+      return publicUrl
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setUploadError('Upload failed. Please try again.')
+      setUploading(false)
+      return null
+    }
+  }
+
+  const handleSave = async () => {
+    if (!form.skuId || !form.qty || !form.cost) {
+      return alert('Please select a tyre and enter quantity and cost')
+    }
+    let invoiceUrl = null
+    if (invoiceFile) invoiceUrl = await uploadInvoice()
+    onSave({ ...form, qty: parseInt(form.qty), cost: parseFloat(form.cost), invoiceUrl })
+  }
+
+  return (
+    <Modal title="Purchase Stock Batch" onClose={onClose} onSave={handleSave} saveDisabled={uploading} saveText={uploading ? 'Uploading...' : 'Save Batch'}>
+      <Field label="Select Tyre SKU">
+        <select style={inputStyle} value={form.skuId} onChange={e => f('skuId', e.target.value)}>
+          <option value="">-- Select tyre --</option>
+          {skus.map(sk => <option key={sk.id} value={sk.id}>{sk.brand} {sk.model} {sk.w}/{sk.p}R{sk.r}</option>)}
+        </select>
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '12px' }}>
+        <Field label="Date"><input style={inputStyle} type="date" value={form.date} onChange={e => f('date', e.target.value)} /></Field>
+        <Field label="Quantity"><input style={inputStyle} type="number" value={form.qty} onChange={e => f('qty', e.target.value)} placeholder="10" /></Field>
+        <Field label="Cost/ea (£)"><input style={inputStyle} type="number" step="0.01" value={form.cost} onChange={e => f('cost', e.target.value)} placeholder="85.00" /></Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }} className="form-grid-2">
+        <Field label="Supplier"><input style={inputStyle} value={form.supplier} onChange={e => f('supplier', e.target.value)} placeholder="Aldridge Tyres Ltd" /></Field>
+        <Field label="Invoice Ref"><input style={inputStyle} value={form.ref} onChange={e => f('ref', e.target.value)} placeholder="ALD-2025-0123" /></Field>
+      </div>
+      <div style={{ marginTop: '12px' }}>
+        <Field label="Notes"><input style={inputStyle} value={form.notes} onChange={e => f('notes', e.target.value)} placeholder="Optional notes..." /></Field>
+      </div>
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+        <Field label="Purchase Invoice (optional)">
+          <input ref={fileInputRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
+          {!invoiceFile ? (
+            <div onClick={() => fileInputRef.current?.click()} style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', cursor: 'pointer', border: '2px dashed var(--border)' }}>
+              <span>📄</span>
+              <span style={{ color: 'var(--text2)' }}>Click to upload PDF or image</span>
+            </div>
+          ) : (
+            <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}>
+              <span style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '6px' }}>✓ {invoiceFile.name}</span>
+              <button onClick={() => setInvoiceFile(null)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}>✕</button>
+            </div>
+          )}
+        </Field>
+        {uploadError && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>{uploadError}</div>}
+      </div>
+    </Modal>
+  )
+}
+
+function UsedModal({ onClose, onSave }) {
+  const [form, setForm] = useState({ brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
+  const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+  return (
+    <Modal title="Add Used / Part-Ex Tyre" onClose={onClose} onSave={() => {
+      if (!form.brand || !form.model) return alert('Brand and model required')
+      onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
+    }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
+        <Field label="Brand"><input style={inputStyle} value={form.brand} onChange={e => f('brand', e.target.value)} placeholder="Michelin" /></Field>
+        <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <Field label="Width (mm)"><input style={inputStyle} type="number" value={form.w} onChange={e => f('w', e.target.value)} placeholder="225" /></Field>
+        <Field label="Profile (%)"><input style={inputStyle} type="number" value={form.p} onChange={e => f('p', e.target.value)} placeholder="45" /></Field>
+        <Field label="Rim (inch)"><input style={inputStyle} type="number" value={form.r} onChange={e => f('r', e.target.value)} placeholder="18" /></Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <Field label="Tread (mm)"><input style={inputStyle} type="number" step="0.1" value={form.tread} onChange={e => f('tread', e.target.value)} placeholder="5.5" /></Field>
+        <Field label="Year"><input style={inputStyle} type="number" value={form.year} onChange={e => f('year', e.target.value)} /></Field>
+        <Field label="Source Customer"><input style={inputStyle} value={form.sourceCust} onChange={e => f('sourceCust', e.target.value)} placeholder="Dave Patel" /></Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <Field label="Cost (£)"><input style={inputStyle} type="number" step="0.01" value={form.cost} onChange={e => f('cost', e.target.value)} placeholder="0.00" /></Field>
+        <Field label="Sell Price (£)"><input style={inputStyle} type="number" step="0.01" value={form.sell} onChange={e => f('sell', e.target.value)} placeholder="45.00" /></Field>
+        <Field label="Date Received"><input style={inputStyle} type="date" value={form.date} onChange={e => f('date', e.target.value)} /></Field>
+      </div>
+      <Field label="Notes"><input style={inputStyle} value={form.notes} onChange={e => f('notes', e.target.value)} placeholder="Condition, origin..." /></Field>
+    </Modal>
+  )
+}
+
+function Modal({ title, children, onClose, onSave, hideActions, saveDisabled, saveText }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '500px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
+        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 700, marginBottom: '18px' }}>{title}</div>
+        {children}
+        {!hideActions && (
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '14px', flexWrap: 'wrap' }}>
+            <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+            <Btn variant="primary" onClick={onSave} disabled={saveDisabled}>{saveText || 'Save'}</Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)' }}>{label}</label>
+      {children}
     </div>
   )
 }
