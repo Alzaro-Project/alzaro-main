@@ -198,14 +198,14 @@ export default function Login() {
           marginBottom: '20px',
         }}>
           <img
-            src="/alzaro-garageops-icon.jpg"
-            alt="Alzaro GarageOps"
-            style={{
-              width: '200px',
-              height: 'auto',
-              display: 'block',
-            }}
-          />
+  src={garageOpsIcon}
+  alt="Alzaro GarageOps"
+  style={{
+    width: '200px',
+    height: 'auto',
+    display: 'block',
+  }}
+/>
         </div>
 
         {showForgotPassword ? (
