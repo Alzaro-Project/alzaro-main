@@ -121,20 +121,20 @@ export const useStore = create(
       // SHARED DATA STATE (both products)
       // --------------------------------------------------------
       settings: {
-        name: 'Smith Tyres MK', addr: '14 Tyrewell Road', city: 'Milton Keynes',
-        post: 'MK1 1AB', phone: '01908 123456', email: 'info@smithtyres.co.uk',
-        vatScheme: 'standard', vatNumber: 'GB123456789', flatRate: 8.5,
+        name: '', addr: '', city: '',
+        post: '', phone: '', email: '',
+        vatScheme: 'standard', vatNumber: '', flatRate: 8.5,
       },
-      customers: SEED_CUSTOMERS,
-      invoices: SEED_INVOICES,
-      licences: SEED_LICENCES,
+      customers: [],
+      invoices: [],
+      licences: [],
 
       // --------------------------------------------------------
       // TYREOPS DATA STATE
       // --------------------------------------------------------
-      skus: SEED_SKUS,
-      batches: SEED_BATCHES,
-      usedTyres: SEED_USED,
+      skus: [],
+      batches: [],
+      usedTyres: [],
 
       // --------------------------------------------------------
       // GARAGEOPS DATA STATE (NEW)
@@ -248,12 +248,12 @@ export const useStore = create(
           garageStatus: null,
           trialEnds: null,
           product: 'tyreops',
-          // TyreOps data reset to seed
-          skus: SEED_SKUS,
-          batches: SEED_BATCHES,
-          usedTyres: SEED_USED,
-          invoices: SEED_INVOICES,
-          customers: SEED_CUSTOMERS,
+          // TyreOps data cleared
+          skus: [],
+          batches: [],
+          usedTyres: [],
+          invoices: [],
+          customers: [],
           // GarageOps data cleared
           vehicles: [],
           services: [],
