@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
 import { checkIsAdmin } from '../lib/db'
-import garageOpsIcon from '../assets/alzaro-garageops-icon.jpg'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
@@ -44,10 +43,11 @@ export default function Login() {
     padding: '13px 16px',
     color: BRAND.text,
     fontSize: '14px',
-    fontFamily: "'Space Grotesk', sans-serif",
+    fontFamily: "'Space Grotesk', Inter, -apple-system, sans-serif",
     outline: 'none',
     width: '100%',
     transition: 'border-color 0.15s ease',
+    boxSizing: 'border-box',
   }
 
   const primaryBtnStyle = {
@@ -59,10 +59,11 @@ export default function Login() {
     borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
-    fontFamily: "'Space Grotesk', sans-serif",
+    fontFamily: "'Space Grotesk', Inter, -apple-system, sans-serif",
     letterSpacing: '-0.2px',
     boxShadow: `0 4px 16px ${BRAND.redGlow}`,
     transition: 'transform 0.1s ease, box-shadow 0.15s ease',
+    width: '100%',
   }
 
   const doLogin = async () => {
@@ -134,7 +135,7 @@ export default function Login() {
     <div style={{
       minHeight: '100vh',
       background: BRAND.bg,
-      fontFamily: "'Space Grotesk', -apple-system, sans-serif",
+      fontFamily: "'Space Grotesk', Inter, -apple-system, sans-serif",
       color: BRAND.text,
       display: 'flex',
       alignItems: 'center',
@@ -145,9 +146,10 @@ export default function Login() {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Import Space Grotesk font (matches landing page) */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+        * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
         .gop-login-card input:focus {
           border-color: ${BRAND.red} !important;
@@ -176,7 +178,7 @@ export default function Login() {
         }
       `}</style>
 
-      {/* Ambient red glow — subtle, atmospheric */}
+      {/* Ambient glow */}
       <div className="gop-bg-accent" style={{ top: '-280px', right: '-200px', animation: 'gopFloat 8s ease-in-out infinite' }} />
       <div className="gop-bg-accent" style={{ bottom: '-280px', left: '-200px', animation: 'gopFloat 10s ease-in-out infinite reverse' }} />
 
@@ -191,25 +193,26 @@ export default function Login() {
         zIndex: 1,
         boxShadow: '0 20px 48px rgba(0,0,0,0.4)',
       }}>
-        {/* Logo — Alzaro GarageOps icon (cropped from full logo, no text) */}
+
+        {/* Logo — matches landing page exactly */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
-          marginBottom: '20px',
+          marginBottom: '24px',
         }}>
-          <img
-  src={garageOpsIcon}
-  alt="Alzaro GarageOps"
-  style={{
-    width: '200px',
-    height: 'auto',
-    display: 'block',
-  }}
-/>
+          <div style={{
+            fontSize: '22px',
+            fontWeight: 700,
+            letterSpacing: '-0.5px',
+            fontFamily: "'Space Grotesk', Inter, -apple-system, sans-serif",
+            lineHeight: 1,
+          }}>
+            <span style={{ color: '#ffffff' }}>Alzaro</span>
+            <span style={{ color: BRAND.red }}>GarageOps</span>
+          </div>
         </div>
 
         {showForgotPassword ? (
-          // ==================== FORGOT PASSWORD VIEW ====================
           <>
             <div style={{ marginBottom: '20px' }}>
               <button
@@ -218,7 +221,7 @@ export default function Login() {
                   background: 'none', border: 'none',
                   color: BRAND.text2, fontSize: '13px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '6px', padding: 0,
-                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontFamily: "'Space Grotesk', Inter, sans-serif",
                 }}
               >
                 ← Back to login
@@ -258,7 +261,6 @@ export default function Login() {
             </div>
           </>
         ) : (
-          // ==================== LOGIN / REGISTER VIEW ====================
           <>
             {/* Tab switcher */}
             <div style={{
@@ -280,6 +282,7 @@ export default function Login() {
                     background: tab === t ? BRAND.surface3 : 'transparent',
                     color: tab === t ? BRAND.text : BRAND.text2,
                     transition: 'all 0.15s ease',
+                    fontFamily: "'Space Grotesk', Inter, sans-serif",
                   }}
                 >
                   {t === 'login' ? 'Login' : 'Register Garage'}
@@ -322,7 +325,7 @@ export default function Login() {
                     background: 'none', border: 'none',
                     color: BRAND.text2, fontSize: '12px', cursor: 'pointer',
                     padding: '8px', textAlign: 'center',
-                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontFamily: "'Space Grotesk', Inter, sans-serif",
                   }}
                 >
                   Forgot password?
@@ -374,7 +377,6 @@ export default function Login() {
                   fontSize: '11px',
                   color: BRAND.text3,
                   textAlign: 'center',
-                  fontFamily: "'JetBrains Mono', monospace",
                   letterSpacing: '0.3px',
                 }}>
                   No credit card · Cancel anytime · UK-based support
@@ -389,18 +391,15 @@ export default function Login() {
       <div style={{
         fontSize: '11px',
         color: BRAND.text3,
-        fontFamily: "'JetBrains Mono', monospace",
         letterSpacing: '0.5px',
         position: 'relative',
         zIndex: 1,
       }}>
-        Alzaro GarageOps · Built for UK garages · v1.0
+        GarageOps · Built for UK garages · v1.0
       </div>
     </div>
   )
 }
-
-// ==================== HELPER COMPONENTS ====================
 
 function ErrorBanner({ text }) {
   return (
