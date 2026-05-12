@@ -54,7 +54,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
       {!isMobile && (
         <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontFamily: "'Space Grotesk', Inter, -apple-system, sans-serif", fontSize: '16px', fontWeight: 700, letterSpacing: '-0.3px' }}>
-  <span style={{ color: 'var(--text)' }}>Alzaro</span><span style={{ color: 'var(--accent)' }}>GarageOps</span>
+  <span style={{ color: 'var(--text)' }}>Alzaro </span><span style={{ color: 'var(--accent)' }}>GarageOps</span>
 </div>
 <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
   Garage Management Pro
