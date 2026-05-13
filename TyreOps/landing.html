@@ -544,6 +544,13 @@
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+    }
+    
+    .feature-card:hover {
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3), 0 0 40px rgba(99,102,241,0.12);
+      transform: translateY(-4px);
     }
     
     .feature-card-header {
