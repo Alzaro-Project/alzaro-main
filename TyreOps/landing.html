@@ -1986,21 +1986,21 @@
     // Scroll to section (works from any page)
     function scrollToSection(event, sectionId) {
       event.preventDefault();
+
+      // Update active pill immediately on click
+      document.querySelectorAll('.nav-center a').forEach(a => a.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+
       const homePage = document.getElementById('page-home');
-      
       if (!homePage.classList.contains('active')) {
         showPage('home');
         setTimeout(() => {
           const target = document.getElementById(sectionId);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
       } else {
         const target = document.getElementById(sectionId);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
     
@@ -2009,7 +2009,36 @@
     window.addEventListener('scroll', () => {
       nav.classList.toggle('scrolled', window.scrollY > 50);
     });
-    
+
+    // Active nav pill — update on click
+    const navPills = document.querySelectorAll('.nav-center a');
+    function setActiveLink(el) {
+      navPills.forEach(a => a.classList.remove('active'));
+      el.classList.add('active');
+    }
+    navPills.forEach(link => {
+      link.addEventListener('click', function() {
+        setActiveLink(this);
+      });
+    });
+
+    // Active nav pill — also track scroll so it updates as you scroll through sections
+    const sections = ['features', 'pricing', 'how'];
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(id => {
+        const section = document.getElementById(id);
+        if (section && window.scrollY >= section.offsetTop - 200) {
+          current = id;
+        }
+      });
+      navPills.forEach(link => {
+        const onclickAttr = link.getAttribute('onclick') || '';
+        const matchesSection = onclickAttr.includes("'" + current + "'");
+        link.classList.toggle('active', !!current && matchesSection);
+      });
+    });
+
     // Scroll reveal animations
     const observerOptions = {
       root: null,
