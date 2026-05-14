@@ -98,7 +98,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', padding: '20px' }}>
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px', padding: '40px', width: '420px', maxWidth: '100%' }}>
         <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '32px', fontWeight: 800, textAlign: 'center', marginBottom: '6px' }}>
-          Garage<span style={{ color: 'var(--accent)' }}>IQ</span>
+          Alzaro<span style={{ color: 'var(--accent)' }}>TyreOps</span>
         </div>
         <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '24px' }}>Tyre Management Platform</div>
         
@@ -242,7 +242,7 @@ export default function Login() {
           </>
         )}
       </div>
-      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>GarageIQ · Tyre Management SaaS · v1.0</div>
+      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Alzaro TyreOps · Tyre Management SaaS · v1.0</div>
     </div>
   )
 }
