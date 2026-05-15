@@ -8,17 +8,24 @@ const NAV = [
   { path: '/inventory', icon: '⚙️', label: 'Inventory', min: 'bronze' },
   { path: '/purchases', icon: '📦', label: 'Purchases', min: 'bronze' },
   { path: '/customers', icon: '👥', label: 'Customers', min: 'bronze' },
-  { path: '/reports', icon: '📑', label: 'Reports', min: 'bronze' },
   { path: '/vat', icon: '📈', label: 'VAT Report', min: 'silver' },
   { path: '/settings', icon: '🔧', label: 'Settings', min: 'bronze' },
 ]
 
-const TIER_LABELS = { bronze: '🥉 Bronze', silver: '🥈 Silver', gold: '🥇 Gold', admin: '👑 Admin' }
 const TIER_CLASSES = {
-  bronze: { bg: 'rgba(180,100,30,0.2)', color: '#cd7f32', border: 'rgba(180,100,30,0.3)' },
-  silver: { bg: 'rgba(160,160,160,0.15)', color: '#c0c0c0', border: 'rgba(160,160,160,0.3)' },
-  gold: { bg: 'rgba(245,200,66,0.12)', color: '#f5c842', border: 'rgba(245,200,66,0.3)' },
-  admin: { bg: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: 'rgba(167,139,250,0.3)' },
+  bronze: { bg: 'rgba(180,100,30,0.12)', color: '#b36b1a', border: 'rgba(180,100,30,0.25)' },
+  silver: { bg: 'rgba(100,100,120,0.1)', color: '#6b7080', border: 'rgba(100,100,120,0.25)' },
+  gold: { bg: 'rgba(79,70,229,0.1)', color: '#4f46e5', border: 'rgba(79,70,229,0.25)' },
+  admin: { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },
+}
+
+function getTheme() {
+  return localStorage.getItem('alzaro-theme') || 'light'
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem('alzaro-theme', theme)
 }
 
 export default function Sidebar({ onNavigate, isMobile }) {
@@ -27,6 +34,16 @@ export default function Sidebar({ onNavigate, isMobile }) {
   const { user, tier, isAdmin, logout, settings } = useStore()
 
   const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.bronze
+
+  const currentTheme = getTheme()
+  const isDark = currentTheme === 'dark'
+
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark'
+    applyTheme(next)
+    // Force re-render by triggering a storage event
+    window.dispatchEvent(new Event('storage'))
+  }
 
   const handleNav = (item) => {
     const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
@@ -40,23 +57,21 @@ export default function Sidebar({ onNavigate, isMobile }) {
     if (onNavigate) onNavigate()
   }
 
-  const handleLogout = () => {
-    logout()
-  }
+  const handleLogout = () => { logout() }
 
   return (
     <div style={{
-      width: '230px', 
-      background: 'var(--surface)', 
+      width: '230px',
+      background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
-      display: 'flex', 
-      flexDirection: 'column', 
+      display: 'flex',
+      flexDirection: 'column',
       height: isMobile ? 'calc(100vh - 56px)' : '100vh',
     }}>
-      {/* Logo - hidden on mobile (shown in header) */}
+      {/* Logo */}
       {!isMobile && (
         <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 800 }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700 }}>
             Alzaro<span style={{ color: 'var(--accent)' }}>TyreOps</span>
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
@@ -83,38 +98,35 @@ export default function Sidebar({ onNavigate, isMobile }) {
 
       {/* Nav */}
       <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-        {/* Global Search */}
         {!isAdmin && (
           <div style={{ padding: '0 12px 12px' }}>
-            <GlobalSearch 
-              showInSidebar 
+            <GlobalSearch
+              showInSidebar
               placeholder="Search..."
               onResultClick={() => { if (onNavigate) onNavigate() }}
             />
           </div>
         )}
-        
+
         {isAdmin ? (
           <>
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text3)', padding: '10px 16px 5px', textTransform: 'uppercase' }}>Platform</div>
             <NavItem icon="👑" label="Licence Manager" active={location.pathname === '/admin'} onClick={handleAdminNav} />
           </>
         ) : (
-          <>
-            {NAV.map(item => {
-              const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
-              return (
-                <NavItem
-                  key={item.path}
-                  icon={item.icon}
-                  label={item.label}
-                  locked={locked}
-                  active={location.pathname === item.path}
-                  onClick={() => handleNav(item)}
-                />
-              )
-            })}
-          </>
+          NAV.map(item => {
+            const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
+            return (
+              <NavItem
+                key={item.path}
+                icon={item.icon}
+                label={item.label}
+                locked={locked}
+                active={location.pathname === item.path}
+                onClick={() => handleNav(item)}
+              />
+            )
+          })
         )}
       </div>
 
@@ -123,18 +135,41 @@ export default function Sidebar({ onNavigate, isMobile }) {
         <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {user?.email}
         </div>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            background: 'none',
+            color: 'var(--text2)',
+            fontSize: '12px',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            marginBottom: '6px',
+          }}
+        >
+          {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+
         <button onClick={handleLogout} style={{
           width: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: '6px',
-          background: 'none', 
-          color: 'var(--text2)', 
-          fontSize: '12px', 
+          background: 'none',
+          color: 'var(--text2)',
+          fontSize: '12px',
           padding: '8px 12px',
-          borderRadius: '6px', 
-          border: '1px solid var(--border)', 
+          borderRadius: '6px',
+          border: '1px solid var(--border)',
           cursor: 'pointer',
         }}>
           🚪 Sign Out
@@ -147,21 +182,21 @@ export default function Sidebar({ onNavigate, isMobile }) {
 function NavItem({ icon, label, active, locked, onClick }) {
   return (
     <div onClick={onClick} style={{
-      display: 'flex', 
-      alignItems: 'center', 
-      gap: '10px', 
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
       padding: '10px 16px',
       margin: '2px 8px',
       borderRadius: '8px',
-      fontSize: '13px', 
-      fontWeight: active ? 600 : 500, 
-      cursor: 'pointer', 
+      fontSize: '13px',
+      fontWeight: active ? 600 : 500,
+      cursor: 'pointer',
       transition: 'all .12s',
       color: active ? 'var(--text)' : 'var(--text2)',
       background: active ? 'var(--surface3)' : 'transparent',
     }}
-      onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'var(--surface2)' } }}
-      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent' } }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--surface2)' }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
     >
       <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{icon}</span>
       <span style={{ flex: 1 }}>{label}</span>
