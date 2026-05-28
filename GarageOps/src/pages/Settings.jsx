@@ -401,7 +401,7 @@ export default function Settings() {
                     style={inputStyle} 
                     value={settings.smtpFromName || ''} 
                     onChange={e => updateSettings({ smtpFromName: e.target.value })} 
-                    placeholder={settings.name || 'GarageIQ'}
+                    placeholder={settings.name || 'Your Garage'}
                   />
                 </div>
                 <div>
