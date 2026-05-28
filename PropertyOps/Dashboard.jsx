@@ -1,20 +1,11 @@
-const { useState, useMemo } = React;
+const { useState } = React;
 
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
 /*  DEMO DATA  — replace with Supabase queries in phase 2             */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
 const DEMO = {
   user: { name: "James M.", email: "james@alzaro.co.uk", tier: "ENTERPRISE" },
-  metrics: {
-    complianceScore: 94,
-    arrears: 4250,
-    occupancy: 95.2,
-    income: 68400,
-    openMaintenance: 7,
-    renewalsDue: 5,
-    properties: 42,
-    let: 40,
-  },
+  metrics: { complianceScore: 94, arrears: 4250, occupancy: 95.2, income: 68400, openMaintenance: 7, renewalsDue: 5, properties: 42, let: 40 },
   certificates: [
     { type: "Gas Safety", ref: "CP12 certificate", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
     { type: "EICR", ref: "Electrical report", addr: "9 Mill Lane Flat 2", days: 18, icon: "ti-bolt", tone: "amber" },
@@ -26,6 +17,43 @@ const DEMO = {
     { text: "Rent received · Flat 4, £1,150", time: "1 hr ago", tone: "blue" },
     { text: "Boiler fault reported · Flat 2", time: "3 hrs ago", tone: "amber" },
     { text: "Tenancy renewed · 8 Vale Rd", time: "Yesterday", tone: "green" },
+  ],
+  properties: [
+    { addr: "14 Oak Street", area: "Manchester", units: 1, type: "House", status: "Let", rent: 1250, score: 78, tone: "amber" },
+    { addr: "9 Mill Lane", area: "Leeds", units: 4, type: "HMO", status: "Let", rent: 3200, score: 88, tone: "green" },
+    { addr: "22 Bridge Road", area: "Manchester", units: 1, type: "Flat", status: "Let", rent: 950, score: 95, tone: "green" },
+    { addr: "5 King's Court", area: "Liverpool", units: 6, type: "Block", status: "Let", rent: 5400, score: 91, tone: "green" },
+    { addr: "31 Park View", area: "Leeds", units: 1, type: "Flat", status: "Vacant", rent: 0, score: 100, tone: "green" },
+    { addr: "8 Vale Road", area: "Sheffield", units: 1, type: "House", status: "Let", rent: 1100, score: 96, tone: "green" },
+  ],
+  tenants: [
+    { name: "Sarah Connor", prop: "14 Oak Street", end: "2026-09-14", rent: 1250, paid: true, rtr: "Verified" },
+    { name: "Tom Hardy", prop: "9 Mill Lane Flat 2", end: "2026-07-01", rent: 800, paid: false, rtr: "Verified" },
+    { name: "Aisha Khan", prop: "22 Bridge Road", end: "2027-01-30", rent: 950, paid: true, rtr: "Verified" },
+    { name: "David Lowe", prop: "5 King's Court Flat 1", end: "2026-06-20", rent: 900, paid: false, rtr: "Pending" },
+    { name: "Maria Silva", prop: "8 Vale Road", end: "2026-11-08", rent: 1100, paid: true, rtr: "Verified" },
+  ],
+  maintenance: [
+    { title: "Boiler not firing", prop: "9 Mill Lane Flat 2", status: "In Progress", priority: "High", contractor: "GasPro Ltd", days: 1 },
+    { title: "Leaking kitchen tap", prop: "14 Oak Street", status: "Assigned", priority: "Medium", contractor: "FlowFix", days: 2 },
+    { title: "Broken window latch", prop: "5 King's Court", status: "Reported", priority: "Low", contractor: "—", days: 0 },
+    { title: "Damp in bedroom", prop: "22 Bridge Road", status: "In Progress", priority: "High", contractor: "DryWall Co", days: 4 },
+    { title: "Annual boiler service", prop: "8 Vale Road", status: "Completed", priority: "Medium", contractor: "GasPro Ltd", days: 12 },
+  ],
+  payments: [
+    { tenant: "Sarah Connor", prop: "14 Oak Street", amount: 1250, due: "2026-05-01", status: "Paid" },
+    { tenant: "Aisha Khan", prop: "22 Bridge Road", amount: 950, due: "2026-05-01", status: "Paid" },
+    { tenant: "Maria Silva", prop: "8 Vale Road", amount: 1100, due: "2026-05-01", status: "Paid" },
+    { tenant: "Tom Hardy", prop: "9 Mill Lane Flat 2", amount: 800, due: "2026-05-01", status: "Overdue" },
+    { tenant: "David Lowe", prop: "5 King's Court Flat 1", amount: 900, due: "2026-05-01", status: "Overdue" },
+  ],
+  documents: [
+    { name: "Tenancy Agreement — 14 Oak St.pdf", cat: "Agreements", size: "240 KB", date: "12 Mar 2026", icon: "ti-file-text", tone: "blue" },
+    { name: "Gas Safety CP12 — 9 Mill Lane.pdf", cat: "Certificates", size: "180 KB", date: "01 Feb 2026", icon: "ti-flame", tone: "red" },
+    { name: "EICR Report — 22 Bridge Rd.pdf", cat: "Certificates", size: "1.2 MB", date: "18 Jan 2026", icon: "ti-bolt", tone: "amber" },
+    { name: "Right to Rent — S. Connor.pdf", cat: "Right to Rent", size: "95 KB", date: "10 Mar 2026", icon: "ti-id", tone: "green" },
+    { name: "Section 21 Notice — Flat 1.pdf", cat: "Notices", size: "60 KB", date: "05 May 2026", icon: "ti-mail", tone: "blue" },
+    { name: "Invoice — GasPro Ltd.pdf", cat: "Invoices", size: "120 KB", date: "20 May 2026", icon: "ti-receipt", tone: "green" },
   ],
 };
 
@@ -41,54 +69,60 @@ const NAV = [
   { id: "settings", label: "Settings", icon: "ti-settings" },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  REPORTS  — what a UK landlord / agent actually needs to pull      */
-/* ------------------------------------------------------------------ */
 const REPORTS = [
-  {
-    cat: "Financial", tone: "green", icon: "ti-coin",
-    items: [
-      { name: "Rent statement", desc: "Rent due vs received per property, with running balance.", icon: "ti-receipt" },
-      { name: "Arrears report", desc: "Every overdue tenant, amount, and days late.", icon: "ti-alert-triangle" },
-      { name: "Landlord statement", desc: "Income, fees and net payout for each landlord.", icon: "ti-file-invoice" },
-      { name: "Profit & loss", desc: "Income vs expenses across the portfolio for any period.", icon: "ti-chart-line" },
-      { name: "Tax-year summary", desc: "SA105-ready income & allowable expenses for HMRC.", icon: "ti-building-bank" },
-    ],
-  },
-  {
-    cat: "Compliance", tone: "red", icon: "ti-shield-check",
-    items: [
-      { name: "Compliance audit", desc: "Every certificate, status and expiry — your audit trail.", icon: "ti-clipboard-check" },
-      { name: "Expiring certificates", desc: "Gas, EICR, EPC, alarms due in the next 30/60/90 days.", icon: "ti-calendar-due" },
-      { name: "Overdue & at-risk", desc: "Properties currently out of compliance, ranked by risk.", icon: "ti-flag" },
-      { name: "Compliance score history", desc: "How your portfolio score has moved over time.", icon: "ti-trending-up" },
-    ],
-  },
-  {
-    cat: "Portfolio & tenancy", tone: "blue", icon: "ti-building-estate",
-    items: [
-      { name: "Occupancy report", desc: "Let vs vacant units and void periods.", icon: "ti-home-check" },
-      { name: "Tenancy renewals", desc: "Tenancies ending soon and renewal status.", icon: "ti-calendar-repeat" },
-      { name: "Rent review", desc: "Current rent vs market, properties due a review.", icon: "ti-arrows-up-down" },
-    ],
-  },
-  {
-    cat: "Operations", tone: "amber", icon: "ti-tools",
-    items: [
-      { name: "Maintenance summary", desc: "Open vs closed jobs, average resolution time.", icon: "ti-progress" },
-      { name: "Contractor performance", desc: "Jobs, spend and response time per contractor.", icon: "ti-users" },
-      { name: "Spend by category", desc: "Where maintenance money went, broken down.", icon: "ti-chart-pie" },
-    ],
-  },
+  { cat: "Financial", tone: "green", icon: "ti-coin", items: [
+    { name: "Rent statement", desc: "Rent due vs received per property, with running balance.", icon: "ti-receipt" },
+    { name: "Arrears report", desc: "Every overdue tenant, amount, and days late.", icon: "ti-alert-triangle" },
+    { name: "Landlord statement", desc: "Income, fees and net payout for each landlord.", icon: "ti-file-invoice" },
+    { name: "Profit & loss", desc: "Income vs expenses across the portfolio for any period.", icon: "ti-chart-line" },
+    { name: "Tax-year summary", desc: "SA105-ready income & allowable expenses for HMRC.", icon: "ti-building-bank" },
+  ]},
+  { cat: "Compliance", tone: "red", icon: "ti-shield-check", items: [
+    { name: "Compliance audit", desc: "Every certificate, status and expiry — your audit trail.", icon: "ti-clipboard-check" },
+    { name: "Expiring certificates", desc: "Gas, EICR, EPC, alarms due in the next 30/60/90 days.", icon: "ti-calendar-due" },
+    { name: "Overdue & at-risk", desc: "Properties currently out of compliance, ranked by risk.", icon: "ti-flag" },
+    { name: "Compliance score history", desc: "How your portfolio score has moved over time.", icon: "ti-trending-up" },
+  ]},
+  { cat: "Portfolio & tenancy", tone: "blue", icon: "ti-building-estate", items: [
+    { name: "Occupancy report", desc: "Let vs vacant units and void periods.", icon: "ti-home-check" },
+    { name: "Tenancy renewals", desc: "Tenancies ending soon and renewal status.", icon: "ti-calendar-repeat" },
+    { name: "Rent review", desc: "Current rent vs market, properties due a review.", icon: "ti-arrows-up-down" },
+  ]},
+  { cat: "Operations", tone: "amber", icon: "ti-tools", items: [
+    { name: "Maintenance summary", desc: "Open vs closed jobs, average resolution time.", icon: "ti-progress" },
+    { name: "Contractor performance", desc: "Jobs, spend and response time per contractor.", icon: "ti-users" },
+    { name: "Spend by category", desc: "Where maintenance money went, broken down.", icon: "ti-chart-pie" },
+  ]},
 ];
 
 const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
-
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
+const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
-/* ------------------------------------------------------------------ */
-/*  SMALL COMPONENTS                                                  */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  SHARED COMPONENTS                                                 */
+/* ================================================================== */
+function PageHead({ title, sub, right }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+      <div>
+        <h2 style={{ fontSize: 19, fontWeight: 600 }}>{title}</h2>
+        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{sub}</div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Btn({ icon, label, primary }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+      background: primary ? "var(--brand)" : "var(--panel-2)", color: primary ? "#fff" : "var(--txt)", border: "0.5px solid " + (primary ? "var(--brand)" : "var(--line)") }}>
+      {icon && <i className={`ti ${icon}`} style={{ fontSize: 15 }} />}{label}
+    </span>
+  );
+}
+
 function Metric({ label, value, sub, color, subColor }) {
   return (
     <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
@@ -99,90 +133,80 @@ function Metric({ label, value, sub, color, subColor }) {
   );
 }
 
-function Panel({ title, action, children }) {
+function Panel({ title, action, children, onAction }) {
   return (
     <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 13 }}>
         <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{title}</span>
-        {action && <span style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>{action}</span>}
+        {action && <span onClick={onAction} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>{action}</span>}
       </div>
       {children}
     </div>
   );
 }
 
-const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
+function Pill({ text, tone }) {
+  const t = toneVar(tone);
+  return <span style={{ fontSize: 10.5, fontWeight: 600, color: t.color, background: t.soft, padding: "3px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>{text}</span>;
+}
 
-/* ------------------------------------------------------------------ */
-/*  PLACEHOLDER PAGE (non-dashboard nav items)                        */
-/* ------------------------------------------------------------------ */
-function Placeholder({ label, icon }) {
+function Table({ cols, children }) {
   return (
-    <div className="fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "70vh", color: "var(--txt-3)" }}>
-      <i className={`ti ${icon}`} style={{ fontSize: 44, color: "var(--brand)", marginBottom: 14 }} />
-      <div style={{ fontSize: 20, fontFamily: "Sora,sans-serif", color: "var(--txt)", fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 13, marginTop: 6 }}>This module is coming next. The dashboard is live — pick "Dashboard".</div>
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+        <thead>
+          <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
+            {cols.map((c, i) => <th key={i} style={{ textAlign: i === 0 ? "left" : "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--txt-3)", fontWeight: 600 }}>{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
     </div>
   );
 }
+const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)" }}>{children}</td>;
 
-/* ------------------------------------------------------------------ */
-/*  DASHBOARD PAGE                                                    */
-/* ------------------------------------------------------------------ */
-function DashboardPage({ range }) {
+/* ================================================================== */
+/*  DASHBOARD                                                         */
+/* ================================================================== */
+function DashboardPage({ range, go }) {
   const m = DEMO.metrics;
   return (
     <div className="fade-in">
-      {/* greeting */}
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: 19, fontWeight: 600 }}>Good morning, James</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{m.properties} properties · 3 items need attention · {range}</div>
       </div>
-
-      {/* metric row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Compliance Score" value={<>{m.complianceScore}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub="Portfolio healthy" color="var(--green)" />
         <Metric label="Rent Arrears" value={gbp(m.arrears)} sub="3 tenants overdue" color="var(--red)" />
         <Metric label="Occupancy" value={m.occupancy + "%"} sub={`${m.let} of ${m.properties} let`} color="var(--blue)" />
         <Metric label="Monthly Income" value={gbp(m.income)} sub="+2.1% vs last month" color="var(--brand)" subColor="var(--green)" />
       </div>
-
-      {/* two-column */}
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Expiring Certificates" action="View all">
+        <Panel title="Expiring Certificates" action="View all" onAction={() => go("compliance")}>
           {DEMO.certificates.map((c, i) => {
             const t = toneVar(c.tone);
             return (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < DEMO.certificates.length - 1 ? "0.5px solid var(--line)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className={`ti ${c.icon}`} style={{ fontSize: 16 }} />
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 12.5, color: "var(--txt)" }}>{c.type} · {c.addr}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.ref}</div>
-                  </div>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
+                  <div><div style={{ fontSize: 12.5 }}>{c.type} · {c.addr}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.ref}</div></div>
                 </div>
-                <span style={{ fontSize: 10.5, fontWeight: 600, color: t.color, background: t.soft, padding: "3px 9px", borderRadius: 6 }}>{c.days} days</span>
+                <Pill text={c.days + " days"} tone={c.tone} />
               </div>
             );
           })}
         </Panel>
-
         <Panel title="Recent Activity">
           {DEMO.activity.map((a, i) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < DEMO.activity.length - 1 ? 13 : 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: `var(--${a.tone})`, marginTop: 5, flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 11.5, color: "var(--txt)" }}>{a.text}</div>
-                <div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{a.time}</div>
-              </div>
+              <div><div style={{ fontSize: 11.5 }}>{a.text}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{a.time}</div></div>
             </div>
           ))}
         </Panel>
       </div>
-
-      {/* bottom metric row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         <Metric label="Open Maintenance" value={m.openMaintenance} sub="2 high priority" color="var(--amber)" />
         <Metric label="Renewals Due" value={m.renewalsDue} sub="Next 60 days" color="var(--blue)" />
@@ -192,48 +216,277 @@ function DashboardPage({ range }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  REPORTS PAGE                                                      */
-/* ------------------------------------------------------------------ */
-function ReportsPage() {
-  const [period, setPeriod] = useState("This Month");
-  const periods = ["This Month", "Quarter", "Tax Year", "Custom"];
+/* ================================================================== */
+/*  PROPERTIES                                                        */
+/* ================================================================== */
+function PropertiesPage() {
+  const [q, setQ] = useState("");
+  const list = DEMO.properties.filter((p) => (p.addr + p.area + p.type).toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="fade-in">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 19, fontWeight: 600 }}>Reports</h2>
-          <div style={{ fontSize: 13, color: "var(--txt-2)" }}>Generate, preview and export any report across your portfolio.</div>
+      <PageHead title="Properties" sub={`${DEMO.properties.length} properties · ${DEMO.metrics.let} let`} right={<Btn icon="ti-plus" label="Add property" primary />} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by address, area or type…"
+        style={{ width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", marginBottom: 14 }} />
+      <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance"]}>
+        {list.map((p, i) => (
+          <tr key={i} className="row">
+            <Td><span style={{ fontWeight: 500 }}>{p.addr}</span></Td>
+            <Td color="var(--txt-2)">{p.area}</Td>
+            <Td color="var(--txt-2)">{p.type}</Td>
+            <Td color="var(--txt-2)">{p.units}</Td>
+            <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
+            <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
+            <Td><span style={{ color: `var(--${p.tone})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  COMPLIANCE                                                        */
+/* ================================================================== */
+function CompliancePage() {
+  const all = [
+    ...DEMO.certificates,
+    { type: "Carbon Monoxide", ref: "Annual check", addr: "14 Oak St", days: 88, icon: "ti-cloud", tone: "green" },
+    { type: "Buildings Insurance", ref: "Policy renewal", addr: "Portfolio-wide", days: 120, icon: "ti-umbrella", tone: "green" },
+    { type: "HMO Licence", ref: "5-year licence", addr: "9 Mill Lane", days: 210, icon: "ti-license", tone: "green" },
+    { type: "Legionella Risk", ref: "Risk assessment", addr: "5 King's Court", days: 12, icon: "ti-droplet", tone: "amber" },
+  ].sort((a, b) => a.days - b.days);
+  const overdue = all.filter((c) => c.days <= 7).length;
+  const soon = all.filter((c) => c.days > 7 && c.days <= 30).length;
+  return (
+    <div className="fade-in">
+      <PageHead title="Compliance" sub="Live tracking of every legal obligation across your portfolio." right={<Btn icon="ti-upload" label="Upload certificate" primary />} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+        <Metric label="Compliance Score" value={<>{DEMO.metrics.complianceScore}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub="Portfolio healthy" color="var(--green)" />
+        <Metric label="Urgent (≤7 days)" value={overdue} sub="Act now" color="var(--red)" />
+        <Metric label="Due Soon (≤30 days)" value={soon} sub="Schedule renewal" color="var(--amber)" />
+        <Metric label="Tracked Items" value={all.length} sub="Across 6 properties" color="var(--blue)" />
+      </div>
+      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Compliance timeline — soonest first</div>
+      <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
+        {all.map((c, i) => {
+          const t = toneVar(c.tone);
+          const status = c.days <= 7 ? "Urgent" : c.days <= 30 ? "Due soon" : "Valid";
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < all.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
+                <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{c.addr} · {c.ref}</div></div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>in {c.days} days</span>
+                <Pill text={status} tone={c.tone} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  TENANTS                                                           */
+/* ================================================================== */
+function TenantsPage() {
+  return (
+    <div className="fade-in">
+      <PageHead title="Tenants" sub={`${DEMO.tenants.length} active tenants`} right={<Btn icon="ti-user-plus" label="Add tenant" primary />} />
+      <Table cols={["Tenant", "Property", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent"]}>
+        {DEMO.tenants.map((t, i) => (
+          <tr key={i}>
+            <Td>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{t.name.split(" ").map((x) => x[0]).join("")}</span>
+                <span style={{ fontWeight: 500 }}>{t.name}</span>
+              </div>
+            </Td>
+            <Td color="var(--txt-2)">{t.prop}</Td>
+            <Td color="var(--txt-2)">{t.end}</Td>
+            <Td>{gbp(t.rent)}</Td>
+            <Td><Pill text={t.paid ? "Up to date" : "Overdue"} tone={t.paid ? "green" : "red"} /></Td>
+            <Td><Pill text={t.rtr} tone={t.rtr === "Verified" ? "green" : "amber"} /></Td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  MAINTENANCE (kanban)                                              */
+/* ================================================================== */
+function MaintenancePage() {
+  const stages = ["Reported", "Assigned", "In Progress", "Completed"];
+  const toneFor = { High: "red", Medium: "amber", Low: "blue" };
+  return (
+    <div className="fade-in">
+      <PageHead title="Maintenance" sub={`${DEMO.maintenance.filter((m) => m.status !== "Completed").length} open jobs · 2 high priority`} right={<Btn icon="ti-plus" label="New job" primary />} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
+        {stages.map((s) => {
+          const jobs = DEMO.maintenance.filter((m) => m.status === s);
+          return (
+            <div key={s}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
+                <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>{s}</span>
+                <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{jobs.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, minHeight: 80 }}>
+                {jobs.map((j, i) => (
+                  <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
+                      <Pill text={j.priority} tone={toneFor[j.priority]} />
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{j.prop}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-2)" }}>
+                      <i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.contractor}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  FINANCE                                                           */
+/* ================================================================== */
+function FinancePage() {
+  const collected = DEMO.payments.filter((p) => p.status === "Paid").reduce((s, p) => s + p.amount, 0);
+  const overdue = DEMO.payments.filter((p) => p.status === "Overdue").reduce((s, p) => s + p.amount, 0);
+  return (
+    <div className="fade-in">
+      <PageHead title="Finance" sub="Rent, arrears and payments across the portfolio." right={<Btn icon="ti-download" label="Export" />} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+        <Metric label="Expected (May)" value={gbp(collected + overdue)} sub="5 tenancies" color="var(--txt)" />
+        <Metric label="Collected" value={gbp(collected)} sub="3 of 5 paid" color="var(--green)" />
+        <Metric label="Arrears" value={gbp(overdue)} sub="2 overdue" color="var(--red)" />
+        <Metric label="Collection rate" value={Math.round((collected / (collected + overdue)) * 100) + "%"} sub="This month" color="var(--blue)" />
+      </div>
+      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger — May 2026</div>
+      <Table cols={["Tenant", "Property", "Amount", "Due date", "Status"]}>
+        {DEMO.payments.map((p, i) => (
+          <tr key={i}>
+            <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
+            <Td color="var(--txt-2)">{p.prop}</Td>
+            <Td>{gbp(p.amount)}</Td>
+            <Td color="var(--txt-2)">{p.due}</Td>
+            <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : "red"} /></Td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  DOCUMENTS                                                         */
+/* ================================================================== */
+function DocumentsPage() {
+  const [cat, setCat] = useState("All");
+  const cats = ["All", "Agreements", "Certificates", "Right to Rent", "Notices", "Invoices"];
+  const list = DEMO.documents.filter((d) => cat === "All" || d.cat === cat);
+  return (
+    <div className="fade-in">
+      <PageHead title="Documents" sub="Secure legal document vault — encrypted, versioned, audit-logged." right={<Btn icon="ti-upload" label="Upload" primary />} />
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+        {cats.map((c) => (
+          <span key={c} onClick={() => setCat(c)} style={{ cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, color: c === cat ? "var(--txt)" : "var(--txt-2)", background: c === cat ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (c === cat ? "var(--line)" : "transparent") }}>{c}</span>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 11 }}>
+        {list.map((d, i) => {
+          const t = toneVar(d.tone);
+          return (
+            <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px", display: "flex", gap: 12, alignItems: "center" }}>
+              <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${d.icon}`} style={{ fontSize: 18 }} /></span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.cat} · {d.size} · {d.date}</div>
+              </div>
+              <i className="ti ti-download" style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  REPORTS  (+ click-to-preview)                                     */
+/* ================================================================== */
+function ReportPreview({ report, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 620, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)" }}>
+          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Preview · demo data</div></div>
+          <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
         </div>
-        <div style={{ display: "flex", gap: 5, fontSize: 12 }}>
-          {periods.map((p) => (
-            <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>
-          ))}
+        <div style={{ padding: 20 }}>
+          <div style={{ fontSize: 12.5, color: "var(--txt-2)", marginBottom: 16, lineHeight: 1.6 }}>{report.desc}</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)" }}>{c}</th>)}</tr></thead>
+            <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>)}</tbody>
+          </table>
+          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+            <Btn icon="ti-file-type-pdf" label="Export PDF" primary />
+            <Btn icon="ti-file-type-csv" label="Export CSV" />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Live data and working exports arrive with the Supabase backend.</div>
         </div>
       </div>
+    </div>
+  );
+}
 
+const SAMPLE = {
+  cols: ["Property", "Detail", "Value", "Status"],
+  rows: [
+    ["14 Oak Street", "Sarah Connor", "£1,250", "Paid"],
+    ["9 Mill Lane Flat 2", "Tom Hardy", "£800", "Overdue"],
+    ["22 Bridge Road", "Aisha Khan", "£950", "Paid"],
+    ["5 King's Court Flat 1", "David Lowe", "£900", "Overdue"],
+    ["8 Vale Road", "Maria Silva", "£1,100", "Paid"],
+  ],
+};
+
+function ReportsPage() {
+  const [period, setPeriod] = useState("This Month");
+  const [preview, setPreview] = useState(null);
+  const periods = ["This Month", "Quarter", "Tax Year", "Custom"];
+  return (
+    <div className="fade-in" style={{ position: "relative" }}>
+      <PageHead title="Reports" sub="Generate, preview and export any report across your portfolio."
+        right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
       {REPORTS.map((group, gi) => {
         const t = toneVar(group.tone);
         return (
           <div key={gi} style={{ marginBottom: 22 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 11 }}>
-              <span style={{ width: 26, height: 26, borderRadius: 7, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <i className={`ti ${group.icon}`} style={{ fontSize: 15 }} />
-              </span>
+              <span style={{ width: 26, height: 26, borderRadius: 7, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${group.icon}`} style={{ fontSize: 15 }} /></span>
               <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{group.cat}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 11 }}>
               {group.items.map((r, ri) => (
-                <div key={ri} className="report-card" style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "14px 16px", cursor: "pointer", transition: "border-color .15s" }}
+                <div key={ri} onClick={() => setPreview({ ...r, ...SAMPLE })} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "14px 16px", cursor: "pointer", transition: "border-color .15s" }}
                   onMouseEnter={(e) => e.currentTarget.style.borderColor = t.color}
                   onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--line)"}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <i className={`ti ${r.icon}`} style={{ fontSize: 16 }} />
-                    </span>
-                    <i className="ti ti-download" style={{ fontSize: 15, color: "var(--txt-3)" }} />
+                    <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${r.icon}`} style={{ fontSize: 16 }} /></span>
+                    <i className="ti ti-eye" style={{ fontSize: 15, color: "var(--txt-3)" }} />
                   </div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--txt)", marginBottom: 4 }}>{r.name}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>{r.name}</div>
                   <div style={{ fontSize: 11.5, color: "var(--txt-3)", lineHeight: 1.5 }}>{r.desc}</div>
                 </div>
               ))}
@@ -241,37 +494,69 @@ function ReportsPage() {
           </div>
         );
       })}
+      {preview && <ReportPreview report={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  SETTINGS                                                          */
+/* ================================================================== */
+function SettingsPage() {
+  const sections = [
+    { title: "Organisation", icon: "ti-building", rows: [["Company name", "Alzaro Property Co."], ["VAT number", "GB 123 4567 89"], ["Plan", "Enterprise"]] },
+    { title: "Team & roles", icon: "ti-users", rows: [["James M.", "Admin"], ["Priya S.", "Property Manager"], ["GasPro Ltd", "Contractor"]] },
+    { title: "Notifications", icon: "ti-bell", rows: [["Compliance reminders", "Email + SMS"], ["Rent received", "Email"], ["Reminder lead time", "60 / 30 / 14 / 1 days"]] },
+    { title: "Integrations", icon: "ti-plug", rows: [["Xero", "Not connected"], ["QuickBooks", "Not connected"], ["Open Banking", "Not connected"]] },
+  ];
+  return (
+    <div className="fade-in">
+      <PageHead title="Settings" sub="Manage your organisation, team, notifications and integrations." />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+        {sections.map((s, i) => (
+          <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
+              <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${s.icon}`} style={{ fontSize: 15 }} /></span>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.title}</span>
+            </div>
+            {s.rows.map((r, j) => (
+              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j < s.rows.length - 1 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
+                <span style={{ color: "var(--txt-2)" }}>{r[0]}</span><span style={{ fontWeight: 500 }}>{r[1]}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  APP SHELL                                                         */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+const PAGES = {
+  properties: PropertiesPage, compliance: CompliancePage, tenants: TenantsPage,
+  maintenance: MaintenancePage, finance: FinancePage, documents: DocumentsPage,
+  reports: ReportsPage, settings: SettingsPage,
+};
+
 function App() {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(false);
+  const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
 
-  const toggleTheme = () => {
-    setLight((v) => {
-      document.body.classList.toggle("light", !v);
-      return !v;
-    });
-  };
-
-  const activeNav = NAV.find((n) => n.id === active);
+  let body;
+  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} />;
+  else { const P = PAGES[active]; body = <P />; }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      {/* ---------------- SIDEBAR ---------------- */}
       <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
         <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Property Operations Pro</div>
-
         <div style={{ fontSize: 15, fontWeight: 600 }}>{DEMO.user.name}</div>
         <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 18px" }}>{DEMO.user.tier}</span>
-
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((n) => {
             const on = n.id === active;
@@ -283,7 +568,6 @@ function App() {
             );
           })}
         </nav>
-
         <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
           <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{DEMO.user.email}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
@@ -291,15 +575,12 @@ function App() {
             <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)" }}>
-            <i className="ti ti-logout" style={{ fontSize: 15 }} />
-            <span style={{ fontSize: 12 }}>Sign Out</span>
+            <i className="ti ti-logout" style={{ fontSize: 15 }} /><span style={{ fontSize: 12 }}>Sign Out</span>
           </div>
         </div>
       </aside>
 
-      {/* ---------------- MAIN ---------------- */}
       <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
-        {/* top bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
             <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
@@ -310,17 +591,12 @@ function App() {
             <span style={{ position: "absolute", top: -2, right: -3, width: 7, height: 7, borderRadius: "50%", background: "var(--red)" }} />
           </div>
         </div>
-
-        {/* time range tabs (dashboard only) */}
         {active === "dashboard" && (
           <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12 }}>
-            {RANGES.map((r) => (
-              <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>
-            ))}
+            {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
           </div>
         )}
-
-        {active === "dashboard" ? <DashboardPage range={range} /> : active === "reports" ? <ReportsPage /> : <Placeholder label={activeNav.label} icon={activeNav.icon} />}
+        {body}
       </main>
     </div>
   );
