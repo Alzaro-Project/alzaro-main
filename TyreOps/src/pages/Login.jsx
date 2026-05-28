@@ -84,7 +84,7 @@ export default function Login() {
         : `${window.location.protocol}//${window.location.host}` // Production (e.g., garageiq-green.vercel.app)
       
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/reset-password`,
+        redirectTo: `${siteUrl}/tyreops/reset-password`,
       })
       if (err) throw err
       setSuccess('Password reset link sent! Check your email inbox (and spam folder).')
