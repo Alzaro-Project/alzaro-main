@@ -16,6 +16,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/confirmed", "destination": "/confirmed.html" },
     { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
     { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/register", "destination": "/TyreOps/dist/index.html" },
@@ -31,7 +32,6 @@
     { "source": "/tyreops/settings", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/admin", "destination": "/TyreOps/dist/index.html" },
     { "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin).+\\..+)", "destination": "/TyreOps/dist/:file" },
-
     { "source": "/garageops", "destination": "/GarageOps/landing.html" },
     { "source": "/garageops/login", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/register", "destination": "/GarageOps/dist/index.html" },
@@ -44,7 +44,6 @@
     { "source": "/garageops/settings", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/admin", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)", "destination": "/GarageOps/dist/:file" },
-
     { "source": "/serviceops", "destination": "/ServiceOps/index.html" },
     { "source": "/ServiceOps", "destination": "/ServiceOps/index.html" },
     { "source": "/soloops", "destination": "/SoloOps/index.html" },
