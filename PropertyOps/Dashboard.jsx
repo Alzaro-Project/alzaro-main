@@ -1,4 +1,4 @@
-const { useState } = React;
+const { useState, useEffect } = React;
 
 /* ================================================================== */
 /*  DEMO DATA  — replace with Supabase queries in phase 2             */
@@ -221,25 +221,83 @@ function DashboardPage({ range, go }) {
 /* ================================================================== */
 function PropertiesPage() {
   const [q, setQ] = useState("");
-  const list = DEMO.properties.filter((p) => (p.addr + p.area + p.type).toLowerCase().includes(q.toLowerCase()));
+  const [rows, setRows] = useState(null);   // null = loading
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ address: "", area: "", type: "House", units: 1, status: "Let", rent: 0 });
+
+  // Load from Supabase on first render (falls back to demo data if keys unset / error)
+  React.useEffect(() => {
+    if (!DB_READY) { setRows(DEMO.properties); return; }
+    db.from("prop_properties").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) { setErr(error.message); setRows(DEMO.properties); }
+        else setRows(data.length ? data : DEMO.properties);
+      });
+  }, []);
+
+  const refresh = async () => {
+    const { data } = await db.from("prop_properties").select("*").order("created_at", { ascending: false });
+    setRows(data || []);
+  };
+
+  const save = async () => {
+    if (!form.address.trim()) { setErr("Address is required."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
+    setErr("");
+    const { error } = await db.from("prop_properties").insert([{ ...form, units: +form.units, rent: +form.rent, score: 100 }]);
+    if (error) { setErr(error.message); return; }
+    setForm({ address: "", area: "", type: "House", units: 1, status: "Let", rent: 0 });
+    setAdding(false);
+    refresh();
+  };
+
+  const list = (rows || []).filter((p) => ((p.address || p.addr || "") + (p.area || "") + (p.type || "")).toLowerCase().includes(q.toLowerCase()));
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
+
   return (
     <div className="fade-in">
-      <PageHead title="Properties" sub={`${DEMO.properties.length} properties · ${DEMO.metrics.let} let`} right={<Btn icon="ti-plus" label="Add property" primary />} />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by address, area or type…"
-        style={{ width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", marginBottom: 14 }} />
-      <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance"]}>
-        {list.map((p, i) => (
-          <tr key={i} className="row">
-            <Td><span style={{ fontWeight: 500 }}>{p.addr}</span></Td>
-            <Td color="var(--txt-2)">{p.area}</Td>
-            <Td color="var(--txt-2)">{p.type}</Td>
-            <Td color="var(--txt-2)">{p.units}</Td>
-            <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
-            <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
-            <Td><span style={{ color: `var(--${p.tone})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
-          </tr>
-        ))}
-      </Table>
+      <PageHead title="Properties" sub={rows ? `${list.length} ${DB_READY ? "" : "(demo) "}properties` : "Loading…"}
+        right={<span onClick={() => { setAdding(!adding); setErr(""); }}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add property"} primary /></span>} />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
+      {adding && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14, display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+          <input style={inp} placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <input style={inp} placeholder="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+          <select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            {["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}
+          </select>
+          <input style={inp} type="number" placeholder="Units" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} />
+          <select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+            {["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}
+          </select>
+          <input style={inp} type="number" placeholder="Rent pcm" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
+          <div style={{ gridColumn: "1 / -1" }}><span onClick={save}><Btn icon="ti-device-floppy" label="Save property" primary /></span></div>
+        </div>
+      )}
+
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by address, area or type…" style={{ ...inp, width: "100%", marginBottom: 14 }} />
+
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading properties…</div>
+      ) : (
+        <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance"]}>
+          {list.map((p, i) => (
+            <tr key={p.id || i}>
+              <Td><span style={{ fontWeight: 500 }}>{p.address || p.addr}</span></Td>
+              <Td color="var(--txt-2)">{p.area}</Td>
+              <Td color="var(--txt-2)">{p.type}</Td>
+              <Td color="var(--txt-2)">{p.units}</Td>
+              <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
+              <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
+              <Td><span style={{ color: `var(--${p.tone || (p.score >= 90 ? "green" : p.score >= 80 ? "amber" : "red")})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </div>
   );
 }
@@ -532,6 +590,82 @@ function SettingsPage() {
 }
 
 /* ================================================================== */
+/*  AUTH SCREEN  (login + sign up)                                    */
+/* ================================================================== */
+function AuthScreen() {
+  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register");
+  const [mode, setMode] = useState(wantsSignup ? "signup" : "login");   // "login" | "signup"
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const applyHash = () => {
+      const h = window.location.hash;
+      if (h === "#signup" || h === "#register") setMode("signup");
+      else if (h === "#login") setMode("login");
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  const submit = async () => {
+    setMsg(""); 
+    if (!email.trim() || !pw.trim()) { setMsg("Enter your email and password."); return; }
+    if (!DB_READY) { setMsg("Database not connected. Add your keys in supabase.js."); return; }
+    setBusy(true);
+    if (mode === "signup") {
+      const { error } = await db.auth.signUp({ email, password: pw });
+      setBusy(false);
+      if (error) setMsg(error.message);
+      else setMsg("Account created. Check your email to confirm, then log in.");
+    } else {
+      const { error } = await db.auth.signInWithPassword({ email, password: pw });
+      setBusy(false);
+      if (error) setMsg(error.message);
+      // on success, the auth listener in App() swaps to the dashboard automatically
+    }
+  };
+
+  const inp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "11px 14px", color: "var(--txt)", fontSize: 13.5, fontFamily: "Inter", outline: "none", marginBottom: 11 };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div className="fade-in" style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <div className="brand" style={{ fontSize: 26, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
+          <div style={{ fontSize: 12.5, color: "var(--txt-3)", marginTop: 4 }}>Property Operations Infrastructure</div>
+        </div>
+
+        <div style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "26px 24px" }}>
+          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>{mode === "login" ? "Welcome back" : "Create your account"}</div>
+          <div style={{ fontSize: 12.5, color: "var(--txt-3)", marginBottom: 20 }}>{mode === "login" ? "Sign in to your portfolio." : "Start managing your properties."}</div>
+
+          <input style={inp} type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+          <input style={inp} type="password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+
+          {msg && <div style={{ fontSize: 11.5, color: msg.includes("created") ? "var(--green)" : "var(--red)", background: msg.includes("created") ? "var(--green-soft)" : "var(--red-soft)", padding: "9px 12px", borderRadius: 8, marginBottom: 12, lineHeight: 1.4 }}>{msg}</div>}
+
+          <button onClick={submit} disabled={busy}
+            style={{ width: "100%", background: "var(--brand)", color: "#fff", border: "none", borderRadius: 9, padding: "12px", fontSize: 13.5, fontWeight: 600, fontFamily: "Inter", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+          </button>
+
+          <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--txt-3)", marginTop: 16 }}>
+            {mode === "login" ? "No account yet? " : "Already have an account? "}
+            <span onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMsg(""); }} style={{ color: "var(--brand)", cursor: "pointer", fontWeight: 500 }}>
+              {mode === "login" ? "Sign up" : "Log in"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  APP SHELL                                                         */
 /* ================================================================== */
 const PAGES = {
@@ -540,7 +674,7 @@ const PAGES = {
   reports: ReportsPage, settings: SettingsPage,
 };
 
-function App() {
+function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(false);
@@ -555,7 +689,7 @@ function App() {
       <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
         <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Property Operations Pro</div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{DEMO.user.name}</div>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
         <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 18px" }}>{DEMO.user.tier}</span>
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((n) => {
@@ -569,14 +703,13 @@ function App() {
           })}
         </nav>
         <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{DEMO.user.email}</div>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : DEMO.user.email}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
             <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)" }}>
-            <i className="ti ti-logout" style={{ fontSize: 15 }} /><span style={{ fontSize: 12 }}>Sign Out</span>
-          </div>
+          <div onClick={signOut} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)" }}>
+            <i className="ti ti-logout" style={{ fontSize: 15 }} /><span style={{ fontSize: 12 }}>Sign Out</span></div>
         </div>
       </aside>
 
@@ -600,6 +733,28 @@ function App() {
       </main>
     </div>
   );
+}
+
+/* ================================================================== */
+/*  ROOT — decides: login screen or dashboard                         */
+/* ================================================================== */
+function App() {
+  const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
+
+  useEffect(() => {
+    if (!DB_READY) { setSession(null); return; }
+    db.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = db.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const signOut = () => db.auth.signOut();
+
+  if (session === undefined) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+  }
+  if (!session) return <AuthScreen />;
+  return <Dashboard user={session.user} signOut={signOut} />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
