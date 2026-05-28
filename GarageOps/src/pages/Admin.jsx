@@ -118,7 +118,7 @@ export default function Admin() {
   return (
     <div>
       <div style={{ background: 'linear-gradient(90deg,rgba(167,139,250,.12),rgba(167,139,250,.04))', border: '1px solid rgba(167,139,250,.25)', borderRadius: '8px', padding: '7px 14px', fontSize: '11px', color: 'var(--purple)', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        👑 GarageIQ Admin Panel — Platform Owner View
+        👑 Alzaro GarageOps Admin Panel — Platform Owner View
       </div>
 
       <PageHeader title="Garage Management" subtitle="All registered garages and subscriptions">
