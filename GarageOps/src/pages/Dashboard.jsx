@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { StatCard, Card, PageHeader, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
+import WelcomeBanner from '../components/WelcomeBanner'
 
 const PERIODS = [
   { key: 'today', label: 'Today' },
@@ -79,6 +80,8 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader title="Dashboard" subtitle={`${settings?.name || 'Your Garage'} — ${PERIODS.find(p => p.key === dashPeriod)?.label}`} />
+
+      <WelcomeBanner />
 
       {/* Global Search Bar */}
       <div style={{ marginBottom: '20px' }}>
