@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Confirmed — Alzaro</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #22c55e;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    }
+    .check {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 1.5rem;
+      border-radius: 50%;
+      background: rgba(34,197,94,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .check svg {
+      width: 38px;
+      height: 38px;
+      stroke: var(--accent);
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: draw 0.6s ease forwards 0.2s;
+    }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    h1 { font-size: 1.6rem; margin-bottom: 0.6rem; }
+    p { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+    .redirect {
+      margin-top: 1.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .redirect strong { color: var(--text); }
+    a.btn {
+      display: inline-block;
+      margin-top: 1.25rem;
+      padding: 0.65rem 1.4rem;
+      background: var(--accent);
+      color: #04220f;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: opacity 0.2s;
+    }
+    a.btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="check">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
+    </div>
+    <h1>Your email is confirmed</h1>
+    <p>Thanks for verifying your email. Your account is ready to go.</p>
+    <div class="redirect">Redirecting to the homepage in <strong id="count">6</strong> seconds…</div>
+    <a class="btn" href="https://alzaro.co.uk">Go now</a>
+  </div>
+
+  <script>
+    var seconds = 6;
+    var redirectTo = "https://alzaro.co.uk";
+    var el = document.getElementById("count");
+    var timer = setInterval(function () {
+      seconds -= 1;
+      if (el) el.textContent = seconds;
+      if (seconds <= 0) {
+        clearInterval(timer);
+        window.location.href = redirectTo;
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
