@@ -73,7 +73,7 @@ export default function TrialGuard({ children }) {
             Your account has been suspended. Please contact support to resolve this issue.
           </div>
           <div style={{ color: 'var(--text3)', fontSize: '13px' }}>
-            Email: support@garageiq.co.uk
+            Email: support@alzaro.co.uk
           </div>
           <button
             onClick={() => {
@@ -114,11 +114,11 @@ export default function TrialGuard({ children }) {
               Trial Expired
             </div>
             <div style={{ color: 'var(--text2)', marginBottom: '24px', lineHeight: 1.6 }}>
-              Your 14-day free trial has ended. Subscribe to continue using GarageIQ and access all your data.
+              Your 14-day free trial has ended. Subscribe to continue using Alzaro GarageOps and access all your data.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <a 
-                href="mailto:support@garageiq.co.uk?subject=GarageIQ Subscription"
+                href="mailto:support@alzaro.co.uk?subject=Alzaro GarageOps Subscription"
                 style={{ 
                   background: 'var(--accent)', 
                   color: '#000', 
@@ -141,7 +141,7 @@ export default function TrialGuard({ children }) {
                 Questions? Contact us:
               </div>
               <div style={{ color: 'var(--text2)', fontSize: '13px' }}>
-                support@garageiq.co.uk
+                support@alzaro.co.uk
               </div>
             </div>
             <button
@@ -167,4 +167,4 @@ export default function TrialGuard({ children }) {
   }
   
   return children
-}
+} 
