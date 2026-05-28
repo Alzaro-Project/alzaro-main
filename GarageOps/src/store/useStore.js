@@ -13,10 +13,10 @@ const TIER_PRICE = { bronze: 60, silver: 75, gold: 90 }
 // TOAST NOTIFICATION HELPER
 // ============================================================
 const showToast = (message, type = 'error') => {
-  let container = document.getElementById('garageiq-toast-container')
+  let container = document.getElementById('garageops-toast-container')
   if (!container) {
     container = document.createElement('div')
-    container.id = 'garageiq-toast-container'
+    container.id = 'garageops-toast-container'
     container.style.cssText = `
       position: fixed; top: 20px; right: 20px; z-index: 9999;
       display: flex; flex-direction: column; gap: 10px;
@@ -158,7 +158,7 @@ export const useStore = create(
       // --------------------------------------------------------
       login: async (email, isAdmin = false) => {
         if (isAdmin) {
-          set({ user: { name: 'GarageIQ Admin', email }, isAdmin: true, tier: 'admin' })
+          set({ user: { name: 'GarageOps Admin', email }, isAdmin: true, tier: 'admin' })
           return
         }
 
@@ -263,9 +263,9 @@ export const useStore = create(
           jobs: [],
           motReminders: [],
         })
-        // Redirect to login — respect whichever product the user was on
-        const productPath = get().product === 'garageops' ? '/garageops/login' : '/tyreops/login'
-        window.location.href = productPath
+        // Redirect to login. The app is served under /garageops, so we use an
+        // absolute path here (a full page reload, outside React Router).
+        window.location.href = '/garageops/login'
       },
 
       // --------------------------------------------------------
@@ -1107,7 +1107,7 @@ export const useStore = create(
       },
     }),
     {
-      name: 'garageiq-store',
+      name: 'garageops-store',
       // Only persist certain fields to localStorage
       partialize: (state) => ({
         user: state.user,
