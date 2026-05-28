@@ -107,7 +107,7 @@ export default function Login() {
           <>
             <div style={{ marginBottom: '20px' }}>
               <button 
-                onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
+                onClick={() => { setShowForgotPassword(false); setError(''); setSuccess('') }}
                 style={{ 
                   background: 'none', 
                   border: 'none', 
@@ -209,7 +209,7 @@ export default function Login() {
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>
                 <button 
-                  onClick={() => navigate('/forgot-password')}
+                  onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
                   style={{ 
                     background: 'none', 
                     border: 'none', 
