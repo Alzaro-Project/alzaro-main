@@ -581,30 +581,102 @@ function MaintenancePage({ user }) {
 /* ================================================================== */
 /*  FINANCE                                                           */
 /* ================================================================== */
-function FinancePage() {
-  const collected = DEMO.payments.filter((p) => p.status === "Paid").reduce((s, p) => s + p.amount, 0);
-  const overdue = DEMO.payments.filter((p) => p.status === "Overdue").reduce((s, p) => s + p.amount, 0);
+function FinancePage({ user }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = { tenant: "", property: "", amount: "", due_date: "", status: "Paid" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows(DEMO.payments.map((p) => ({ tenant: p.tenant, property: p.prop, amount: p.amount, due_date: p.due, status: p.status }))); return; }
+    db.from("prop_payments").select("*").order("due_date", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => {
+    const { data } = await db.from("prop_payments").select("*").order("due_date", { ascending: false });
+    setRows(data || []);
+  };
+
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property: p.property || "", amount: p.amount || "", due_date: p.due_date || "", status: p.status || "Paid" }); setEditId(p.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.tenant.trim()) { setErr("Tenant name is required."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount };
+    if (!payload.due_date) delete payload.due_date;
+    let error;
+    if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
+    else ({ error } = await db.from("prop_payments").insert([{ ...payload, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
+  };
+
+  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
+
+  const data = rows || [];
+  const collected = data.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
+  const overdue = data.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
+  const expected = collected + overdue;
+  const rate = expected ? Math.round((collected / expected) * 100) : 0;
+  const paidCount = data.filter((p) => p.status === "Paid").length;
+  const overdueCount = data.filter((p) => p.status === "Overdue").length;
+
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+
   return (
     <div className="fade-in">
-      <PageHead title="Finance" sub="Rent, arrears and payments across the portfolio." right={<Btn icon="ti-download" label="Export" />} />
+      <PageHead title="Finance" sub={rows ? `${data.length} payment${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add payment"} primary /></span>} />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-        <Metric label="Expected (May)" value={gbp(collected + overdue)} sub="5 tenancies" color="var(--txt)" />
-        <Metric label="Collected" value={gbp(collected)} sub="3 of 5 paid" color="var(--green)" />
-        <Metric label="Arrears" value={gbp(overdue)} sub="2 overdue" color="var(--red)" />
-        <Metric label="Collection rate" value={Math.round((collected / (collected + overdue)) * 100) + "%"} sub="This month" color="var(--blue)" />
+        <Metric label="Expected" value={gbp(expected)} sub={`${data.length} payment${data.length === 1 ? "" : "s"}`} color="var(--txt)" />
+        <Metric label="Collected" value={gbp(collected)} sub={`${paidCount} paid`} color="var(--green)" />
+        <Metric label="Arrears" value={gbp(overdue)} sub={`${overdueCount} overdue`} color="var(--red)" />
+        <Metric label="Collection rate" value={rate + "%"} sub="Paid vs expected" color="var(--blue)" />
       </div>
-      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger — May 2026</div>
-      <Table cols={["Tenant", "Property", "Amount", "Due date", "Status"]}>
-        {DEMO.payments.map((p, i) => (
-          <tr key={i}>
-            <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
-            <Td color="var(--txt-2)">{p.prop}</Td>
-            <Td>{gbp(p.amount)}</Td>
-            <Td color="var(--txt-2)">{p.due}</Td>
-            <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : "red"} /></Td>
-          </tr>
-        ))}
-      </Table>
+
+      {adding && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label style={fld}>Tenant<input style={inp} placeholder="e.g. Sarah Connor" value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })} /></label>
+            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1250" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Paid", "Overdue", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update payment" : "Save payment"} primary /></span></div>
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger</div>
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading payments…</div>
+      ) : data.length === 0 ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
+      ) : (
+        <Table cols={["Tenant", "Property", "Amount", "Due date", "Status", ""]}>
+          {data.map((p, i) => (
+            <tr key={p.id || i}>
+              <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
+              <Td color="var(--txt-2)">{p.property || p.prop || "—"}</Td>
+              <Td>{gbp(p.amount || 0)}</Td>
+              <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
+              <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
+              <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </div>
   );
 }
