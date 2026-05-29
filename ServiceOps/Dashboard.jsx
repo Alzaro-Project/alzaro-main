@@ -174,6 +174,31 @@ const errBanner = { fontSize: 11.5, color: "var(--red)", background: "var(--red-
 const emptyCard = { color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" };
 const rowActions = (DB, onEdit, onDel) => DB ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={onEdit} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={onDel} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null;
 
+/* Shared: load the customer list once, for dropdowns across pages */
+function useCustomers() {
+  const [customers, setCustomers] = useState([]);
+  useEffect(() => {
+    if (!DB_READY) return;
+    db.from("svc_customers").select("id,name,site").order("name", { ascending: true })
+      .then(({ data }) => setCustomers(data || []));
+  }, []);
+  return customers;
+}
+
+/* Shared: a customer picker that stores customer_id and keeps the name in sync */
+function CustomerSelect({ customers, value, onChange }) {
+  return (
+    <select style={inp} value={value || ""} onChange={(e) => {
+      const id = e.target.value;
+      const c = customers.find((x) => String(x.id) === String(id));
+      onChange(id ? +id : "", c ? c.name : "", c ? c.site : "");
+    }}>
+      <option value="">— Select customer —</option>
+      {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+    </select>
+  );
+}
+
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
@@ -275,6 +300,7 @@ function CustomersPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [detail, setDetail] = useState(null);
   const blank = { name: "", area: "", contact: "", email: "", type: "Homeowner", site: "" };
   const [form, setForm] = useState(blank);
 
@@ -334,7 +360,7 @@ function CustomersPage({ user }) {
               <Td>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{(c.name || "?").split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
-                  <span style={{ fontWeight: 500 }}>{c.name}</span>
+                  <span onClick={() => setDetail(c)} style={{ fontWeight: 500, cursor: "pointer", color: "var(--brand)" }}>{c.name}</span>
                 </div>
               </Td>
               <Td><Pill text={c.type || "—"} tone={c.type === "Commercial" ? "blue" : c.type === "Agency" ? "amber" : "green"} /></Td>
@@ -348,19 +374,76 @@ function CustomersPage({ user }) {
           ))}
         </Table>
       )}
+      {detail && <CustomerDetail customer={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }
 
-/* ================================================================== */
-/*  QUOTES                                                            */
+/* Customer detail — shows everything linked to one customer */
+function CustomerDetail({ customer, onClose }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    if (!DB_READY) { setData({ quotes: [], jobs: [], invoices: [], certs: [], bookings: [] }); return () => window.removeEventListener("keydown", onKey); }
+    Promise.all([
+      db.from("svc_quotes").select("*").eq("customer_id", customer.id),
+      db.from("svc_jobs").select("*").eq("customer_id", customer.id),
+      db.from("svc_invoices").select("*").eq("customer_id", customer.id),
+      db.from("svc_certificates").select("*").eq("customer_id", customer.id),
+      db.from("svc_bookings").select("*").eq("customer_id", customer.id),
+    ]).then(([q, j, i, c, b]) => setData({ quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: c.data || [], bookings: b.data || [] }));
+    return () => window.removeEventListener("keydown", onKey);
+  }, [customer.id]);
+
+  const Section = ({ title, items, render }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 8 }}>{title} ({items.length})</div>
+      {items.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>None yet.</div>
+        : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{items.map(render)}</div>}
+    </div>
+  );
+  const line = (left, right, tone) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", fontSize: 12.5 }}>
+      <span>{left}</span>{right && <Pill text={right} tone={tone || "blue"} />}
+    </div>
+  );
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 60, overflow: "auto" }}>
+      <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)" }}>
+          <div style={{ fontSize: 17, fontWeight: 600 }}>{customer.name}</div>
+          <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 3 }}>{[customer.type, customer.area, customer.site].filter(Boolean).join(" · ")}</div>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 6, display: "flex", gap: 16 }}>
+            {customer.contact && <span><i className="ti ti-phone" style={{ fontSize: 13, marginRight: 4 }} />{customer.contact}</span>}
+            {customer.email && <span><i className="ti ti-mail" style={{ fontSize: 13, marginRight: 4 }} />{customer.email}</span>}
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          {!data ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div> : (
+            <>
+              <Section title="Quotes" items={data.quotes} render={(q) => <div key={q.id}>{line(`${q.ref || "—"} · ${q.description || ""}`, gbp(+q.amount || 0), "amber")}</div>} />
+              <Section title="Jobs" items={data.jobs} render={(j) => <div key={j.id}>{line(j.title, j.status, j.status === "Completed" ? "green" : "blue")}</div>} />
+              <Section title="Invoices" items={data.invoices} render={(v) => <div key={v.id}>{line(`${v.ref || "—"} · ${gbp(+v.amount || 0)}`, v.status, v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue")}</div>} />
+              <Section title="Bookings" items={data.bookings} render={(b) => <div key={b.id}>{line(`${b.booking_date || ""} ${b.booking_time || ""} · ${b.title}`, b.engineer || "Unassigned", "brand")}</div>} />
+              <Section title="Certificates" items={data.certs} render={(c) => <div key={c.id}>{line(`${c.cert_type} · ${c.site || ""}`, c.expiry_date ? `exp ${c.expiry_date}` : "—", "green")}</div>} />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 /* ================================================================== */
 function QuotesPage({ user }) {
+  const customers = useCustomers();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer: "", description: "", amount: "", status: "Draft", quote_date: "" };
+  const blank = { ref: "", customer_id: "", customer: "", description: "", amount: "", status: "Draft", quote_date: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -371,13 +454,13 @@ function QuotesPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_quotes").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (q) => { setForm({ ref: q.ref || "", customer: q.customer || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "" }); setEditId(q.id); setAdding(true); setErr(""); };
+  const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "" }); setEditId(q.id); setAdding(true); setErr(""); };
 
   const save = async () => {
-    if (!form.customer.trim()) { setErr("Customer is required."); return; }
+    if (!form.customer.trim()) { setErr("Please select a customer."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null };
     if (!payload.quote_date) delete payload.quote_date;
     let error;
     if (editId) ({ error } = await db.from("svc_quotes").update(payload).eq("id", editId));
@@ -410,7 +493,7 @@ function QuotesPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit quote" : "New quote"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Reference<input style={inp} placeholder="e.g. QUO-223" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
-            <label style={fld}>Customer<input style={inp} placeholder="e.g. Sarah Connor" value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} /></label>
+            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name) => setForm({ ...form, customer_id: id, customer: name })} /></label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1850" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={{ ...fld, gridColumn: "span 2" }}>Description<input style={inp} placeholder="e.g. Full bathroom refit" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Approved", "Rejected"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -448,11 +531,12 @@ function QuotesPage({ user }) {
 function JobsPage({ user }) {
   const stages = ["New", "Scheduled", "In Progress", "Completed", "Invoiced"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
+  const customers = useCustomers();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { title: "", customer: "", site: "", engineer: "", priority: "Medium", value: "", status: "New" };
+  const blank = { title: "", customer_id: "", customer: "", site: "", engineer: "", priority: "Medium", value: "", status: "New" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -463,13 +547,13 @@ function JobsPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_jobs").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", customer: j.customer || "", site: j.site || "", engineer: j.engineer || "", priority: j.priority || "Medium", value: j.value || "", status: j.status || "New" }); setEditId(j.id); setAdding(true); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", customer_id: j.customer_id || "", customer: j.customer || "", site: j.site || "", engineer: j.engineer || "", priority: j.priority || "Medium", value: j.value || "", status: j.status || "New" }); setEditId(j.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Job title is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, value: form.value === "" ? 0 : +form.value };
+    const payload = { ...form, value: form.value === "" ? 0 : +form.value, customer_id: form.customer_id || null };
     let error;
     if (editId) ({ error } = await db.from("svc_jobs").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_jobs").insert([{ ...payload, user_id: user.id }]));
@@ -496,7 +580,7 @@ function JobsPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New job"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label style={fld}>Customer<input style={inp} placeholder="e.g. Mill Lane Lettings" value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} /></label>
+            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
             <label style={fld}>Site<input style={inp} placeholder="e.g. 9 Mill Lane Flat 2" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
             <label style={fld}>Engineer<input style={inp} placeholder="e.g. Dave R." value={form.engineer} onChange={(e) => setForm({ ...form, engineer: e.target.value })} /></label>
             <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -559,40 +643,99 @@ function JobsPage({ user }) {
 /* ================================================================== */
 /*  DIARY  (week view)                                                */
 /* ================================================================== */
-function DiaryPage() {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const engineers = [
-    { name: "Dave R.", tone: "brand" },
-    { name: "Mike T.", tone: "blue" },
-  ];
-  const slots = {
-    Mon: [], Tue: [], Wed: [], Thu: [], Fri: [], Sat: [],
+function DiaryPage({ user }) {
+  const customers = useCustomers();
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = { title: "", customer_id: "", customer: "", site: "", engineer: "", booking_date: "", booking_time: "", priority: "Medium" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows([]); return; }
+    db.from("svc_bookings").select("*").order("booking_date", { ascending: true })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => { const { data } = await db.from("svc_bookings").select("*").order("booking_date", { ascending: true }); setRows(data || []); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (b) => { setForm({ title: b.title || "", customer_id: b.customer_id || "", customer: b.customer || "", site: b.site || "", engineer: b.engineer || "", booking_date: b.booking_date || "", booking_time: b.booking_time || "", priority: b.priority || "Medium" }); setEditId(b.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.title.trim()) { setErr("Booking title is required."); return; }
+    if (!form.booking_date) { setErr("Please choose a date."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    const payload = { ...form, customer_id: form.customer_id || null };
+    if (!payload.booking_time) delete payload.booking_time;
+    let error;
+    if (editId) ({ error } = await db.from("svc_bookings").update(payload).eq("id", editId));
+    else ({ error } = await db.from("svc_bookings").insert([{ ...payload, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
   };
+  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_bookings").delete().eq("id", id); refresh(); } };
+
+  const data = rows || [];
+  const toneFor = { High: "red", Medium: "amber", Low: "blue" };
+  // group by date
+  const byDate = {};
+  data.forEach((b) => { const k = b.booking_date || "No date"; (byDate[k] = byDate[k] || []).push(b); });
+  const dates = Object.keys(byDate).sort();
+  const fmtDay = (iso) => iso === "No date" ? "No date" : new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+
   return (
     <div className="fade-in">
-      <PageHead title="Diary" sub="This week · 2 engineers · drag-and-drop scheduling arrives with the backend."
-        right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>{engineers.map((e) => <span key={e.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--txt-2)" }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: `var(--${e.tone})` }} />{e.name}</span>)}<span><Btn icon="ti-plus" label="New booking" primary /></span></div>} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10 }}>
-        {days.map((d) => (
-          <div key={d}>
-            <div style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 9, textAlign: "center" }}>{d}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 120 }}>
-              {(slots[d] || []).map((s, i) => {
-                const t = toneVar(s.tone);
+      <PageHead title="Diary" sub={rows ? `${data.length} booking${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New booking"} primary /></span>} />
+      {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={errBanner}>{err}</div>}
+      {adding && (
+        <div style={formCard}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit booking" : "New booking"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+            <label style={fld}>Booking title<input style={inp} placeholder="e.g. Boiler service" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={fld}>Date<input style={inp} type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></label>
+            <label style={fld}>Time<input style={inp} type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></label>
+            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
+            <label style={fld}>Engineer<input style={inp} placeholder="e.g. Dave R." value={form.engineer} onChange={(e) => setForm({ ...form, engineer: e.target.value })} /></label>
+            <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update booking" : "Save booking"} primary /></span></div>
+        </div>
+      )}
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading diary…</div>
+      ) : data.length === 0 ? (
+        <div style={emptyCard}>No bookings yet. Click "New booking" to schedule your first job.</div>
+      ) : (
+        dates.map((dk) => (
+          <div key={dk} style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 9 }}>{fmtDay(dk)}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {byDate[dk].sort((a, b) => (a.booking_time || "").localeCompare(b.booking_time || "")).map((b) => {
+                const t = toneVar(toneFor[b.priority] || "blue");
                 return (
-                  <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderLeft: `2px solid ${t.color}`, borderRadius: 8, padding: "9px 10px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: t.color, fontFamily: "monospace" }}>{s.time}</div>
-                    <div style={{ fontSize: 12, fontWeight: 500, margin: "3px 0", lineHeight: 1.3 }}>{s.job}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{s.cust}</div>
-                    <div style={{ fontSize: 10, color: "var(--txt-2)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><i className="ti ti-user-cog" style={{ fontSize: 11 }} />{s.eng}</div>
+                  <div key={b.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderLeft: `2px solid ${t.color}`, borderRadius: 8, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: t.color, fontFamily: "monospace", minWidth: 46 }}>{b.booking_time || "—"}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{b.title}</div>
+                        <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{b.customer || "—"}{b.site ? ` · ${b.site}` : ""}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <span style={{ fontSize: 11, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><i className="ti ti-user-cog" style={{ fontSize: 13 }} />{b.engineer || "Unassigned"}</span>
+                      {rowActions(DB_READY, () => openEdit(b), () => remove(b.id))}
+                    </div>
                   </div>
                 );
               })}
-              {(slots[d] || []).length === 0 && <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center", padding: "16px 0", border: "1px dashed var(--line)", borderRadius: 8 }}>—</div>}
             </div>
           </div>
-        ))}
-      </div>
+        ))
+      )}
     </div>
   );
 }
@@ -601,11 +744,12 @@ function DiaryPage() {
 /*  INVOICING                                                         */
 /* ================================================================== */
 function InvoicingPage({ user }) {
+  const customers = useCustomers();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer: "", amount: "", due_date: "", status: "Draft" };
+  const blank = { ref: "", customer_id: "", customer: "", amount: "", due_date: "", status: "Draft" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -616,13 +760,13 @@ function InvoicingPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_invoices").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (v) => { setForm({ ref: v.ref || "", customer: v.customer || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft" }); setEditId(v.id); setAdding(true); setErr(""); };
+  const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft" }); setEditId(v.id); setAdding(true); setErr(""); };
 
   const save = async () => {
-    if (!form.customer.trim()) { setErr("Customer is required."); return; }
+    if (!form.customer.trim()) { setErr("Please select a customer."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null };
     if (!payload.due_date) delete payload.due_date;
     let error;
     if (editId) ({ error } = await db.from("svc_invoices").update(payload).eq("id", editId));
@@ -656,7 +800,7 @@ function InvoicingPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit invoice" : "New invoice"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Reference<input style={inp} placeholder="e.g. INV-1045" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
-            <label style={fld}>Customer<input style={inp} placeholder="e.g. King's Court Mgmt" value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} /></label>
+            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name) => setForm({ ...form, customer_id: id, customer: name })} /></label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 540" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -690,36 +834,91 @@ function InvoicingPage({ user }) {
 /* ================================================================== */
 /*  CERTIFICATES                                                      */
 /* ================================================================== */
-function CertificatesPage() {
-  const all = [];
-  const urgent = all.filter((c) => c.days <= 7).length;
-  const soon = all.filter((c) => c.days > 7 && c.days <= 30).length;
+function CertificatesPage({ user }) {
+  const customers = useCustomers();
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const TYPES = ["Gas Safety (CP12)", "EICR", "EIC (Installation)", "Boiler Service", "PAT Testing", "Completion Certificate", "Other"];
+  const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", site: "", ref: "", expiry_date: "" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows([]); return; }
+    db.from("svc_certificates").select("*").order("expiry_date", { ascending: true })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => { const { data } = await db.from("svc_certificates").select("*").order("expiry_date", { ascending: true }); setRows(data || []); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (c) => { setForm({ cert_type: c.cert_type || "Other", customer_id: c.customer_id || "", customer: c.customer || "", site: c.site || "", ref: c.ref || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.expiry_date) { setErr("Please set an expiry date."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    const payload = { ...form, customer_id: form.customer_id || null };
+    let error;
+    if (editId) ({ error } = await db.from("svc_certificates").update(payload).eq("id", editId));
+    else ({ error } = await db.from("svc_certificates").insert([{ ...payload, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
+  };
+  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_certificates").delete().eq("id", id); refresh(); } };
+
+  const iconForType = (ty) => /gas|cp12|boiler/i.test(ty) ? "ti-flame" : /eicr|eic|pat|electric/i.test(ty) ? "ti-bolt" : /completion/i.test(ty) ? "ti-circle-check" : "ti-shield-check";
+  const daysLeft = (iso) => Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
+  const data = (rows || []).map((c) => ({ ...c, days: c.expiry_date ? daysLeft(c.expiry_date) : 9999 })).sort((a, b) => a.days - b.days);
+  const urgent = data.filter((c) => c.days <= 7).length;
+  const soon = data.filter((c) => c.days > 7 && c.days <= 30).length;
+
   return (
     <div className="fade-in">
-      <PageHead title="Certificates" sub="Track every gas, electrical and completion certificate across your jobs." right={<Btn icon="ti-upload" label="Upload certificate" primary />} />
+      <PageHead title="Certificates" sub={rows ? `${data.length} certificate${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add certificate"} primary /></span>} />
+      {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={errBanner}>{err}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-        <Metric label="Tracked items" value={all.length} sub="Across all sites" color="var(--blue)" />
+        <Metric label="Tracked items" value={data.length} sub="Across all sites" color="var(--blue)" />
         <Metric label="Urgent (≤7 days)" value={urgent} sub="Renew now" color="var(--red)" />
         <Metric label="Due soon (≤30 days)" value={soon} sub="Schedule renewal" color="var(--amber)" />
-        <Metric label="Valid" value={all.length - urgent - soon} sub="In date" color="var(--green)" />
+        <Metric label="Valid" value={data.length - urgent - soon} sub="In date" color="var(--green)" />
       </div>
+      {adding && (
+        <div style={formCard}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit certificate" : "New certificate"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label style={fld}>Type<select style={inp} value={form.cert_type} onChange={(e) => setForm({ ...form, cert_type: e.target.value })}>{TYPES.map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Customer / Property<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
+            <label style={fld}>Expiry date<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
+            <label style={fld}>Site / address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
+            <label style={{ ...fld, gridColumn: "span 2" }}>Reference / notes<input style={inp} placeholder="e.g. Landlord gas safety record" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update certificate" : "Save certificate"} primary /></span></div>
+        </div>
+      )}
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Certificate timeline — soonest first</div>
-      {all.length === 0 ? (
-        <div style={emptyCard}>No certificates yet. Click "Upload certificate" to add your first one.</div>
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading certificates…</div>
+      ) : data.length === 0 ? (
+        <div style={emptyCard}>No certificates yet. Click "Add certificate" to track your first one.</div>
       ) : (
       <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
-        {all.map((c, i) => {
-          const t = toneVar(c.tone);
+        {data.map((c, i) => {
+          const tone = c.days <= 7 ? "red" : c.days <= 30 ? "amber" : "green";
+          const t = toneVar(tone);
           const status = c.days <= 7 ? "Urgent" : c.days <= 30 ? "Due soon" : "Valid";
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < all.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+            <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < data.length - 1 ? "0.5px solid var(--line)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
-                <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{c.addr} · {c.ref}</div></div>
+                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${iconForType(c.cert_type)}`} style={{ fontSize: 16 }} /></span>
+                <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.cert_type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{[c.customer, c.site, c.ref].filter(Boolean).join(" · ") || "—"}</div></div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>in {c.days} days</span>
-                <Pill text={status} tone={c.tone} />
+                <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days < 0 ? `expired ${-c.days}d ago` : `in ${c.days} days`}</span>
+                <Pill text={status} tone={tone} />
+                {rowActions(DB_READY, () => openEdit(c), () => remove(c.id))}
               </div>
             </div>
           );
