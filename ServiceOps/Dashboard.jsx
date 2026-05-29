@@ -193,22 +193,30 @@ function useProperties() {
 
 /* Quick "add customer" inline popup */
 function QuickAddCustomer({ user, onAdded, onClose }) {
-  const [name, setName] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ name: "", type: "Homeowner", area: "", contact: "", email: "", site: "" });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   const save = async () => {
-    if (!name.trim()) { setErr("Name required."); return; }
+    if (!f.name.trim()) { setErr("Name required."); return; }
     setBusy(true);
-    const { data, error } = await db.from("svc_customers").insert([{ name: name.trim(), user_id: user.id }]).select().single();
+    const { data, error } = await db.from("svc_customers").insert([{ ...f, name: f.name.trim(), user_id: user.id }]).select().single();
     setBusy(false);
     if (error) { setErr(error.message); return; }
     onAdded(data); onClose();
   };
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 360 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 520, maxWidth: "100%" }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>New customer</div>
         {err && <div style={errBanner}>{err}</div>}
-        <input style={inp} placeholder="Customer name" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={busy ? "Saving…" : "Add"} primary /></span><span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={fld}>Customer name<input style={inp} placeholder="e.g. Sarah Connor" value={f.name} autoFocus onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <label style={fld}>Type<select style={inp} value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{["Homeowner", "Landlord", "Agency", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label style={fld}>Region<input style={inp} placeholder="e.g. Manchester" value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} /></label>
+          <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={f.contact} onChange={(e) => setF({ ...f, contact: e.target.value })} /></label>
+          <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+          <label style={fld}>Site address<input style={inp} placeholder="e.g. 14 Oak Street" value={f.site} onChange={(e) => setF({ ...f, site: e.target.value })} /></label>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}><span onClick={save}><Btn icon="ti-device-floppy" label={busy ? "Saving…" : "Add customer"} primary /></span><span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span></div>
       </div>
     </div>
   );
