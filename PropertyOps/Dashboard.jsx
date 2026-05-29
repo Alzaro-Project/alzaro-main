@@ -1222,11 +1222,54 @@ function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(false);
+  const [allData, setAllData] = useState(null);
+  const [query, setQuery] = useState("");
+  const [showNotif, setShowNotif] = useState(false);
   const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
+
+  // load everything once for search + notifications
+  useEffect(() => {
+    if (!DB_READY) { setAllData({ props: [], comp: [], pays: [], maint: [], tenants: [], docs: [] }); return; }
+    Promise.all([
+      db.from("prop_properties").select("*"), db.from("prop_compliance").select("*"),
+      db.from("prop_payments").select("*"), db.from("prop_maintenance").select("*"),
+      db.from("prop_tenants").select("*"), db.from("prop_documents").select("*"),
+    ]).then(([p, c, pay, mt, tn, dc]) => setAllData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [], docs: dc.data || [] }));
+  }, [active]);
+
+  // ---- global search ----
+  const q = query.trim().toLowerCase();
+  const results = [];
+  if (q && allData) {
+    const has = (s) => (s || "").toLowerCase().includes(q);
+    allData.props.forEach((p) => { if (has(p.address || p.addr) || has(p.area) || has(p.type)) results.push({ icon: "ti-building-estate", label: p.address || p.addr, sub: `Property · ${p.area || ""}`, page: "properties" }); });
+    allData.tenants.forEach((t) => { if (has(t.name) || has(t.property)) results.push({ icon: "ti-user", label: t.name, sub: `Tenant · ${t.property || ""}`, page: "tenants" }); });
+    allData.comp.forEach((c) => { if (has(c.type) || has(c.property) || has(c.reference)) results.push({ icon: "ti-shield-check", label: c.type, sub: `Certificate · ${c.property || ""}`, page: "compliance" }); });
+    allData.maint.forEach((m) => { if (has(m.title) || has(m.property) || has(m.contractor)) results.push({ icon: "ti-tools", label: m.title, sub: `Maintenance · ${m.property || ""}`, page: "maintenance" }); });
+    allData.pays.forEach((p) => { if (has(p.tenant) || has(p.property)) results.push({ icon: "ti-coin", label: `${p.tenant} · ${gbp(p.amount || 0)}`, sub: `Payment · ${p.status}`, page: "finance" }); });
+    allData.docs.forEach((dd) => { if (has(dd.name) || has(dd.category)) results.push({ icon: "ti-file", label: dd.name, sub: `Document · ${dd.category}`, page: "documents" }); });
+  }
+
+  // ---- notifications: expiring certs + arrears ----
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const alerts = [];
+  if (allData) {
+    allData.comp.forEach((c) => {
+      if (!c.expiry_date) return;
+      const days = Math.round((new Date(c.expiry_date) - today) / 864e5);
+      if (days <= 30) alerts.push({ tone: days <= 7 ? "red" : "amber", icon: "ti-shield-check", text: `${c.type}${c.property ? " · " + c.property : ""}`, sub: days < 0 ? `Expired ${-days} days ago` : `Expires in ${days} days`, page: "compliance", days });
+    });
+    allData.pays.filter((p) => p.status === "Overdue").forEach((p) => {
+      alerts.push({ tone: "red", icon: "ti-coin", text: `Rent overdue · ${p.tenant}`, sub: `${gbp(p.amount || 0)} outstanding`, page: "finance", days: -1 });
+    });
+  }
+  alerts.sort((a, b) => a.days - b.days);
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
+
+  const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -1259,13 +1302,50 @@ function Dashboard({ user, signOut }) {
 
       <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
-            <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-            <input placeholder="Search properties, tenants, certificates…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+          <div style={{ flex: 1, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
+              <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search properties, tenants, certificates…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+              {query && <i className="ti ti-x" onClick={() => setQuery("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
+            </div>
+            {q && (
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 10, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 40, maxHeight: 340, overflow: "auto" }}>
+                {results.length === 0 ? (
+                  <div style={{ padding: "16px", fontSize: 12.5, color: "var(--txt-3)" }}>No matches for "{query}".</div>
+                ) : results.slice(0, 12).map((r, i) => (
+                  <div key={i} onClick={() => goTo(r.page)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 14px", cursor: "pointer", borderBottom: i < Math.min(results.length, 12) - 1 ? "0.5px solid var(--line)" : "none" }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel-2)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                    <i className={`ti ${r.icon}`} style={{ fontSize: 16, color: "var(--brand)" }} />
+                    <div><div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.label}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{r.sub}</div></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
-            <i className="ti ti-bell" style={{ fontSize: 20 }} />
-            <span style={{ position: "absolute", top: -2, right: -3, width: 7, height: 7, borderRadius: "50%", background: "var(--red)" }} />
+          <div style={{ position: "relative" }}>
+            <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
+              <i className="ti ti-bell" style={{ fontSize: 20 }} />
+              {alerts.length > 0 && <span style={{ position: "absolute", top: -4, right: -5, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--red)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{alerts.length}</span>}
+            </div>
+            {showNotif && (
+              <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 40, overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--line)", fontSize: 12, fontWeight: 600 }}>Notifications {alerts.length > 0 && <span style={{ color: "var(--txt-3)", fontWeight: 400 }}>· {alerts.length}</span>}</div>
+                <div style={{ maxHeight: 320, overflow: "auto" }}>
+                  {alerts.length === 0 ? (
+                    <div style={{ padding: "20px 16px", fontSize: 12.5, color: "var(--txt-3)", textAlign: "center" }}>All clear — nothing needs attention.</div>
+                  ) : alerts.map((a, i) => {
+                    const t = toneVar(a.tone);
+                    return (
+                      <div key={i} onClick={() => goTo(a.page)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 16px", cursor: "pointer", borderBottom: i < alerts.length - 1 ? "0.5px solid var(--line)" : "none" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel-2)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${a.icon}`} style={{ fontSize: 15 }} /></span>
+                        <div><div style={{ fontSize: 12, fontWeight: 500 }}>{a.text}</div><div style={{ fontSize: 10.5, color: t.color }}>{a.sub}</div></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         {active === "dashboard" && (
