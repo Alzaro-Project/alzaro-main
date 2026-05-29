@@ -450,7 +450,7 @@ function CompliancePage({ user, go }) {
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], maint: [] });
   const properties = usePropertyList();
-  const blank = { type: "Gas Safety", property_id: "", reference: "", expiry_date: "" };
+  const blank = { type: "Gas Safety", property_id: "", reference: "", start_date: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -467,13 +467,14 @@ function CompliancePage({ user, go }) {
 
   const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property_id: c.property_id || "", reference: c.reference || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+  const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property_id: c.property_id || "", reference: c.reference || "", start_date: c.start_date || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.expiry_date) { setErr("Expiry date is required — it's what we track."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    if (!payload.start_date) delete payload.start_date;
     let error;
     if (editId) ({ error } = await db.from("prop_compliance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_compliance").insert([{ ...payload, user_id: user.id }]));
@@ -523,6 +524,7 @@ function CompliancePage({ user, go }) {
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.keys(TYPES).map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Reference / notes<input style={inp} placeholder="e.g. CP12 certificate" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
+            <label style={fld}>Issued / start date<input style={inp} type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
             <label style={fld}>Expiry date<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update certificate" : "Save certificate"} primary /></span></div>
@@ -773,6 +775,14 @@ function MaintenancePage({ user, go }) {
     refresh();
   };
 
+  const [dragId, setDragId] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const moveTo = async (j, status) => {
+    if (!j || !status || j.status === status || !j.id || !DB_READY) return;
+    await db.from("prop_maintenance").update({ status }).eq("id", j.id);
+    refresh();
+  };
+
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
   const open = (rows || []).filter((m) => m.status !== "Completed").length;
@@ -806,14 +816,22 @@ function MaintenancePage({ user, go }) {
           {stages.map((s) => {
             const jobs = (rows || []).filter((m) => m.status === s);
             return (
-              <div key={s}>
+              <div key={s}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(s); }}
+                onDragLeave={() => setDragOver((v) => v === s ? null : v)}
+                onDrop={(e) => { e.preventDefault(); const j = (rows || []).find((x) => String(x.id) === String(dragId)); moveTo(j, s); setDragId(null); setDragOver(null); }}
+                style={{ borderRadius: 10, padding: 4, background: dragOver === s ? "var(--brand-soft)" : "transparent", transition: "background .15s" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
                   <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>{s}</span>
                   <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{jobs.length}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 9, minHeight: 80 }}>
                   {jobs.map((j, i) => (
-                    <div key={j.id || i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px" }}>
+                    <div key={j.id || i}
+                      draggable={!!(j.id && DB_READY)}
+                      onDragStart={() => setDragId(j.id)}
+                      onDragEnd={() => { setDragId(null); setDragOver(null); }}
+                      style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px", cursor: j.id && DB_READY ? "grab" : "default", opacity: String(dragId) === String(j.id) ? 0.5 : 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 6 }}>
                         <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
                         <Pill text={j.priority} tone={toneFor[j.priority] || "blue"} />
@@ -1002,6 +1020,8 @@ function DocumentsPage({ user }) {
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pickCat, setPickCat] = useState("Certificates");
+  const [pickProp, setPickProp] = useState("");
+  const properties = usePropertyList();
   const [preview, setPreview] = useState(null);
   const fileRef = React.useRef(null);
 
@@ -1025,7 +1045,7 @@ function DocumentsPage({ user }) {
       const path = `${user.id}/${Date.now()}_${file.name}`;
       const { error: upErr } = await db.storage.from("documents").upload(path, file);
       if (upErr) throw upErr;
-      const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), user_id: user.id }]);
+      const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), property_id: pickProp || null, property: propLabel(properties, pickProp), user_id: user.id }]);
       if (dbErr) throw dbErr;
       await refresh();
     } catch (e2) { setErr(e2.message || "Upload failed"); }
@@ -1068,6 +1088,9 @@ function DocumentsPage({ user }) {
           <select value={pickCat} onChange={(e) => setPickCat(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }}>
             {cats.slice(1).map((c) => <option key={c}>{c}</option>)}
           </select>
+          <select value={pickProp} onChange={(e) => setPickProp(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }}>
+            <option value="">— no property —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}
+          </select>
           <span onClick={() => !uploading && fileRef.current && fileRef.current.click()}><Btn icon={uploading ? "ti-loader" : "ti-upload"} label={uploading ? "Uploading…" : "Upload"} primary /></span>
         </div>
       } />
@@ -1094,7 +1117,7 @@ function DocumentsPage({ user }) {
                 <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${catIcon[d.category] || "ti-file"}`} style={{ fontSize: 18 }} /></span>
                 <div onClick={() => d.file_path && DB_READY && openPreview(d)} style={{ minWidth: 0, flex: 1, cursor: d.file_path && DB_READY ? "pointer" : "default" }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}{(propLabel(properties, d.property_id) || d.property) ? " · " + (propLabel(properties, d.property_id) || d.property) : ""}</div>
                 </div>
                 {d.file_path && DB_READY && <i className="ti ti-eye" onClick={() => openPreview(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Preview" />}
                 {d.file_path && DB_READY && <i className="ti ti-download" onClick={() => download(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Download" />}
@@ -1189,7 +1212,7 @@ function buildReport(name, d) {
 function ReportPreview({ report, onClose }) {
   const empty = report.rows.length === 0;
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)" }}>
           <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · ${report.period || "All time"} · your live data` : "Preview · coming soon"}</div></div>
