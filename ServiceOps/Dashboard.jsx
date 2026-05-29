@@ -177,48 +177,90 @@ const rowActions = (DB, onEdit, onDel) => DB ? <span style={{ display: "flex", g
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
-function DashboardPage({ range, go }) {
-  const m = DEMO.metrics;
+function DashboardPage({ range, go, user }) {
+  const [d, setD] = useState(null); // { customers, quotes, jobs, invoices }
+
+  useEffect(() => {
+    if (!DB_READY) { setD({ customers: [], quotes: [], jobs: [], invoices: [] }); return; }
+    Promise.all([
+      db.from("svc_customers").select("*"),
+      db.from("svc_quotes").select("*"),
+      db.from("svc_jobs").select("*"),
+      db.from("svc_invoices").select("*"),
+    ]).then(([c, q, j, i]) => setD({
+      customers: c.data || [], quotes: q.data || [], jobs: j.data || [], invoices: i.data || [],
+    }));
+  }, []);
+
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const name = user ? user.email.split("@")[0].split(/[._]/)[0].replace(/^\w/, (x) => x.toUpperCase()) : "there";
+
+  if (!d) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading dashboard…</div>;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const openJobs = d.jobs.filter((j) => j.status !== "Completed" && j.status !== "Invoiced");
+  const jobsToday = d.jobs.filter((j) => (j.created_at || "").slice(0, 10) === today).length;
+  const collected = d.invoices.filter((v) => v.status === "Paid").reduce((s, v) => s + (+v.amount || 0), 0);
+  const outstanding = d.invoices.filter((v) => v.status === "Sent" || v.status === "Overdue").reduce((s, v) => s + (+v.amount || 0), 0);
+  const overdueCount = d.invoices.filter((v) => v.status === "Overdue").length;
+  const openQuotes = d.quotes.filter((q) => q.status === "Sent" || q.status === "Draft");
+  const quoteValue = openQuotes.reduce((s, q) => s + (+q.amount || 0), 0);
+  const awaitingInvoice = d.jobs.filter((j) => j.status === "Completed").length;
+
+  // recent activity — newest records across tables
+  const acts = [];
+  d.invoices.forEach((v) => acts.push({ when: v.created_at, text: `Invoice ${v.status === "Paid" ? "paid" : "raised"} · ${v.ref || "—"} · ${gbp(+v.amount || 0)}`, tone: v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue" }));
+  d.quotes.forEach((q) => acts.push({ when: q.created_at, text: `Quote ${q.status?.toLowerCase() || "added"} · ${q.ref || "—"} · ${gbp(+q.amount || 0)}`, tone: q.status === "Approved" ? "green" : "amber" }));
+  d.jobs.forEach((j) => acts.push({ when: j.created_at, text: `Job ${j.status?.toLowerCase() || "added"} · ${j.title}`, tone: j.status === "Completed" ? "green" : "blue" }));
+  d.customers.forEach((c) => acts.push({ when: c.created_at, text: `New customer · ${c.name}`, tone: "brand" }));
+  const recent = acts.filter((a) => a.when).sort((a, b) => new Date(b.when) - new Date(a.when)).slice(0, 5);
+  const ago = (iso) => {
+    const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " hr ago";
+    return Math.floor(s / 86400) + " days ago";
+  };
+
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 19, fontWeight: 600 }}>Good morning, Dave</h2>
-        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{m.jobsToday} jobs today · 2 invoices overdue · {range}</div>
+        <h2 style={{ fontSize: 19, fontWeight: 600 }}>{greet}, {name}</h2>
+        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} invoice{overdueCount === 1 ? "" : "s"} overdue · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Revenue (Month)" value={gbp(m.revenue)} sub="+8.4% vs last month" color="var(--brand)" subColor="var(--green)" />
-        <Metric label="Outstanding" value={gbp(m.outstanding)} sub="2 invoices overdue" color="var(--red)" />
-        <Metric label="Jobs Today" value={m.jobsToday} sub={`${m.jobsWeek} this week`} color="var(--blue)" />
-        <Metric label="Open Quotes" value={m.quotesOpen} sub={`${gbp(m.quoteValue)} potential`} color="var(--amber)" />
+        <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" />
+        <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" />
+        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" />
+        <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Certificates Due" action="View all" onAction={() => go("certificates")}>
-          {DEMO.certificates.map((c, i) => {
-            const t = toneVar(c.tone);
+        <Panel title="Jobs by Stage" action="View all" onAction={() => go("jobs")}>
+          {["New", "Scheduled", "In Progress", "Completed", "Invoiced"].map((s, i, arr) => {
+            const n = d.jobs.filter((j) => j.status === s).length;
+            const tone = s === "Completed" ? "green" : s === "In Progress" ? "amber" : s === "Invoiced" ? "brand" : "blue";
             return (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < DEMO.certificates.length - 1 ? "0.5px solid var(--line)" : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
-                  <div><div style={{ fontSize: 12.5 }}>{c.type} · {c.addr}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.ref}</div></div>
-                </div>
-                <Pill text={c.days + " days"} tone={c.tone} />
+              <div key={s} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < arr.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+                <span style={{ fontSize: 12.5 }}>{s}</span>
+                <Pill text={String(n)} tone={tone} />
               </div>
             );
           })}
         </Panel>
         <Panel title="Recent Activity">
-          {DEMO.activity.map((a, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < DEMO.activity.length - 1 ? 13 : 0 }}>
+          {recent.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>No activity yet. Add a customer, quote or job to get started.</div> : recent.map((a, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < recent.length - 1 ? 13 : 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: `var(--${a.tone})`, marginTop: 5, flexShrink: 0 }} />
-              <div><div style={{ fontSize: 11.5 }}>{a.text}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{a.time}</div></div>
+              <div><div style={{ fontSize: 11.5 }}>{a.text}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{ago(a.when)}</div></div>
             </div>
           ))}
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-        <Metric label="Jobs This Week" value={m.jobsWeek} sub="4 awaiting invoice" color="var(--blue)" />
-        <Metric label="Certificates Due" value={m.certsDue} sub="Next 30 days" color="var(--amber)" />
-        <Metric label="Active Customers" value={m.customers} sub="+5 this month" color="var(--txt)" subColor="var(--green)" />
+        <Metric label="Awaiting Invoice" value={awaitingInvoice} sub="Completed jobs" color="var(--blue)" />
+        <Metric label="Total Quotes" value={d.quotes.length} sub={`${d.quotes.filter((q) => q.status === "Approved").length} approved`} color="var(--amber)" />
+        <Metric label="Active Customers" value={d.customers.length} sub="In your database" color="var(--txt)" subColor="var(--green)" />
       </div>
     </div>
   );
@@ -1098,7 +1140,7 @@ function Dashboard({ user, signOut }) {
   const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
 
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} />;
+  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
   return (
