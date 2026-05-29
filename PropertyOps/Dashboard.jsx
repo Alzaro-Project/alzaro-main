@@ -350,27 +350,89 @@ function CompliancePage() {
 /* ================================================================== */
 /*  TENANTS                                                           */
 /* ================================================================== */
-function TenantsPage() {
+function TenantsPage({ user }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: "", property: "", email: "", phone: "", rent: 0, tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" });
+
+  useEffect(() => {
+    if (!DB_READY) { setRows(DEMO.tenants.map((t) => ({ name: t.name, property: t.prop, tenancy_end: t.end, rent: t.rent, rent_status: t.paid ? "Up to date" : "Overdue", rtr_status: t.rtr }))); return; }
+    db.from("prop_tenants").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => {
+    const { data } = await db.from("prop_tenants").select("*").order("created_at", { ascending: false });
+    setRows(data || []);
+  };
+
+  const save = async () => {
+    if (!form.name.trim()) { setErr("Tenant name is required."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    const payload = { ...form, rent: +form.rent, user_id: user.id };
+    if (!payload.tenancy_end) delete payload.tenancy_end;
+    const { error } = await db.from("prop_tenants").insert([payload]);
+    if (error) { setErr(error.message); return; }
+    setForm({ name: "", property: "", email: "", phone: "", rent: 0, tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" });
+    setAdding(false); refresh();
+  };
+
+  const remove = async (id) => {
+    if (!id || !DB_READY) return;
+    await db.from("prop_tenants").delete().eq("id", id);
+    refresh();
+  };
+
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
+
   return (
     <div className="fade-in">
-      <PageHead title="Tenants" sub={`${DEMO.tenants.length} active tenants`} right={<Btn icon="ti-user-plus" label="Add tenant" primary />} />
-      <Table cols={["Tenant", "Property", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent"]}>
-        {DEMO.tenants.map((t, i) => (
-          <tr key={i}>
-            <Td>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{t.name.split(" ").map((x) => x[0]).join("")}</span>
-                <span style={{ fontWeight: 500 }}>{t.name}</span>
-              </div>
-            </Td>
-            <Td color="var(--txt-2)">{t.prop}</Td>
-            <Td color="var(--txt-2)">{t.end}</Td>
-            <Td>{gbp(t.rent)}</Td>
-            <Td><Pill text={t.paid ? "Up to date" : "Overdue"} tone={t.paid ? "green" : "red"} /></Td>
-            <Td><Pill text={t.rtr} tone={t.rtr === "Verified" ? "green" : "amber"} /></Td>
-          </tr>
-        ))}
-      </Table>
+      <PageHead title="Tenants" sub={rows ? `${rows.length} ${DB_READY ? "" : "(demo) "}tenants` : "Loading…"}
+        right={<span onClick={() => { setAdding(!adding); setErr(""); }}><Btn icon={adding ? "ti-x" : "ti-user-plus"} label={adding ? "Cancel" : "Add tenant"} primary /></span>} />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
+      {adding && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <input style={inp} placeholder="Tenant name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input style={inp} placeholder="Property" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} />
+          <input style={inp} type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input style={inp} placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input style={inp} type="number" placeholder="Rent pcm" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
+          <input style={inp} type="date" placeholder="Tenancy end" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} />
+          <select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select>
+          <select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select>
+          <div><span onClick={save}><Btn icon="ti-device-floppy" label="Save tenant" primary /></span></div>
+        </div>
+      )}
+
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading tenants…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No tenants yet. Click "Add tenant" to create your first one.</div>
+      ) : (
+        <Table cols={["Tenant", "Property", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent", ""]}>
+          {rows.map((t, i) => (
+            <tr key={t.id || i}>
+              <Td>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{(t.name || "?").split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
+                  <span style={{ fontWeight: 500 }}>{t.name}</span>
+                </div>
+              </Td>
+              <Td color="var(--txt-2)">{t.property || "—"}</Td>
+              <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
+              <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
+              <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
+              <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
+              <Td>{t.id && DB_READY ? <i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /> : null}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </div>
   );
 }
