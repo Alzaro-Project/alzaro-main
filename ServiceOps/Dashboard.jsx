@@ -385,14 +385,15 @@ function CustomerDetail({ customer, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    if (!DB_READY) { setData({ quotes: [], jobs: [], invoices: [], certs: [], bookings: [] }); return () => window.removeEventListener("keydown", onKey); }
+    if (!DB_READY) { setData({ quotes: [], jobs: [], invoices: [], certs: [], bookings: [], documents: [] }); return () => window.removeEventListener("keydown", onKey); }
     Promise.all([
       db.from("svc_quotes").select("*").eq("customer_id", customer.id),
       db.from("svc_jobs").select("*").eq("customer_id", customer.id),
       db.from("svc_invoices").select("*").eq("customer_id", customer.id),
       db.from("svc_certificates").select("*").eq("customer_id", customer.id),
       db.from("svc_bookings").select("*").eq("customer_id", customer.id),
-    ]).then(([q, j, i, c, b]) => setData({ quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: c.data || [], bookings: b.data || [] }));
+      db.from("svc_documents").select("*").eq("customer_id", customer.id),
+    ]).then(([q, j, i, c, b, dc]) => setData({ quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: c.data || [], bookings: b.data || [], documents: dc.data || [] }));
     return () => window.removeEventListener("keydown", onKey);
   }, [customer.id]);
 
@@ -429,6 +430,7 @@ function CustomerDetail({ customer, onClose }) {
               <Section title="Invoices" items={data.invoices} render={(v) => <div key={v.id}>{line(`${v.ref || "—"} · ${gbp(+v.amount || 0)}`, v.status, v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue")}</div>} />
               <Section title="Bookings" items={data.bookings} render={(b) => <div key={b.id}>{line(`${b.booking_date || ""} ${b.booking_time || ""} · ${b.title}`, b.engineer || "Unassigned", "brand")}</div>} />
               <Section title="Certificates" items={data.certs} render={(c) => <div key={c.id}>{line(`${c.cert_type} · ${c.site || ""}`, c.expiry_date ? `exp ${c.expiry_date}` : "—", "green")}</div>} />
+              <Section title="Documents" items={data.documents} render={(dc) => <div key={dc.id}>{line(dc.name, dc.cat, "blue")}</div>} />
             </>
           )}
         </div>
@@ -975,12 +977,14 @@ function DocViewer({ doc, url, onClose }) {
 }
 
 function DocumentsPage({ user }) {
+  const customers = useCustomers();
   const cats = ["All", "Quotes", "Invoices", "Certificates", "Job Photos"];
   const [cat, setCat] = useState("All");
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploadCat, setUploadCat] = useState("Certificates");
+  const [uploadCust, setUploadCust] = useState({ id: "", name: "" });
   const [viewer, setViewer] = useState(null); // { doc, url }
 
   const load = () => {
@@ -990,7 +994,7 @@ function DocumentsPage({ user }) {
   };
   useEffect(load, []);
 
-  const doUpload = async (file, category, replaceDoc) => {
+  const doUpload = async (file, category, cust, replaceDoc) => {
     if (!file) return;
     if (!DB_READY) { setErr("Database not connected."); return; }
     setErr(""); setBusy(true);
@@ -999,12 +1003,12 @@ function DocumentsPage({ user }) {
       const { error: upErr } = await db.storage.from(DOC_BUCKET).upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       if (replaceDoc) {
-        // delete old file, point row at new one
+        // delete old file, point row at new one (keep its customer + category)
         await db.storage.from(DOC_BUCKET).remove([replaceDoc.path]);
         const { error } = await db.from("svc_documents").update({ path, name: file.name, size: file.size, cat: replaceDoc.cat }).eq("id", replaceDoc.id);
         if (error) throw error;
       } else {
-        const { error } = await db.from("svc_documents").insert([{ user_id: user.id, name: file.name, path, size: file.size, cat: category }]);
+        const { error } = await db.from("svc_documents").insert([{ user_id: user.id, name: file.name, path, size: file.size, cat: category, customer_id: cust && cust.id ? cust.id : null, customer: cust ? cust.name : null }]);
         if (error) throw error;
       }
       load();
@@ -1041,8 +1045,12 @@ function DocumentsPage({ user }) {
     <div className="fade-in">
       <PageHead title="Documents" sub={rows ? `${data.length} file${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
         right={<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={uploadCust.id} onChange={(e) => { const c = customers.find((x) => String(x.id) === e.target.value); setUploadCust({ id: e.target.value, name: c ? c.name : "" }); }} style={{ ...inp, width: "auto", padding: "8px 10px" }}>
+            <option value="">No customer</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
           <select value={uploadCat} onChange={(e) => setUploadCat(e.target.value)} style={{ ...inp, width: "auto", padding: "8px 10px" }}>{cats.filter((c) => c !== "All").map((c) => <option key={c}>{c}</option>)}</select>
-          <span onClick={() => !busy && pickFile((f) => doUpload(f, uploadCat, null))}><Btn icon={busy ? "ti-loader" : "ti-upload"} label={busy ? "Uploading…" : "Upload"} primary /></span>
+          <span onClick={() => !busy && pickFile((f) => doUpload(f, uploadCat, uploadCust, null))}><Btn icon={busy ? "ti-loader" : "ti-upload"} label={busy ? "Uploading…" : "Upload"} primary /></span>
         </span>} />
       {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={errBanner}>{err}</div>}
@@ -1067,12 +1075,12 @@ function DocumentsPage({ user }) {
                   <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${meta.icon}`} style={{ fontSize: 18 }} /></span>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.cat} · {fmtSize(d.size)} · {when}</div>
+                    <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.customer ? `${d.customer} · ` : ""}{d.cat} · {fmtSize(d.size)} · {when}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, borderTop: "0.5px solid var(--line)", paddingTop: 10 }}>
                   <span onClick={() => openView(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--brand)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 15 }} />View</span>
-                  <span onClick={() => !busy && pickFile((f) => doUpload(f, d.cat, d))} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--txt-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-replace" style={{ fontSize: 15 }} />Replace</span>
+                  <span onClick={() => !busy && pickFile((f) => doUpload(f, d.cat, null, d))} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--txt-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-replace" style={{ fontSize: 15 }} />Replace</span>
                   <span onClick={() => remove(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--red)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-trash" style={{ fontSize: 15 }} />Delete</span>
                 </div>
               </div>
