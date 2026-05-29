@@ -379,7 +379,7 @@ function DashboardPage({ range, go, user }) {
 /* ================================================================== */
 /*  CUSTOMERS                                                         */
 /* ================================================================== */
-function CustomersPage({ user }) {
+function CustomersPage({ user, openCustomerId, clearOpen }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
@@ -394,6 +394,14 @@ function CustomersPage({ user }) {
     db.from("svc_customers").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data || []); });
   }, []);
+
+  // open a specific customer's detail when arriving from search
+  useEffect(() => {
+    if (openCustomerId && rows) {
+      const c = rows.find((x) => String(x.id) === String(openCustomerId));
+      if (c) { setDetail(c); if (clearOpen) clearOpen(); }
+    }
+  }, [openCustomerId, rows]);
 
   const refresh = async () => { const { data } = await db.from("svc_customers").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
@@ -497,7 +505,7 @@ function CustomerDetail({ customer, onClose }) {
   );
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 60, overflow: "auto" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
       <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0 }}>
@@ -1564,19 +1572,26 @@ function Dashboard({ user, signOut }) {
     if (!term || !DB_READY) { setHits({ customers: [], jobs: [], invoices: [], quotes: [], properties: [] }); return; }
     const like = `%${term}%`;
     Promise.all([
-      db.from("svc_customers").select("id,name,site,area").ilike("name", like).limit(6),
-      db.from("svc_jobs").select("id,title,customer,status").ilike("title", like).limit(6),
-      db.from("svc_invoices").select("id,ref,customer,amount,status").ilike("ref", like).limit(6),
-      db.from("svc_quotes").select("id,ref,customer,amount,status").ilike("ref", like).limit(6),
-      db.from("svc_properties").select("id,address,postcode,customer").ilike("address", like).limit(6),
+      db.from("svc_customers").select("id,name,site,area,type,contact,email").or(`name.ilike.${like},site.ilike.${like},area.ilike.${like}`).limit(8),
+      db.from("svc_jobs").select("id,title,customer,status").or(`title.ilike.${like},customer.ilike.${like},site.ilike.${like}`).limit(8),
+      db.from("svc_invoices").select("id,ref,customer,amount,status").or(`ref.ilike.${like},customer.ilike.${like}`).limit(8),
+      db.from("svc_quotes").select("id,ref,customer,amount,status").or(`ref.ilike.${like},customer.ilike.${like}`).limit(8),
+      db.from("svc_properties").select("id,address,postcode,customer,customer_id").or(`address.ilike.${like},postcode.ilike.${like},customer.ilike.${like}`).limit(8),
     ]).then(([c, j, i, q, p]) => setHits({ customers: c.data || [], jobs: j.data || [], invoices: i.data || [], quotes: q.data || [], properties: p.data || [] }));
   }, [search]);
 
   const searching = search.trim().length > 0;
   const totalHits = hits.customers.length + hits.jobs.length + hits.invoices.length + hits.quotes.length + hits.properties.length;
 
+  // navigate: always clear search + close notifications so the overlay never lingers
+  const goTo = (page) => { setSearch(""); setShowNotif(false); setActive(page); };
+  // open a specific customer's detail from search
+  const [openCustomerId, setOpenCustomerId] = useState(null);
+  const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); };
+
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
+  if (active === "dashboard") body = <DashboardPage range={range} go={goTo} user={user} />;
+  else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
   return (
@@ -1590,7 +1605,7 @@ function Dashboard({ user, signOut }) {
           {NAV.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => setActive(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ fontSize: 13 }}>{n.label}</span>
               </div>
@@ -1627,7 +1642,7 @@ function Dashboard({ user, signOut }) {
                   : notifs.map((n, i) => {
                     const t = toneVar(n.tone);
                     return (
-                      <div key={i} onClick={() => { setActive(n.go); setShowNotif(false); }} style={{ display: "flex", gap: 10, alignItems: "center", padding: "11px 15px", borderBottom: i < notifs.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
+                      <div key={i} onClick={() => { goTo(n.go); }} style={{ display: "flex", gap: 10, alignItems: "center", padding: "11px 15px", borderBottom: i < notifs.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
                         <span style={{ width: 26, height: 26, borderRadius: 7, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${n.icon}`} style={{ fontSize: 14 }} /></span>
                         <span style={{ fontSize: 11.5 }}>{n.text}</span>
                       </div>
@@ -1640,13 +1655,18 @@ function Dashboard({ user, signOut }) {
         {searching ? (
           <div className="fade-in">
             <PageHead title="Search results" sub={`${totalHits} match${totalHits === 1 ? "" : "es"} for "${search}"`} right={<span onClick={() => setSearch("")}><Btn icon="ti-x" label="Clear" /></span>} />
-            {totalHits === 0 ? <div style={emptyCard}>No matches. Try a customer name, job title, or invoice/quote reference.</div> : (
+            {totalHits === 0 ? <div style={emptyCard}>No matches. Try a customer name, address, job title, or invoice/quote reference.</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {hits.customers.length > 0 && <SearchGroup title="Customers" go={() => setActive("customers")} items={hits.customers.map((c) => `${c.name}${c.area ? " · " + c.area : ""}`)} />}
-                {hits.properties.length > 0 && <SearchGroup title="Properties" go={() => setActive("properties")} items={hits.properties.map((p) => `${p.address}${p.postcode ? ", " + p.postcode : ""} · ${p.customer || ""}`)} />}
-                {hits.jobs.length > 0 && <SearchGroup title="Jobs" go={() => setActive("jobs")} items={hits.jobs.map((j) => `${j.title} · ${j.customer || ""} · ${j.status}`)} />}
-                {hits.quotes.length > 0 && <SearchGroup title="Quotes" go={() => setActive("quotes")} items={hits.quotes.map((q) => `${q.ref || "—"} · ${q.customer || ""} · ${gbp(+q.amount || 0)}`)} />}
-                {hits.invoices.length > 0 && <SearchGroup title="Invoices" go={() => setActive("invoicing")} items={hits.invoices.map((v) => `${v.ref || "—"} · ${v.customer || ""} · ${gbp(+v.amount || 0)}`)} />}
+                {hits.customers.length > 0 && <SearchGroup title="Customers" goLabel="Customers" onGo={() => goTo("customers")}
+                  rows={hits.customers.map((c) => ({ label: `${c.name}${c.site ? " · " + c.site : c.area ? " · " + c.area : ""}`, onClick: () => openCustomer(c.id) }))} />}
+                {hits.properties.length > 0 && <SearchGroup title="Properties" goLabel="Properties" onGo={() => goTo("properties")}
+                  rows={hits.properties.map((p) => ({ label: `${p.address}${p.postcode ? ", " + p.postcode : ""} · ${p.customer || ""}`, onClick: () => p.customer_id ? openCustomer(p.customer_id) : goTo("properties") }))} />}
+                {hits.jobs.length > 0 && <SearchGroup title="Jobs" goLabel="Jobs" onGo={() => goTo("jobs")}
+                  rows={hits.jobs.map((j) => ({ label: `${j.title} · ${j.customer || ""} · ${j.status}`, onClick: () => goTo("jobs") }))} />}
+                {hits.quotes.length > 0 && <SearchGroup title="Quotes" goLabel="Quotes" onGo={() => goTo("quotes")}
+                  rows={hits.quotes.map((q) => ({ label: `${q.ref || "—"} · ${q.customer || ""} · ${gbp(+q.amount || 0)}`, onClick: () => goTo("quotes") }))} />}
+                {hits.invoices.length > 0 && <SearchGroup title="Invoices" goLabel="Invoicing" onGo={() => goTo("invoicing")}
+                  rows={hits.invoices.map((v) => ({ label: `${v.ref || "—"} · ${v.customer || ""} · ${gbp(+v.amount || 0)}`, onClick: () => goTo("invoicing") }))} />}
               </div>
             )}
           </div>
@@ -1665,15 +1685,15 @@ function Dashboard({ user, signOut }) {
   );
 }
 
-function SearchGroup({ title, items, go }) {
+function SearchGroup({ title, rows, goLabel, onGo }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{title} ({items.length})</span>
-        <span onClick={go} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>Go to {title}</span>
+        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{title} ({rows.length})</span>
+        <span onClick={onGo} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>Go to {goLabel}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {items.map((t, i) => <div key={i} onClick={go} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "10px 13px", fontSize: 12.5, cursor: "pointer" }}>{t}</div>)}
+        {rows.map((r, i) => <div key={i} onClick={r.onClick} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "10px 13px", fontSize: 12.5, cursor: "pointer" }}>{r.label}</div>)}
       </div>
     </div>
   );
