@@ -168,6 +168,17 @@ export default function Dashboard() {
     navigate('/invoices')
   }
 
+  // -------- CALENDAR DAY CLICK --------
+  // Hands the chosen date to the full Calendar page via sessionStorage,
+  // then navigates there. The Calendar page can read
+  // sessionStorage.getItem('garageops_calendar_date') on mount.
+  const handleCalendarDayClick = (year, month, day) => {
+    const picked = new Date(year, month, day)
+    const iso = `${picked.getFullYear()}-${String(picked.getMonth() + 1).padStart(2, '0')}-${String(picked.getDate()).padStart(2, '0')}`
+    sessionStorage.setItem('garageops_calendar_date', iso)
+    navigate('/calendar')
+  }
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -245,7 +256,11 @@ export default function Dashboard() {
       {/* ===== MID ROW: P&L + CALENDAR ===== */}
       <div className="dash-mid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
         <RevenueChart invoices={invoices} />
-        <MiniCalendar motsDueSoon={motsDueSoon} onOpenFull={() => navigate('/calendar')} />
+        <MiniCalendar
+          motsDueSoon={motsDueSoon}
+          onOpenFull={() => navigate('/calendar')}
+          onDayClick={handleCalendarDayClick}
+        />
       </div>
 
       {/* ===== MOTs DUE SOON LIST ===== */}
@@ -363,7 +378,7 @@ function RevenueChart({ invoices }) {
   )
 }
 
-function MiniCalendar({ motsDueSoon, onOpenFull }) {
+function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
   const [view, setView] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const monthName = new Date(view.y, view.m, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -411,22 +426,39 @@ function MiniCalendar({ motsDueSoon, onOpenFull }) {
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
           <div key={i} style={{ textAlign: 'center', padding: '4px 0', fontSize: '9px', color: T.text3, fontFamily: 'monospace' }}>{d}</div>
         ))}
-        {cells.map((c, i) => (
-          <div key={i} style={{
-            position: 'relative',
-            textAlign: 'center', padding: '6px 0',
-            borderRadius: '4px',
-            fontSize: '11px',
-            color: c.dim ? '#3c3845' : (c.isToday ? '#fff' : T.text),
-            background: c.isToday ? T.red : 'transparent',
-            fontWeight: c.isToday ? 500 : 400,
-          }}>
-            {c.d}
-            {!c.dim && c.hasMot && !c.isToday && (
-              <span style={{ position: 'absolute', bottom: '2px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: T.amber }} />
-            )}
-          </div>
-        ))}
+        {cells.map((c, i) => {
+          // Real (non-dim) days are clickable → jump to full Calendar on that date
+          const clickable = !c.dim && onDayClick
+          return (
+            <div
+              key={i}
+              onClick={clickable ? () => onDayClick(view.y, view.m, c.d) : undefined}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDayClick(view.y, view.m, c.d) } } : undefined}
+              title={clickable ? 'Open in calendar' : undefined}
+              style={{
+                position: 'relative',
+                textAlign: 'center', padding: '6px 0',
+                borderRadius: '4px',
+                fontSize: '11px',
+                color: c.dim ? '#3c3845' : (c.isToday ? '#fff' : T.text),
+                background: c.isToday ? T.red : 'transparent',
+                fontWeight: c.isToday ? 500 : 400,
+                cursor: clickable ? 'pointer' : 'default',
+                transition: 'background .12s',
+                outline: 'none',
+              }}
+              onMouseEnter={clickable ? (e) => { if (!c.isToday) e.currentTarget.style.background = T.surface3 } : undefined}
+              onMouseLeave={clickable ? (e) => { if (!c.isToday) e.currentTarget.style.background = 'transparent' } : undefined}
+            >
+              {c.d}
+              {!c.dim && c.hasMot && !c.isToday && (
+                <span style={{ position: 'absolute', bottom: '2px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: T.amber }} />
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
