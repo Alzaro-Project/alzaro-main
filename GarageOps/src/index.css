@@ -1,34 +1,58 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
-
 @import "tailwindcss";
 
-
-
-:root {
+/* ---- DARK (default) ---- */
+:root, :root[data-theme='dark'] {
   --bg: #0d0d10;
   --surface: #16161a;
   --surface2: #1e1e24;
   --surface3: #26262e;
   --border: #2e2e38;
+  --border2: #3a3a46;
   --accent: #f5c842;
   --green: #3dd68c;
   --red: #ff5f5f;
+  --amber: #ff9800;
   --blue: #60a5fa;
   --teal: #2dd4bf;
   --purple: #a78bfa;
   --text: #f0f0f0;
   --text2: #9090a0;
   --text3: #606070;
+  --dim-day: #3c3845;
+  --hover: #1e1e24;
+  --active: #1e1e24;
+}
+
+/* ---- LIGHT ---- */
+:root[data-theme='light'] {
+  --bg: #f7f6f9;
+  --surface: #ffffff;
+  --surface2: #f3f1f6;
+  --surface3: #e9e6ef;
+  --border: #e2e0e8;
+  --border2: #d4d2dc;
+  --accent: #d4a017;
+  --green: #2e9e4f;
+  --red: #e53935;
+  --amber: #e67e00;
+  --blue: #2563eb;
+  --teal: #0d9488;
+  --purple: #7c3aed;
+  --text: #1a1820;
+  --text2: #5c586a;
+  --text3: #9090a0;
+  --dim-day: #c8c4d0;
+  --hover: #f3f1f6;
+  --active: #f0eef5;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Plus Jakarta Sans', sans-serif;
   min-height: 100vh;
 }
-
 .font-head { font-family: 'Syne', sans-serif; }
 .font-mono { font-family: 'DM Mono', monospace; }
