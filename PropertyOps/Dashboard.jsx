@@ -557,11 +557,13 @@ function CompliancePage({ user }) {
 /* ================================================================== */
 /*  TENANTS                                                           */
 /* ================================================================== */
-function TenantsPage({ user }) {
+function TenantsPage({ user, go }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
   const properties = usePropertyList();
   const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_start: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
   const [form, setForm] = useState(blank);
@@ -570,6 +572,9 @@ function TenantsPage({ user }) {
     if (!DB_READY) { setRows(DEMO.tenants.map((t) => ({ name: t.name, property: t.prop, tenancy_end: t.end, rent: t.rent, rent_status: t.paid ? "Up to date" : "Overdue", rtr_status: t.rtr }))); return; }
     db.from("prop_tenants").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+    Promise.all([
+      db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"), db.from("prop_payments").select("*"),
+    ]).then(([c, m, p]) => setRelated({ comp: c.data || [], maint: m.data || [], pays: p.data || [] }));
   }, []);
 
   const refresh = async () => {
@@ -633,24 +638,59 @@ function TenantsPage({ user }) {
       ) : rows.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No tenants yet. Click "Add tenant" to create your first one.</div>
       ) : (
-        <Table cols={["Tenant", "Property", "Tenancy starts", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent", ""]}>
-          {rows.map((t, i) => (
-            <tr key={t.id || i}>
-              <Td>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{(t.name || "?").split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
-                  <span style={{ fontWeight: 500 }}>{t.name}</span>
-                </div>
-              </Td>
-              <Td color="var(--txt-2)">{propLabel(properties, t.property_id) || t.property || "—"}</Td>
-              <Td color="var(--txt-2)">{t.tenancy_start || "—"}</Td>
-              <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
-              <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
-              <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
-              <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
-              <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
-            </tr>
-          ))}
+        <Table cols={["", "Tenant", "Property", "Tenancy starts", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent", ""]}>
+          {rows.map((t, i) => {
+            const isOpen = expandedId === (t.id || i);
+            const pid = t.property_id;
+            const sameProp = (x) => pid && String(x.property_id) === String(pid);
+            const propName = propLabel(properties, pid) || t.property || "—";
+            const tComp = related.comp.filter(sameProp);
+            const tMaint = related.maint.filter(sameProp);
+            const tPays = related.pays.filter((x) => sameProp(x) || (t.name && (x.tenant || "").toLowerCase() === t.name.toLowerCase()));
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            return (
+              <React.Fragment key={t.id || i}>
+                <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (t.id || i))}>
+                  <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
+                  <Td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{(t.name || "?").split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
+                      <span style={{ fontWeight: 500 }}>{t.name}</span>
+                    </div>
+                  </Td>
+                  <Td color="var(--txt-2)">{propName}</Td>
+                  <Td color="var(--txt-2)">{t.tenancy_start || "—"}</Td>
+                  <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
+                  <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
+                  <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
+                  <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
+                  <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
+                        <DetailBox title="Contact" icon="ti-address-book">
+                          <DetailRow main={t.email || "No email"} sub="Email" />
+                          <DetailRow main={t.phone || "No phone"} sub="Phone" />
+                          <DetailRow main={propName} sub="Property" pill={t.rent ? gbp(t.rent) + " pcm" : ""} tone="blue" />
+                        </DetailBox>
+                        <DetailBox title="Payments" icon="ti-coin" empty={tPays.length === 0} emptyText="No payments linked." onClick={() => go && go("finance")}>
+                          {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                        </DetailBox>
+                        <DetailBox title="Property Compliance" icon="ti-shield-check" empty={tComp.length === 0} emptyText={pid ? "No certificates on this property." : "Link a property to see its certificates."} onClick={() => go && go("compliance")}>
+                          {tComp.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                        </DetailBox>
+                        <DetailBox title="Property Maintenance" icon="ti-tools" empty={tMaint.length === 0} emptyText={pid ? "No maintenance on this property." : "Link a property to see its jobs."} onClick={() => go && go("maintenance")}>
+                          {tMaint.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
+                        </DetailBox>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </Table>
       )}
     </div>
