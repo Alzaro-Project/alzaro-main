@@ -684,33 +684,105 @@ function FinancePage({ user }) {
 /* ================================================================== */
 /*  DOCUMENTS                                                         */
 /* ================================================================== */
-function DocumentsPage() {
+function DocumentsPage({ user }) {
+  const cats = ["All", "Agreements", "Certificates", "Right to Rent", "Notices", "Invoices", "Other"];
+  const catIcon = { Agreements: "ti-file-text", Certificates: "ti-certificate", "Right to Rent": "ti-id", Notices: "ti-mail", Invoices: "ti-receipt", Other: "ti-file" };
+  const catTone = { Agreements: "blue", Certificates: "red", "Right to Rent": "green", Notices: "blue", Invoices: "green", Other: "amber" };
   const [cat, setCat] = useState("All");
-  const cats = ["All", "Agreements", "Certificates", "Right to Rent", "Notices", "Invoices"];
-  const list = DEMO.documents.filter((d) => cat === "All" || d.cat === cat);
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [pickCat, setPickCat] = useState("Certificates");
+  const fileRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows(DEMO.documents.map((d) => ({ name: d.name, category: d.cat, size_kb: 0, file_path: null }))); return; }
+    db.from("prop_documents").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => {
+    const { data } = await db.from("prop_documents").select("*").order("created_at", { ascending: false });
+    setRows(data || []);
+  };
+
+  const onPick = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!DB_READY) { setErr("Add your Supabase keys to upload."); return; }
+    setErr(""); setUploading(true);
+    try {
+      const path = `${user.id}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await db.storage.from("documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), user_id: user.id }]);
+      if (dbErr) throw dbErr;
+      await refresh();
+    } catch (e2) { setErr(e2.message || "Upload failed"); }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const download = async (d) => {
+    if (!d.file_path || !DB_READY) return;
+    const { data, error } = await db.storage.from("documents").createSignedUrl(d.file_path, 60);
+    if (error) { setErr(error.message); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const remove = async (d) => {
+    if (!d.id || !DB_READY) return;
+    if (d.file_path) await db.storage.from("documents").remove([d.file_path]);
+    await db.from("prop_documents").delete().eq("id", d.id);
+    refresh();
+  };
+
+  const data = (rows || []).filter((d) => cat === "All" || d.category === cat);
+  const fmtSize = (kb) => !kb ? "" : kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB";
+
   return (
     <div className="fade-in">
-      <PageHead title="Documents" sub="Secure legal document vault — encrypted, versioned, audit-logged." right={<Btn icon="ti-upload" label="Upload" primary />} />
+      <input ref={fileRef} type="file" style={{ display: "none" }} onChange={onPick} />
+      <PageHead title="Documents" sub="Secure legal document vault — private to your account." right={
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={pickCat} onChange={(e) => setPickCat(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }}>
+            {cats.slice(1).map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <span onClick={() => !uploading && fileRef.current && fileRef.current.click()}><Btn icon={uploading ? "ti-loader" : "ti-upload"} label={uploading ? "Uploading…" : "Upload"} primary /></span>
+        </div>
+      } />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
       <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
         {cats.map((c) => (
           <span key={c} onClick={() => setCat(c)} style={{ cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, color: c === cat ? "var(--txt)" : "var(--txt-2)", background: c === cat ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (c === cat ? "var(--line)" : "transparent") }}>{c}</span>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 11 }}>
-        {list.map((d, i) => {
-          const t = toneVar(d.tone);
-          return (
-            <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px", display: "flex", gap: 12, alignItems: "center" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${d.icon}`} style={{ fontSize: 18 }} /></span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.cat} · {d.size} · {d.date}</div>
+
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading documents…</div>
+      ) : data.length === 0 ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No documents yet. Pick a category and click "Upload" to add one.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 11 }}>
+          {data.map((d, i) => {
+            const t = toneVar(catTone[d.category] || "amber");
+            return (
+              <div key={d.id || i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px", display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${catIcon[d.category] || "ti-file"}`} style={{ fontSize: 18 }} /></span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}</div>
+                </div>
+                {d.file_path && DB_READY && <i className="ti ti-download" onClick={() => download(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Download" />}
+                {d.id && DB_READY && <i className="ti ti-trash" onClick={() => remove(d)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />}
               </div>
-              <i className="ti ti-download" style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} />
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
