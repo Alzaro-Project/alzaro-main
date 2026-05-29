@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { useBookings } from '../hooks/useBookings'
+import { useServices } from '../hooks/useServices'
 
 // ============================================================
 // Calendar — GarageOps v2 (Step 2: full CRUD)
@@ -37,10 +38,7 @@ const STATUS_OPTIONS = [
   { value: 'no_show',     label: 'No show' },
 ]
 
-const JOB_TYPES = [
-  'MOT', 'Annual Service', 'Interim Service', 'Full Service',
-  'Repair', 'Diagnostic', 'Tyres', 'Brakes', 'Other',
-]
+const JOB_TYPE_FALLBACK = ['MOT', 'Service', 'Repair', 'Diagnostic', 'Other']
 
 const VIEWS = [
   { key: 'month', label: 'Month', icon: 'ti-calendar' },
@@ -515,6 +513,7 @@ function BookingModal({ booking, onClose, onEdit, onDelete }) {
 function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
   const customers = useStore(s => s.customers) || []
   const vehicles  = useStore(s => s.vehicles)  || []
+  const { services } = useServices()
 
   const [form, setForm] = useState(() => ({
     id: initial.id || null,
@@ -677,10 +676,40 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Job type</div>
-            <select value={form.job_type} onChange={e => setForm(f => ({ ...f, job_type: e.target.value }))} style={inputStyle}>
-              <option value="">— Select —</option>
-              {JOB_TYPES.map(j => <option key={j} value={j}>{j}</option>)}
-            </select>
+            {services.length > 0 ? (
+              <select
+                value={form.job_type}
+                onChange={e => {
+                  const name = e.target.value
+                  // Find the matching service and pull its default duration
+                  const svc = services.find(s => s.name === name)
+                  setForm(f => ({
+                    ...f,
+                    job_type: name,
+                    duration_min: svc?.default_duration_min ?? f.duration_min,
+                    description: f.description || svc?.default_description || '',
+                  }))
+                }}
+                style={inputStyle}
+              >
+                <option value="">— Select —</option>
+                {services.map(s => (
+                  <option key={s.id} value={s.name}>
+                    {s.name}{s.default_duration_min ? ` (${s.default_duration_min} min)` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select value={form.job_type} onChange={e => setForm(f => ({ ...f, job_type: e.target.value }))} style={inputStyle}>
+                <option value="">— Select —</option>
+                {JOB_TYPE_FALLBACK.map(j => <option key={j} value={j}>{j}</option>)}
+              </select>
+            )}
+            {services.length === 0 && (
+              <div style={{ fontSize: '10px', color: T.text3, marginTop: '4px' }}>
+                Add services in <strong>Items → Services</strong> to customise this list.
+              </div>
+            )}
           </div>
           <div>
             <div style={fieldLbl}>Status</div>
