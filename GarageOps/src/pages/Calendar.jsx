@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { useBookings } from '../hooks/useBookings'
 import { useServices } from '../hooks/useServices'
+import { useDayNotes } from '../hooks/useDayNotes'
 
 // ============================================================
 // Calendar — GarageOps v2 (Step 2: full CRUD)
@@ -117,6 +118,19 @@ export default function Calendar() {
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [formMode, setFormMode] = useState(null) // null | 'create' | 'edit'
   const [formInitial, setFormInitial] = useState({})
+
+  // Quick per-day notes (Supabase-backed)
+  const { getNote, saveNote } = useDayNotes()
+
+  // If the Dashboard handed us a date (clicking a day there), jump to it.
+  useEffect(() => {
+    const picked = sessionStorage.getItem('garageops_calendar_date')
+    if (picked) {
+      const d = new Date(picked + 'T00:00:00')
+      if (!isNaN(d)) { setRefDate(d); setView('day') }
+      sessionStorage.removeItem('garageops_calendar_date')
+    }
+  }, [])
 
   // Group bookings by date for fast lookup
   const byDate = useMemo(() => {
@@ -247,22 +261,39 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Body */}
-      <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: T.text3 }}>
-            <i className="ti ti-loader-2" style={{ fontSize: '28px', display: 'inline-block', animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: '13px', marginTop: '12px' }}>Loading bookings...</div>
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-          </div>
-        ) : (
-          <>
-            {view === 'month' && <MonthView refDate={refDate} byDate={byDate} onBookingClick={setSelectedBooking} onDayClick={d => { setRefDate(d); setView('day') }} />}
-            {view === 'week'  && <WeekView  refDate={refDate} byDate={byDate} slotSettings={slotSettings} onBookingClick={setSelectedBooking} onSlotClick={(date, time) => openCreate({ booking_date: fmtDate(date), start_time: time })} />}
-            {view === 'day'   && <DayView   refDate={refDate} byDate={byDate} slotSettings={slotSettings} onBookingClick={setSelectedBooking} onSlotClick={time => openCreate({ booking_date: fmtDate(refDate), start_time: time })} />}
-          </>
-        )}
+      {/* Body + side panel */}
+      <div className="cal-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '14px', alignItems: 'start' }}>
+        <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: T.text3 }}>
+              <i className="ti ti-loader-2" style={{ fontSize: '28px', display: 'inline-block', animation: 'spin 1s linear infinite' }} />
+              <div style={{ fontSize: '13px', marginTop: '12px' }}>Loading bookings...</div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </div>
+          ) : (
+            <>
+              {view === 'month' && <MonthView refDate={refDate} byDate={byDate} onBookingClick={setSelectedBooking} onDayClick={d => { setRefDate(d); setView('day') }} />}
+              {view === 'week'  && <WeekView  refDate={refDate} byDate={byDate} slotSettings={slotSettings} onBookingClick={setSelectedBooking} onSlotClick={(date, time) => openCreate({ booking_date: fmtDate(date), start_time: time })} />}
+              {view === 'day'   && <DayView   refDate={refDate} byDate={byDate} slotSettings={slotSettings} onBookingClick={setSelectedBooking} onSlotClick={time => openCreate({ booking_date: fmtDate(refDate), start_time: time })} />}
+            </>
+          )}
+        </div>
+
+        {/* Right-side panel: today's bookings + quick note */}
+        <TodayPanel
+          byDate={byDate}
+          onBookingClick={setSelectedBooking}
+          onAddBooking={() => openCreate({ booking_date: fmtDate(new Date()) })}
+          getNote={getNote}
+          saveNote={saveNote}
+        />
       </div>
+
+      <style>{`
+        @media (max-width: 860px) {
+          .cal-layout { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
       {!loading && bookings.length === 0 && (
         <div style={{ marginTop: '14px', padding: '14px', background: T.surface2, borderRadius: '10px', textAlign: 'center', fontSize: '12px', color: T.text2 }}>
@@ -748,6 +779,140 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
             {saving ? 'Saving...' : (mode === 'edit' ? 'Save changes' : 'Create booking')}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// TODAY PANEL (right side) — today's bookings + quick note
+// ============================================================
+function TodayPanel({ byDate, onBookingClick, onAddBooking, getNote, saveNote }) {
+  const todayStr = fmtDate(new Date())
+  const todays = (byDate[todayStr] || [])
+    .slice()
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+
+  const [note, setNote] = useState('')
+  const [savedNote, setSavedNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+
+  // Load the note for today whenever the stored value changes
+  useEffect(() => {
+    const n = getNote(todayStr)
+    setNote(n)
+    setSavedNote(n)
+  }, [getNote, todayStr])
+
+  const dirty = note !== savedNote
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await saveNote(todayStr, note)
+      setSavedNote(note.trim())
+      setNote(note.trim())
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 1800)
+    } catch (e) {
+      // error surfaced by hook; keep dirty so they can retry
+    }
+    setSaving(false)
+  }
+
+  const niceToday = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Today's bookings */}
+      <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600 }}>Today</div>
+          <span style={{ fontSize: '10px', fontFamily: 'monospace', color: T.text3 }}>
+            {todays.length} booking{todays.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div style={{ fontSize: '11px', color: T.text2, marginBottom: '12px' }}>{niceToday}</div>
+
+        {todays.length === 0 ? (
+          <div style={{ fontSize: '12px', color: T.text3, padding: '14px 0', textAlign: 'center' }}>
+            Nothing booked today
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {todays.map(b => (
+              <div
+                key={b.id}
+                onClick={() => onBookingClick(b)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBookingClick(b) } }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '9px 10px', borderRadius: '9px',
+                  background: T.surface2, border: `1px solid ${T.border}`,
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ width: '4px', alignSelf: 'stretch', borderRadius: '4px', background: STATUS_COLOR[b.status] || T.grey }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {b.customer_name || 'Booking'}
+                  </div>
+                  <div style={{ fontSize: '10px', color: T.text2, fontFamily: 'monospace', marginTop: '2px' }}>
+                    {fmtTime(b.start_time)}{b.vehicle_reg ? ` · ${b.vehicle_reg}` : ''}{b.job_type ? ` · ${b.job_type}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onAddBooking} style={{
+          width: '100%', marginTop: '12px',
+          background: 'transparent', border: `1px dashed ${T.border2}`,
+          color: T.text2, borderRadius: '9px', padding: '8px',
+          fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+        }}>
+          <i className="ti ti-plus" /> Add booking for today
+        </button>
+      </div>
+
+      {/* Quick note for today */}
+      <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600 }}>Note for today</div>
+          {justSaved && <span style={{ fontSize: '10px', color: T.green, fontFamily: 'monospace' }}>✓ Saved</span>}
+        </div>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Jot something down — parts on order, staff off, reminders..."
+          rows={4}
+          style={{
+            width: '100%', resize: 'vertical',
+            background: T.surface2, border: `1px solid ${T.border2}`,
+            borderRadius: '8px', padding: '9px 12px',
+            color: T.text, fontSize: '12px', fontFamily: 'inherit', outline: 'none',
+          }}
+        />
+        <button
+          onClick={handleSave}
+          disabled={!dirty || saving}
+          style={{
+            width: '100%', marginTop: '8px',
+            background: dirty ? T.red : T.surface3,
+            color: dirty ? '#fff' : T.text3,
+            border: 'none', borderRadius: '8px', padding: '8px',
+            fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
+            cursor: dirty && !saving ? 'pointer' : 'default',
+            opacity: saving ? 0.7 : 1,
+          }}
+        >
+          {saving ? 'Saving...' : dirty ? 'Save note' : 'Saved'}
+        </button>
       </div>
     </div>
   )
