@@ -10,11 +10,18 @@ import { useServices } from '../hooks/useServices'
 // ============================================================
 
 const T = {
-  bg: '#0c0a0f',
-  surface: '#14121a', surface2: '#1e1b26', surface3: '#282432',
-  border: 'rgba(255,255,255,0.06)', border2: 'rgba(255,255,255,0.1)',
-  red: '#e53935', green: '#4caf50', amber: '#ff9800',
-  text: '#f8f7fa', text2: '#9d99a8', text3: '#5c586a',
+  bg: 'var(--bg)',
+  surface: 'var(--surface)',
+  surface2: 'var(--surface2)',
+  surface3: 'var(--surface3)',
+  border: 'var(--border)',
+  border2: 'var(--border2)',
+  red: 'var(--red)',
+  green: 'var(--green)',
+  amber: 'var(--amber)',
+  text: 'var(--text)',
+  text2: 'var(--text2)',
+  text3: 'var(--text3)',
 }
 
 const TABS = [
