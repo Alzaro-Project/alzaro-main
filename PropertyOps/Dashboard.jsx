@@ -437,7 +437,7 @@ function DetailRow({ main, sub, pill, tone }) {
 /* ================================================================== */
 /*  COMPLIANCE                                                        */
 /* ================================================================== */
-function CompliancePage({ user }) {
+function CompliancePage({ user, go }) {
   const TYPES = {
     "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing",
     "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug",
@@ -447,6 +447,8 @@ function CompliancePage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [related, setRelated] = useState({ tenants: [], maint: [] });
   const properties = usePropertyList();
   const blank = { type: "Gas Safety", property_id: "", reference: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
@@ -459,6 +461,8 @@ function CompliancePage({ user }) {
     }
     db.from("prop_compliance").select("*")
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+    Promise.all([db.from("prop_tenants").select("*"), db.from("prop_maintenance").select("*")])
+      .then(([t, m]) => setRelated({ tenants: t.data || [], maint: m.data || [] }));
   }, []);
 
   const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
@@ -534,18 +538,40 @@ function CompliancePage({ user }) {
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
           {items.map((c, i) => {
             const t = toneVar(c.tone);
+            const isOpen = expandedId === (c.id || i);
+            const pid = c.property_id;
+            const same = (x) => pid && String(x.property_id) === String(pid);
+            const propName = propLabel(properties, pid) || c.property || "—";
+            const cT = related.tenants.filter(same);
+            const cM = related.maint.filter(same);
             return (
-              <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < items.length - 1 ? "0.5px solid var(--line)" : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
-                  <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{propLabel(properties, c.property_id) || c.property || "—"}{c.reference ? " · " + c.reference : ""}</div></div>
+              <React.Fragment key={c.id || i}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: (isOpen || i < items.length - 1) ? "0.5px solid var(--line)" : "none", cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (c.id || i))}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 14, color: "var(--txt-3)" }} />
+                    <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
+                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{propName}{c.reference ? " · " + c.reference : ""}</div></div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days} days ago` : `in ${c.days} days`}</span>
+                    <Pill text={c.status} tone={c.tone} />
+                    {c.id && DB_READY && <span style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(c)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(c.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span>}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days} days ago` : `in ${c.days} days`}</span>
-                  <Pill text={c.status} tone={c.tone} />
-                  {c.id && DB_READY && <span style={{ display: "flex", gap: 10 }}><i className="ti ti-pencil" onClick={() => openEdit(c)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(c.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span>}
-                </div>
-              </div>
+                {isOpen && (
+                  <div className="fade-in" style={{ padding: "12px 0 16px 26px", borderBottom: i < items.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+                      <DetailBox title="Tenant(s)" icon="ti-users" empty={cT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
+                        {cT.map((x, j) => <DetailRow key={j} main={x.name} sub={x.rent ? gbp(x.rent) + " pcm" : ""} pill={x.rent_status} tone={x.rent_status === "Overdue" ? "red" : "green"} />)}
+                      </DetailBox>
+                      <DetailBox title="Maintenance" icon="ti-tools" empty={cM.length === 0} emptyText={pid ? "No jobs." : "No property linked."} onClick={() => go && go("maintenance")}>
+                        {cM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
+                      </DetailBox>
+                    </div>
+                    <div style={{ marginTop: 12 }}><span onClick={() => go && go("documents")}><Btn icon="ti-folder" label="View documents" /></span></div>
+                  </div>
+                )}
+              </React.Fragment>
             );
           })}
         </div>
@@ -700,7 +726,7 @@ function TenantsPage({ user, go }) {
 /* ================================================================== */
 /*  MAINTENANCE (kanban)                                              */
 /* ================================================================== */
-function MaintenancePage({ user }) {
+function MaintenancePage({ user, go }) {
   const stages = ["Reported", "Assigned", "In Progress", "Completed"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
   const [rows, setRows] = useState(null);
@@ -805,6 +831,7 @@ function MaintenancePage({ user }) {
                           <div style={{ display: "flex", gap: 10 }}>
                             <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
                             <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                            <i className="ti ti-folder" onClick={() => go && go("documents")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="View documents" />
                           </div>
                         </div>
                       )}
@@ -824,11 +851,13 @@ function MaintenancePage({ user }) {
 /* ================================================================== */
 /*  FINANCE                                                           */
 /* ================================================================== */
-function FinancePage({ user }) {
+function FinancePage({ user, go }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [related, setRelated] = useState({ tenants: [], comp: [], maint: [] });
   const properties = usePropertyList();
   const blank = { tenant: "", property_id: "", amount: "", due_date: "", status: "Paid" };
   const [form, setForm] = useState(blank);
@@ -837,6 +866,9 @@ function FinancePage({ user }) {
     if (!DB_READY) { setRows(DEMO.payments.map((p) => ({ tenant: p.tenant, property: p.prop, amount: p.amount, due_date: p.due, status: p.status }))); return; }
     db.from("prop_payments").select("*").order("due_date", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+    Promise.all([
+      db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"),
+    ]).then(([t, c, m]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [] }));
   }, []);
 
   const refresh = async () => {
@@ -908,17 +940,50 @@ function FinancePage({ user }) {
       ) : data.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
       ) : (
-        <Table cols={["Tenant", "Property", "Amount", "Due date", "Status", ""]}>
-          {data.map((p, i) => (
-            <tr key={p.id || i}>
-              <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
-              <Td color="var(--txt-2)">{propLabel(properties, p.property_id) || p.property || p.prop || "—"}</Td>
-              <Td>{gbp(p.amount || 0)}</Td>
-              <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
-              <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
-              <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
-            </tr>
-          ))}
+        <Table cols={["", "Tenant", "Property", "Amount", "Due date", "Status", ""]}>
+          {data.map((p, i) => {
+            const isOpen = expandedId === (p.id || i);
+            const pid = p.property_id;
+            const same = (x) => pid && String(x.property_id) === String(pid);
+            const propName = propLabel(properties, pid) || p.property || p.prop || "—";
+            const pT = related.tenants.filter(same);
+            const pC = related.comp.filter(same);
+            const pM = related.maint.filter(same);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            return (
+              <React.Fragment key={p.id || i}>
+                <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (p.id || i))}>
+                  <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
+                  <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
+                  <Td color="var(--txt-2)">{propName}</Td>
+                  <Td>{gbp(p.amount || 0)}</Td>
+                  <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
+                  <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
+                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+                          <DetailBox title="Tenant(s)" icon="ti-users" empty={pT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
+                            {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
+                          </DetailBox>
+                          <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText={pid ? "No certificates." : "No property linked."} onClick={() => go && go("compliance")}>
+                            {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                          </DetailBox>
+                          <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText={pid ? "No jobs." : "No property linked."} onClick={() => go && go("maintenance")}>
+                            {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
+                          </DetailBox>
+                        </div>
+                        <div style={{ marginTop: 12 }}><span onClick={() => go && go("documents")}><Btn icon="ti-folder" label="View documents" /></span></div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </Table>
       )}
     </div>
@@ -937,6 +1002,7 @@ function DocumentsPage({ user }) {
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pickCat, setPickCat] = useState("Certificates");
+  const [preview, setPreview] = useState(null);
   const fileRef = React.useRef(null);
 
   useEffect(() => {
@@ -972,6 +1038,16 @@ function DocumentsPage({ user }) {
     const { data, error } = await db.storage.from("documents").createSignedUrl(d.file_path, 60);
     if (error) { setErr(error.message); return; }
     window.open(data.signedUrl, "_blank");
+  };
+
+  const openPreview = async (d) => {
+    if (!d.file_path || !DB_READY) { setErr("No file to preview."); return; }
+    setErr("");
+    const { data, error } = await db.storage.from("documents").createSignedUrl(d.file_path, 300);
+    if (error) { setErr(error.message); return; }
+    const ext = (d.name.split(".").pop() || "").toLowerCase();
+    const kind = ["pdf"].includes(ext) ? "pdf" : ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext) ? "image" : "other";
+    setPreview({ ...d, url: data.signedUrl, kind });
   };
 
   const remove = async (d) => {
@@ -1016,15 +1092,43 @@ function DocumentsPage({ user }) {
             return (
               <div key={d.id || i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px", display: "flex", gap: 12, alignItems: "center" }}>
                 <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${catIcon[d.category] || "ti-file"}`} style={{ fontSize: 18 }} /></span>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div onClick={() => d.file_path && DB_READY && openPreview(d)} style={{ minWidth: 0, flex: 1, cursor: d.file_path && DB_READY ? "pointer" : "default" }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
                   <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}</div>
                 </div>
+                {d.file_path && DB_READY && <i className="ti ti-eye" onClick={() => openPreview(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Preview" />}
                 {d.file_path && DB_READY && <i className="ti ti-download" onClick={() => download(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Download" />}
                 {d.id && DB_READY && <i className="ti ti-trash" onClick={() => remove(d)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {preview && (
+        <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 60 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 820, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)" }}>
+              <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{preview.name}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{preview.category}</div></div>
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <i className="ti ti-download" onClick={() => download(preview)} style={{ fontSize: 17, color: "var(--txt-2)", cursor: "pointer" }} title="Download" />
+                <i className="ti ti-x" onClick={() => setPreview(null)} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: "auto", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
+              {preview.kind === "pdf" ? (
+                <iframe src={preview.url} title="preview" style={{ width: "100%", height: "75vh", border: "none" }} />
+              ) : preview.kind === "image" ? (
+                <img src={preview.url} alt={preview.name} style={{ maxWidth: "100%", maxHeight: "75vh", objectFit: "contain" }} />
+              ) : (
+                <div style={{ textAlign: "center", padding: 40 }}>
+                  <i className="ti ti-file-unknown" style={{ fontSize: 40, color: "var(--txt-3)" }} />
+                  <div style={{ fontSize: 13, color: "var(--txt-2)", margin: "12px 0" }}>This file type can't be previewed in-browser.</div>
+                  <span onClick={() => download(preview)}><Btn icon="ti-download" label="Download to view" primary /></span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
