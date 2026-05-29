@@ -5,10 +5,9 @@ import GlobalSearch from './GlobalSearch'
 // ============================================================
 // Sidebar — GarageOps v2
 // ------------------------------------------------------------
-// 8 nav items, Tabler outline icons.
-// Now theme-aware: colours come from a palette that switches on
-// the store `theme` ('dark' | 'light'). Footer has a Light/Dark
-// toggle above Sign out (PropOps style).
+// Colours come from CSS variables (see styles/theme.css), so the
+// whole component reflips when the store sets data-theme on <html>.
+// Footer has a Light/Dark toggle above Sign out (PropOps style).
 // ============================================================
 
 const NAV = [
@@ -29,36 +28,12 @@ const TIER_STYLE = {
   admin:  { bg: 'rgba(167,139,250,0.1)',  color: '#a78bfa', border: 'rgba(167,139,250,0.3)', icon: 'ti-shield-lock' },
 }
 
-// Sidebar palette per theme
-function sidebarPalette(isDark) {
-  return isDark ? {
-    bg: '#14121a',
-    border: 'rgba(255,255,255,0.06)',
-    border2: 'rgba(255,255,255,0.08)',
-    text: '#f8f7fa',
-    text2: '#9d99a8',
-    text3: '#5c586a',
-    hover: '#1e1b26',
-    active: '#1e1b26',
-  } : {
-    bg: '#ffffff',
-    border: 'rgba(0,0,0,0.08)',
-    border2: 'rgba(0,0,0,0.1)',
-    text: '#1a1820',
-    text2: '#5c586a',
-    text3: '#9d99a8',
-    hover: '#f3f1f6',
-    active: '#f0eef5',
-  }
-}
-
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, tier, isAdmin, logout, settings, theme, toggleTheme } = useStore()
 
   const isDark = theme !== 'light'
-  const P = sidebarPalette(isDark)
   const ts = TIER_STYLE[tier] || TIER_STYLE.bronze
 
   const handleNav = (item) => {
@@ -71,29 +46,29 @@ export default function Sidebar({ onNavigate, isMobile }) {
   return (
     <div style={{
       width: '230px',
-      background: P.bg,
-      borderRight: `1px solid ${P.border}`,
+      background: 'var(--surface)',
+      borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       height: isMobile ? 'calc(100vh - 56px)' : '100vh',
       fontFamily: "'Space Grotesk', sans-serif",
-      transition: 'background .2s, border-color .2s',
+      transition: 'var(--theme-transition)',
     }}>
       {/* Logo — hidden on mobile (shown in app header) */}
       {!isMobile && (
-        <div style={{ padding: '18px 16px 14px', borderBottom: `1px solid ${P.border}` }}>
-          <div style={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', color: P.text }}>
-            Alzaro<span style={{ color: '#e53935' }}>GarageOps</span>
+        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text)' }}>
+            Alzaro<span style={{ color: 'var(--red)' }}>GarageOps</span>
           </div>
-          <div style={{ fontSize: '10px', color: P.text3, fontFamily: 'monospace', marginTop: '4px', letterSpacing: '0.3px' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'monospace', marginTop: '4px', letterSpacing: '0.3px' }}>
             Garage management pro
           </div>
         </div>
       )}
 
       {/* Garage info + tier */}
-      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${P.border}` }}>
-        <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: P.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {settings?.name || user?.name || 'Your Garage'}
         </div>
         <span style={{
@@ -119,7 +94,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
       <div style={{ flex: 1, padding: '6px 0', overflowY: 'auto' }}>
         {isAdmin ? (
           <>
-            <div style={{ fontSize: '9px', fontWeight: 500, letterSpacing: '1px', color: P.text3, padding: '12px 16px 6px', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '9px', fontWeight: 500, letterSpacing: '1px', color: 'var(--text3)', padding: '12px 16px 6px', textTransform: 'uppercase', fontFamily: 'monospace' }}>
               Platform
             </div>
             <NavItem
@@ -127,7 +102,6 @@ export default function Sidebar({ onNavigate, isMobile }) {
               label="Licence manager"
               active={location.pathname === '/admin'}
               onClick={() => { navigate('/admin'); if (onNavigate) onNavigate() }}
-              P={P}
             />
           </>
         ) : (
@@ -141,7 +115,6 @@ export default function Sidebar({ onNavigate, isMobile }) {
                 locked={locked}
                 active={location.pathname === item.path}
                 onClick={() => handleNav(item)}
-                P={P}
               />
             )
           })
@@ -149,18 +122,19 @@ export default function Sidebar({ onNavigate, isMobile }) {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '12px 14px', borderTop: `1px solid ${P.border}` }}>
+      <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
         {/* Light / Dark mode toggle (above Sign out — PropOps style) */}
         <button
           onClick={() => toggleTheme()}
+          className="go-footer-btn"
           style={{
             width: '100%',
             background: 'transparent',
-            border: `1px solid ${P.border2}`,
+            border: '1px solid var(--border2)',
             borderRadius: '6px',
             padding: '7px',
             fontSize: '11px',
-            color: P.text2,
+            color: 'var(--text2)',
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
@@ -168,31 +142,28 @@ export default function Sidebar({ onNavigate, isMobile }) {
             gap: '6px',
             fontFamily: 'inherit',
             marginBottom: '8px',
-            transition: 'background .12s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = P.hover }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           <i
             className={`ti ${isDark ? 'ti-sun' : 'ti-moon'}`}
-            style={{ fontSize: '13px', color: isDark ? '#f5c842' : '#a78bfa' }}
+            style={{ fontSize: '13px', color: isDark ? '#f5c842' : '#7c3aed' }}
             aria-hidden="true"
           />
           {isDark ? 'Light Mode' : 'Dark Mode'}
         </button>
 
-        <div style={{ fontSize: '10px', color: P.text3, marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {user?.email}
         </div>
-        <button onClick={() => logout()} style={{
+        <button onClick={() => logout()} className="go-footer-btn" style={{
           width: '100%',
           background: 'transparent',
-          border: `1px solid ${P.border2}`,
+          border: '1px solid var(--border2)',
           borderRadius: '6px',
           padding: '7px',
           fontSize: '11px',
-          color: P.text2,
+          color: 'var(--text2)',
           cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
@@ -203,13 +174,19 @@ export default function Sidebar({ onNavigate, isMobile }) {
           <i className="ti ti-logout" aria-hidden="true" /> Sign out
         </button>
       </div>
+
+      {/* Hover styles via CSS so they work with variables */}
+      <style>{`
+        .go-footer-btn:hover { background: var(--hover) !important; }
+        .go-nav-item:hover { background: var(--hover); }
+      `}</style>
     </div>
   )
 }
 
-function NavItem({ icon, label, active, locked, onClick, P }) {
+function NavItem({ icon, label, active, locked, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className={active ? '' : 'go-nav-item'} style={{
       display: 'flex',
       alignItems: 'center',
       gap: '10px',
@@ -220,17 +197,14 @@ function NavItem({ icon, label, active, locked, onClick, P }) {
       fontWeight: active ? 500 : 400,
       cursor: 'pointer',
       transition: 'all .12s',
-      color: active ? P.text : P.text2,
-      background: active ? P.active : 'transparent',
-    }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = P.hover }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
-    >
+      color: active ? 'var(--text)' : 'var(--text2)',
+      background: active ? 'var(--active)' : 'transparent',
+    }}>
       <i className={`ti ${icon}`} style={{
         fontSize: '16px',
         width: '18px',
         textAlign: 'center',
-        color: active ? '#e53935' : P.text2,
+        color: active ? 'var(--red)' : 'var(--text2)',
       }} aria-hidden="true" />
       <span style={{ flex: 1 }}>{label}</span>
       {locked && <i className="ti ti-lock" style={{ fontSize: '11px', opacity: 0.5 }} aria-hidden="true" />}
