@@ -224,9 +224,10 @@ function PropertiesPage({ user }) {
   const [rows, setRows] = useState(null);   // null = loading
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ address: "", area: "", type: "House", units: 1, status: "Let", rent: 0 });
+  const [editId, setEditId] = useState(null);
+  const blank = { address: "", area: "", type: "House", units: "", status: "Let", rent: "" };
+  const [form, setForm] = useState(blank);
 
-  // Load from Supabase on first render (falls back to demo data if keys unset / error)
   React.useEffect(() => {
     if (!DB_READY) { setRows(DEMO.properties); return; }
     db.from("prop_properties").select("*").order("created_at", { ascending: false })
@@ -241,16 +242,25 @@ function PropertiesPage({ user }) {
     setRows(data || []);
   };
 
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", units: p.units || "", status: p.status || "Let", rent: p.rent || "" }); setEditId(p.id); setAdding(true); setErr(""); };
+
   const save = async () => {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
-    const { error } = await db.from("prop_properties").insert([{ ...form, units: +form.units, rent: +form.rent, score: 100, user_id: user.id }]);
+    const payload = { ...form, units: form.units === "" ? 1 : +form.units, rent: form.rent === "" ? 0 : +form.rent };
+    let error;
+    if (editId) {
+      ({ error } = await db.from("prop_properties").update(payload).eq("id", editId));
+    } else {
+      ({ error } = await db.from("prop_properties").insert([{ ...payload, score: 100, user_id: user.id }]));
+    }
     if (error) { setErr(error.message); return; }
-    setForm({ address: "", area: "", type: "House", units: 1, status: "Let", rent: 0 });
-    setAdding(false);
-    refresh();
+    setForm(blank); setAdding(false); setEditId(null); refresh();
   };
+
+  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_properties").delete().eq("id", id); refresh(); } };
 
   const list = (rows || []).filter((p) => ((p.address || p.addr || "") + (p.area || "") + (p.type || "")).toLowerCase().includes(q.toLowerCase()));
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
@@ -258,24 +268,23 @@ function PropertiesPage({ user }) {
   return (
     <div className="fade-in">
       <PageHead title="Properties" sub={rows ? `${list.length} ${DB_READY ? "" : "(demo) "}properties` : "Loading…"}
-        right={<span onClick={() => { setAdding(!adding); setErr(""); }}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add property"} primary /></span>} />
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add property"} primary /></span>} />
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
       {adding && (
-        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14, display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
-          <input style={inp} placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <input style={inp} placeholder="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
-          <select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            {["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}
-          </select>
-          <input style={inp} type="number" placeholder="Units" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} />
-          <select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-            {["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}
-          </select>
-          <input style={inp} type="number" placeholder="Rent pcm" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
-          <div style={{ gridColumn: "1 / -1" }}><span onClick={save}><Btn icon="ti-device-floppy" label="Save property" primary /></span></div>
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit property" : "New property"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Units<input style={inp} type="number" placeholder="e.g. 1" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update property" : "Save property"} primary /></span></div>
         </div>
       )}
 
@@ -284,7 +293,7 @@ function PropertiesPage({ user }) {
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading properties…</div>
       ) : (
-        <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance"]}>
+        <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance", ""]}>
           {list.map((p, i) => (
             <tr key={p.id || i}>
               <Td><span style={{ fontWeight: 500 }}>{p.address || p.addr}</span></Td>
@@ -294,6 +303,7 @@ function PropertiesPage({ user }) {
               <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
               <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
               <Td><span style={{ color: `var(--${p.tone || (p.score >= 90 ? "green" : p.score >= 80 ? "amber" : "red")})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
+              <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
             </tr>
           ))}
         </Table>
@@ -354,7 +364,9 @@ function TenantsPage({ user }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", property: "", email: "", phone: "", rent: 0, tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" });
+  const [editId, setEditId] = useState(null);
+  const blank = { name: "", property: "", email: "", phone: "", rent: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
+  const [form, setForm] = useState(blank);
 
   useEffect(() => {
     if (!DB_READY) { setRows(DEMO.tenants.map((t) => ({ name: t.name, property: t.prop, tenancy_end: t.end, rent: t.rent, rent_status: t.paid ? "Up to date" : "Overdue", rtr_status: t.rtr }))); return; }
@@ -367,45 +379,52 @@ function TenantsPage({ user }) {
     setRows(data || []);
   };
 
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (t) => { setForm({ name: t.name || "", property: t.property || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
+
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, rent: +form.rent, user_id: user.id };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent };
     if (!payload.tenancy_end) delete payload.tenancy_end;
-    const { error } = await db.from("prop_tenants").insert([payload]);
+    let error;
+    if (editId) {
+      ({ error } = await db.from("prop_tenants").update(payload).eq("id", editId));
+    } else {
+      ({ error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]));
+    }
     if (error) { setErr(error.message); return; }
-    setForm({ name: "", property: "", email: "", phone: "", rent: 0, tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" });
-    setAdding(false); refresh();
+    setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const remove = async (id) => {
-    if (!id || !DB_READY) return;
-    await db.from("prop_tenants").delete().eq("id", id);
-    refresh();
-  };
+  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_tenants").delete().eq("id", id); refresh(); } };
 
-  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 
   return (
     <div className="fade-in">
       <PageHead title="Tenants" sub={rows ? `${rows.length} ${DB_READY ? "" : "(demo) "}tenants` : "Loading…"}
-        right={<span onClick={() => { setAdding(!adding); setErr(""); }}><Btn icon={adding ? "ti-x" : "ti-user-plus"} label={adding ? "Cancel" : "Add tenant"} primary /></span>} />
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-user-plus"} label={adding ? "Cancel" : "Add tenant"} primary /></span>} />
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
       {adding && (
-        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <input style={inp} placeholder="Tenant name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input style={inp} placeholder="Property" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} />
-          <input style={inp} type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input style={inp} placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <input style={inp} type="number" placeholder="Rent pcm" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} />
-          <input style={inp} type="date" placeholder="Tenancy end" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} />
-          <select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select>
-          <select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select>
-          <div><span onClick={save}><Btn icon="ti-device-floppy" label="Save tenant" primary /></span></div>
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit tenant" : "New tenant"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+            <label style={fld}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
+            <label style={fld}>Tenancy end date<input style={inp} type="date" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} /></label>
+            <label style={fld}>Rent status<select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Right to Rent<select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update tenant" : "Save tenant"} primary /></span></div>
         </div>
       )}
 
@@ -428,7 +447,7 @@ function TenantsPage({ user }) {
               <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
               <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
               <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
-              <Td>{t.id && DB_READY ? <i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /> : null}</Td>
+              <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
             </tr>
           ))}
         </Table>
@@ -440,39 +459,121 @@ function TenantsPage({ user }) {
 /* ================================================================== */
 /*  MAINTENANCE (kanban)                                              */
 /* ================================================================== */
-function MaintenancePage() {
+function MaintenancePage({ user }) {
   const stages = ["Reported", "Assigned", "In Progress", "Completed"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = { title: "", property: "", priority: "Medium", contractor: "", status: "Reported" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows(DEMO.maintenance.map((m) => ({ title: m.title, property: m.prop, priority: m.priority, contractor: m.contractor, status: m.status }))); return; }
+    db.from("prop_maintenance").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => {
+    const { data } = await db.from("prop_maintenance").select("*").order("created_at", { ascending: false });
+    setRows(data || []);
+  };
+
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", property: j.property || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported" }); setEditId(j.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.title.trim()) { setErr("Job title is required."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    let error;
+    if (editId) ({ error } = await db.from("prop_maintenance").update(form).eq("id", editId));
+    else ({ error } = await db.from("prop_maintenance").insert([{ ...form, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
+  };
+
+  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_maintenance").delete().eq("id", id); refresh(); } };
+
+  const move = async (j, dir) => {
+    const idx = stages.indexOf(j.status);
+    const next = stages[idx + dir];
+    if (!next || !j.id || !DB_READY) return;
+    await db.from("prop_maintenance").update({ status: next }).eq("id", j.id);
+    refresh();
+  };
+
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+  const open = (rows || []).filter((m) => m.status !== "Completed").length;
+
   return (
     <div className="fade-in">
-      <PageHead title="Maintenance" sub={`${DEMO.maintenance.filter((m) => m.status !== "Completed").length} open jobs · 2 high priority`} right={<Btn icon="ti-plus" label="New job" primary />} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
-        {stages.map((s) => {
-          const jobs = DEMO.maintenance.filter((m) => m.status === s);
-          return (
-            <div key={s}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
-                <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>{s}</span>
-                <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{jobs.length}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 9, minHeight: 80 }}>
-                {jobs.map((j, i) => (
-                  <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 6 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
-                      <Pill text={j.priority} tone={toneFor[j.priority]} />
+      <PageHead title="Maintenance" sub={rows ? `${open} open job${open === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New job"} primary /></span>} />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
+      {adding && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New maintenance job"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+            <label style={fld}>Issue / job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={fld}>Property<input style={inp} placeholder="e.g. 9 Mill Lane Flat 2" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
+            <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update job" : "Save job"} primary /></span></div>
+        </div>
+      )}
+
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading jobs…</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
+          {stages.map((s) => {
+            const jobs = (rows || []).filter((m) => m.status === s);
+            return (
+              <div key={s}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
+                  <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>{s}</span>
+                  <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{jobs.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 9, minHeight: 80 }}>
+                  {jobs.map((j, i) => (
+                    <div key={j.id || i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 6 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
+                        <Pill text={j.priority} tone={toneFor[j.priority] || "blue"} />
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{j.property || j.prop || "—"}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-2)", marginBottom: j.id && DB_READY ? 9 : 0 }}>
+                        <i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.contractor || "Unassigned"}
+                      </div>
+                      {j.id && DB_READY && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 8 }}>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            {stages.indexOf(j.status) > 0 && <i className="ti ti-arrow-left" onClick={() => move(j, -1)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Move back" />}
+                            {stages.indexOf(j.status) < stages.length - 1 && <i className="ti ti-arrow-right" onClick={() => move(j, 1)} style={{ fontSize: 14, color: "var(--brand)", cursor: "pointer" }} title="Move forward" />}
+                          </div>
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                            <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{j.prop}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-2)" }}>
-                      <i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.contractor}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                  {jobs.length === 0 && <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center", padding: "16px 0", border: "1px dashed var(--line)", borderRadius: 10 }}>—</div>}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
