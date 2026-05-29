@@ -691,33 +691,149 @@ function CertificatesPage() {
 /* ================================================================== */
 /*  DOCUMENTS                                                         */
 /* ================================================================== */
-function DocumentsPage() {
-  const [cat, setCat] = useState("All");
+const DOC_BUCKET = "svc-documents";
+const fmtSize = (b) => b == null ? "—" : b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
+const iconFor = (cat, name) => {
+  const n = (name || "").toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|heic)$/.test(n)) return { icon: "ti-photo", tone: "blue" };
+  if (cat === "Certificates") return { icon: "ti-shield-check", tone: "green" };
+  if (cat === "Invoices") return { icon: "ti-receipt", tone: "amber" };
+  if (cat === "Quotes") return { icon: "ti-file-dollar", tone: "brand" };
+  return { icon: "ti-file", tone: "blue" };
+};
+const isImage = (name) => /\.(png|jpe?g|gif|webp|heic)$/i.test(name || "");
+const isPdf = (name) => /\.pdf$/i.test(name || "");
+
+function DocViewer({ doc, url, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 30, zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 900, height: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{doc.name}</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <a href={url} download={doc.name}><i className="ti ti-download" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Download" /></a>
+            <a href={url} target="_blank" rel="noreferrer"><i className="ti ti-external-link" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Open in new tab" /></a>
+            <i className="ti ti-x" onClick={onClose} style={{ fontSize: 20, color: "var(--txt-2)", cursor: "pointer" }} />
+          </div>
+        </div>
+        <div style={{ flex: 1, background: "#0d0d10", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {url == null ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>
+            : isImage(doc.name) ? <img src={url} alt={doc.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            : isPdf(doc.name) ? <iframe src={url} title={doc.name} style={{ width: "100%", height: "100%", border: "none" }} />
+            : <div style={{ textAlign: "center", color: "var(--txt-2)", fontSize: 13 }}><i className="ti ti-file" style={{ fontSize: 40, display: "block", marginBottom: 10 }} />Preview not available for this file type.<br /><a href={url} download={doc.name} style={{ color: "var(--brand)" }}>Download instead</a></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentsPage({ user }) {
   const cats = ["All", "Quotes", "Invoices", "Certificates", "Job Photos"];
-  const list = DEMO.documents.filter((d) => cat === "All" || d.cat === cat);
+  const [cat, setCat] = useState("All");
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [uploadCat, setUploadCat] = useState("Certificates");
+  const [viewer, setViewer] = useState(null); // { doc, url }
+
+  const load = () => {
+    if (!DB_READY) { setRows([]); return; }
+    db.from("svc_documents").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data || []); });
+  };
+  useEffect(load, []);
+
+  const doUpload = async (file, category, replaceDoc) => {
+    if (!file) return;
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    setErr(""); setBusy(true);
+    try {
+      const path = `${user.id}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await db.storage.from(DOC_BUCKET).upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      if (replaceDoc) {
+        // delete old file, point row at new one
+        await db.storage.from(DOC_BUCKET).remove([replaceDoc.path]);
+        const { error } = await db.from("svc_documents").update({ path, name: file.name, size: file.size, cat: replaceDoc.cat }).eq("id", replaceDoc.id);
+        if (error) throw error;
+      } else {
+        const { error } = await db.from("svc_documents").insert([{ user_id: user.id, name: file.name, path, size: file.size, cat: category }]);
+        if (error) throw error;
+      }
+      load();
+    } catch (e) { setErr(e.message || "Upload failed."); }
+    setBusy(false);
+  };
+
+  const openView = async (d) => {
+    setViewer({ doc: d, url: null });
+    const { data, error } = await db.storage.from(DOC_BUCKET).createSignedUrl(d.path, 3600);
+    if (error) { setErr(error.message); setViewer(null); return; }
+    setViewer({ doc: d, url: data.signedUrl });
+  };
+
+  const remove = async (d) => {
+    if (!DB_READY) return;
+    await db.storage.from(DOC_BUCKET).remove([d.path]);
+    await db.from("svc_documents").delete().eq("id", d.id);
+    load();
+  };
+
+  const pickFile = (onPick) => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx";
+    inp.onchange = () => inp.files[0] && onPick(inp.files[0]);
+    inp.click();
+  };
+
+  const data = rows || [];
+  const list = data.filter((d) => cat === "All" || d.cat === cat);
+
   return (
     <div className="fade-in">
-      <PageHead title="Documents" sub="Quotes, invoices, certificates and job photos — all in one vault." right={<Btn icon="ti-upload" label="Upload" primary />} />
+      <PageHead title="Documents" sub={rows ? `${data.length} file${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={uploadCat} onChange={(e) => setUploadCat(e.target.value)} style={{ ...inp, width: "auto", padding: "8px 10px" }}>{cats.filter((c) => c !== "All").map((c) => <option key={c}>{c}</option>)}</select>
+          <span onClick={() => !busy && pickFile((f) => doUpload(f, uploadCat, null))}><Btn icon={busy ? "ti-loader" : "ti-upload"} label={busy ? "Uploading…" : "Upload"} primary /></span>
+        </span>} />
+      {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={errBanner}>{err}</div>}
       <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
         {cats.map((c) => (
           <span key={c} onClick={() => setCat(c)} style={{ cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, color: c === cat ? "var(--txt)" : "var(--txt-2)", background: c === cat ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (c === cat ? "var(--line)" : "transparent") }}>{c}</span>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 11 }}>
-        {list.map((d, i) => {
-          const t = toneVar(d.tone);
-          return (
-            <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px", display: "flex", gap: 12, alignItems: "center" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${d.icon}`} style={{ fontSize: 18 }} /></span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.cat} · {d.size} · {d.date}</div>
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading documents…</div>
+      ) : list.length === 0 ? (
+        <div style={emptyCard}>No documents yet. Pick a category and click "Upload" to add your first file.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 11 }}>
+          {list.map((d) => {
+            const meta = iconFor(d.cat, d.name);
+            const t = toneVar(meta.tone);
+            const when = d.created_at ? new Date(d.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+            return (
+              <div key={d.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 15px" }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${meta.icon}`} style={{ fontSize: 18 }} /></span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.cat} · {fmtSize(d.size)} · {when}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, borderTop: "0.5px solid var(--line)", paddingTop: 10 }}>
+                  <span onClick={() => openView(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--brand)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 15 }} />View</span>
+                  <span onClick={() => !busy && pickFile((f) => doUpload(f, d.cat, d))} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--txt-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-replace" style={{ fontSize: 15 }} />Replace</span>
+                  <span onClick={() => remove(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--red)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-trash" style={{ fontSize: 15 }} />Delete</span>
+                </div>
               </div>
-              <i className="ti ti-download" style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} />
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+      {viewer && <DocViewer doc={viewer.doc} url={viewer.url} onClose={() => setViewer(null)} />}
     </div>
   );
 }
