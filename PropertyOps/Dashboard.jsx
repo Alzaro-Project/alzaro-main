@@ -315,44 +315,117 @@ function PropertiesPage({ user }) {
 /* ================================================================== */
 /*  COMPLIANCE                                                        */
 /* ================================================================== */
-function CompliancePage() {
-  const all = [
-    ...DEMO.certificates,
-    { type: "Carbon Monoxide", ref: "Annual check", addr: "14 Oak St", days: 88, icon: "ti-cloud", tone: "green" },
-    { type: "Buildings Insurance", ref: "Policy renewal", addr: "Portfolio-wide", days: 120, icon: "ti-umbrella", tone: "green" },
-    { type: "HMO Licence", ref: "5-year licence", addr: "9 Mill Lane", days: 210, icon: "ti-license", tone: "green" },
-    { type: "Legionella Risk", ref: "Risk assessment", addr: "5 King's Court", days: 12, icon: "ti-droplet", tone: "amber" },
-  ].sort((a, b) => a.days - b.days);
-  const overdue = all.filter((c) => c.days <= 7).length;
-  const soon = all.filter((c) => c.days > 7 && c.days <= 30).length;
+function CompliancePage({ user }) {
+  const TYPES = {
+    "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing",
+    "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug",
+    "Buildings Insurance": "ti-umbrella", "HMO Licence": "ti-license", "Fire Risk Assessment": "ti-fire-extinguisher",
+  };
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = { type: "Gas Safety", property: "", reference: "", expiry_date: "" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) {
+      const today = new Date();
+      setRows(DEMO.certificates.map((c) => ({ type: c.type, property: c.addr, reference: c.ref, expiry_date: new Date(today.getTime() + c.days * 864e5).toISOString().slice(0, 10) })));
+      return;
+    }
+    db.from("prop_compliance").select("*")
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+  }, []);
+
+  const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property: c.property || "", reference: c.reference || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.expiry_date) { setErr("Expiry date is required — it's what we track."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    let error;
+    if (editId) ({ error } = await db.from("prop_compliance").update(form).eq("id", editId));
+    else ({ error } = await db.from("prop_compliance").insert([{ ...form, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
+  };
+
+  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").delete().eq("id", id); refresh(); } };
+
+  // compute days-to-expiry + status for each item
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const items = (rows || []).map((c) => {
+    const exp = c.expiry_date ? new Date(c.expiry_date) : null;
+    const days = exp ? Math.round((exp - today) / 864e5) : null;
+    const tone = days === null ? "blue" : days < 0 ? "red" : days <= 7 ? "red" : days <= 30 ? "amber" : "green";
+    const status = days === null ? "No date" : days < 0 ? "Expired" : days <= 7 ? "Urgent" : days <= 30 ? "Due soon" : "Valid";
+    return { ...c, days, tone, status };
+  }).sort((a, b) => (a.days ?? 9999) - (b.days ?? 9999));
+
+  const urgent = items.filter((c) => c.days !== null && c.days <= 7).length;
+  const soon = items.filter((c) => c.days !== null && c.days > 7 && c.days <= 30).length;
+  const valid = items.filter((c) => c.days !== null && c.days > 30).length;
+  const score = items.length ? Math.max(0, Math.round((valid / items.length) * 100)) : 100;
+
+  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+
   return (
     <div className="fade-in">
-      <PageHead title="Compliance" sub="Live tracking of every legal obligation across your portfolio." right={<Btn icon="ti-upload" label="Upload certificate" primary />} />
+      <PageHead title="Compliance" sub="Live tracking of every legal obligation across your portfolio."
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add certificate"} primary /></span>} />
+
+      {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-        <Metric label="Compliance Score" value={<>{DEMO.metrics.complianceScore}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub="Portfolio healthy" color="var(--green)" />
-        <Metric label="Urgent (≤7 days)" value={overdue} sub="Act now" color="var(--red)" />
+        <Metric label="Compliance Score" value={<>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
+        <Metric label="Urgent (≤7 days)" value={urgent} sub="Act now" color="var(--red)" />
         <Metric label="Due Soon (≤30 days)" value={soon} sub="Schedule renewal" color="var(--amber)" />
-        <Metric label="Tracked Items" value={all.length} sub="Across 6 properties" color="var(--blue)" />
+        <Metric label="Tracked Items" value={items.length} sub="Certificates" color="var(--blue)" />
       </div>
+
+      {adding && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit certificate" : "New certificate"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.keys(TYPES).map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Reference / notes<input style={inp} placeholder="e.g. CP12 certificate" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
+            <label style={fld}>Expiry date<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update certificate" : "Save certificate"} primary /></span></div>
+        </div>
+      )}
+
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Compliance timeline — soonest first</div>
-      <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
-        {all.map((c, i) => {
-          const t = toneVar(c.tone);
-          const status = c.days <= 7 ? "Urgent" : c.days <= 30 ? "Due soon" : "Valid";
-          return (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < all.length - 1 ? "0.5px solid var(--line)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
-                <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{c.addr} · {c.ref}</div></div>
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading certificates…</div>
+      ) : items.length === 0 ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No certificates tracked yet. Click "Add certificate" to start tracking expiry dates.</div>
+      ) : (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
+          {items.map((c, i) => {
+            const t = toneVar(c.tone);
+            return (
+              <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < items.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
+                  <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{c.property || "—"}{c.reference ? " · " + c.reference : ""}</div></div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days} days ago` : `in ${c.days} days`}</span>
+                  <Pill text={c.status} tone={c.tone} />
+                  {c.id && DB_READY && <span style={{ display: "flex", gap: 10 }}><i className="ti ti-pencil" onClick={() => openEdit(c)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(c.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span>}
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>in {c.days} days</span>
-                <Pill text={status} tone={c.tone} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
