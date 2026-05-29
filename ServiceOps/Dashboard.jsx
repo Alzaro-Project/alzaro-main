@@ -491,8 +491,8 @@ function CustomerDetail({ customer, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 60, overflow: "auto" }}>
       <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
-        <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 600 }}>{customer.name}</div>
           <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 3 }}>{[customer.type, customer.area, customer.site].filter(Boolean).join(" · ")}</div>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 6, display: "flex", gap: 16 }}>
@@ -500,7 +500,7 @@ function CustomerDetail({ customer, onClose }) {
             {customer.email && <span><i className="ti ti-mail" style={{ fontSize: 13, marginRight: 4 }} />{customer.email}</span>}
           </div>
         </div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 20, overflow: "auto", flex: 1 }}>
           {!data ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div> : (
             <>
               <Section title="Properties" items={data.properties} render={(p) => <div key={p.id}>{line(p.address, p.postcode || "", "brand")}</div>} />
@@ -1307,11 +1307,21 @@ const SAMPLE = {
 function ReportsPage() {
   const [period, setPeriod] = useState("This Month");
   const [preview, setPreview] = useState(null);
-  const periods = ["This Month", "Quarter", "VAT Quarter", "Custom"];
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const periods = ["This Month", "Quarter", "VAT Year", "Custom"];
+  const periodLabel = period === "Custom" ? (from && to ? `${from} → ${to}` : "Custom range — pick dates") : period;
   return (
     <div className="fade-in" style={{ position: "relative" }}>
-      <PageHead title="Reports" sub="Generate, preview and export any report across your business."
+      <PageHead title="Reports" sub={`Showing: ${periodLabel}`}
         right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
+      {period === "Custom" && (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 18, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 14 }}>
+          <label style={fld}>From<input style={{ ...inp, width: 170 }} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          <label style={fld}>To<input style={{ ...inp, width: 170 }} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <span style={{ fontSize: 11.5, color: "var(--txt-3)", paddingBottom: 9 }}>Reports below will use this date range.</span>
+        </div>
+      )}
       {REPORTS.map((group, gi) => {
         const t = toneVar(group.tone);
         return (
@@ -1516,7 +1526,46 @@ function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showNotif, setShowNotif] = useState(false);
+  const [hits, setHits] = useState({ customers: [], jobs: [], invoices: [], quotes: [], properties: [] });
+  const [notifs, setNotifs] = useState([]);
   const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
+
+  // notifications: overdue invoices + certs expiring within 30 days
+  useEffect(() => {
+    if (!DB_READY) return;
+    Promise.all([
+      db.from("svc_invoices").select("ref,customer,amount,status").eq("status", "Overdue"),
+      db.from("svc_certificates").select("cert_type,customer,site,expiry_date"),
+    ]).then(([inv, cert]) => {
+      const list = [];
+      (inv.data || []).forEach((v) => list.push({ icon: "ti-receipt", tone: "red", text: `Overdue invoice ${v.ref || ""} · ${v.customer || ""} · ${gbp(+v.amount || 0)}`, go: "invoicing" }));
+      (cert.data || []).forEach((c) => {
+        if (!c.expiry_date) return;
+        const days = Math.ceil((new Date(c.expiry_date + "T00:00:00") - new Date()) / 86400000);
+        if (days <= 30) list.push({ icon: "ti-shield-check", tone: days <= 7 ? "red" : "amber", text: `${c.cert_type} ${days < 0 ? "expired" : "due in " + days + "d"} · ${c.customer || c.site || ""}`, go: "certificates" });
+      });
+      setNotifs(list);
+    });
+  }, []);
+
+  // global search across tables (debounced-ish: on each change)
+  useEffect(() => {
+    const term = search.trim();
+    if (!term || !DB_READY) { setHits({ customers: [], jobs: [], invoices: [], quotes: [], properties: [] }); return; }
+    const like = `%${term}%`;
+    Promise.all([
+      db.from("svc_customers").select("id,name,site,area").ilike("name", like).limit(6),
+      db.from("svc_jobs").select("id,title,customer,status").ilike("title", like).limit(6),
+      db.from("svc_invoices").select("id,ref,customer,amount,status").ilike("ref", like).limit(6),
+      db.from("svc_quotes").select("id,ref,customer,amount,status").ilike("ref", like).limit(6),
+      db.from("svc_properties").select("id,address,postcode,customer").ilike("address", like).limit(6),
+    ]).then(([c, j, i, q, p]) => setHits({ customers: c.data || [], jobs: j.data || [], invoices: i.data || [], quotes: q.data || [], properties: p.data || [] }));
+  }, [search]);
+
+  const searching = search.trim().length > 0;
+  const totalHits = hits.customers.length + hits.jobs.length + hits.invoices.length + hits.quotes.length + hits.properties.length;
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
@@ -1552,23 +1601,72 @@ function Dashboard({ user, signOut }) {
       </aside>
 
       <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, position: "relative" }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
             <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-            <input placeholder="Search customers, jobs, invoices…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customers, jobs, invoices, quotes, properties…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+            {search && <i className="ti ti-x" onClick={() => setSearch("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
           </div>
-          <div style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
+          <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
             <i className="ti ti-bell" style={{ fontSize: 20 }} />
-            <span style={{ position: "absolute", top: -2, right: -3, width: 7, height: 7, borderRadius: "50%", background: "var(--red)" }} />
+            {notifs.length > 0 && <span style={{ position: "absolute", top: -4, right: -5, minWidth: 15, height: 15, padding: "0 4px", borderRadius: 8, background: "var(--red)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{notifs.length}</span>}
           </div>
+          {showNotif && (
+            <div style={{ position: "absolute", top: 46, right: 0, width: 320, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 12, boxShadow: "0 16px 40px rgba(0,0,0,.4)", zIndex: 40, overflow: "hidden" }}>
+              <div style={{ padding: "12px 15px", borderBottom: "0.5px solid var(--line)", fontSize: 12, fontWeight: 600 }}>Notifications</div>
+              <div style={{ maxHeight: 320, overflow: "auto" }}>
+                {notifs.length === 0 ? <div style={{ padding: 16, fontSize: 12, color: "var(--txt-3)" }}>You're all caught up. No overdue invoices or expiring certificates.</div>
+                  : notifs.map((n, i) => {
+                    const t = toneVar(n.tone);
+                    return (
+                      <div key={i} onClick={() => { setActive(n.go); setShowNotif(false); }} style={{ display: "flex", gap: 10, alignItems: "center", padding: "11px 15px", borderBottom: i < notifs.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
+                        <span style={{ width: 26, height: 26, borderRadius: 7, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${n.icon}`} style={{ fontSize: 14 }} /></span>
+                        <span style={{ fontSize: 11.5 }}>{n.text}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
-        {active === "dashboard" && (
-          <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12 }}>
-            {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+        {searching ? (
+          <div className="fade-in">
+            <PageHead title="Search results" sub={`${totalHits} match${totalHits === 1 ? "" : "es"} for "${search}"`} right={<span onClick={() => setSearch("")}><Btn icon="ti-x" label="Clear" /></span>} />
+            {totalHits === 0 ? <div style={emptyCard}>No matches. Try a customer name, job title, or invoice/quote reference.</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {hits.customers.length > 0 && <SearchGroup title="Customers" go={() => setActive("customers")} items={hits.customers.map((c) => `${c.name}${c.area ? " · " + c.area : ""}`)} />}
+                {hits.properties.length > 0 && <SearchGroup title="Properties" go={() => setActive("properties")} items={hits.properties.map((p) => `${p.address}${p.postcode ? ", " + p.postcode : ""} · ${p.customer || ""}`)} />}
+                {hits.jobs.length > 0 && <SearchGroup title="Jobs" go={() => setActive("jobs")} items={hits.jobs.map((j) => `${j.title} · ${j.customer || ""} · ${j.status}`)} />}
+                {hits.quotes.length > 0 && <SearchGroup title="Quotes" go={() => setActive("quotes")} items={hits.quotes.map((q) => `${q.ref || "—"} · ${q.customer || ""} · ${gbp(+q.amount || 0)}`)} />}
+                {hits.invoices.length > 0 && <SearchGroup title="Invoices" go={() => setActive("invoicing")} items={hits.invoices.map((v) => `${v.ref || "—"} · ${v.customer || ""} · ${gbp(+v.amount || 0)}`)} />}
+              </div>
+            )}
           </div>
+        ) : (
+          <>
+            {active === "dashboard" && (
+              <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12 }}>
+                {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+              </div>
+            )}
+            {body}
+          </>
         )}
-        {body}
       </main>
+    </div>
+  );
+}
+
+function SearchGroup({ title, items, go }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{title} ({items.length})</span>
+        <span onClick={go} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>Go to {title}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {items.map((t, i) => <div key={i} onClick={go} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "10px 13px", fontSize: 12.5, cursor: "pointer" }}>{t}</div>)}
+      </div>
     </div>
   );
 }
