@@ -219,7 +219,7 @@ function DashboardPage({ range, go }) {
 /* ================================================================== */
 /*  PROPERTIES                                                        */
 /* ================================================================== */
-function PropertiesPage() {
+function PropertiesPage({ user }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);   // null = loading
   const [err, setErr] = useState("");
@@ -245,7 +245,7 @@ function PropertiesPage() {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
-    const { error } = await db.from("prop_properties").insert([{ ...form, units: +form.units, rent: +form.rent, score: 100 }]);
+    const { error } = await db.from("prop_properties").insert([{ ...form, units: +form.units, rent: +form.rent, score: 100, user_id: user.id }]);
     if (error) { setErr(error.message); return; }
     setForm({ address: "", area: "", type: "House", units: 1, status: "Let", rent: 0 });
     setAdding(false);
@@ -739,7 +739,7 @@ function Dashboard({ user, signOut }) {
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range} go={setActive} />;
-  else { const P = PAGES[active]; body = <P />; }
+  else { const P = PAGES[active]; body = <P user={user} />; }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
