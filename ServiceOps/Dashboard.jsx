@@ -524,12 +524,7 @@ function DiaryPage() {
     { name: "Mike T.", tone: "blue" },
   ];
   const slots = {
-    Mon: [{ time: "08:30", job: "Boiler service", cust: "King's Court", eng: "Dave R.", tone: "brand" }, { time: "13:00", job: "Tap repair", cust: "S. Connor", eng: "Mike T.", tone: "blue" }],
-    Tue: [{ time: "09:00", job: "Consumer unit", cust: "A. Khan", eng: "Mike T.", tone: "blue" }],
-    Wed: [{ time: "08:00", job: "Radiator swap", cust: "S. Connor", eng: "Dave R.", tone: "brand" }, { time: "11:30", job: "EICR test", cust: "Mill Lane", eng: "Mike T.", tone: "blue" }, { time: "15:00", job: "Quote visit", cust: "D. Lowe", eng: "Dave R.", tone: "brand" }],
-    Thu: [{ time: "10:00", job: "Boiler not firing", cust: "Mill Lane", eng: "Dave R.", tone: "brand" }],
-    Fri: [{ time: "09:30", job: "Annual gas safety", cust: "King's Court", eng: "Dave R.", tone: "brand" }, { time: "14:00", job: "Leak follow-up", cust: "S. Connor", eng: "Mike T.", tone: "blue" }],
-    Sat: [{ time: "10:00", job: "Emergency call-out", cust: "On rota", eng: "Mike T.", tone: "red" }],
+    Mon: [], Tue: [], Wed: [], Thu: [], Fri: [], Sat: [],
   };
   return (
     <div className="fade-in">
@@ -654,13 +649,7 @@ function InvoicingPage({ user }) {
 /*  CERTIFICATES                                                      */
 /* ================================================================== */
 function CertificatesPage() {
-  const all = [
-    ...DEMO.certificates,
-    { type: "Completion Certificate", ref: "Boiler swap signed off", addr: "Flat 4", days: 90, icon: "ti-circle-check", tone: "green" },
-    { type: "Public Liability Ins.", ref: "Policy renewal", addr: "Business-wide", days: 140, icon: "ti-umbrella", tone: "green" },
-    { type: "Gas Safe Registration", ref: "Annual renewal", addr: "Dave R.", days: 205, icon: "ti-id-badge", tone: "green" },
-    { type: "EICR", ref: "Electrical report", addr: "8 Vale Road", days: 11, icon: "ti-bolt", tone: "amber" },
-  ].sort((a, b) => a.days - b.days);
+  const all = [];
   const urgent = all.filter((c) => c.days <= 7).length;
   const soon = all.filter((c) => c.days > 7 && c.days <= 30).length;
   return (
@@ -673,6 +662,9 @@ function CertificatesPage() {
         <Metric label="Valid" value={all.length - urgent - soon} sub="In date" color="var(--green)" />
       </div>
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Certificate timeline — soonest first</div>
+      {all.length === 0 ? (
+        <div style={emptyCard}>No certificates yet. Click "Upload certificate" to add your first one.</div>
+      ) : (
       <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
         {all.map((c, i) => {
           const t = toneVar(c.tone);
@@ -691,6 +683,7 @@ function CertificatesPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
