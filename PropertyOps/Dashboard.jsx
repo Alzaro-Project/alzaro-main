@@ -563,7 +563,7 @@ function TenantsPage({ user }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const properties = usePropertyList();
-  const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
+  const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_start: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -578,7 +578,7 @@ function TenantsPage({ user }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
+  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
@@ -586,6 +586,7 @@ function TenantsPage({ user }) {
     setErr("");
     const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     if (!payload.tenancy_end) delete payload.tenancy_end;
+    if (!payload.tenancy_start) delete payload.tenancy_start;
     let error;
     if (editId) {
       ({ error } = await db.from("prop_tenants").update(payload).eq("id", editId));
@@ -618,6 +619,7 @@ function TenantsPage({ user }) {
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
             <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
             <label style={fld}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
+            <label style={fld}>Tenancy start date<input style={inp} type="date" value={form.tenancy_start} onChange={(e) => setForm({ ...form, tenancy_start: e.target.value })} /></label>
             <label style={fld}>Tenancy end date<input style={inp} type="date" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} /></label>
             <label style={fld}>Rent status<select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Right to Rent<select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -631,7 +633,7 @@ function TenantsPage({ user }) {
       ) : rows.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No tenants yet. Click "Add tenant" to create your first one.</div>
       ) : (
-        <Table cols={["Tenant", "Property", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent", ""]}>
+        <Table cols={["Tenant", "Property", "Tenancy starts", "Tenancy ends", "Rent (pcm)", "Rent status", "Right to Rent", ""]}>
           {rows.map((t, i) => (
             <tr key={t.id || i}>
               <Td>
@@ -641,6 +643,7 @@ function TenantsPage({ user }) {
                 </div>
               </Td>
               <Td color="var(--txt-2)">{propLabel(properties, t.property_id) || t.property || "—"}</Td>
+              <Td color="var(--txt-2)">{t.tenancy_start || "—"}</Td>
               <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
               <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
               <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
