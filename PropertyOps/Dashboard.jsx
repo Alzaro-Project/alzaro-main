@@ -166,6 +166,20 @@ function Table({ cols, children }) {
 }
 const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)" }}>{children}</td>;
 
+// Shared: load the user's properties once, for dropdowns + linking
+function usePropertyList() {
+  const [props, setProps] = useState([]);
+  useEffect(() => {
+    if (!DB_READY) { setProps(DEMO.properties.map((p, i) => ({ id: i + 1, address: p.addr }))); return; }
+    db.from("prop_properties").select("id,address").order("created_at", { ascending: false })
+      .then(({ data }) => setProps(data || []));
+  }, []);
+  return props;
+}
+
+// Resolve a property_id to its address label
+const propLabel = (props, id) => { const p = props.find((x) => String(x.id) === String(id)); return p ? p.address : null; };
+
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
@@ -265,7 +279,7 @@ function DashboardPage({ range, go, user }) {
 /* ================================================================== */
 /*  PROPERTIES                                                        */
 /* ================================================================== */
-function PropertiesPage({ user }) {
+function PropertiesPage({ user, go }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);   // null = loading
   const [err, setErr] = useState("");
@@ -370,16 +384,16 @@ function PropertiesPage({ user }) {
                   <tr>
                     <td colSpan={8} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
-                        <DetailBox title="Tenants" icon="ti-users" empty={pT.length === 0} emptyText="No tenants linked.">
+                        <DetailBox title="Tenants" icon="ti-users" empty={pT.length === 0} emptyText="No tenants linked." onClick={() => go && go("tenants")}>
                           {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
                         </DetailBox>
-                        <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText="No certificates tracked.">
+                        <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText="No certificates tracked." onClick={() => go && go("compliance")}>
                           {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
                         </DetailBox>
-                        <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText="No maintenance jobs.">
+                        <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText="No maintenance jobs." onClick={() => go && go("maintenance")}>
                           {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
                         </DetailBox>
-                        <DetailBox title="Payments" icon="ti-coin" empty={pP.length === 0} emptyText="No payments logged.">
+                        <DetailBox title="Payments" icon="ti-coin" empty={pP.length === 0} emptyText="No payments logged." onClick={() => go && go("finance")}>
                           {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
                         </DetailBox>
                       </div>
@@ -395,12 +409,16 @@ function PropertiesPage({ user }) {
   );
 }
 
-function DetailBox({ title, icon, children, empty, emptyText }) {
+function DetailBox({ title, icon, children, empty, emptyText, onClick }) {
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <i className={`ti ${icon}`} style={{ fontSize: 14, color: "var(--brand)" }} />
-        <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-2)" }}>{title}</span>
+    <div onClick={onClick} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px", cursor: onClick ? "pointer" : "default" }}
+      onMouseEnter={(e) => onClick && (e.currentTarget.style.borderColor = "var(--brand)")} onMouseLeave={(e) => onClick && (e.currentTarget.style.borderColor = "var(--line)")}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <i className={`ti ${icon}`} style={{ fontSize: 14, color: "var(--brand)" }} />
+          <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-2)" }}>{title}</span>
+        </div>
+        {onClick && <i className="ti ti-arrow-up-right" style={{ fontSize: 14, color: "var(--txt-3)" }} />}
       </div>
       {empty ? <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{emptyText}</div> : children}
     </div>
@@ -429,7 +447,8 @@ function CompliancePage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { type: "Gas Safety", property: "", reference: "", expiry_date: "" };
+  const properties = usePropertyList();
+  const blank = { type: "Gas Safety", property_id: "", reference: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -444,15 +463,16 @@ function CompliancePage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property: c.property || "", reference: c.reference || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+  const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property_id: c.property_id || "", reference: c.reference || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.expiry_date) { setErr("Expiry date is required — it's what we track."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
+    const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     let error;
-    if (editId) ({ error } = await db.from("prop_compliance").update(form).eq("id", editId));
-    else ({ error } = await db.from("prop_compliance").insert([{ ...form, user_id: user.id }]));
+    if (editId) ({ error } = await db.from("prop_compliance").update(payload).eq("id", editId));
+    else ({ error } = await db.from("prop_compliance").insert([{ ...payload, user_id: user.id }]));
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -497,7 +517,7 @@ function CompliancePage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit certificate" : "New certificate"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.keys(TYPES).map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Reference / notes<input style={inp} placeholder="e.g. CP12 certificate" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
             <label style={fld}>Expiry date<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
           </div>
@@ -518,7 +538,7 @@ function CompliancePage({ user }) {
               <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < items.length - 1 ? "0.5px solid var(--line)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
-                  <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{c.property || "—"}{c.reference ? " · " + c.reference : ""}</div></div>
+                  <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{propLabel(properties, c.property_id) || c.property || "—"}{c.reference ? " · " + c.reference : ""}</div></div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days} days ago` : `in ${c.days} days`}</span>
@@ -542,7 +562,8 @@ function TenantsPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { name: "", property: "", email: "", phone: "", rent: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
+  const properties = usePropertyList();
+  const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -557,13 +578,13 @@ function TenantsPage({ user }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (t) => { setForm({ name: t.name || "", property: t.property || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
+  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     if (!payload.tenancy_end) delete payload.tenancy_end;
     let error;
     if (editId) {
@@ -593,7 +614,7 @@ function TenantsPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit tenant" : "New tenant"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
             <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
             <label style={fld}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
@@ -619,7 +640,7 @@ function TenantsPage({ user }) {
                   <span style={{ fontWeight: 500 }}>{t.name}</span>
                 </div>
               </Td>
-              <Td color="var(--txt-2)">{t.property || "—"}</Td>
+              <Td color="var(--txt-2)">{propLabel(properties, t.property_id) || t.property || "—"}</Td>
               <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
               <Td>{t.rent ? gbp(t.rent) : "—"}</Td>
               <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
@@ -643,7 +664,8 @@ function MaintenancePage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { title: "", property: "", priority: "Medium", contractor: "", status: "Reported" };
+  const properties = usePropertyList();
+  const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -658,15 +680,16 @@ function MaintenancePage({ user }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", property: j.property || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported" }); setEditId(j.id); setAdding(true); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported" }); setEditId(j.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Job title is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
+    const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     let error;
-    if (editId) ({ error } = await db.from("prop_maintenance").update(form).eq("id", editId));
-    else ({ error } = await db.from("prop_maintenance").insert([{ ...form, user_id: user.id }]));
+    if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
+    else ({ error } = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]));
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -698,7 +721,7 @@ function MaintenancePage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New maintenance job"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
             <label style={fld}>Issue / job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label style={fld}>Property<input style={inp} placeholder="e.g. 9 Mill Lane Flat 2" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
             <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -726,7 +749,7 @@ function MaintenancePage({ user }) {
                         <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
                         <Pill text={j.priority} tone={toneFor[j.priority] || "blue"} />
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{j.property || j.prop || "—"}</div>
+                      <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{propLabel(properties, j.property_id) || j.property || j.prop || "—"}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-2)", marginBottom: j.id && DB_READY ? 9 : 0 }}>
                         <i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.contractor || "Unassigned"}
                       </div>
@@ -763,7 +786,8 @@ function FinancePage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { tenant: "", property: "", amount: "", due_date: "", status: "Paid" };
+  const properties = usePropertyList();
+  const blank = { tenant: "", property_id: "", amount: "", due_date: "", status: "Paid" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -778,13 +802,13 @@ function FinancePage({ user }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property: p.property || "", amount: p.amount || "", due_date: p.due_date || "", status: p.status || "Paid" }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", status: p.status || "Paid" }); setEditId(p.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.tenant.trim()) { setErr("Tenant name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     if (!payload.due_date) delete payload.due_date;
     let error;
     if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
@@ -826,7 +850,7 @@ function FinancePage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant<input style={inp} placeholder="e.g. Sarah Connor" value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })} /></label>
-            <label style={fld}>Property<input style={inp} placeholder="e.g. 14 Oak Street" value={form.property} onChange={(e) => setForm({ ...form, property: e.target.value })} /></label>
+            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1250" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Paid", "Overdue", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -845,7 +869,7 @@ function FinancePage({ user }) {
           {data.map((p, i) => (
             <tr key={p.id || i}>
               <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
-              <Td color="var(--txt-2)">{p.property || p.prop || "—"}</Td>
+              <Td color="var(--txt-2)">{propLabel(properties, p.property_id) || p.property || p.prop || "—"}</Td>
               <Td>{gbp(p.amount || 0)}</Td>
               <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
               <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
@@ -1346,7 +1370,7 @@ function Dashboard({ user, signOut }) {
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
-  else { const P = PAGES[active]; body = <P user={user} />; }
+  else { const P = PAGES[active]; body = <P user={user} go={setActive} />; }
 
   const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
 
