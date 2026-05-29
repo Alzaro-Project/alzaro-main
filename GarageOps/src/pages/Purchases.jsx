@@ -8,8 +8,12 @@
 // ============================================================
 
 const T = {
-  surface: '#14121a', border: 'rgba(255,255,255,0.06)',
-  red: '#e53935', text: '#f8f7fa', text2: '#9d99a8', text3: '#5c586a',
+  surface: 'var(--surface)',
+  border: 'var(--border)',
+  red: 'var(--red)',
+  text: 'var(--text)',
+  text2: 'var(--text2)',
+  text3: 'var(--text3)',
 }
 
 export default function Purchases() {
