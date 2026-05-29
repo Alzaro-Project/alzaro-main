@@ -10,6 +10,17 @@ const TIER_ORDER = ['bronze', 'silver', 'gold']
 const TIER_PRICE = { bronze: 60, silver: 75, gold: 90 }
 
 // ============================================================
+// THEME HELPER
+// ============================================================
+// Applies the theme to the <html> element so any global CSS can react
+// via [data-theme="light"] / [data-theme="dark"]. Safe to call anywhere.
+const applyTheme = (theme) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', theme)
+  }
+}
+
+// ============================================================
 // TOAST NOTIFICATION HELPER
 // ============================================================
 const showToast = (message, type = 'error') => {
@@ -88,6 +99,11 @@ export const useStore = create(
       product: 'tyreops',  // NEW: 'tyreops' | 'garageops' — drives UI and which data to load
 
       // --------------------------------------------------------
+      // THEME STATE (NEW)
+      // --------------------------------------------------------
+      theme: 'dark',  // 'dark' | 'light'
+
+      // --------------------------------------------------------
       // SHARED DATA STATE (both products)
       // --------------------------------------------------------
       settings: {
@@ -122,6 +138,20 @@ export const useStore = create(
       // --------------------------------------------------------
       dashPeriod: 'month',
       dashWidgets: ['revenue', 'cogs', 'profit', 'stockval', 'plchart', 'brandchart', 'toptyres', 'alerts'],
+
+      // --------------------------------------------------------
+      // THEME ACTIONS (NEW)
+      // --------------------------------------------------------
+      setTheme: (theme) => {
+        const next = theme === 'light' ? 'light' : 'dark'
+        applyTheme(next)
+        set({ theme: next })
+      },
+      toggleTheme: () => {
+        const next = get().theme === 'dark' ? 'light' : 'dark'
+        applyTheme(next)
+        set({ theme: next })
+      },
 
       // --------------------------------------------------------
       // AUTH ACTIONS
@@ -232,6 +262,8 @@ export const useStore = create(
           labourRates: [],
           jobs: [],
           motReminders: [],
+          // Note: theme is intentionally NOT reset on logout — keep the
+          // user's chosen appearance across sessions.
         })
         // Redirect to login. The app is served under /garageops, so we use an
         // absolute path here (a full page reload, outside React Router).
@@ -1085,11 +1117,17 @@ export const useStore = create(
         isAdmin: state.isAdmin,
         garageId: state.garageId,
         product: state.product,  // NEW: remember which product on reload
+        theme: state.theme,      // NEW: remember light/dark across sessions
         settings: state.settings,
         dashPeriod: state.dashPeriod,
         dashWidgets: state.dashWidgets,
         // Don't persist data — it comes from Supabase on login
       }),
+      // After the persisted state is rehydrated on page load, apply the saved
+      // theme to <html> so the app opens in the right appearance.
+      onRehydrateStorage: () => (state) => {
+        if (state?.theme) applyTheme(state.theme)
+      },
     }
   )
 )
