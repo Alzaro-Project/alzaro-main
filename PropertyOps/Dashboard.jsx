@@ -169,48 +169,94 @@ const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: co
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
-function DashboardPage({ range, go }) {
-  const m = DEMO.metrics;
+function DashboardPage({ range, go, user }) {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    if (!DB_READY) { setData({ props: DEMO.properties, comp: [], pays: [], maint: [] }); return; }
+    Promise.all([
+      db.from("prop_properties").select("*"),
+      db.from("prop_compliance").select("*"),
+      db.from("prop_payments").select("*"),
+      db.from("prop_maintenance").select("*"),
+    ]).then(([p, c, pay, mt]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [] }));
+  }, []);
+
+  if (!data) return <div className="fade-in" style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading your portfolio…</div>;
+
+  const { props, comp, pays, maint } = data;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // properties / occupancy
+  const totalProps = props.length;
+  const letProps = props.filter((p) => p.status === "Let").length;
+  const occupancy = totalProps ? Math.round((letProps / totalProps) * 1000) / 10 : 0;
+  const income = props.filter((p) => p.status === "Let").reduce((s, p) => s + (p.rent || 0), 0);
+
+  // compliance
+  const certs = comp.map((c) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; return { ...c, days: d }; });
+  const valid = certs.filter((c) => c.days !== null && c.days > 30).length;
+  const score = certs.length ? Math.max(0, Math.round((valid / certs.length) * 100)) : 100;
+  const expiringSoon = certs.filter((c) => c.days !== null && c.days <= 30).sort((a, b) => a.days - b.days).slice(0, 5);
+  const attention = certs.filter((c) => c.days !== null && c.days <= 30).length;
+
+  // finance
+  const arrears = pays.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
+  const arrearsCount = pays.filter((p) => p.status === "Overdue").length;
+
+  // maintenance
+  const openMaint = maint.filter((m) => m.status !== "Completed").length;
+  const highPri = maint.filter((m) => m.status !== "Completed" && m.priority === "High").length;
+
+  const toneFor = { "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing", "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug", "Buildings Insurance": "ti-umbrella", "HMO Licence": "ti-license", "Fire Risk Assessment": "ti-fire-extinguisher" };
+  const certTone = (d) => d < 0 || d <= 7 ? "red" : d <= 30 ? "amber" : "blue";
+  const name = user ? user.email.split("@")[0] : "there";
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 19, fontWeight: 600 }}>Good morning, James</h2>
-        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{m.properties} properties · 3 items need attention · {range}</div>
+        <h2 style={{ fontSize: 19, fontWeight: 600 }}>{greet}, {name}</h2>
+        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{totalProps} propert{totalProps === 1 ? "y" : "ies"} · {attention} item{attention === 1 ? "" : "s"} need attention · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Compliance Score" value={<>{m.complianceScore}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub="Portfolio healthy" color="var(--green)" />
-        <Metric label="Rent Arrears" value={gbp(m.arrears)} sub="3 tenants overdue" color="var(--red)" />
-        <Metric label="Occupancy" value={m.occupancy + "%"} sub={`${m.let} of ${m.properties} let`} color="var(--blue)" />
-        <Metric label="Monthly Income" value={gbp(m.income)} sub="+2.1% vs last month" color="var(--brand)" subColor="var(--green)" />
+        <Metric label="Compliance Score" value={<>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : certs.length ? "At risk" : "No certs tracked"} color={score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
+        <Metric label="Rent Arrears" value={gbp(arrears)} sub={`${arrearsCount} overdue`} color={arrears ? "var(--red)" : "var(--green)"} />
+        <Metric label="Occupancy" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} color="var(--blue)" />
+        <Metric label="Monthly Income" value={gbp(income)} sub="From let properties" color="var(--brand)" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
         <Panel title="Expiring Certificates" action="View all" onAction={() => go("compliance")}>
-          {DEMO.certificates.map((c, i) => {
-            const t = toneVar(c.tone);
+          {expiringSoon.length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 30 days. {certs.length === 0 && "Add certificates in Compliance to track them here."}</div>
+          ) : expiringSoon.map((c, i) => {
+            const t = toneVar(certTone(c.days));
             return (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < DEMO.certificates.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+              <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
-                  <div><div style={{ fontSize: 12.5 }}>{c.type} · {c.addr}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.ref}</div></div>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${toneFor[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
+                  <div><div style={{ fontSize: 12.5 }}>{c.type}{c.property ? " · " + c.property : ""}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.reference || "—"}</div></div>
                 </div>
-                <Pill text={c.days + " days"} tone={c.tone} />
+                <Pill text={c.days < 0 ? "expired" : c.days + " days"} tone={certTone(c.days)} />
               </div>
             );
           })}
         </Panel>
-        <Panel title="Recent Activity">
-          {DEMO.activity.map((a, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < DEMO.activity.length - 1 ? 13 : 0 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: `var(--${a.tone})`, marginTop: 5, flexShrink: 0 }} />
-              <div><div style={{ fontSize: 11.5 }}>{a.text}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{a.time}</div></div>
-            </div>
-          ))}
+        <Panel title="Portfolio Summary">
+          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Properties</span><span style={{ fontWeight: 600 }}>{totalProps}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Let / Vacant</span><span style={{ fontWeight: 600 }}>{letProps} / {totalProps - letProps}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Certificates tracked</span><span style={{ fontWeight: 600 }}>{certs.length}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Open maintenance</span><span style={{ fontWeight: 600 }}>{openMaint}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Payments logged</span><span style={{ fontWeight: 600 }}>{pays.length}</span></div>
+          </div>
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-        <Metric label="Open Maintenance" value={m.openMaintenance} sub="2 high priority" color="var(--amber)" />
-        <Metric label="Renewals Due" value={m.renewalsDue} sub="Next 60 days" color="var(--blue)" />
-        <Metric label="Properties" value={m.properties} sub="All compliant ✓" color="var(--txt)" subColor="var(--green)" />
+        <Metric label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
+        <Metric label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
+        <Metric label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} color="var(--txt)" subColor={score >= 90 ? "var(--green)" : "var(--amber)"} />
       </div>
     </div>
   );
@@ -863,50 +909,111 @@ function DocumentsPage({ user }) {
 /* ================================================================== */
 /*  REPORTS  (+ click-to-preview)                                     */
 /* ================================================================== */
+function downloadCSV(filename, cols, rows) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [cols.map(esc).join(","), ...rows.map((r) => r.map(esc).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Build a report's columns + rows from live data. Returns null if not yet wired.
+function buildReport(name, d) {
+  const gbpc = (n) => "£" + (n || 0).toLocaleString("en-GB");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  switch (name) {
+    case "Rent statement":
+    case "Landlord statement":
+      return { cols: ["Tenant", "Property", "Amount", "Due date", "Status"], rows: d.pays.map((p) => [p.tenant, p.property, gbpc(p.amount), p.due_date || "—", p.status]) };
+    case "Arrears report":
+      return { cols: ["Tenant", "Property", "Amount", "Due date"], rows: d.pays.filter((p) => p.status === "Overdue").map((p) => [p.tenant, p.property, gbpc(p.amount), p.due_date || "—"]) };
+    case "Profit & loss":
+    case "Tax-year summary": {
+      const collected = d.pays.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
+      const due = d.pays.reduce((s, p) => s + (p.amount || 0), 0);
+      return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Properties", d.props.length]] };
+    }
+    case "Compliance audit":
+      return { cols: ["Type", "Property", "Reference", "Expiry date"], rows: d.comp.map((c) => [c.type, c.property || "—", c.reference || "—", c.expiry_date || "—"]) };
+    case "Expiring certificates":
+      return { cols: ["Type", "Property", "Expiry date", "Days left"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 90).sort((a, b) => a.dd - b.dd).map((c) => [c.type, c.property || "—", c.expiry_date, c.dd]) };
+    case "Overdue & at-risk":
+      return { cols: ["Type", "Property", "Expiry date", "Status"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 30).map((c) => [c.type, c.property || "—", c.expiry_date, c.dd < 0 ? "Expired" : c.dd <= 7 ? "Urgent" : "Due soon"]) };
+    case "Occupancy report":
+      return { cols: ["Property", "Area", "Type", "Status", "Rent"], rows: d.props.map((p) => [p.address || p.addr, p.area || "—", p.type || "—", p.status, gbpc(p.rent)]) };
+    case "Tenancy renewals":
+      return { cols: ["Tenant", "Property", "Tenancy ends"], rows: d.tenants.map((t) => [t.name, t.property || "—", t.tenancy_end || "—"]) };
+    case "Maintenance summary":
+      return { cols: ["Job", "Property", "Priority", "Status", "Contractor"], rows: d.maint.map((m) => [m.title, m.property || "—", m.priority, m.status, m.contractor || "—"]) };
+    case "Contractor performance": {
+      const byc = {};
+      d.maint.forEach((m) => { const c = m.contractor || "Unassigned"; byc[c] = (byc[c] || 0) + 1; });
+      return { cols: ["Contractor", "Jobs"], rows: Object.entries(byc).map(([c, n]) => [c, n]) };
+    }
+    default:
+      return null; // not yet wired
+  }
+}
+
 function ReportPreview({ report, onClose }) {
+  const empty = report.rows.length === 0;
   return (
-    <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 620, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)" }}>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Preview · demo data</div></div>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)" }}>
+          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · your live data` : "Preview · coming soon"}</div></div>
           <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
         </div>
         <div style={{ padding: 20 }}>
           <div style={{ fontSize: 12.5, color: "var(--txt-2)", marginBottom: 16, lineHeight: 1.6 }}>{report.desc}</div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)" }}>{c}</th>)}</tr></thead>
-            <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>)}</tbody>
-          </table>
-          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-            <Btn icon="ti-file-type-pdf" label="Export PDF" primary />
-            <Btn icon="ti-file-type-csv" label="Export CSV" />
-          </div>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Live data and working exports arrive with the Supabase backend.</div>
+          {empty ? (
+            <div style={{ fontSize: 12.5, color: "var(--txt-3)", padding: "20px 0", textAlign: "center" }}>{report.wired ? "No data for this report yet — add some in the relevant section first." : "This report isn't wired to live data yet."}</div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)" }}>{c}</th>)}</tr></thead>
+              <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>)}</tbody>
+            </table>
+          )}
+          {report.wired && !empty && (
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <span onClick={() => downloadCSV(report.name.replace(/\s+/g, "_") + ".csv", report.cols, report.rows)}><Btn icon="ti-file-type-csv" label="Download CSV" primary /></span>
+            </div>
+          )}
+          {!report.wired && <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>This report is on the roadmap — the data it needs isn't captured yet.</div>}
         </div>
       </div>
     </div>
   );
 }
 
-const SAMPLE = {
-  cols: ["Property", "Detail", "Value", "Status"],
-  rows: [
-    ["14 Oak Street", "Sarah Connor", "£1,250", "Paid"],
-    ["9 Mill Lane Flat 2", "Tom Hardy", "£800", "Overdue"],
-    ["22 Bridge Road", "Aisha Khan", "£950", "Paid"],
-    ["5 King's Court Flat 1", "David Lowe", "£900", "Overdue"],
-    ["8 Vale Road", "Maria Silva", "£1,100", "Paid"],
-  ],
-};
-
-function ReportsPage() {
-  const [period, setPeriod] = useState("This Month");
+function ReportsPage({ user }) {
+  const [period, setPeriod] = useState("All time");
   const [preview, setPreview] = useState(null);
-  const periods = ["This Month", "Quarter", "Tax Year", "Custom"];
+  const [d, setD] = useState(null);
+  const periods = ["All time", "This Month", "Quarter", "Tax Year"];
+
+  useEffect(() => {
+    if (!DB_READY) { setD({ props: [], comp: [], pays: [], maint: [], tenants: [] }); return; }
+    Promise.all([
+      db.from("prop_properties").select("*"), db.from("prop_compliance").select("*"),
+      db.from("prop_payments").select("*"), db.from("prop_maintenance").select("*"),
+      db.from("prop_tenants").select("*"),
+    ]).then(([p, c, pay, mt, tn]) => setD({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
+  }, []);
+
+  const openReport = (r) => {
+    const built = d ? buildReport(r.name, d) : null;
+    if (built) setPreview({ ...r, ...built, wired: true });
+    else setPreview({ ...r, cols: ["Info"], rows: [], wired: false });
+  };
+
   return (
     <div className="fade-in" style={{ position: "relative" }}>
-      <PageHead title="Reports" sub="Generate, preview and export any report across your portfolio."
+      <PageHead title="Reports" sub="Generate, preview and export reports from your live data."
         right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
+      {!d && <div style={{ fontSize: 12, color: "var(--txt-3)", marginBottom: 14 }}>Loading your data…</div>}
       {REPORTS.map((group, gi) => {
         const t = toneVar(group.tone);
         return (
@@ -917,7 +1024,7 @@ function ReportsPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 11 }}>
               {group.items.map((r, ri) => (
-                <div key={ri} onClick={() => setPreview({ ...r, ...SAMPLE })} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "14px 16px", cursor: "pointer", transition: "border-color .15s" }}
+                <div key={ri} onClick={() => openReport(r)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "14px 16px", cursor: "pointer", transition: "border-color .15s" }}
                   onMouseEnter={(e) => e.currentTarget.style.borderColor = t.color}
                   onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--line)"}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
@@ -1118,7 +1225,7 @@ function Dashboard({ user, signOut }) {
   const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
 
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} />;
+  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
   return (
