@@ -1366,9 +1366,13 @@ function SettingsPage({ user }) {
   const saveOrg = async () => {
     if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
     setErr(""); setSaving(true); setSaved(false);
-    const { error } = await db.from("prop_settings").upsert({ user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, updated_at: new Date().toISOString() });
+    const { error } = await db.from("prop_settings").upsert(
+      { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
     setSaving(false);
-    if (error) setErr(error.message); else { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+    if (error) { setErr(error.message); return; }
+    setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
   const tiers = [
@@ -1608,11 +1612,22 @@ const PAGES = {
 function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
-  const [light, setLight] = useState(false);
+  const [light, setLight] = useState(() => {
+    try { return localStorage.getItem("propops_theme") === "light"; } catch (e) { return false; }
+  });
   const [allData, setAllData] = useState(null);
   const [query, setQuery] = useState("");
   const [showNotif, setShowNotif] = useState(false);
-  const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
+
+  useEffect(() => {
+    document.body.classList.toggle("light", light);
+  }, [light]);
+
+  const toggleTheme = () => setLight((v) => {
+    const next = !v;
+    try { localStorage.setItem("propops_theme", next ? "light" : "dark"); } catch (e) {}
+    return next;
+  });
 
   // load everything once for search + notifications
   useEffect(() => {
