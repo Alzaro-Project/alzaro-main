@@ -1345,31 +1345,120 @@ function ReportsPage({ user }) {
 /* ================================================================== */
 /*  SETTINGS                                                          */
 /* ================================================================== */
-function SettingsPage() {
-  const sections = [
-    { title: "Organisation", icon: "ti-building", rows: [["Company name", "Alzaro Property Co."], ["VAT number", "GB 123 4567 89"], ["Plan", "Enterprise"]] },
-    { title: "Team & roles", icon: "ti-users", rows: [["James M.", "Admin"], ["Priya S.", "Property Manager"], ["GasPro Ltd", "Contractor"]] },
-    { title: "Notifications", icon: "ti-bell", rows: [["Compliance reminders", "Email + SMS"], ["Rent received", "Email"], ["Reminder lead time", "60 / 30 / 14 / 1 days"]] },
-    { title: "Integrations", icon: "ti-plug", rows: [["Xero", "Not connected"], ["QuickBooks", "Not connected"], ["Open Banking", "Not connected"]] },
+function SettingsPage({ user }) {
+  const [org, setOrg] = useState({ company_name: "", vat_number: "" });
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+  const currentPlan = "Enterprise"; // shown as current; real billing is future Stripe work
+
+  useEffect(() => {
+    if (!DB_READY) { setLoaded(true); return; }
+    db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data) setOrg({ company_name: data.company_name || "", vat_number: data.vat_number || "" });
+        else if (user.user_metadata && user.user_metadata.company_name) setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
+        setLoaded(true);
+      });
+  }, []);
+
+  const saveOrg = async () => {
+    if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
+    setErr(""); setSaving(true); setSaved(false);
+    const { error } = await db.from("prop_settings").upsert({ user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, updated_at: new Date().toISOString() });
+    setSaving(false);
+    if (error) setErr(error.message); else { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+  };
+
+  const tiers = [
+    { name: "Starter", price: 35, sub: "per month", best: "Up to 5 properties", features: ["Up to 5 properties", "Compliance tracking", "Tenant & rent records", "Document vault", "Email support"] },
+    { name: "Professional", price: 65, sub: "per month", best: "Up to 25 properties", features: ["Everything in Starter", "Up to 25 properties", "Automated reminders", "Custom reports & exports", "Priority support"] },
+    { name: "Enterprise", price: 120, sub: "per month", best: "Unlimited", features: ["Everything in Professional", "Unlimited properties", "Team roles & permissions", "API & integrations", "Dedicated account manager"] },
   ];
+
+  const inp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+  const card = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" };
+  const head = (icon, title) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
+      <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${icon}`} style={{ fontSize: 15 }} /></span>
+      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{title}</span>
+    </div>
+  );
+
   return (
     <div className="fade-in">
-      <PageHead title="Settings" sub="Manage your organisation, team, notifications and integrations." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
-        {sections.map((s, i) => (
-          <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
-              <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${s.icon}`} style={{ fontSize: 15 }} /></span>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.title}</span>
-            </div>
-            {s.rows.map((r, j) => (
-              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j < s.rows.length - 1 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
-                <span style={{ color: "var(--txt-2)" }}>{r[0]}</span><span style={{ fontWeight: 500 }}>{r[1]}</span>
+      <PageHead title="Settings" sub="Manage your organisation, team and subscription." />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
+        {/* Organisation — editable */}
+        <div style={card}>
+          {head("ti-building", "Organisation")}
+          {!loaded ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>Loading…</div> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <label style={fld}>Company name<input style={inp} placeholder="e.g. Alzaro Property Co." value={org.company_name} onChange={(e) => setOrg({ ...org, company_name: e.target.value })} /></label>
+              <label style={fld}>VAT number<input style={inp} placeholder="e.g. GB 123 4567 89" value={org.vat_number} onChange={(e) => setOrg({ ...org, vat_number: e.target.value })} /></label>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
+              {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+                {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
               </div>
-            ))}
+            </div>
+          )}
+        </div>
+
+        {/* Team & roles */}
+        <div style={card}>
+          {head("ti-users", "Team & roles")}
+          {[["You", user ? user.email : "—", "Admin"], ["Invite teammates", "Coming soon", ""]].map((r, j) => (
+            <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j === 0 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
+              <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] && r[1] !== "Coming soon" ? ` · ${r[1]}` : ""}{r[1] === "Coming soon" ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Enterprise plan.</div>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <div style={{ ...card, marginBottom: 18 }}>
+        {head("ti-bell", "Notifications")}
+        {[["Compliance reminders", "In-app alerts (email reminders coming soon)"], ["Rent overdue", "In-app alerts"], ["Reminder lead time", "30 / 7 days before expiry"]].map((r, j, arr) => (
+          <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j < arr.length - 1 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
+            <span style={{ color: "var(--txt-2)" }}>{r[0]}</span><span style={{ fontWeight: 500 }}>{r[1]}</span>
           </div>
         ))}
       </div>
+
+      {/* Subscription */}
+      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+        {tiers.map((t) => {
+          const isCurrent = t.name === currentPlan;
+          return (
+            <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
+              {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
+              <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
+              <div style={{ marginBottom: 14 }}><span style={{ fontSize: 26, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /{t.sub.replace("per ", "")}</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
+                {t.features.map((f, k) => (
+                  <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, color: "var(--txt-2)" }}>
+                    <i className="ti ti-check" style={{ fontSize: 13, color: "var(--green)", marginTop: 1, flexShrink: 0 }} />{f}
+                  </div>
+                ))}
+              </div>
+              {isCurrent ? (
+                <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
+              ) : (
+                <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
     </div>
   );
 }
