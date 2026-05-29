@@ -3,53 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 
 // ============================================================
-// Dashboard — GarageOps v2 (theme-aware: dark + light)
+// Dashboard — GarageOps v2
 // ------------------------------------------------------------
-// Top bar: New Invoice + Quick Sale + Search
-// Period tabs (Today / Week / Month / Quarter / 6 Months / Year)
-// Top 4 tiles: Sales (Money In|Invoiced) · Overdue · MOTs Due · placeholder
-// Mid row: Monthly revenue chart · Mini calendar (clickable days)
-// MOTs Due Soon list
-// Bottom 4 tiles: Unpaid Sent · Avg Invoice · Total Customers · placeholder
+// Colours come from CSS variables (see styles/theme.css). The store
+// sets data-theme on <html>; this whole page reflips automatically.
+// Calendar days are clickable → jump to /calendar on that date.
 // ============================================================
-
-// ---------- THEME PALETTE ----------
-// Brand red stays constant in both themes. Surfaces + text flip.
-function palette(isDark) {
-  return isDark ? {
-    bg: '#0c0a0f',
-    surface: '#14121a',
-    surface2: '#1e1b26',
-    surface3: '#282432',
-    border: 'rgba(255,255,255,0.06)',
-    border2: 'rgba(255,255,255,0.1)',
-    red: '#e53935',
-    green: '#4caf50',
-    amber: '#ff9800',
-    blue: '#60a5fa',
-    purple: '#a78bfa',
-    text: '#f8f7fa',
-    text2: '#9d99a8',
-    text3: '#5c586a',
-    dimDay: '#3c3845',
-  } : {
-    bg: '#f7f6f9',
-    surface: '#ffffff',
-    surface2: '#f3f1f6',
-    surface3: '#e9e6ef',
-    border: 'rgba(0,0,0,0.08)',
-    border2: 'rgba(0,0,0,0.12)',
-    red: '#e53935',
-    green: '#2e9e4f',
-    amber: '#e67e00',
-    blue: '#2563eb',
-    purple: '#7c3aed',
-    text: '#1a1820',
-    text2: '#5c586a',
-    text3: '#9d99a8',
-    dimDay: '#c8c4d0',
-  }
-}
 
 const PERIODS = [
   { key: 'today', label: 'Today' },
@@ -62,11 +21,6 @@ const PERIODS = [
 
 // ---------- HELPERS ----------
 function money(n) { return `£${(Number(n) || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
-function shortMoney(n) {
-  const v = Number(n) || 0
-  if (v >= 1000) return `£${(v / 1000).toFixed(1)}k`
-  return `£${v.toFixed(0)}`
-}
 
 function invoiceTotal(inv) {
   return (inv.lines || []).reduce((sum, l) => {
@@ -97,70 +51,60 @@ function inRange(date, [start, end]) {
   return d >= start && d <= end
 }
 
-// ---------- STYLE BUILDERS (depend on palette) ----------
-function makeStyles(T) {
-  return {
-    btnPrimary: {
-      background: T.red, color: '#fff', border: 'none',
-      padding: '11px 16px', borderRadius: '10px',
-      fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
-      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-    },
-    btnSecondary: {
-      background: T.surface2, color: T.text, border: `1px solid ${T.border2}`,
-      padding: '11px 14px', borderRadius: '10px',
-      fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
-      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-    },
-    searchBox: {
-      flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
-      background: T.surface2, border: `1px solid ${T.border}`,
-      padding: '10px 13px', borderRadius: '10px',
-    },
-    tile: {
-      background: T.surface, border: `0.5px solid ${T.border}`,
-      borderRadius: '12px', padding: '14px',
-      minHeight: '100px',
-    },
-    tileLbl: {
-      fontSize: '10px', color: T.text2,
-      textTransform: 'uppercase', letterSpacing: '0.8px',
-      fontWeight: 500, marginBottom: '8px', fontFamily: 'monospace',
-    },
-    tileNum: {
-      fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1.1, color: T.text,
-    },
-    tileSub: { fontSize: '11px', color: T.text2, marginTop: '4px' },
-    calNav: {
-      width: '24px', height: '24px',
-      background: T.surface2, border: 'none',
-      color: T.text2, borderRadius: '5px', cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '12px',
-    },
-    iconBtn: {
-      width: '26px', height: '26px',
-      background: T.surface2, border: 'none',
-      borderRadius: '5px', color: T.text2, cursor: 'pointer',
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '12px', textDecoration: 'none',
-    },
-    linkBtn: {
-      background: 'none', border: 'none',
-      color: T.red, fontSize: '11px', cursor: 'pointer',
-      fontFamily: 'inherit',
-    },
-  }
+// ---------- STYLES (use CSS variables) ----------
+const btnPrimary = {
+  background: 'var(--red)', color: '#fff', border: 'none',
+  padding: '11px 16px', borderRadius: '10px',
+  fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
+  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
 }
-
-function toggleBtn(on, T) {
-  return {
-    padding: '4px 8px', fontSize: '10px',
-    color: on ? T.text : T.text2,
-    background: on ? T.surface3 : 'transparent',
-    border: 'none', borderRadius: '4px',
-    cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-  }
+const btnSecondary = {
+  background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border2)',
+  padding: '11px 14px', borderRadius: '10px',
+  fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
+  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
+}
+const searchBox = {
+  flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
+  background: 'var(--surface2)', border: '1px solid var(--border)',
+  padding: '10px 13px', borderRadius: '10px',
+}
+const tile = {
+  background: 'var(--surface)', border: '0.5px solid var(--border)',
+  borderRadius: '12px', padding: '14px', minHeight: '100px',
+}
+const tileLbl = {
+  fontSize: '10px', color: 'var(--text2)',
+  textTransform: 'uppercase', letterSpacing: '0.8px',
+  fontWeight: 500, marginBottom: '8px', fontFamily: 'monospace',
+}
+const tileNum = {
+  fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1.1, color: 'var(--text)',
+}
+const tileSub = { fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }
+const toggleBtn = (on) => ({
+  padding: '4px 8px', fontSize: '10px',
+  color: on ? 'var(--text)' : 'var(--text2)',
+  background: on ? 'var(--surface3)' : 'transparent',
+  border: 'none', borderRadius: '4px',
+  cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+})
+const calNav = {
+  width: '24px', height: '24px',
+  background: 'var(--surface2)', border: 'none',
+  color: 'var(--text2)', borderRadius: '5px', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px',
+}
+const iconBtn = {
+  width: '26px', height: '26px',
+  background: 'var(--surface2)', border: 'none',
+  borderRadius: '5px', color: 'var(--text2)', cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: '12px', textDecoration: 'none',
+}
+const linkBtn = {
+  background: 'none', border: 'none',
+  color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
 }
 
 // ============================================================
@@ -168,9 +112,7 @@ function toggleBtn(on, T) {
 // ============================================================
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod, theme } = useStore()
-  const T = palette(theme !== 'light')
-  const S = makeStyles(T)
+  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod } = useStore()
   const period = dashPeriod || 'today'
   const [salesType, setSalesType] = useState('paid') // 'paid' | 'invoiced'
   const [search, setSearch] = useState('')
@@ -266,23 +208,23 @@ export default function Dashboard() {
   // RENDER
   // ============================================================
   return (
-    <div style={{ fontFamily: "'Space Grotesk', sans-serif", color: T.text }}>
+    <div style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--text)' }}>
 
       {/* ===== TOP BAR ===== */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => navigate('/invoices')} style={S.btnPrimary}>
+        <button onClick={() => navigate('/invoices')} style={btnPrimary}>
           <i className="ti ti-plus" aria-hidden="true" /> New invoice
         </button>
-        <button onClick={handleQuickSale} style={S.btnSecondary}>
+        <button onClick={handleQuickSale} style={btnSecondary}>
           <i className="ti ti-bolt" aria-hidden="true" /> Quick sale
         </button>
-        <div style={S.searchBox}>
-          <i className="ti ti-search" style={{ color: T.text3 }} aria-hidden="true" />
+        <div style={searchBox}>
+          <i className="ti ti-search" style={{ color: 'var(--text3)' }} aria-hidden="true" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search customers, invoices, car reg..."
-            style={{ background: 'none', border: 'none', outline: 'none', color: T.text, fontFamily: 'inherit', fontSize: '13px', width: '100%' }}
+            style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'inherit', fontSize: '13px', width: '100%' }}
           />
         </div>
       </div>
@@ -290,7 +232,7 @@ export default function Dashboard() {
       {/* ===== PERIOD TABS ===== */}
       <div style={{
         display: 'flex', gap: '4px',
-        background: T.surface, border: `0.5px solid ${T.border}`,
+        background: 'var(--surface)', border: '0.5px solid var(--border)',
         padding: '4px', borderRadius: '10px',
         marginBottom: '16px', overflowX: 'auto',
       }}>
@@ -298,8 +240,8 @@ export default function Dashboard() {
           <button key={p.key} onClick={() => setDashPeriod(p.key)} style={{
             padding: '8px 14px', borderRadius: '7px',
             fontSize: '12px', fontWeight: period === p.key ? 500 : 400,
-            color: period === p.key ? T.text : T.text2,
-            background: period === p.key ? T.surface2 : 'transparent',
+            color: period === p.key ? 'var(--text)' : 'var(--text2)',
+            background: period === p.key ? 'var(--surface2)' : 'transparent',
             border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
           }}>{p.label}</button>
         ))}
@@ -308,74 +250,72 @@ export default function Dashboard() {
       {/* ===== TOP 4 TILES ===== */}
       <div className="dash-top4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
         {/* Sales */}
-        <div style={S.tile}>
-          <div style={S.tileLbl}>Sales</div>
-          <div style={{ display: 'inline-flex', background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '6px', padding: '2px', marginBottom: '10px' }}>
-            <button onClick={() => setSalesType('paid')} style={toggleBtn(salesType === 'paid', T)}>Money in</button>
-            <button onClick={() => setSalesType('invoiced')} style={toggleBtn(salesType === 'invoiced', T)}>Invoiced</button>
+        <div style={tile}>
+          <div style={tileLbl}>Sales</div>
+          <div style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '6px', padding: '2px', marginBottom: '10px' }}>
+            <button onClick={() => setSalesType('paid')} style={toggleBtn(salesType === 'paid')}>Money in</button>
+            <button onClick={() => setSalesType('invoiced')} style={toggleBtn(salesType === 'invoiced')}>Invoiced</button>
           </div>
-          <div style={{ ...S.tileNum, color: T.green }}>{money(sales.total)}</div>
-          <div style={S.tileSub}>{sales.count} {salesType === 'paid' ? 'paid' : 'invoice'}{sales.count === 1 ? '' : 's'}</div>
+          <div style={{ ...tileNum, color: 'var(--green)' }}>{money(sales.total)}</div>
+          <div style={tileSub}>{sales.count} {salesType === 'paid' ? 'paid' : 'invoice'}{sales.count === 1 ? '' : 's'}</div>
         </div>
 
         {/* Overdue */}
-        <div style={S.tile}>
-          <div style={S.tileLbl}>Overdue invoices</div>
-          <div style={{ ...S.tileNum, color: T.red }}>{overdue.count}</div>
-          <div style={S.tileSub}>{money(overdue.total)} outstanding</div>
+        <div style={tile}>
+          <div style={tileLbl}>Overdue invoices</div>
+          <div style={{ ...tileNum, color: 'var(--red)' }}>{overdue.count}</div>
+          <div style={tileSub}>{money(overdue.total)} outstanding</div>
         </div>
 
         {/* MOTs Due Soon */}
-        <div style={S.tile}>
-          <div style={S.tileLbl}>MOTs due soon</div>
-          <div style={{ ...S.tileNum, color: T.amber }}>{motsDueSoon.length}</div>
-          <div style={S.tileSub}>Next 30 days</div>
+        <div style={tile}>
+          <div style={tileLbl}>MOTs due soon</div>
+          <div style={{ ...tileNum, color: 'var(--amber)' }}>{motsDueSoon.length}</div>
+          <div style={tileSub}>Next 30 days</div>
         </div>
 
         {/* Placeholder */}
-        <PlaceholderTile T={T} />
+        <PlaceholderTile />
       </div>
 
       {/* ===== MID ROW: P&L + CALENDAR ===== */}
       <div className="dash-mid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-        <RevenueChart invoices={invoices} T={T} />
+        <RevenueChart invoices={invoices} />
         <MiniCalendar
           motsDueSoon={motsDueSoon}
           onOpenFull={() => navigate('/calendar')}
           onDayClick={handleCalendarDayClick}
-          T={T}
-          S={S}
         />
       </div>
 
       {/* ===== MOTs DUE SOON LIST ===== */}
-      <SectionLabel T={T}>
+      <SectionLabel>
         MOTs due soon
-        <button onClick={() => navigate('/customers')} style={S.linkBtn}>View all →</button>
+        <button onClick={() => navigate('/customers')} style={linkBtn}>View all →</button>
       </SectionLabel>
-      <MotsList items={motsDueSoon.slice(0, 5)} T={T} S={S} />
+      <MotsList items={motsDueSoon.slice(0, 5)} />
 
       {/* ===== BOTTOM 4 TILES ===== */}
       <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-        <div style={S.tile}>
-          <div style={S.tileLbl}>Unpaid sent</div>
-          <div style={{ ...S.tileNum, color: T.blue }}>{unpaidSent.count}</div>
-          <div style={S.tileSub}>{money(unpaidSent.total)} awaiting</div>
+        <div style={tile}>
+          <div style={tileLbl}>Unpaid sent</div>
+          <div style={{ ...tileNum, color: 'var(--blue)' }}>{unpaidSent.count}</div>
+          <div style={tileSub}>{money(unpaidSent.total)} awaiting</div>
         </div>
-        <div style={S.tile}>
-          <div style={S.tileLbl}>Avg invoice</div>
-          <div style={S.tileNum}>{money(avgInvoice)}</div>
-          <div style={S.tileSub}>This month</div>
+        <div style={tile}>
+          <div style={tileLbl}>Avg invoice</div>
+          <div style={tileNum}>{money(avgInvoice)}</div>
+          <div style={tileSub}>This month</div>
         </div>
-        <div style={S.tile}>
-          <div style={S.tileLbl}>Total customers</div>
-          <div style={S.tileNum}>{customers.length}</div>
-          <div style={S.tileSub}>On the books</div>
+        <div style={tile}>
+          <div style={tileLbl}>Total customers</div>
+          <div style={tileNum}>{customers.length}</div>
+          <div style={tileSub}>On the books</div>
         </div>
-        <PlaceholderTile T={T} />
+        <PlaceholderTile />
       </div>
 
-      {/* Responsive breakdown */}
+      {/* Responsive + calendar hover */}
       <style>{`
         @media (max-width: 900px) {
           .dash-top4, .dash-bot4 { grid-template-columns: repeat(2, 1fr) !important; }
@@ -384,6 +324,7 @@ export default function Dashboard() {
         @media (max-width: 480px) {
           .dash-top4, .dash-bot4 { grid-template-columns: 1fr !important; }
         }
+        .go-cal-day:hover { background: var(--surface3) !important; }
       `}</style>
     </div>
   )
@@ -393,22 +334,22 @@ export default function Dashboard() {
 // SUB-COMPONENTS
 // ============================================================
 
-function PlaceholderTile({ T }) {
+function PlaceholderTile() {
   return (
     <div style={{
       background: 'rgba(229,57,53,0.04)',
-      border: `0.5px dashed rgba(229,57,53,0.3)`,
+      border: '0.5px dashed rgba(229,57,53,0.3)',
       borderRadius: '12px', padding: '14px',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100px', color: T.text3,
+      minHeight: '100px', color: 'var(--text3)',
     }}>
-      <i className="ti ti-plus" style={{ fontSize: '20px', color: T.red, opacity: 0.6, marginBottom: '6px' }} aria-hidden="true" />
-      <div style={{ fontSize: '11px', fontFamily: 'monospace', color: T.text3 }}>Add later</div>
+      <i className="ti ti-plus" style={{ fontSize: '20px', color: 'var(--red)', opacity: 0.6, marginBottom: '6px' }} aria-hidden="true" />
+      <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text3)' }}>Add later</div>
     </div>
   )
 }
 
-function RevenueChart({ invoices, T }) {
+function RevenueChart({ invoices }) {
   const monthData = useMemo(() => {
     const now = new Date()
     const months = []
@@ -435,15 +376,15 @@ function RevenueChart({ invoices, T }) {
   const max = Math.max(...monthData.map(m => m.rev), 1) * 1.1
 
   return (
-    <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '16px' }}>
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={{ fontWeight: 500, fontSize: '13px', color: T.text }}>Monthly revenue</div>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: T.text2 }}>
+        <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text)' }}>Monthly revenue</div>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: 'var(--text2)' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '8px', height: '8px', background: T.red, borderRadius: '2px' }} />Revenue
+            <span style={{ width: '8px', height: '8px', background: 'var(--red)', borderRadius: '2px' }} />Revenue
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '8px', height: '8px', background: T.text2, borderRadius: '2px' }} />Cost
+            <span style={{ width: '8px', height: '8px', background: 'var(--text2)', borderRadius: '2px' }} />Cost
           </span>
         </div>
       </div>
@@ -451,10 +392,10 @@ function RevenueChart({ invoices, T }) {
         {monthData.map((m, i) => (
           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%' }}>
             <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', flex: 1, justifyContent: 'center', width: '100%' }}>
-              <div title={`Revenue: ${money(m.rev)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: T.red, height: `${(m.rev / max) * 100}%`, minHeight: m.rev > 0 ? '2px' : '0' }} />
-              <div title={`Cost: ${money(m.cost)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: T.text2, height: `${(m.cost / max) * 100}%`, minHeight: m.cost > 0 ? '2px' : '0' }} />
+              <div title={`Revenue: ${money(m.rev)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: 'var(--red)', height: `${(m.rev / max) * 100}%`, minHeight: m.rev > 0 ? '2px' : '0' }} />
+              <div title={`Cost: ${money(m.cost)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: 'var(--text2)', height: `${(m.cost / max) * 100}%`, minHeight: m.cost > 0 ? '2px' : '0' }} />
             </div>
-            <div style={{ fontSize: '9px', color: T.text3, fontFamily: 'monospace' }}>{m.name}</div>
+            <div style={{ fontSize: '9px', color: 'var(--text3)', fontFamily: 'monospace' }}>{m.name}</div>
           </div>
         ))}
       </div>
@@ -462,7 +403,7 @@ function RevenueChart({ invoices, T }) {
   )
 }
 
-function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick, T, S }) {
+function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
   const [view, setView] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const monthName = new Date(view.y, view.m, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -496,24 +437,25 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick, T, S }) {
   }
 
   return (
-    <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '16px' }}>
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ fontWeight: 500, fontSize: '13px', color: T.text }}>{monthName}</div>
+        <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text)' }}>{monthName}</div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={() => nav(-1)} style={S.calNav}><i className="ti ti-chevron-left" /></button>
-          <button onClick={() => nav(1)} style={S.calNav}><i className="ti ti-chevron-right" /></button>
-          <button onClick={onOpenFull} style={{ ...S.calNav, width: 'auto', padding: '0 8px', fontSize: '10px', fontFamily: 'monospace' }}>Open</button>
+          <button onClick={() => nav(-1)} style={calNav}><i className="ti ti-chevron-left" /></button>
+          <button onClick={() => nav(1)} style={calNav}><i className="ti ti-chevron-right" /></button>
+          <button onClick={onOpenFull} style={{ ...calNav, width: 'auto', padding: '0 8px', fontSize: '10px', fontFamily: 'monospace' }}>Open</button>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-          <div key={i} style={{ textAlign: 'center', padding: '4px 0', fontSize: '9px', color: T.text3, fontFamily: 'monospace' }}>{d}</div>
+          <div key={i} style={{ textAlign: 'center', padding: '4px 0', fontSize: '9px', color: 'var(--text3)', fontFamily: 'monospace' }}>{d}</div>
         ))}
         {cells.map((c, i) => {
           const clickable = !c.dim && onDayClick
           return (
             <div
               key={i}
+              className={clickable && !c.isToday ? 'go-cal-day' : ''}
               onClick={clickable ? () => onDayClick(view.y, view.m, c.d) : undefined}
               role={clickable ? 'button' : undefined}
               tabIndex={clickable ? 0 : undefined}
@@ -524,19 +466,17 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick, T, S }) {
                 textAlign: 'center', padding: '6px 0',
                 borderRadius: '4px',
                 fontSize: '11px',
-                color: c.dim ? T.dimDay : (c.isToday ? '#fff' : T.text),
-                background: c.isToday ? T.red : 'transparent',
+                color: c.dim ? 'var(--dim-day)' : (c.isToday ? '#fff' : 'var(--text)'),
+                background: c.isToday ? 'var(--red)' : 'transparent',
                 fontWeight: c.isToday ? 500 : 400,
                 cursor: clickable ? 'pointer' : 'default',
                 transition: 'background .12s',
                 outline: 'none',
               }}
-              onMouseEnter={clickable ? (e) => { if (!c.isToday) e.currentTarget.style.background = T.surface3 } : undefined}
-              onMouseLeave={clickable ? (e) => { if (!c.isToday) e.currentTarget.style.background = 'transparent' } : undefined}
             >
               {c.d}
               {!c.dim && c.hasMot && !c.isToday && (
-                <span style={{ position: 'absolute', bottom: '2px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: T.amber }} />
+                <span style={{ position: 'absolute', bottom: '2px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: 'var(--amber)' }} />
               )}
             </div>
           )
@@ -546,17 +486,17 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick, T, S }) {
   )
 }
 
-function MotsList({ items, T, S }) {
+function MotsList({ items }) {
   if (!items.length) {
     return (
-      <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '24px', textAlign: 'center', color: T.text3, fontSize: '13px', marginBottom: '14px' }}>
+      <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '24px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px', marginBottom: '14px' }}>
         No MOTs due in the next 30 days
       </div>
     )
   }
   const today = new Date(); today.setHours(0, 0, 0, 0)
   return (
-    <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '4px 0', marginBottom: '14px' }}>
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '4px 0', marginBottom: '14px' }}>
       {items.map(r => {
         const diff = Math.ceil((r.date - today) / (1000 * 60 * 60 * 24))
         const isUrgent = diff <= 7
@@ -568,17 +508,17 @@ function MotsList({ items, T, S }) {
           <div key={r.id} style={{
             display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.9fr 1fr 90px',
             gap: '12px', padding: '12px 18px',
-            borderBottom: `0.5px solid ${T.border}`, alignItems: 'center', fontSize: '12px',
+            borderBottom: '0.5px solid var(--border)', alignItems: 'center', fontSize: '12px',
           }}>
-            <span style={{ fontWeight: 500, color: T.text }}>{r.name}</span>
-            <span style={{ fontFamily: 'monospace', background: T.surface2, padding: '3px 8px', borderRadius: '5px', color: T.text, display: 'inline-block', fontSize: '11px', width: 'fit-content' }}>{r.reg}</span>
-            <span style={{ color: T.text2 }}>{r.vehicle || '—'}</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 500, color: isUrgent ? T.red : T.amber }}>{status}</span>
+            <span style={{ fontWeight: 500, color: 'var(--text)' }}>{r.name}</span>
+            <span style={{ fontFamily: 'monospace', background: 'var(--surface2)', padding: '3px 8px', borderRadius: '5px', color: 'var(--text)', display: 'inline-block', fontSize: '11px', width: 'fit-content' }}>{r.reg}</span>
+            <span style={{ color: 'var(--text2)' }}>{r.vehicle || '—'}</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 500, color: isUrgent ? 'var(--red)' : 'var(--amber)' }}>{status}</span>
             <span style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
               {r.phone && (
                 <>
-                  <a href={`tel:${r.phone}`} style={S.iconBtn} title="Call"><i className="ti ti-phone" /></a>
-                  <a href={`https://wa.me/${r.phone.replace(/[^\d]/g, '').replace(/^0/, '44')}`} target="_blank" rel="noopener noreferrer" style={S.iconBtn} title="WhatsApp"><i className="ti ti-brand-whatsapp" /></a>
+                  <a href={`tel:${r.phone}`} style={iconBtn} title="Call"><i className="ti ti-phone" /></a>
+                  <a href={`https://wa.me/${r.phone.replace(/[^\d]/g, '').replace(/^0/, '44')}`} target="_blank" rel="noopener noreferrer" style={iconBtn} title="WhatsApp"><i className="ti ti-brand-whatsapp" /></a>
                 </>
               )}
             </span>
@@ -589,10 +529,10 @@ function MotsList({ items, T, S }) {
   )
 }
 
-function SectionLabel({ children, T }) {
+function SectionLabel({ children }) {
   return (
     <div style={{
-      fontSize: '10px', color: T.text2,
+      fontSize: '10px', color: 'var(--text2)',
       textTransform: 'uppercase', letterSpacing: '0.8px',
       fontWeight: 500, marginBottom: '10px', fontFamily: 'monospace',
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
