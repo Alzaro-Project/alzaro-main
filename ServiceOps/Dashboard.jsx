@@ -199,6 +199,9 @@ function QuickAddCustomer({ user, onAdded, onClose }) {
     if (!f.name.trim()) { setErr("Name required."); return; }
     setBusy(true);
     const { data, error } = await db.from("svc_customers").insert([{ ...f, name: f.name.trim(), user_id: user.id }]).select().single();
+    if (!error && data && f.site.trim()) {
+      await db.from("svc_properties").insert([{ customer_id: data.id, customer: data.name, address: f.site.trim(), prop_type: f.type === "Commercial" ? "Commercial" : "House", user_id: user.id }]);
+    }
     setBusy(false);
     if (error) { setErr(error.message); return; }
     onAdded(data); onClose();
@@ -379,7 +382,7 @@ function DashboardPage({ range, go, user }) {
 /* ================================================================== */
 /*  CUSTOMERS                                                         */
 /* ================================================================== */
-function CustomersPage({ user, openCustomerId, clearOpen }) {
+function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
@@ -412,8 +415,16 @@ function CustomersPage({ user, openCustomerId, clearOpen }) {
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
     let error;
-    if (editId) ({ error } = await db.from("svc_customers").update(form).eq("id", editId));
-    else ({ error } = await db.from("svc_customers").insert([{ ...form, user_id: user.id }]));
+    if (editId) {
+      ({ error } = await db.from("svc_customers").update(form).eq("id", editId));
+    } else {
+      // create the customer, then auto-create their first property from the site address
+      const { data: newCust, error: cErr } = await db.from("svc_customers").insert([{ ...form, user_id: user.id }]).select().single();
+      error = cErr;
+      if (!cErr && newCust && form.site.trim()) {
+        await db.from("svc_properties").insert([{ customer_id: newCust.id, customer: newCust.name, address: form.site.trim(), prop_type: form.type === "Commercial" ? "Commercial" : "House", user_id: user.id }]);
+      }
+    }
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -467,13 +478,13 @@ function CustomersPage({ user, openCustomerId, clearOpen }) {
           ))}
         </Table>
       )}
-      {detail && <CustomerDetail customer={detail} onClose={() => setDetail(null)} />}
+      {detail && <CustomerDetail customer={detail} onClose={() => setDetail(null)} go={go} />}
     </div>
   );
 }
 
 /* Customer detail — shows everything linked to one customer */
-function CustomerDetail({ customer, onClose }) {
+function CustomerDetail({ customer, onClose, go }) {
   const [data, setData] = useState(null);
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -491,6 +502,8 @@ function CustomerDetail({ customer, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [customer.id]);
 
+  const nav = (page) => { onClose(); if (go) go(page); };
+
   const Section = ({ title, items, render }) => (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 8 }}>{title} ({items.length})</div>
@@ -498,9 +511,9 @@ function CustomerDetail({ customer, onClose }) {
         : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{items.map(render)}</div>}
     </div>
   );
-  const line = (left, right, tone) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", fontSize: 12.5 }}>
-      <span>{left}</span>{right && <Pill text={right} tone={tone || "blue"} />}
+  const line = (left, right, tone, onClick) => (
+    <div onClick={onClick} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, cursor: onClick ? "pointer" : "default" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 7 }}>{onClick && <i className="ti ti-arrow-up-right" style={{ fontSize: 13, color: "var(--brand)" }} />}{left}</span>{right && <Pill text={right} tone={tone || "blue"} />}
     </div>
   );
 
@@ -519,13 +532,13 @@ function CustomerDetail({ customer, onClose }) {
         <div style={{ padding: 20, overflow: "auto", flex: 1 }}>
           {!data ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div> : (
             <>
-              <Section title="Properties" items={data.properties} render={(p) => <div key={p.id}>{line(p.address, p.postcode || "", "brand")}</div>} />
-              <Section title="Quotes" items={data.quotes} render={(q) => <div key={q.id}>{line(`${q.ref || "—"} · ${q.description || ""}`, gbp(+q.amount || 0), "amber")}</div>} />
-              <Section title="Jobs" items={data.jobs} render={(j) => <div key={j.id}>{line(j.title, j.status, j.status === "Completed" ? "green" : "blue")}</div>} />
-              <Section title="Invoices" items={data.invoices} render={(v) => <div key={v.id}>{line(`${v.ref || "—"} · ${gbp(+v.amount || 0)}`, v.status, v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue")}</div>} />
-              <Section title="Bookings" items={data.bookings} render={(b) => <div key={b.id}>{line(`${b.booking_date || ""} ${b.booking_time || ""} · ${b.title}`, b.engineer || "Unassigned", "brand")}</div>} />
-              <Section title="Certificates" items={data.certs} render={(c) => <div key={c.id}>{line(`${c.cert_type} · ${c.site || ""}`, c.expiry_date ? `exp ${c.expiry_date}` : "—", "green")}</div>} />
-              <Section title="Documents" items={data.documents} render={(dc) => <div key={dc.id}>{line(dc.name, dc.cat, "blue")}</div>} />
+              <Section title="Properties" items={data.properties} render={(p) => <div key={p.id}>{line(p.address, p.postcode || "", "brand", () => nav("properties"))}</div>} />
+              <Section title="Quotes" items={data.quotes} render={(q) => <div key={q.id}>{line(`${q.ref || "—"} · ${q.description || ""}`, gbp(+q.amount || 0), "amber", () => nav("quotes"))}</div>} />
+              <Section title="Jobs" items={data.jobs} render={(j) => <div key={j.id}>{line(j.title, j.status, j.status === "Completed" ? "green" : "blue", () => nav("jobs"))}</div>} />
+              <Section title="Invoices" items={data.invoices} render={(v) => <div key={v.id}>{line(`${v.ref || "—"} · ${gbp(+v.amount || 0)}`, v.status, v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue", () => nav("invoicing"))}</div>} />
+              <Section title="Bookings" items={data.bookings} render={(b) => <div key={b.id}>{line(`${b.booking_date || ""} ${b.booking_time || ""} · ${b.title}`, b.engineer || "Unassigned", "brand", () => nav("diary"))}</div>} />
+              <Section title="Certificates" items={data.certs} render={(c) => <div key={c.id}>{line(`${c.cert_type} · ${c.site || ""}`, c.expiry_date ? `exp ${c.expiry_date}` : "—", "green", () => nav("certificates"))}</div>} />
+              <Section title="Documents" items={data.documents} render={(dc) => <div key={dc.id}>{line(dc.name, dc.cat, "blue", () => nav("documents"))}</div>} />
             </>
           )}
         </div>
@@ -1591,7 +1604,7 @@ function Dashboard({ user, signOut }) {
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range} go={goTo} user={user} />;
-  else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} />;
+  else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} go={goTo} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
   return (
