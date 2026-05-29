@@ -1074,7 +1074,9 @@ function ReportsPage({ user }) {
   const [period, setPeriod] = useState("All time");
   const [preview, setPreview] = useState(null);
   const [d, setD] = useState(null);
-  const periods = ["All time", "This Month", "Quarter", "Tax Year"];
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const periods = ["All time", "This Month", "Quarter", "Tax Year", "Custom"];
 
   useEffect(() => {
     if (!DB_READY) { setD({ props: [], comp: [], pays: [], maint: [], tenants: [] }); return; }
@@ -1090,6 +1092,12 @@ function ReportsPage({ user }) {
     if (label === "This Month") return [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0)];
     if (label === "Quarter") { const qm = Math.floor(now.getMonth() / 3) * 3; return [new Date(now.getFullYear(), qm, 1), new Date(now.getFullYear(), qm + 3, 0)]; }
     if (label === "Tax Year") { const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1; return [new Date(y, 3, 6), new Date(y + 1, 3, 5)]; } // UK tax year 6 Apr–5 Apr
+    if (label === "Custom") {
+      if (!customFrom && !customTo) return null;
+      const start = customFrom ? new Date(customFrom) : new Date(1900, 0, 1);
+      const end = customTo ? new Date(customTo) : new Date(3000, 0, 1);
+      return [start, end];
+    }
     return null; // All time
   };
 
@@ -1105,17 +1113,34 @@ function ReportsPage({ user }) {
     };
   };
 
+  const periodLabel = () => {
+    if (period !== "Custom") return period;
+    if (!customFrom && !customTo) return "Custom (no dates set)";
+    return `${customFrom || "earliest"} → ${customTo || "latest"}`;
+  };
+
   const openReport = (r) => {
     const scoped = d ? filterByPeriod(d, period) : null;
     const built = scoped ? buildReport(r.name, scoped) : null;
-    if (built) setPreview({ ...r, ...built, wired: true, period });
-    else setPreview({ ...r, cols: ["Info"], rows: [], wired: false, period });
+    const lbl = periodLabel();
+    if (built) setPreview({ ...r, ...built, wired: true, period: lbl });
+    else setPreview({ ...r, cols: ["Info"], rows: [], wired: false, period: lbl });
   };
 
   return (
     <div className="fade-in" style={{ position: "relative" }}>
       <PageHead title="Reports" sub="Generate, preview and export reports from your live data."
         right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
+      {period === "Custom" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
+          <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>From</span>
+          <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }} />
+          <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>To</span>
+          <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }} />
+          {(customFrom || customTo) && <span onClick={() => { setCustomFrom(""); setCustomTo(""); }} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>Clear</span>}
+          <span style={{ fontSize: 11, color: "var(--txt-3)", marginLeft: "auto" }}>Open any report to apply this range</span>
+        </div>
+      )}
       {!d && <div style={{ fontSize: 12, color: "var(--txt-3)", marginBottom: 14 }}>Loading your data…</div>}
       {REPORTS.map((group, gi) => {
         const t = toneVar(group.tone);
