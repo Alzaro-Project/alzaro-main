@@ -55,50 +55,20 @@ const showToast = (message, type = 'error') => {
 // ============================================================
 // SEED DATA (used only for demo/fallback when not logged into Supabase)
 // ============================================================
-const SEED_SKUS = [
-  { id: 'SK1', brand: 'Michelin', model: 'Pilot Sport 4', w: 225, p: 45, r: 18, sell: 145, alert: 2, season: 'summer' },
-  { id: 'SK2', brand: 'Continental', model: 'PremiumContact 6', w: 205, p: 55, r: 16, sell: 99, alert: 3, season: 'summer' },
-  { id: 'SK3', brand: 'Pirelli', model: 'Cinturato P7', w: 215, p: 60, r: 16, sell: 89, alert: 2, season: 'summer' },
-  { id: 'SK4', brand: 'Bridgestone', model: 'Turanza T005', w: 195, p: 65, r: 15, sell: 72, alert: 2, season: 'allseason' },
-]
+// All demo/seed data removed — the app starts empty. Real data comes from
+// Supabase on login. These remain as empty arrays so the existing references
+// (initial state + logout reset) keep working without further changes.
+const SEED_SKUS = []
 
-const SEED_BATCHES = [
-  { id: 'B1', skuId: 'SK1', date: '2025-09-10', qty: 10, remaining: 8, cost: 89, supplier: 'Aldridge Tyres Ltd', ref: 'ALD-2025-0112', notes: '' },
-  { id: 'B2', skuId: 'SK1', date: '2025-11-15', qty: 10, remaining: 10, cost: 82, supplier: 'Aldridge Tyres Ltd', ref: 'ALD-2025-0198', notes: 'Winter deal' },
-  { id: 'B3', skuId: 'SK2', date: '2025-10-01', qty: 15, remaining: 12, cost: 62, supplier: 'National Tyre Wholesale', ref: 'NTW-88421', notes: '' },
-  { id: 'B4', skuId: 'SK3', date: '2025-10-20', qty: 6, remaining: 1, cost: 58, supplier: 'National Tyre Wholesale', ref: 'NTW-88562', notes: '' },
-  { id: 'B5', skuId: 'SK4', date: '2025-11-01', qty: 8, remaining: 6, cost: 45, supplier: 'Euro Tyre Direct', ref: 'ETD-2025-4421', notes: '' },
-]
+const SEED_BATCHES = []
 
-const SEED_USED = [
-  { id: 'U1', brand: 'Michelin', model: 'Pilot Sport 4', w: 225, p: 45, r: 18, tread: 6.2, year: 2022, cost: 0, sell: 45, sourceCust: 'Dave Patel', date: '2025-11-05', notes: 'Good condition', sold: false },
-  { id: 'U2', brand: 'Continental', model: 'PremiumContact 6', w: 205, p: 55, r: 16, tread: 4.8, year: 2021, cost: 10, sell: 35, sourceCust: 'Sarah Williams', date: '2025-11-12', notes: 'Even wear', sold: false },
-]
+const SEED_USED = []
 
-const SEED_CUSTOMERS = [
-  { id: 'C1', name: 'John Thompson', email: 'john.thompson@email.com', phone: '07700 900123', reg: 'MK21 ABC', vehicle: 'Ford Focus' },
-  { id: 'C2', name: 'Sarah Williams', email: 'sarah.w@gmail.com', phone: '07800 111222', reg: 'LK70 XYZ', vehicle: 'VW Golf' },
-  { id: 'C3', name: 'Dave Patel', email: 'dpatel@company.co.uk', phone: '07900 333444', reg: 'BD19 PWR', vehicle: 'BMW 3 Series' },
-]
+const SEED_CUSTOMERS = []
 
-const SEED_INVOICES = [
-  {
-    id: 'INV-001', custId: 'C1', custName: 'John Thompson', custEmail: 'john.thompson@email.com',
-    reg: 'MK21 ABC', date: '2025-11-12', due: '2025-11-26', status: 'paid', vatScheme: 'standard',
-    lines: [
-      { desc: 'Michelin Pilot Sport 4 (225/45R18)', qty: 2, unit: 145, skuId: 'SK1', batchId: 'B1', cost: 89, lineType: 'new' },
-      { desc: 'Fitting & balancing', qty: 2, unit: 15, cost: 0, lineType: 'service' },
-    ], notes: ''
-  },
-]
+const SEED_INVOICES = []
 
-const SEED_LICENCES = [
-  { id: 'L1', name: 'Smith Tyres MK', email: 'demo@smithtyres.co.uk', tier: 'gold', status: 'active', since: '2025-06-01' },
-  { id: 'L2', name: 'Quick Fit Luton', email: 'owner@quickfitluton.co.uk', tier: 'silver', status: 'active', since: '2025-08-15' },
-  { id: 'L3', name: 'Budget Tyres Northampton', email: 'info@budgettyres.co.uk', tier: 'bronze', status: 'active', since: '2025-09-01' },
-  { id: 'L4', name: 'Premier Auto Bedford', email: 'premier@bedfordautos.co.uk', tier: 'gold', status: 'active', since: '2025-10-10' },
-  { id: 'L5', name: 'FastLane Tyres Coventry', email: 'fastlane@tyres.co.uk', tier: 'silver', status: 'trial', since: '2025-11-01' },
-]
+const SEED_LICENCES = []
 
 // ============================================================
 // STORE
@@ -121,9 +91,9 @@ export const useStore = create(
       // SHARED DATA STATE (both products)
       // --------------------------------------------------------
       settings: {
-        name: 'Smith Tyres MK', addr: '14 Tyrewell Road', city: 'Milton Keynes',
-        post: 'MK1 1AB', phone: '01908 123456', email: 'info@smithtyres.co.uk',
-        vatScheme: 'standard', vatNumber: 'GB123456789', flatRate: 8.5,
+        name: '', addr: '', city: '',
+        post: '', phone: '', email: '',
+        vatScheme: 'standard', vatNumber: '', flatRate: 8.5,
       },
       customers: SEED_CUSTOMERS,
       invoices: SEED_INVOICES,
