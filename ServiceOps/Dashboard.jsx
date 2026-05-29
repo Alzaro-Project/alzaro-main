@@ -389,7 +389,7 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const [detail, setDetail] = useState(null);
-  const blank = { name: "", area: "", contact: "", email: "", type: "Homeowner", site: "" };
+  const blank = { name: "", area: "", contact: "", email: "", type: "Homeowner", site: "", postcode: "", prop_type: "House" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -408,24 +408,26 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
 
   const refresh = async () => { const { data } = await db.from("svc_customers").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (c) => { setForm({ name: c.name || "", area: c.area || "", contact: c.contact || "", email: c.email || "", type: c.type || "Homeowner", site: c.site || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+  const openEdit = (c) => { setForm({ name: c.name || "", area: c.area || "", contact: c.contact || "", email: c.email || "", type: c.type || "Homeowner", site: c.site || "", postcode: "", prop_type: "House" }); setEditId(c.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.name.trim()) { setErr("Customer name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
-    let error;
+    // only the customer's own columns go to svc_customers
+    const custFields = { name: form.name, area: form.area, contact: form.contact, email: form.email, type: form.type, site: form.site };
     if (editId) {
-      ({ error } = await db.from("svc_customers").update(form).eq("id", editId));
+      const { error } = await db.from("svc_customers").update(custFields).eq("id", editId);
+      if (error) { setErr(error.message); return; }
     } else {
-      // create the customer, then auto-create their first property from the site address
-      const { data: newCust, error: cErr } = await db.from("svc_customers").insert([{ ...form, user_id: user.id }]).select().single();
-      error = cErr;
-      if (!cErr && newCust && form.site.trim()) {
-        await db.from("svc_properties").insert([{ customer_id: newCust.id, customer: newCust.name, address: form.site.trim(), prop_type: form.type === "Commercial" ? "Commercial" : "House", user_id: user.id }]);
+      const { data: newCust, error: cErr } = await db.from("svc_customers").insert([{ ...custFields, user_id: user.id }]).select().single();
+      if (cErr) { setErr(cErr.message); return; }
+      // auto-create their first property from the address fields
+      if (newCust && form.site.trim()) {
+        const { error: pErr } = await db.from("svc_properties").insert([{ customer_id: newCust.id, customer: newCust.name, address: form.site.trim(), postcode: form.postcode.trim(), prop_type: form.prop_type, user_id: user.id }]);
+        if (pErr) { setErr("Customer saved, but property wasn't created: " + pErr.message); return; }
       }
     }
-    if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_customers").delete().eq("id", id); refresh(); } };
@@ -447,8 +449,20 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
             <label style={fld}>Region<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></label>
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-            <label style={fld}>Site address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
           </div>
+          {!editId && (
+            <>
+              <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", margin: "16px 0 10px" }}>First property <span style={{ textTransform: "none", color: "var(--txt-3)" }}>(optional — adds to Properties, add more later)</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+                <label style={fld}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
+                <label style={fld}>Postcode<input style={inp} placeholder="e.g. M1 2AB" value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} /></label>
+                <label style={fld}>Property type<select style={inp} value={form.prop_type} onChange={(e) => setForm({ ...form, prop_type: e.target.value })}>{["House", "Flat", "Bungalow", "Commercial", "HMO", "Other"].map((x) => <option key={x}>{x}</option>)}</select></label>
+              </div>
+            </>
+          )}
+          {editId && (
+            <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginTop: 14 }}>Manage this customer's addresses in the <strong>Properties</strong> tab.</div>
+          )}
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update customer" : "Save customer"} primary /></span></div>
         </div>
       )}
