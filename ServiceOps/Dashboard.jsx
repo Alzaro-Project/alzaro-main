@@ -237,9 +237,9 @@ function CustomersPage({ user }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.customers); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("svc_customers").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows(DEMO.customers); } else setRows(data.length ? data : DEMO.customers); });
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data || []); });
   }, []);
 
   const refresh = async () => { const { data } = await db.from("svc_customers").select("*").order("created_at", { ascending: false }); setRows(data || []); };
@@ -322,7 +322,7 @@ function QuotesPage({ user }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.quotes.map((q) => ({ ref: q.ref, customer: q.customer, description: q.desc, amount: q.amount, status: q.status, quote_date: q.date }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("svc_quotes").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
   }, []);
@@ -414,7 +414,7 @@ function JobsPage({ user }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.jobs); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("svc_jobs").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
   }, []);
@@ -572,7 +572,7 @@ function InvoicingPage({ user }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.invoices.map((v) => ({ ref: v.ref, customer: v.customer, amount: v.amount, due_date: v.due, status: v.status }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("svc_invoices").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
   }, []);
