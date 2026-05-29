@@ -271,7 +271,9 @@ function PropertiesPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { address: "", area: "", type: "House", units: "", status: "Let", rent: "" };
+  const [expandedId, setExpandedId] = useState(null);
+  const [related, setRelated] = useState({ tenants: [], comp: [], maint: [], pays: [] });
+  const blank = { address: "", area: "", type: "House", status: "Let", rent: "" };
   const [form, setForm] = useState(blank);
 
   React.useEffect(() => {
@@ -281,6 +283,10 @@ function PropertiesPage({ user }) {
         if (error) { setErr(error.message); setRows(DEMO.properties); }
         else setRows(data.length ? data : DEMO.properties);
       });
+    Promise.all([
+      db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"),
+      db.from("prop_maintenance").select("*"), db.from("prop_payments").select("*"),
+    ]).then(([t, c, m, p]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [], pays: p.data || [] }));
   }, []);
 
   const refresh = async () => {
@@ -289,13 +295,13 @@ function PropertiesPage({ user }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", units: p.units || "", status: p.status || "Let", rent: p.rent || "" }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "" }); setEditId(p.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
-    const payload = { ...form, units: form.units === "" ? 1 : +form.units, rent: form.rent === "" ? 0 : +form.rent };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent };
     let error;
     if (editId) {
       ({ error } = await db.from("prop_properties").update(payload).eq("id", editId));
@@ -326,7 +332,6 @@ function PropertiesPage({ user }) {
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Units<input style={inp} type="number" placeholder="e.g. 1" value={form.units} onChange={(e) => setForm({ ...form, units: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
           </div>
@@ -339,21 +344,74 @@ function PropertiesPage({ user }) {
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading properties…</div>
       ) : (
-        <Table cols={["Address", "Area", "Type", "Units", "Status", "Rent (pcm)", "Compliance", ""]}>
-          {list.map((p, i) => (
-            <tr key={p.id || i}>
-              <Td><span style={{ fontWeight: 500 }}>{p.address || p.addr}</span></Td>
-              <Td color="var(--txt-2)">{p.area}</Td>
-              <Td color="var(--txt-2)">{p.type}</Td>
-              <Td color="var(--txt-2)">{p.units}</Td>
-              <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
-              <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
-              <Td><span style={{ color: `var(--${p.tone || (p.score >= 90 ? "green" : p.score >= 80 ? "amber" : "red")})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
-              <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
-            </tr>
-          ))}
+        <Table cols={["", "Address", "Area", "Type", "Status", "Rent (pcm)", "Compliance", ""]}>
+          {list.map((p, i) => {
+            const addr = (p.address || p.addr || "").toLowerCase();
+            const match = (s) => (s || "").toLowerCase() === addr || (addr && (s || "").toLowerCase().includes(addr));
+            const isOpen = expandedId === (p.id || i);
+            const pT = related.tenants.filter((t) => match(t.property));
+            const pC = related.comp.filter((c) => match(c.property));
+            const pM = related.maint.filter((m) => match(m.property));
+            const pP = related.pays.filter((x) => match(x.property));
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            return (
+              <React.Fragment key={p.id || i}>
+                <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (p.id || i))}>
+                  <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
+                  <Td><span style={{ fontWeight: 500 }}>{p.address || p.addr}</span></Td>
+                  <Td color="var(--txt-2)">{p.area || "—"}</Td>
+                  <Td color="var(--txt-2)">{p.type}</Td>
+                  <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
+                  <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
+                  <Td><span style={{ color: `var(--${p.tone || (p.score >= 90 ? "green" : p.score >= 80 ? "amber" : "red")})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
+                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
+                        <DetailBox title="Tenants" icon="ti-users" empty={pT.length === 0} emptyText="No tenants linked.">
+                          {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
+                        </DetailBox>
+                        <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText="No certificates tracked.">
+                          {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                        </DetailBox>
+                        <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText="No maintenance jobs.">
+                          {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
+                        </DetailBox>
+                        <DetailBox title="Payments" icon="ti-coin" empty={pP.length === 0} emptyText="No payments logged.">
+                          {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                        </DetailBox>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </Table>
       )}
+    </div>
+  );
+}
+
+function DetailBox({ title, icon, children, empty, emptyText }) {
+  return (
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <i className={`ti ${icon}`} style={{ fontSize: 14, color: "var(--brand)" }} />
+        <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-2)" }}>{title}</span>
+      </div>
+      {empty ? <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{emptyText}</div> : children}
+    </div>
+  );
+}
+
+function DetailRow({ main, sub, pill, tone }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", gap: 8 }}>
+      <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{main}</div>{sub && <div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{sub}</div>}</div>
+      {pill && <Pill text={pill} tone={tone} />}
     </div>
   );
 }
@@ -963,7 +1021,7 @@ function ReportPreview({ report, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)" }}>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · your live data` : "Preview · coming soon"}</div></div>
+          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · ${report.period || "All time"} · your live data` : "Preview · coming soon"}</div></div>
           <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
         </div>
         <div style={{ padding: 20 }}>
@@ -1003,10 +1061,31 @@ function ReportsPage({ user }) {
     ]).then(([p, c, pay, mt, tn]) => setD({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
   }, []);
 
+  const periodRange = (label) => {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    if (label === "This Month") return [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0)];
+    if (label === "Quarter") { const qm = Math.floor(now.getMonth() / 3) * 3; return [new Date(now.getFullYear(), qm, 1), new Date(now.getFullYear(), qm + 3, 0)]; }
+    if (label === "Tax Year") { const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1; return [new Date(y, 3, 6), new Date(y + 1, 3, 5)]; } // UK tax year 6 Apr–5 Apr
+    return null; // All time
+  };
+
+  const filterByPeriod = (data, label) => {
+    const range = periodRange(label);
+    if (!range || !data) return data;
+    const [start, end] = range;
+    const inRange = (dateStr) => { if (!dateStr) return false; const dt = new Date(dateStr); return dt >= start && dt <= end; };
+    return {
+      ...data,
+      pays: data.pays.filter((p) => inRange(p.due_date)),
+      comp: data.comp.filter((c) => inRange(c.expiry_date)),
+    };
+  };
+
   const openReport = (r) => {
-    const built = d ? buildReport(r.name, d) : null;
-    if (built) setPreview({ ...r, ...built, wired: true });
-    else setPreview({ ...r, cols: ["Info"], rows: [], wired: false });
+    const scoped = d ? filterByPeriod(d, period) : null;
+    const built = scoped ? buildReport(r.name, scoped) : null;
+    if (built) setPreview({ ...r, ...built, wired: true, period });
+    else setPreview({ ...r, cols: ["Info"], rows: [], wired: false, period });
   };
 
   return (
