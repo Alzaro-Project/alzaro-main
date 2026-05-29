@@ -3,32 +3,52 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 
 // ============================================================
-// Dashboard — GarageOps v2
+// Dashboard — GarageOps v2 (theme-aware: dark + light)
 // ------------------------------------------------------------
 // Top bar: New Invoice + Quick Sale + Search
 // Period tabs (Today / Week / Month / Quarter / 6 Months / Year)
 // Top 4 tiles: Sales (Money In|Invoiced) · Overdue · MOTs Due · placeholder
-// Mid row: Monthly revenue chart · Mini calendar
+// Mid row: Monthly revenue chart · Mini calendar (clickable days)
 // MOTs Due Soon list
 // Bottom 4 tiles: Unpaid Sent · Avg Invoice · Total Customers · placeholder
 // ============================================================
 
-// ---------- THEME ----------
-const T = {
-  bg: '#0c0a0f',
-  surface: '#14121a',
-  surface2: '#1e1b26',
-  surface3: '#282432',
-  border: 'rgba(255,255,255,0.06)',
-  border2: 'rgba(255,255,255,0.1)',
-  red: '#e53935',
-  green: '#4caf50',
-  amber: '#ff9800',
-  blue: '#60a5fa',
-  purple: '#a78bfa',
-  text: '#f8f7fa',
-  text2: '#9d99a8',
-  text3: '#5c586a',
+// ---------- THEME PALETTE ----------
+// Brand red stays constant in both themes. Surfaces + text flip.
+function palette(isDark) {
+  return isDark ? {
+    bg: '#0c0a0f',
+    surface: '#14121a',
+    surface2: '#1e1b26',
+    surface3: '#282432',
+    border: 'rgba(255,255,255,0.06)',
+    border2: 'rgba(255,255,255,0.1)',
+    red: '#e53935',
+    green: '#4caf50',
+    amber: '#ff9800',
+    blue: '#60a5fa',
+    purple: '#a78bfa',
+    text: '#f8f7fa',
+    text2: '#9d99a8',
+    text3: '#5c586a',
+    dimDay: '#3c3845',
+  } : {
+    bg: '#f7f6f9',
+    surface: '#ffffff',
+    surface2: '#f3f1f6',
+    surface3: '#e9e6ef',
+    border: 'rgba(0,0,0,0.08)',
+    border2: 'rgba(0,0,0,0.12)',
+    red: '#e53935',
+    green: '#2e9e4f',
+    amber: '#e67e00',
+    blue: '#2563eb',
+    purple: '#7c3aed',
+    text: '#1a1820',
+    text2: '#5c586a',
+    text3: '#9d99a8',
+    dimDay: '#c8c4d0',
+  }
 }
 
 const PERIODS = [
@@ -77,12 +97,80 @@ function inRange(date, [start, end]) {
   return d >= start && d <= end
 }
 
+// ---------- STYLE BUILDERS (depend on palette) ----------
+function makeStyles(T) {
+  return {
+    btnPrimary: {
+      background: T.red, color: '#fff', border: 'none',
+      padding: '11px 16px', borderRadius: '10px',
+      fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
+      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
+    },
+    btnSecondary: {
+      background: T.surface2, color: T.text, border: `1px solid ${T.border2}`,
+      padding: '11px 14px', borderRadius: '10px',
+      fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
+      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
+    },
+    searchBox: {
+      flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
+      background: T.surface2, border: `1px solid ${T.border}`,
+      padding: '10px 13px', borderRadius: '10px',
+    },
+    tile: {
+      background: T.surface, border: `0.5px solid ${T.border}`,
+      borderRadius: '12px', padding: '14px',
+      minHeight: '100px',
+    },
+    tileLbl: {
+      fontSize: '10px', color: T.text2,
+      textTransform: 'uppercase', letterSpacing: '0.8px',
+      fontWeight: 500, marginBottom: '8px', fontFamily: 'monospace',
+    },
+    tileNum: {
+      fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1.1, color: T.text,
+    },
+    tileSub: { fontSize: '11px', color: T.text2, marginTop: '4px' },
+    calNav: {
+      width: '24px', height: '24px',
+      background: T.surface2, border: 'none',
+      color: T.text2, borderRadius: '5px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: '12px',
+    },
+    iconBtn: {
+      width: '26px', height: '26px',
+      background: T.surface2, border: 'none',
+      borderRadius: '5px', color: T.text2, cursor: 'pointer',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: '12px', textDecoration: 'none',
+    },
+    linkBtn: {
+      background: 'none', border: 'none',
+      color: T.red, fontSize: '11px', cursor: 'pointer',
+      fontFamily: 'inherit',
+    },
+  }
+}
+
+function toggleBtn(on, T) {
+  return {
+    padding: '4px 8px', fontSize: '10px',
+    color: on ? T.text : T.text2,
+    background: on ? T.surface3 : 'transparent',
+    border: 'none', borderRadius: '4px',
+    cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+  }
+}
+
 // ============================================================
 // MAIN
 // ============================================================
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod } = useStore()
+  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod, theme } = useStore()
+  const T = palette(theme !== 'light')
+  const S = makeStyles(T)
   const period = dashPeriod || 'today'
   const [salesType, setSalesType] = useState('paid') // 'paid' | 'invoiced'
   const [search, setSearch] = useState('')
@@ -113,7 +201,6 @@ export default function Dashboard() {
   }, [invoices])
 
   // -------- MOTs DUE SOON TILE + LIST --------
-  // Pulls from motReminders first, falls back to vehicles.mot_due
   const motsDueSoon = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const limit = new Date(today); limit.setDate(today.getDate() + 30)
@@ -149,9 +236,6 @@ export default function Dashboard() {
     return monthInv.reduce((s, i) => s + invoiceTotal(i), 0) / monthInv.length
   }, [invoices])
 
-  // -------- RECENT INVOICES (kept for the MOTs section table style) --------
-  // Note: actual invoice list lives on /invoices — dashboard only shows MOTs list
-
   // -------- QUICK SALE --------
   const handleQuickSale = () => {
     const choice = window.confirm(
@@ -160,7 +244,6 @@ export default function Dashboard() {
       'Cancel = Pre-filled paid invoice (still pick a customer)'
     )
     if (choice) {
-      // Walk-in: hand a flag to Invoices via session storage
       sessionStorage.setItem('garageops_quick_sale', 'walkin')
     } else {
       sessionStorage.setItem('garageops_quick_sale', 'paid')
@@ -187,13 +270,13 @@ export default function Dashboard() {
 
       {/* ===== TOP BAR ===== */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => navigate('/invoices')} style={btnPrimary}>
+        <button onClick={() => navigate('/invoices')} style={S.btnPrimary}>
           <i className="ti ti-plus" aria-hidden="true" /> New invoice
         </button>
-        <button onClick={handleQuickSale} style={btnSecondary}>
+        <button onClick={handleQuickSale} style={S.btnSecondary}>
           <i className="ti ti-bolt" aria-hidden="true" /> Quick sale
         </button>
-        <div style={searchBox}>
+        <div style={S.searchBox}>
           <i className="ti ti-search" style={{ color: T.text3 }} aria-hidden="true" />
           <input
             value={search}
@@ -225,69 +308,71 @@ export default function Dashboard() {
       {/* ===== TOP 4 TILES ===== */}
       <div className="dash-top4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
         {/* Sales */}
-        <div style={tile}>
-          <div style={tileLbl}>Sales</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>Sales</div>
           <div style={{ display: 'inline-flex', background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '6px', padding: '2px', marginBottom: '10px' }}>
-            <button onClick={() => setSalesType('paid')} style={toggleBtn(salesType === 'paid')}>Money in</button>
-            <button onClick={() => setSalesType('invoiced')} style={toggleBtn(salesType === 'invoiced')}>Invoiced</button>
+            <button onClick={() => setSalesType('paid')} style={toggleBtn(salesType === 'paid', T)}>Money in</button>
+            <button onClick={() => setSalesType('invoiced')} style={toggleBtn(salesType === 'invoiced', T)}>Invoiced</button>
           </div>
-          <div style={{ ...tileNum, color: T.green }}>{money(sales.total)}</div>
-          <div style={tileSub}>{sales.count} {salesType === 'paid' ? 'paid' : 'invoice'}{sales.count === 1 ? '' : 's'}</div>
+          <div style={{ ...S.tileNum, color: T.green }}>{money(sales.total)}</div>
+          <div style={S.tileSub}>{sales.count} {salesType === 'paid' ? 'paid' : 'invoice'}{sales.count === 1 ? '' : 's'}</div>
         </div>
 
         {/* Overdue */}
-        <div style={tile}>
-          <div style={tileLbl}>Overdue invoices</div>
-          <div style={{ ...tileNum, color: T.red }}>{overdue.count}</div>
-          <div style={tileSub}>{money(overdue.total)} outstanding</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>Overdue invoices</div>
+          <div style={{ ...S.tileNum, color: T.red }}>{overdue.count}</div>
+          <div style={S.tileSub}>{money(overdue.total)} outstanding</div>
         </div>
 
         {/* MOTs Due Soon */}
-        <div style={tile}>
-          <div style={tileLbl}>MOTs due soon</div>
-          <div style={{ ...tileNum, color: T.amber }}>{motsDueSoon.length}</div>
-          <div style={tileSub}>Next 30 days</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>MOTs due soon</div>
+          <div style={{ ...S.tileNum, color: T.amber }}>{motsDueSoon.length}</div>
+          <div style={S.tileSub}>Next 30 days</div>
         </div>
 
         {/* Placeholder */}
-        <PlaceholderTile />
+        <PlaceholderTile T={T} />
       </div>
 
       {/* ===== MID ROW: P&L + CALENDAR ===== */}
       <div className="dash-mid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-        <RevenueChart invoices={invoices} />
+        <RevenueChart invoices={invoices} T={T} />
         <MiniCalendar
           motsDueSoon={motsDueSoon}
           onOpenFull={() => navigate('/calendar')}
           onDayClick={handleCalendarDayClick}
+          T={T}
+          S={S}
         />
       </div>
 
       {/* ===== MOTs DUE SOON LIST ===== */}
-      <SectionLabel>
+      <SectionLabel T={T}>
         MOTs due soon
-        <button onClick={() => navigate('/customers')} style={linkBtn}>View all →</button>
+        <button onClick={() => navigate('/customers')} style={S.linkBtn}>View all →</button>
       </SectionLabel>
-      <MotsList items={motsDueSoon.slice(0, 5)} />
+      <MotsList items={motsDueSoon.slice(0, 5)} T={T} S={S} />
 
       {/* ===== BOTTOM 4 TILES ===== */}
       <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-        <div style={tile}>
-          <div style={tileLbl}>Unpaid sent</div>
-          <div style={{ ...tileNum, color: T.blue }}>{unpaidSent.count}</div>
-          <div style={tileSub}>{money(unpaidSent.total)} awaiting</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>Unpaid sent</div>
+          <div style={{ ...S.tileNum, color: T.blue }}>{unpaidSent.count}</div>
+          <div style={S.tileSub}>{money(unpaidSent.total)} awaiting</div>
         </div>
-        <div style={tile}>
-          <div style={tileLbl}>Avg invoice</div>
-          <div style={tileNum}>{money(avgInvoice)}</div>
-          <div style={tileSub}>This month</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>Avg invoice</div>
+          <div style={S.tileNum}>{money(avgInvoice)}</div>
+          <div style={S.tileSub}>This month</div>
         </div>
-        <div style={tile}>
-          <div style={tileLbl}>Total customers</div>
-          <div style={tileNum}>{customers.length}</div>
-          <div style={tileSub}>On the books</div>
+        <div style={S.tile}>
+          <div style={S.tileLbl}>Total customers</div>
+          <div style={S.tileNum}>{customers.length}</div>
+          <div style={S.tileSub}>On the books</div>
         </div>
-        <PlaceholderTile />
+        <PlaceholderTile T={T} />
       </div>
 
       {/* Responsive breakdown */}
@@ -308,7 +393,7 @@ export default function Dashboard() {
 // SUB-COMPONENTS
 // ============================================================
 
-function PlaceholderTile() {
+function PlaceholderTile({ T }) {
   return (
     <div style={{
       background: 'rgba(229,57,53,0.04)',
@@ -323,8 +408,7 @@ function PlaceholderTile() {
   )
 }
 
-function RevenueChart({ invoices }) {
-  // last 6 months
+function RevenueChart({ invoices, T }) {
   const monthData = useMemo(() => {
     const now = new Date()
     const months = []
@@ -353,7 +437,7 @@ function RevenueChart({ invoices }) {
   return (
     <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={{ fontWeight: 500, fontSize: '13px' }}>Monthly revenue</div>
+        <div style={{ fontWeight: 500, fontSize: '13px', color: T.text }}>Monthly revenue</div>
         <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: T.text2 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ width: '8px', height: '8px', background: T.red, borderRadius: '2px' }} />Revenue
@@ -378,12 +462,11 @@ function RevenueChart({ invoices }) {
   )
 }
 
-function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
+function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick, T, S }) {
   const [view, setView] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const monthName = new Date(view.y, view.m, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 
-  // Days that have an MOT due in the displayed month
   const motDays = useMemo(() => {
     const set = new Set()
     motsDueSoon.forEach(r => {
@@ -415,11 +498,11 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
   return (
     <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ fontWeight: 500, fontSize: '13px' }}>{monthName}</div>
+        <div style={{ fontWeight: 500, fontSize: '13px', color: T.text }}>{monthName}</div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={() => nav(-1)} style={calNav}><i className="ti ti-chevron-left" /></button>
-          <button onClick={() => nav(1)} style={calNav}><i className="ti ti-chevron-right" /></button>
-          <button onClick={onOpenFull} style={{ ...calNav, width: 'auto', padding: '0 8px', fontSize: '10px', fontFamily: 'monospace' }}>Open</button>
+          <button onClick={() => nav(-1)} style={S.calNav}><i className="ti ti-chevron-left" /></button>
+          <button onClick={() => nav(1)} style={S.calNav}><i className="ti ti-chevron-right" /></button>
+          <button onClick={onOpenFull} style={{ ...S.calNav, width: 'auto', padding: '0 8px', fontSize: '10px', fontFamily: 'monospace' }}>Open</button>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
@@ -427,7 +510,6 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
           <div key={i} style={{ textAlign: 'center', padding: '4px 0', fontSize: '9px', color: T.text3, fontFamily: 'monospace' }}>{d}</div>
         ))}
         {cells.map((c, i) => {
-          // Real (non-dim) days are clickable → jump to full Calendar on that date
           const clickable = !c.dim && onDayClick
           return (
             <div
@@ -442,7 +524,7 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
                 textAlign: 'center', padding: '6px 0',
                 borderRadius: '4px',
                 fontSize: '11px',
-                color: c.dim ? '#3c3845' : (c.isToday ? '#fff' : T.text),
+                color: c.dim ? T.dimDay : (c.isToday ? '#fff' : T.text),
                 background: c.isToday ? T.red : 'transparent',
                 fontWeight: c.isToday ? 500 : 400,
                 cursor: clickable ? 'pointer' : 'default',
@@ -464,7 +546,7 @@ function MiniCalendar({ motsDueSoon, onOpenFull, onDayClick }) {
   )
 }
 
-function MotsList({ items }) {
+function MotsList({ items, T, S }) {
   if (!items.length) {
     return (
       <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '24px', textAlign: 'center', color: T.text3, fontSize: '13px', marginBottom: '14px' }}>
@@ -488,15 +570,15 @@ function MotsList({ items }) {
             gap: '12px', padding: '12px 18px',
             borderBottom: `0.5px solid ${T.border}`, alignItems: 'center', fontSize: '12px',
           }}>
-            <span style={{ fontWeight: 500 }}>{r.name}</span>
+            <span style={{ fontWeight: 500, color: T.text }}>{r.name}</span>
             <span style={{ fontFamily: 'monospace', background: T.surface2, padding: '3px 8px', borderRadius: '5px', color: T.text, display: 'inline-block', fontSize: '11px', width: 'fit-content' }}>{r.reg}</span>
             <span style={{ color: T.text2 }}>{r.vehicle || '—'}</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 500, color: isUrgent ? T.red : T.amber }}>{status}</span>
             <span style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
               {r.phone && (
                 <>
-                  <a href={`tel:${r.phone}`} style={iconBtn} title="Call"><i className="ti ti-phone" /></a>
-                  <a href={`https://wa.me/${r.phone.replace(/[^\d]/g, '').replace(/^0/, '44')}`} target="_blank" rel="noopener noreferrer" style={iconBtn} title="WhatsApp"><i className="ti ti-brand-whatsapp" /></a>
+                  <a href={`tel:${r.phone}`} style={S.iconBtn} title="Call"><i className="ti ti-phone" /></a>
+                  <a href={`https://wa.me/${r.phone.replace(/[^\d]/g, '').replace(/^0/, '44')}`} target="_blank" rel="noopener noreferrer" style={S.iconBtn} title="WhatsApp"><i className="ti ti-brand-whatsapp" /></a>
                 </>
               )}
             </span>
@@ -507,7 +589,7 @@ function MotsList({ items }) {
   )
 }
 
-function SectionLabel({ children }) {
+function SectionLabel({ children, T }) {
   return (
     <div style={{
       fontSize: '10px', color: T.text2,
@@ -518,65 +600,4 @@ function SectionLabel({ children }) {
       {children}
     </div>
   )
-}
-
-// ============================================================
-// STYLES
-// ============================================================
-const btnPrimary = {
-  background: T.red, color: '#fff', border: 'none',
-  padding: '11px 16px', borderRadius: '10px',
-  fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
-  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-}
-const btnSecondary = {
-  background: T.surface2, color: T.text, border: `1px solid ${T.border2}`,
-  padding: '11px 14px', borderRadius: '10px',
-  fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
-  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-}
-const searchBox = {
-  flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
-  background: T.surface2, border: `1px solid ${T.border}`,
-  padding: '10px 13px', borderRadius: '10px',
-}
-const tile = {
-  background: T.surface, border: `0.5px solid ${T.border}`,
-  borderRadius: '12px', padding: '14px',
-  minHeight: '100px',
-}
-const tileLbl = {
-  fontSize: '10px', color: T.text2,
-  textTransform: 'uppercase', letterSpacing: '0.8px',
-  fontWeight: 500, marginBottom: '8px', fontFamily: 'monospace',
-}
-const tileNum = {
-  fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1.1,
-}
-const tileSub = { fontSize: '11px', color: T.text2, marginTop: '4px' }
-const toggleBtn = (on) => ({
-  padding: '4px 8px', fontSize: '10px',
-  color: on ? T.text : T.text2,
-  background: on ? T.surface3 : 'transparent',
-  border: 'none', borderRadius: '4px',
-  cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-})
-const calNav = {
-  width: '24px', height: '24px',
-  background: T.surface2, border: 'none',
-  color: T.text2, borderRadius: '5px', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: '12px',
-}
-const iconBtn = {
-  width: '26px', height: '26px',
-  background: T.surface2, border: 'none',
-  borderRadius: '5px', color: T.text2, cursor: 'pointer',
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: '12px', textDecoration: 'none',
-}
-const linkBtn = {
-  background: 'none', border: 'none',
-  color: T.red, fontSize: '11px', cursor: 'pointer',
-  fontFamily: 'inherit',
 }
