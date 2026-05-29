@@ -1347,6 +1347,7 @@ function ReportsPage({ user }) {
 /* ================================================================== */
 function SettingsPage({ user }) {
   const [org, setOrg] = useState({ company_name: "", vat_number: "" });
+  const [notif, setNotif] = useState({ notify_compliance: true, notify_rent: true, reminder_lead: "30 / 7 days before expiry" });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1357,8 +1358,16 @@ function SettingsPage({ user }) {
     if (!DB_READY) { setLoaded(true); return; }
     db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
-        if (data) setOrg({ company_name: data.company_name || "", vat_number: data.vat_number || "" });
-        else if (user.user_metadata && user.user_metadata.company_name) setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
+        if (data) {
+          setOrg({ company_name: data.company_name || "", vat_number: data.vat_number || "" });
+          setNotif({
+            notify_compliance: data.notify_compliance !== false,
+            notify_rent: data.notify_rent !== false,
+            reminder_lead: data.reminder_lead || "30 / 7 days before expiry",
+          });
+        } else if (user.user_metadata && user.user_metadata.company_name) {
+          setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
+        }
         setLoaded(true);
       });
   }, []);
@@ -1367,7 +1376,7 @@ function SettingsPage({ user }) {
     if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
     setErr(""); setSaving(true); setSaved(false);
     const { error } = await db.from("prop_settings").upsert(
-      { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, updated_at: new Date().toISOString() },
+      { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
     setSaving(false);
@@ -1425,14 +1434,35 @@ function SettingsPage({ user }) {
         </div>
       </div>
 
-      {/* Notifications */}
+      {/* Notifications — editable */}
       <div style={{ ...card, marginBottom: 18 }}>
         {head("ti-bell", "Notifications")}
-        {[["Compliance reminders", "In-app alerts (email reminders coming soon)"], ["Rent overdue", "In-app alerts"], ["Reminder lead time", "30 / 7 days before expiry"]].map((r, j, arr) => (
-          <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j < arr.length - 1 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
-            <span style={{ color: "var(--txt-2)" }}>{r[0]}</span><span style={{ fontWeight: 500 }}>{r[1]}</span>
-          </div>
-        ))}
+        {(() => {
+          const Toggle = ({ on, onClick }) => (
+            <span onClick={onClick} style={{ width: 38, height: 22, borderRadius: 11, background: on ? "var(--brand)" : "var(--line-2)", position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
+              <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+            </span>
+          );
+          return (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+                <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Compliance reminders</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when certificates are due to expire</div></div>
+                <Toggle on={notif.notify_compliance} onClick={() => setNotif({ ...notif, notify_compliance: !notif.notify_compliance })} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+                <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Rent overdue alerts</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when a payment becomes overdue</div></div>
+                <Toggle on={notif.notify_rent} onClick={() => setNotif({ ...notif, notify_rent: !notif.notify_rent })} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
+                <div style={{ fontSize: 12.5, color: "var(--txt)" }}>Reminder lead time</div>
+                <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "7px 10px", color: "var(--txt)", fontSize: 12, fontFamily: "Inter", outline: "none" }}>
+                  {["60 / 30 / 7 days before expiry", "30 / 7 days before expiry", "14 / 1 days before expiry", "7 days before expiry"].map((x) => <option key={x}>{x}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 6 }}>Changes save with the "Save changes" button above. Email delivery of these reminders is coming soon — alerts currently show in the app.</div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Subscription */}
