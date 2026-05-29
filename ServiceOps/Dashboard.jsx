@@ -96,7 +96,7 @@ const REPORTS = [
   ]},
 ];
 
-const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
+const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year", "Custom"];
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
 const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
@@ -446,7 +446,6 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Customer name<input style={inp} placeholder="e.g. Sarah Connor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["Homeowner", "Landlord", "Agency", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={fld}>Region<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></label>
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
           </div>
@@ -1568,6 +1567,8 @@ const PAGES = {
 function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
   const [light, setLight] = useState(false);
   const [search, setSearch] = useState("");
   const [showNotif, setShowNotif] = useState(false);
@@ -1617,7 +1618,7 @@ function Dashboard({ user, signOut }) {
   const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); };
 
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range} go={goTo} user={user} />;
+  if (active === "dashboard") body = <DashboardPage range={range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range} go={goTo} user={user} />;
   else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} go={goTo} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
@@ -1700,8 +1701,17 @@ function Dashboard({ user, signOut }) {
         ) : (
           <>
             {active === "dashboard" && (
-              <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12 }}>
-                {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", gap: 5, fontSize: 12 }}>
+                  {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+                </div>
+                {range === "Custom" && (
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 10, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 12, width: "fit-content" }}>
+                    <label style={fld}>From<input style={{ ...inp, width: 160 }} type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} /></label>
+                    <label style={fld}>To<input style={{ ...inp, width: 160 }} type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} /></label>
+                    {rangeFrom && rangeTo && <span style={{ fontSize: 11.5, color: "var(--txt-3)", paddingBottom: 9 }}>{rangeFrom} → {rangeTo}</span>}
+                  </div>
+                )}
               </div>
             )}
             {body}
