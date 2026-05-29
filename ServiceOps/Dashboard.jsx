@@ -60,6 +60,7 @@ const DEMO = {
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
   { id: "customers", label: "Customers", icon: "ti-users" },
+  { id: "properties", label: "Properties", icon: "ti-home" },
   { id: "quotes", label: "Quotes", icon: "ti-file-dollar" },
   { id: "jobs", label: "Jobs", icon: "ti-briefcase" },
   { id: "diary", label: "Diary", icon: "ti-calendar" },
@@ -177,25 +178,101 @@ const rowActions = (DB, onEdit, onDel) => DB ? <span style={{ display: "flex", g
 /* Shared: load the customer list once, for dropdowns across pages */
 function useCustomers() {
   const [customers, setCustomers] = useState([]);
-  useEffect(() => {
-    if (!DB_READY) return;
-    db.from("svc_customers").select("id,name,site").order("name", { ascending: true })
-      .then(({ data }) => setCustomers(data || []));
-  }, []);
-  return customers;
+  const reload = () => { if (DB_READY) db.from("svc_customers").select("id,name,site").order("name", { ascending: true }).then(({ data }) => setCustomers(data || [])); };
+  useEffect(reload, []);
+  return [customers, reload];
 }
 
-/* Shared: a customer picker that stores customer_id and keeps the name in sync */
-function CustomerSelect({ customers, value, onChange }) {
+/* Shared: load all properties (with their customer_id) */
+function useProperties() {
+  const [properties, setProperties] = useState([]);
+  const reload = () => { if (DB_READY) db.from("svc_properties").select("*").order("address", { ascending: true }).then(({ data }) => setProperties(data || [])); };
+  useEffect(reload, []);
+  return [properties, reload];
+}
+
+/* Quick "add customer" inline popup */
+function QuickAddCustomer({ user, onAdded, onClose }) {
+  const [name, setName] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!name.trim()) { setErr("Name required."); return; }
+    setBusy(true);
+    const { data, error } = await db.from("svc_customers").insert([{ name: name.trim(), user_id: user.id }]).select().single();
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onAdded(data); onClose();
+  };
   return (
-    <select style={inp} value={value || ""} onChange={(e) => {
-      const id = e.target.value;
-      const c = customers.find((x) => String(x.id) === String(id));
-      onChange(id ? +id : "", c ? c.name : "", c ? c.site : "");
-    }}>
-      <option value="">— Select customer —</option>
-      {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 360 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>New customer</div>
+        {err && <div style={errBanner}>{err}</div>}
+        <input style={inp} placeholder="Customer name" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={busy ? "Saving…" : "Add"} primary /></span><span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span></div>
+      </div>
+    </div>
+  );
+}
+
+/* Quick "add property" inline popup, tied to a customer */
+function QuickAddProperty({ user, customerId, customerName, onAdded, onClose }) {
+  const [address, setAddress] = useState(""); const [postcode, setPostcode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!address.trim()) { setErr("Address required."); return; }
+    setBusy(true);
+    const { data, error } = await db.from("svc_properties").insert([{ address: address.trim(), postcode: postcode.trim(), customer_id: customerId, customer: customerName, user_id: user.id }]).select().single();
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onAdded(data); onClose();
+  };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 380 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>New property for {customerName}</div>
+        {err && <div style={errBanner}>{err}</div>}
+        <input style={{ ...inp, marginBottom: 8 }} placeholder="Address (e.g. 14 Oak Street)" value={address} autoFocus onChange={(e) => setAddress(e.target.value)} />
+        <input style={inp} placeholder="Postcode" value={postcode} onChange={(e) => setPostcode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={busy ? "Saving…" : "Add"} primary /></span><span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span></div>
+      </div>
+    </div>
+  );
+}
+
+/* Shared: customer + property cascade picker.
+   form needs: customer_id, customer, property_id, site
+   onSet(patch) merges fields into the form. */
+function CustomerPropertyPicker({ user, customers, properties, reloadCustomers, reloadProperties, form, onSet }) {
+  const [addCust, setAddCust] = useState(false);
+  const [addProp, setAddProp] = useState(false);
+  const custProps = properties.filter((p) => String(p.customer_id) === String(form.customer_id));
+
+  return (
+    <>
+      <label style={fld}>Customer
+        <select style={inp} value={form.customer_id || ""} onChange={(e) => {
+          if (e.target.value === "__add") { setAddCust(true); return; }
+          const c = customers.find((x) => String(x.id) === e.target.value);
+          onSet({ customer_id: e.target.value ? +e.target.value : "", customer: c ? c.name : "", property_id: "", site: "" });
+        }}>
+          <option value="">— Select customer —</option>
+          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="__add">+ Add new customer…</option>
+        </select>
+      </label>
+      <label style={fld}>Property
+        <select style={inp} value={form.property_id || ""} disabled={!form.customer_id} onChange={(e) => {
+          if (e.target.value === "__add") { setAddProp(true); return; }
+          const p = custProps.find((x) => String(x.id) === e.target.value);
+          onSet({ property_id: e.target.value ? +e.target.value : "", site: p ? [p.address, p.postcode].filter(Boolean).join(", ") : form.site });
+        }}>
+          <option value="">{form.customer_id ? (custProps.length ? "— Select property —" : "No properties yet") : "Select customer first"}</option>
+          {custProps.map((p) => <option key={p.id} value={p.id}>{p.address}{p.postcode ? `, ${p.postcode}` : ""}</option>)}
+          {form.customer_id && <option value="__add">+ Add new property…</option>}
+        </select>
+      </label>
+      {addCust && <QuickAddCustomer user={user} onClose={() => setAddCust(false)} onAdded={(c) => { reloadCustomers(); onSet({ customer_id: c.id, customer: c.name, property_id: "", site: "" }); }} />}
+      {addProp && form.customer_id && <QuickAddProperty user={user} customerId={form.customer_id} customerName={form.customer} onClose={() => setAddProp(false)} onAdded={(p) => { reloadProperties(); onSet({ property_id: p.id, site: [p.address, p.postcode].filter(Boolean).join(", ") }); }} />}
+    </>
   );
 }
 
@@ -340,7 +417,7 @@ function CustomersPage({ user }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Customer name<input style={inp} placeholder="e.g. Sarah Connor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["Homeowner", "Landlord", "Agency", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={fld}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
+            <label style={fld}>Region<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></label>
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
             <label style={fld}>Site address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
@@ -354,7 +431,7 @@ function CustomersPage({ user }) {
       ) : list.length === 0 ? (
         <div style={emptyCard}>No customers yet. Click "Add customer" to create your first one.</div>
       ) : (
-        <Table cols={["Customer", "Type", "Area", "Phone", "Site", "Jobs", "Spend", ""]}>
+        <Table cols={["Customer", "Type", "Region", "Phone", "Site", "Jobs", "Spend", ""]}>
           {list.map((c, i) => (
             <tr key={c.id || i}>
               <Td>
@@ -385,7 +462,7 @@ function CustomerDetail({ customer, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    if (!DB_READY) { setData({ quotes: [], jobs: [], invoices: [], certs: [], bookings: [], documents: [] }); return () => window.removeEventListener("keydown", onKey); }
+    if (!DB_READY) { setData({ quotes: [], jobs: [], invoices: [], certs: [], bookings: [], documents: [], properties: [] }); return () => window.removeEventListener("keydown", onKey); }
     Promise.all([
       db.from("svc_quotes").select("*").eq("customer_id", customer.id),
       db.from("svc_jobs").select("*").eq("customer_id", customer.id),
@@ -393,7 +470,8 @@ function CustomerDetail({ customer, onClose }) {
       db.from("svc_certificates").select("*").eq("customer_id", customer.id),
       db.from("svc_bookings").select("*").eq("customer_id", customer.id),
       db.from("svc_documents").select("*").eq("customer_id", customer.id),
-    ]).then(([q, j, i, c, b, dc]) => setData({ quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: c.data || [], bookings: b.data || [], documents: dc.data || [] }));
+      db.from("svc_properties").select("*").eq("customer_id", customer.id),
+    ]).then(([q, j, i, c, b, dc, p]) => setData({ quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: c.data || [], bookings: b.data || [], documents: dc.data || [], properties: p.data || [] }));
     return () => window.removeEventListener("keydown", onKey);
   }, [customer.id]);
 
@@ -425,6 +503,7 @@ function CustomerDetail({ customer, onClose }) {
         <div style={{ padding: 20 }}>
           {!data ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div> : (
             <>
+              <Section title="Properties" items={data.properties} render={(p) => <div key={p.id}>{line(p.address, p.postcode || "", "brand")}</div>} />
               <Section title="Quotes" items={data.quotes} render={(q) => <div key={q.id}>{line(`${q.ref || "—"} · ${q.description || ""}`, gbp(+q.amount || 0), "amber")}</div>} />
               <Section title="Jobs" items={data.jobs} render={(j) => <div key={j.id}>{line(j.title, j.status, j.status === "Completed" ? "green" : "blue")}</div>} />
               <Section title="Invoices" items={data.invoices} render={(v) => <div key={v.id}>{line(`${v.ref || "—"} · ${gbp(+v.amount || 0)}`, v.status, v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue")}</div>} />
@@ -439,13 +518,100 @@ function CustomerDetail({ customer, onClose }) {
   );
 }
 /* ================================================================== */
-function QuotesPage({ user }) {
-  const customers = useCustomers();
+/*  PROPERTIES                                                        */
+/* ================================================================== */
+function PropertiesPage({ user }) {
+  const [customers, reloadCustomers] = useCustomers();
+  const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", description: "", amount: "", status: "Draft", quote_date: "" };
+  const blank = { customer_id: "", customer: "", address: "", postcode: "", prop_type: "House", notes: "" };
+  const [form, setForm] = useState(blank);
+
+  useEffect(() => {
+    if (!DB_READY) { setRows([]); return; }
+    db.from("svc_properties").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data || []); });
+  }, []);
+
+  const refresh = async () => { const { data } = await db.from("svc_properties").select("*").order("created_at", { ascending: false }); setRows(data || []); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openEdit = (p) => { setForm({ customer_id: p.customer_id || "", customer: p.customer || "", address: p.address || "", postcode: p.postcode || "", prop_type: p.prop_type || "House", notes: p.notes || "" }); setEditId(p.id); setAdding(true); setErr(""); };
+
+  const save = async () => {
+    if (!form.address.trim()) { setErr("Address is required."); return; }
+    if (!form.customer_id) { setErr("Please choose which customer this property belongs to."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr("");
+    const payload = { ...form, customer_id: form.customer_id || null };
+    let error;
+    if (editId) ({ error } = await db.from("svc_properties").update(payload).eq("id", editId));
+    else ({ error } = await db.from("svc_properties").insert([{ ...payload, user_id: user.id }]));
+    if (error) { setErr(error.message); return; }
+    setForm(blank); setAdding(false); setEditId(null); refresh();
+  };
+  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_properties").delete().eq("id", id); refresh(); } };
+
+  const data = rows || [];
+  const list = data.filter((p) => ((p.address || "") + (p.postcode || "") + (p.customer || "") + (p.prop_type || "")).toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="fade-in">
+      <PageHead title="Properties" sub={rows ? `${data.length} ${DB_READY ? "" : "(demo) "}propert${data.length === 1 ? "y" : "ies"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add property"} primary /></span>} />
+      {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
+      {err && <div style={errBanner}>{err}</div>}
+      {adding && (
+        <div style={formCard}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit property" : "New property"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label style={fld}>Belongs to customer
+              <select style={inp} value={form.customer_id || ""} onChange={(e) => { const c = customers.find((x) => String(x.id) === e.target.value); setForm({ ...form, customer_id: e.target.value ? +e.target.value : "", customer: c ? c.name : "" }); }}>
+                <option value="">— Select customer —</option>
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label style={fld}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
+            <label style={fld}>Postcode<input style={inp} placeholder="e.g. M1 2AB" value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} /></label>
+            <label style={fld}>Type<select style={inp} value={form.prop_type} onChange={(e) => setForm({ ...form, prop_type: e.target.value })}>{["House", "Flat", "Bungalow", "Commercial", "HMO", "Other"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={{ ...fld, gridColumn: "span 2" }}>Notes<input style={inp} placeholder="e.g. Access via rear, boiler in loft" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+          </div>
+          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update property" : "Save property"} primary /></span></div>
+        </div>
+      )}
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by address, postcode, customer or type…" style={{ ...inp, marginBottom: 14 }} />
+      {rows === null ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading properties…</div>
+      ) : list.length === 0 ? (
+        <div style={emptyCard}>No properties yet. Add a customer first, then add their property here (or use "+ Add new property" inside any customer dropdown).</div>
+      ) : (
+        <Table cols={["Address", "Postcode", "Type", "Customer", ""]}>
+          {list.map((p) => (
+            <tr key={p.id}>
+              <Td><span style={{ fontWeight: 500 }}>{p.address}</span>{p.notes ? <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{p.notes}</div> : null}</Td>
+              <Td color="var(--txt-2)">{p.postcode || "—"}</Td>
+              <Td><Pill text={p.prop_type || "—"} tone={p.prop_type === "Commercial" || p.prop_type === "HMO" ? "blue" : "green"} /></Td>
+              <Td color="var(--txt-2)">{p.customer || "—"}</Td>
+              <Td>{p.id && rowActions(DB_READY, () => openEdit(p), () => remove(p.id))}</Td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
+function QuotesPage({ user }) {
+  const [customers, reloadCustomers] = useCustomers();
+  const [properties, reloadProperties] = useProperties();
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", description: "", amount: "", status: "Draft", quote_date: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -456,13 +622,13 @@ function QuotesPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_quotes").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "" }); setEditId(q.id); setAdding(true); setErr(""); };
+  const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", property_id: q.property_id || "", site: q.site || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "" }); setEditId(q.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.customer.trim()) { setErr("Please select a customer."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null, property_id: form.property_id || null };
     if (!payload.quote_date) delete payload.quote_date;
     let error;
     if (editId) ({ error } = await db.from("svc_quotes").update(payload).eq("id", editId));
@@ -495,7 +661,7 @@ function QuotesPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit quote" : "New quote"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Reference<input style={inp} placeholder="e.g. QUO-223" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
-            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name) => setForm({ ...form, customer_id: id, customer: name })} /></label>
+            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1850" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={{ ...fld, gridColumn: "span 2" }}>Description<input style={inp} placeholder="e.g. Full bathroom refit" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Approved", "Rejected"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -533,12 +699,13 @@ function QuotesPage({ user }) {
 function JobsPage({ user }) {
   const stages = ["New", "Scheduled", "In Progress", "Completed", "Invoiced"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
-  const customers = useCustomers();
+  const [customers, reloadCustomers] = useCustomers();
+  const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { title: "", customer_id: "", customer: "", site: "", engineer: "", priority: "Medium", value: "", status: "New" };
+  const blank = { title: "", customer_id: "", customer: "", property_id: "", site: "", engineer: "", priority: "Medium", value: "", status: "New" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -549,13 +716,13 @@ function JobsPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_jobs").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", customer_id: j.customer_id || "", customer: j.customer || "", site: j.site || "", engineer: j.engineer || "", priority: j.priority || "Medium", value: j.value || "", status: j.status || "New" }); setEditId(j.id); setAdding(true); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", customer_id: j.customer_id || "", customer: j.customer || "", property_id: j.property_id || "", site: j.site || "", engineer: j.engineer || "", priority: j.priority || "Medium", value: j.value || "", status: j.status || "New" }); setEditId(j.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Job title is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, value: form.value === "" ? 0 : +form.value, customer_id: form.customer_id || null };
+    const payload = { ...form, value: form.value === "" ? 0 : +form.value, customer_id: form.customer_id || null, property_id: form.property_id || null };
     let error;
     if (editId) ({ error } = await db.from("svc_jobs").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_jobs").insert([{ ...payload, user_id: user.id }]));
@@ -582,7 +749,7 @@ function JobsPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New job"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
+            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
             <label style={fld}>Site<input style={inp} placeholder="e.g. 9 Mill Lane Flat 2" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
             <label style={fld}>Engineer<input style={inp} placeholder="e.g. Dave R." value={form.engineer} onChange={(e) => setForm({ ...form, engineer: e.target.value })} /></label>
             <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -646,12 +813,13 @@ function JobsPage({ user }) {
 /*  DIARY  (week view)                                                */
 /* ================================================================== */
 function DiaryPage({ user }) {
-  const customers = useCustomers();
+  const [customers, reloadCustomers] = useCustomers();
+  const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { title: "", customer_id: "", customer: "", site: "", engineer: "", booking_date: "", booking_time: "", priority: "Medium" };
+  const blank = { title: "", customer_id: "", customer: "", property_id: "", site: "", engineer: "", booking_date: "", booking_time: "", priority: "Medium" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -662,14 +830,14 @@ function DiaryPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_bookings").select("*").order("booking_date", { ascending: true }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (b) => { setForm({ title: b.title || "", customer_id: b.customer_id || "", customer: b.customer || "", site: b.site || "", engineer: b.engineer || "", booking_date: b.booking_date || "", booking_time: b.booking_time || "", priority: b.priority || "Medium" }); setEditId(b.id); setAdding(true); setErr(""); };
+  const openEdit = (b) => { setForm({ title: b.title || "", customer_id: b.customer_id || "", customer: b.customer || "", property_id: b.property_id || "", site: b.site || "", engineer: b.engineer || "", booking_date: b.booking_date || "", booking_time: b.booking_time || "", priority: b.priority || "Medium" }); setEditId(b.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Booking title is required."); return; }
     if (!form.booking_date) { setErr("Please choose a date."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, customer_id: form.customer_id || null };
+    const payload = { ...form, customer_id: form.customer_id || null, property_id: form.property_id || null };
     if (!payload.booking_time) delete payload.booking_time;
     let error;
     if (editId) ({ error } = await db.from("svc_bookings").update(payload).eq("id", editId));
@@ -700,7 +868,7 @@ function DiaryPage({ user }) {
             <label style={fld}>Booking title<input style={inp} placeholder="e.g. Boiler service" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
             <label style={fld}>Date<input style={inp} type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></label>
             <label style={fld}>Time<input style={inp} type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></label>
-            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
+            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
             <label style={fld}>Engineer<input style={inp} placeholder="e.g. Dave R." value={form.engineer} onChange={(e) => setForm({ ...form, engineer: e.target.value })} /></label>
             <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
@@ -746,12 +914,13 @@ function DiaryPage({ user }) {
 /*  INVOICING                                                         */
 /* ================================================================== */
 function InvoicingPage({ user }) {
-  const customers = useCustomers();
+  const [customers, reloadCustomers] = useCustomers();
+  const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", amount: "", due_date: "", status: "Draft" };
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -762,13 +931,13 @@ function InvoicingPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_invoices").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft" }); setEditId(v.id); setAdding(true); setErr(""); };
+  const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", property_id: v.property_id || "", site: v.site || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft" }); setEditId(v.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.customer.trim()) { setErr("Please select a customer."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null, property_id: form.property_id || null };
     if (!payload.due_date) delete payload.due_date;
     let error;
     if (editId) ({ error } = await db.from("svc_invoices").update(payload).eq("id", editId));
@@ -802,7 +971,7 @@ function InvoicingPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit invoice" : "New invoice"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Reference<input style={inp} placeholder="e.g. INV-1045" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
-            <label style={fld}>Customer<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name) => setForm({ ...form, customer_id: id, customer: name })} /></label>
+            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 540" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -837,13 +1006,14 @@ function InvoicingPage({ user }) {
 /*  CERTIFICATES                                                      */
 /* ================================================================== */
 function CertificatesPage({ user }) {
-  const customers = useCustomers();
+  const [customers, reloadCustomers] = useCustomers();
+  const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const TYPES = ["Gas Safety (CP12)", "EICR", "EIC (Installation)", "Boiler Service", "PAT Testing", "Completion Certificate", "Other"];
-  const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", site: "", ref: "", expiry_date: "" };
+  const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", property_id: "", site: "", ref: "", issue_date: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -854,13 +1024,14 @@ function CertificatesPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_certificates").select("*").order("expiry_date", { ascending: true }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (c) => { setForm({ cert_type: c.cert_type || "Other", customer_id: c.customer_id || "", customer: c.customer || "", site: c.site || "", ref: c.ref || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+  const openEdit = (c) => { setForm({ cert_type: c.cert_type || "Other", customer_id: c.customer_id || "", customer: c.customer || "", property_id: c.property_id || "", site: c.site || "", ref: c.ref || "", issue_date: c.issue_date || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.expiry_date) { setErr("Please set an expiry date."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, customer_id: form.customer_id || null };
+    const payload = { ...form, customer_id: form.customer_id || null, property_id: form.property_id || null };
+    if (!payload.issue_date) delete payload.issue_date;
     let error;
     if (editId) ({ error } = await db.from("svc_certificates").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_certificates").insert([{ ...payload, user_id: user.id }]));
@@ -892,7 +1063,8 @@ function CertificatesPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit certificate" : "New certificate"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Type<select style={inp} value={form.cert_type} onChange={(e) => setForm({ ...form, cert_type: e.target.value })}>{TYPES.map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={fld}>Customer / Property<CustomerSelect customers={customers} value={form.customer_id} onChange={(id, name, site) => setForm({ ...form, customer_id: id, customer: name, site: site || form.site })} /></label>
+            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
+            <label style={fld}>Issue date<input style={inp} type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} /></label>
             <label style={fld}>Expiry date<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
             <label style={fld}>Site / address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
             <label style={{ ...fld, gridColumn: "span 2" }}>Reference / notes<input style={inp} placeholder="e.g. Landlord gas safety record" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
@@ -977,7 +1149,7 @@ function DocViewer({ doc, url, onClose }) {
 }
 
 function DocumentsPage({ user }) {
-  const customers = useCustomers();
+  const [customers] = useCustomers();
   const cats = ["All", "Quotes", "Invoices", "Certificates", "Job Photos"];
   const [cat, setCat] = useState("All");
   const [rows, setRows] = useState(null);
@@ -1335,7 +1507,7 @@ function AuthScreen() {
 /*  APP SHELL                                                         */
 /* ================================================================== */
 const PAGES = {
-  customers: CustomersPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
+  customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
   reports: ReportsPage, settings: SettingsPage,
 };
