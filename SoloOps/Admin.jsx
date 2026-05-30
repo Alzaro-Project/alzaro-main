@@ -1,5 +1,5 @@
 // ============================================================
-//  Alzaro SoloOps — Admin Panel
+//  Alzaro SoloOps — Admin Panels
 //  Loaded by admin.html. Secure: relies on Supabase RLS +
 //  soloops_is_admin(). A non-admin session simply gets no rows
 //  (and is bounced out). No service key in the browser.
