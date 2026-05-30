@@ -1400,12 +1400,15 @@ function SettingsPage({ user }) {
   const saveOrg = async () => {
     if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
     setErr(""); setSaving(true); setSaved(false);
-    const { error } = await db.from("prop_settings").upsert(
-      { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
+    const record = { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead, updated_at: new Date().toISOString() };
+    // upsert, then read back to confirm it actually persisted
+    const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
+    if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
+    const { data: check, error: readErr } = await db.from("prop_settings").select("company_name,vat_number").eq("user_id", user.id).maybeSingle();
     setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (readErr) { setErr("Saved, but couldn't confirm: " + readErr.message); return; }
+    if (!check) { setErr("Save didn't persist — this usually means the prop_settings table or its security policy is missing. Re-run the settings SQL in Supabase."); return; }
+    setOrg({ company_name: check.company_name || "", vat_number: check.vat_number || "" });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
