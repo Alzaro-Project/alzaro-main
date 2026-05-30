@@ -1381,14 +1381,15 @@ function SettingsPage({ user }) {
 
   useEffect(() => {
     if (!DB_READY) { setLoaded(true); return; }
-    db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setOrg({ company_name: data.company_name || "", vat_number: data.vat_number || "" });
+    db.from("prop_settings").select("*").eq("user_id", user.id)
+      .then(({ data, error }) => {
+        const row = !error && data && data.length ? data[0] : null;
+        if (row) {
+          setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "" });
           setNotif({
-            notify_compliance: data.notify_compliance !== false,
-            notify_rent: data.notify_rent !== false,
-            reminder_lead: data.reminder_lead || "30 / 7 days before expiry",
+            notify_compliance: row.notify_compliance !== false,
+            notify_rent: row.notify_rent !== false,
+            reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
           });
         } else if (user.user_metadata && user.user_metadata.company_name) {
           setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
@@ -1404,11 +1405,12 @@ function SettingsPage({ user }) {
     // upsert, then read back to confirm it actually persisted
     const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
     if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
-    const { data: check, error: readErr } = await db.from("prop_settings").select("company_name,vat_number").eq("user_id", user.id).maybeSingle();
+    const { data: check, error: readErr } = await db.from("prop_settings").select("company_name,vat_number").eq("user_id", user.id);
     setSaving(false);
     if (readErr) { setErr("Saved, but couldn't confirm: " + readErr.message); return; }
-    if (!check) { setErr("Save didn't persist — this usually means the prop_settings table or its security policy is missing. Re-run the settings SQL in Supabase."); return; }
-    setOrg({ company_name: check.company_name || "", vat_number: check.vat_number || "" });
+    const row = check && check.length ? check[0] : null;
+    if (!row) { setErr("Save didn't persist — this usually means the prop_settings table or its security policy is missing. Re-run the settings SQL in Supabase."); return; }
+    setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "" });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
