@@ -7,7 +7,7 @@
 const { useState } = React
 
 // Emails listed here go to the admin dashboard instead of the normal one.
-const ADMIN_EMAILS = ['admin@alzaro.co.uk']
+const ADMIN_EMAILS = ['mohammmed250052@gmail.com']
 
 function Login() {
   const [tab, setTab] = useState(window.__START_TAB === 'register' ? 'register' : 'login')
@@ -43,7 +43,7 @@ function Login() {
         await window.sb.auth.signOut()
         throw new Error('No SoloOps account found for this email. Please use the Register tab to create one.')
       }
-      goTo('/soloops/dashboard')
+      goTo(isAdmin ? '/soloops/admin' : '/soloops/dashboard')
     } catch (err) {
       const msg = err.message || 'Login failed'
       // Keep Supabase's deliberate ambiguity (don't reveal if an email exists),
