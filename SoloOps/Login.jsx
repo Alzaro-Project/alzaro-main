@@ -1,8 +1,19 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { useStore } from '../store/useStore'
-import { checkIsAdmin } from '../lib/db'
+import { createClient } from '@supabase/supabase-js'
+
+// ============================================================
+//  SUPABASE CONNECTION
+//  Paste your project's values below (Supabase dashboard →
+//  Project Settings → API). Nothing else needs configuring.
+// ============================================================
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co'
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY'
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+// Optional: emails listed here go to the admin dashboard instead
+// of the normal one. Leave as-is if you don't need it.
+const ADMIN_EMAILS = ['admin@alzaro.co.uk']
 
 export default function Login() {
   const [tab, setTab] = useState('login')
@@ -13,8 +24,10 @@ export default function Login() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const { login } = useStore()
-  const navigate = useNavigate()
+
+  // Where to send the user after a successful login.
+  // Plain redirects, so this works with or without react-router.
+  const goTo = (path) => { window.location.href = path }
 
   const inp = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
@@ -29,18 +42,8 @@ export default function Login() {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) throw err
 
-      // Check if user is admin
-      const isAdmin = await checkIsAdmin(email)
-
-      if (isAdmin) {
-        // Admin login
-        login(email, true)
-        navigate('/admin')
-      } else {
-        // Regular sole trader login
-        login(email, false)
-        navigate('/dashboard')
-      }
+      const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase())
+      goTo(isAdmin ? '/soloops/admin' : '/soloops/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -77,10 +80,9 @@ export default function Login() {
     if (!email) return setError('Please enter your email address')
     setLoading(true); setError(''); setSuccess('')
     try {
-      // Use the actual deployed URL, not localhost
       const siteUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:5173'  // Dev
-        : `${window.location.protocol}//${window.location.host}` // Production (e.g., alzaro-main.vercel.app)
+        ? 'http://localhost:5173'
+        : `${window.location.protocol}//${window.location.host}`
 
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${siteUrl}/soloops/reset-password`,
@@ -101,22 +103,12 @@ export default function Login() {
         </div>
         <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '24px' }}>Business Operations for Sole Traders</div>
 
-        {/* Forgot Password View */}
         {showForgotPassword ? (
           <>
             <div style={{ marginBottom: '20px' }}>
               <button
                 onClick={() => { setShowForgotPassword(false); setError(''); setSuccess('') }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text2)',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
+                style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 ← Back to login
               </button>
@@ -156,17 +148,7 @@ export default function Login() {
               <button
                 onClick={doForgotPassword}
                 disabled={loading}
-                style={{
-                  background: 'linear-gradient(135deg, var(--orange), var(--amber))',
-                  color: '#000',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  padding: '13px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  opacity: loading ? .7 : 1
-                }}
+                style={{ background: 'linear-gradient(135deg, var(--orange), var(--amber))', color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}
               >
                 {loading ? 'Sending...' : 'Send Reset Link'}
               </button>
@@ -174,7 +156,6 @@ export default function Login() {
           </>
         ) : (
           <>
-            {/* Login/Register Tabs */}
             <div style={{ display: 'flex', gap: '6px', background: 'var(--surface2)', borderRadius: '8px', padding: '4px', marginBottom: '20px' }}>
               {['login', 'register'].map(t => (
                 <div key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }} style={{
@@ -209,15 +190,7 @@ export default function Login() {
                 </button>
                 <button
                   onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text2)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    textAlign: 'center'
-                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px', textAlign: 'center' }}
                 >
                   Forgot password?
                 </button>
