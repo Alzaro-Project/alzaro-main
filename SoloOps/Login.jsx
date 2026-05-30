@@ -43,7 +43,7 @@ function Login() {
         await window.sb.auth.signOut()
         throw new Error('No SoloOps account found for this email. Please use the Register tab to create one.')
       }
-      goTo('dashboard.html')
+      goTo('/soloops/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -77,7 +77,7 @@ function Login() {
         ? 'http://localhost:5173'
         : `${window.location.protocol}//${window.location.host}`
       const { error: err } = await window.sb.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/soloops/reset-password`,
+        redirectTo: `${siteUrl}/soloops/login`,
       })
       if (err) throw err
       setSuccess('Password reset link sent! Check your email inbox (and spam folder).')
