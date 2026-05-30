@@ -1,216 +1,81 @@
 {
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build",
+  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
-    {
-      "source": "/TyreOps",
-      "destination": "/tyreops",
-      "permanent": true
-    },
+    { "source": "/TyreOps", "destination": "/tyreops", "permanent": true },
     {
       "source": "/TyreOps/:path((?!dist).*)",
       "destination": "/tyreops/:path",
       "permanent": true
     },
-    {
-      "source": "/GarageOps",
-      "destination": "/garageops",
-      "permanent": true
-    },
+    { "source": "/GarageOps", "destination": "/garageops", "permanent": true },
     {
       "source": "/GarageOps/:path((?!dist).*)",
       "destination": "/garageops/:path",
       "permanent": true
+    },
+    { "source": "/ServiceOps", "destination": "/serviceops", "permanent": true },
+    {
+      "source": "/ServiceOps/:path((?!dist).*)",
+      "destination": "/serviceops/:path",
+      "permanent": true
     }
   ],
   "rewrites": [
-    {
-      "source": "/confirmed",
-      "destination": "/confirmed.html"
-    },
-    {
-      "source": "/tyreops",
-      "destination": "/TyreOps/landing.html"
-    },
-    {
-      "source": "/tyreops/login",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/register",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/forgot-password",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/reset-password",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/dashboard",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/invoices",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/inventory",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/customers",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/purchases",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/reports",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/vat",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/settings",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/admin",
-      "destination": "/TyreOps/dist/index.html"
-    },
-    {
-      "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin).+\\..+)",
-      "destination": "/TyreOps/dist/:file"
-    },
-    {
-      "source": "/garageops",
-      "destination": "/GarageOps/landing.html"
-    },
-    {
-      "source": "/garageops/login",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/register",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/forgot-password",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/reset-password",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/dashboard",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/customers",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/invoices",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/reports",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/settings",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/admin",
-      "destination": "/GarageOps/dist/index.html"
-    },
-    {
-      "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)",
-      "destination": "/GarageOps/dist/:file"
-    },
-    {
-      "source": "/serviceops/login",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/register",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/:file((?!login|register).+\\..+)",
-      "destination": "/ServiceOps/:file"
-    },
-    {
-      "source": "/serviceops",
-      "destination": "/ServiceOps/index.html"
-    },
-    {
-      "source": "/ServiceOps",
-      "destination": "/ServiceOps/index.html"
-    },
-    {
-      "source": "/soloops/login",
-      "destination": "/SoloOps/login.html"
-    },
-    {
-      "source": "/soloops/register",
-      "destination": "/SoloOps/register.html"
-    },
-    {
-      "source": "/soloops/dashboard",
-      "destination": "/SoloOps/dashboard.html"
-    },
-    {
-      "source": "/soloops/reset-password",
-      "destination": "/SoloOps/reset-password.html"
-    },
-    {
-      "source": "/soloops/:file((?!login|register|dashboard|reset-password).+\\..+)",
-      "destination": "/SoloOps/:file"
-    },
-    {
-      "source": "/soloops",
-      "destination": "/SoloOps/index.html"
-    },
-    {
-      "source": "/SoloOps",
-      "destination": "/SoloOps/index.html"
-    },
-    {
-      "source": "/propertyops/login",
-      "destination": "/PropertyOps/app.html"
-    },
-    {
-      "source": "/propertyops/register",
-      "destination": "/PropertyOps/app.html"
-    },
-    {
-      "source": "/propertyops/:file((?!login|register).+\\..+)",
-      "destination": "/PropertyOps/:file"
-    },
-    {
-      "source": "/propertyops",
-      "destination": "/PropertyOps/index.html"
-    },
-    {
-      "source": "/PropertyOps",
-      "destination": "/PropertyOps/index.html"
-    },
-    {
-      "source": "/stockops",
-      "destination": "/StockOps/index.html"
-    },
-    {
-      "source": "/StockOps",
-      "destination": "/StockOps/index.html"
-    }
+    { "source": "/confirmed", "destination": "/confirmed.html" },
+    { "source": "/tyreops", "destination": "/TyreOps/landing.html" },
+    { "source": "/tyreops/login", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/register", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/forgot-password", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/reset-password", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/dashboard", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/invoices", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/inventory", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/customers", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/purchases", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/reports", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/vat", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/settings", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/admin", "destination": "/TyreOps/dist/index.html" },
+    { "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin).+\\..+)", "destination": "/TyreOps/dist/:file" },
+    { "source": "/garageops", "destination": "/GarageOps/landing.html" },
+    { "source": "/garageops/login", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/register", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/forgot-password", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/reset-password", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/dashboard", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/customers", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/invoices", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/reports", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/settings", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/admin", "destination": "/GarageOps/dist/index.html" },
+    { "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)", "destination": "/GarageOps/dist/:file" },
+    { "source": "/serviceops", "destination": "/ServiceOps/index.html" },
+    { "source": "/serviceops/login", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/register", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/forgot-password", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/reset-password", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/dashboard", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/jobs", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/quotes", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/invoices", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/customers", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/schedule", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/settings", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/admin", "destination": "/ServiceOps/dist/index.html" },
+    { "source": "/serviceops/:file((?!login|register|forgot-password|reset-password|dashboard|jobs|quotes|invoices|customers|schedule|settings|admin).+\\..+)", "destination": "/ServiceOps/dist/:file" },
+    { "source": "/soloops/login", "destination": "/SoloOps/login.html" },
+    { "source": "/soloops/register", "destination": "/SoloOps/register.html" },
+    { "source": "/soloops/dashboard", "destination": "/SoloOps/dashboard.html" },
+    { "source": "/soloops/:file((?!login|register|dashboard).+\\..+)", "destination": "/SoloOps/:file" },
+    { "source": "/soloops", "destination": "/SoloOps/index.html" },
+    { "source": "/SoloOps", "destination": "/SoloOps/index.html" },
+    { "source": "/propertyops/login", "destination": "/PropertyOps/app.html" },
+    { "source": "/propertyops/register", "destination": "/PropertyOps/app.html" },
+    { "source": "/propertyops/:file((?!login|register).+\\..+)", "destination": "/PropertyOps/:file" },
+    { "source": "/propertyops", "destination": "/PropertyOps/index.html" },
+    { "source": "/PropertyOps", "destination": "/PropertyOps/index.html" },
+    { "source": "/stockops", "destination": "/StockOps/index.html" },
+    { "source": "/StockOps", "destination": "/StockOps/index.html" }
   ]
 }
