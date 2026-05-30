@@ -1,0 +1,98 @@
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useStore, TIER_ORDER } from '../store/useStore'
+import { PRODUCT, TIER_META } from '../config/product'
+import { NAV } from '../config/nav'
+
+const TIER_CLASSES = {
+  starter:  { bg: 'rgba(100,116,139,0.12)', color: '#64748b', border: 'rgba(100,116,139,0.25)' },
+  pro:      { bg: 'rgba(16,185,129,0.1)',   color: '#10b981', border: 'rgba(16,185,129,0.25)' },
+  business: { bg: 'rgba(13,148,136,0.12)',  color: '#0d9488', border: 'rgba(13,148,136,0.25)' },
+  admin:    { bg: 'rgba(124,58,237,0.1)',   color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },
+}
+
+const getTheme = () => localStorage.getItem('alzaro-theme') || 'light'
+const applyTheme = (t) => { document.documentElement.setAttribute('data-theme', t); localStorage.setItem('alzaro-theme', t) }
+
+export default function Sidebar({ onNavigate, isMobile }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user, tier, isAdmin, logout, settings } = useStore()
+
+  const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.starter
+  const isDark = getTheme() === 'dark'
+
+  const toggleTheme = () => { applyTheme(isDark ? 'light' : 'dark'); window.dispatchEvent(new Event('storage')) }
+
+  const handleNav = (item) => {
+    const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
+    if (locked) { alert('Upgrade your plan to access this feature.'); return }
+    navigate(item.path)
+    if (onNavigate) onNavigate()
+  }
+
+  return (
+    <div style={{ width: '230px', background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 56px)' : '100vh' }}>
+      {!isMobile && (
+        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700 }}>
+            Alzaro<span style={{ color: 'var(--accent)' }}>{PRODUCT.name.replace('Alzaro', '')}</span>
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>{PRODUCT.tagline}</div>
+        </div>
+      )}
+
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+          {settings?.name || user?.name || `Your ${PRODUCT.tenantNoun}`}
+        </div>
+        {!isAdmin && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, fontFamily: 'DM Mono, monospace', background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: 'uppercase' }}>
+            {TIER_META[tier]?.icon} {tier}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
+        {isAdmin ? (
+          <>
+            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text3)', padding: '10px 16px 5px', textTransform: 'uppercase' }}>Platform</div>
+            <NavItem icon="👑" label="Licence Manager" active={location.pathname === '/admin'} onClick={() => { navigate('/admin'); onNavigate?.() }} />
+          </>
+        ) : (
+          NAV.map(item => {
+            const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
+            return <NavItem key={item.path} icon={item.icon} label={item.label} locked={locked} active={location.pathname === item.path} onClick={() => handleNav(item)} />
+          })
+        )}
+      </div>
+
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+        <button onClick={toggleTheme} style={btnStyle}>{isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
+        <button onClick={logout} style={{ ...btnStyle, marginBottom: 0 }}>🚪 Sign Out</button>
+      </div>
+    </div>
+  )
+}
+
+const btnStyle = {
+  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+  background: 'none', color: 'var(--text2)', fontSize: '12px', padding: '8px 12px',
+  borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer', marginBottom: '6px',
+}
+
+function NavItem({ icon, label, active, locked, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', margin: '2px 8px',
+      borderRadius: '8px', fontSize: '13px', fontWeight: active ? 600 : 500, cursor: 'pointer',
+      transition: 'all .12s', color: active ? 'var(--text)' : 'var(--text2)', background: active ? 'var(--surface3)' : 'transparent',
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--surface2)' }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+      <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {locked && <span style={{ fontSize: '10px', opacity: .5 }}>🔒</span>}
+    </div>
+  )
+}
