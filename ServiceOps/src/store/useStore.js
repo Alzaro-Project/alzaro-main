@@ -24,20 +24,31 @@ export const useStore = create((set, get) => ({
   init: async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
-      await get().hydrateUser(session.user)
+      const res = await get().hydrateUser(session.user)
+      // Valid session but no account for THIS product → sign out silently.
+      if (!res.ok) {
+        await supabase.auth.signOut()
+        set({ user: null, isAdmin: false, tenantId: null, status: null, settings: {} })
+      }
     }
     set({ ready: true })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        get().hydrateUser(session.user)
+        const res = await get().hydrateUser(session.user)
+        if (!res.ok) {
+          await supabase.auth.signOut()
+          set({ user: null, isAdmin: false, tenantId: null, status: null, settings: {} })
+        }
       } else {
         set({ user: null, isAdmin: false, tenantId: null, status: null, settings: {} })
       }
     })
   },
 
-  /* Pull tenant + admin info for a logged-in auth user. */
+  /* Pull tenant + admin info for a logged-in auth user.
+     Returns { ok, isAdmin }. ok=false means this user has no account
+     for THIS product (even if their email/password is valid elsewhere). */
   hydrateUser: async (authUser) => {
     const email = authUser.email
     const isAdmin = await checkIsAdmin(email)
@@ -48,28 +59,35 @@ export const useStore = create((set, get) => ({
         isAdmin: true,
         tenantId: null,
       })
-      return
+      return { ok: true, isAdmin: true }
     }
 
     const tenant = await getTenantByUserId(authUser.id)
+
+    // No tenant row for this product → user does not belong here.
+    if (!tenant) {
+      return { ok: false, isAdmin: false }
+    }
+
     set({
-      user: { id: authUser.id, email, name: tenant?.name || email },
+      user: { id: authUser.id, email, name: tenant.name || email },
       isAdmin: false,
-      tenantId: tenant?.id || null,
-      tier: tenant?.tier || TIER_ORDER[0],
-      status: tenant?.status || 'trial',
+      tenantId: tenant.id,
+      tier: tenant.tier || TIER_ORDER[0],
+      status: tenant.status || 'trial',
       settings: {
-        name: tenant?.name || '',
-        addr: tenant?.address || '',
-        phone: tenant?.phone || '',
+        name: tenant.name || '',
+        addr: tenant.address || '',
+        phone: tenant.phone || '',
         email,
       },
     })
+    return { ok: true, isAdmin: false }
   },
 
   /* Called by Login after a successful supabase sign-in. */
   login: async (authUser) => {
-    await get().hydrateUser(authUser)
+    return await get().hydrateUser(authUser)
   },
 
   logout: async () => {
