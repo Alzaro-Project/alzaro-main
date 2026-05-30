@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin } from '../lib/db'
 import { PRODUCT } from '../config/product'
 
 export default function Login() {
@@ -35,9 +34,18 @@ export default function Login() {
     try {
       const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) throw err
-      await login(data.user)
-      const isAdmin = await checkIsAdmin(email)
-      navigate(isAdmin ? '/admin' : '/dashboard')
+
+      const res = await login(data.user)
+
+      // Valid credentials, but no account for THIS product.
+      if (!res.ok) {
+        await supabase.auth.signOut()
+        setLoading(false)
+        setError(`No ${PRODUCT.name} account found for this email. Please register for ${PRODUCT.name} first.`)
+        return
+      }
+
+      navigate(res.isAdmin ? '/admin' : '/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
