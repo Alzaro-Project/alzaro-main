@@ -58,7 +58,7 @@ function App() {
   useEffect(() => { if (session) loadAll() }, [session])
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
-  const signOut = async () => { await window.sb.auth.signOut(); window.location.href = 'app.html' }
+  const signOut = async () => { await window.sb.auth.signOut(); window.location.href = 'login.html' }
 
   // ---- derived totals ----
   const revenue = invoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
@@ -77,7 +77,7 @@ function App() {
 
   if (session === null) {
     // not logged in → bounce to login
-    window.location.href = 'app.html'
+    window.location.href = 'login.html'
     return null
   }
 
