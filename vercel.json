@@ -63,7 +63,7 @@
     { "source": "/serviceops/schedule", "destination": "/ServiceOps/dist/index.html" },
     { "source": "/serviceops/settings", "destination": "/ServiceOps/dist/index.html" },
     { "source": "/serviceops/admin", "destination": "/ServiceOps/dist/index.html" },
-    { "source": "/serviceops/:file((?!login|register|forgot-password|reset-password|dashboard|jobs|quotes|invoices|customers|schedule|settings|admin).+\\..+)", "destination": "/ServiceOps/dist/:file" },
+    { "source": "/serviceops/dist/:path*", "destination": "/ServiceOps/dist/:path*" },
     { "source": "/soloops/login", "destination": "/SoloOps/login.html" },
     { "source": "/soloops/register", "destination": "/SoloOps/register.html" },
     { "source": "/soloops/dashboard", "destination": "/SoloOps/dashboard.html" },
