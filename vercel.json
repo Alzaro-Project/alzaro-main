@@ -50,7 +50,7 @@
     { "source": "/garageops/settings", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/admin", "destination": "/GarageOps/dist/index.html" },
     { "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)", "destination": "/GarageOps/dist/:file" },
-    { "source": "/serviceops", "destination": "/ServiceOps/index.html" },
+    { "source": "/serviceops", "destination": "/ServiceOps/landing.html" },
     { "source": "/serviceops/login", "destination": "/ServiceOps/dist/index.html" },
     { "source": "/serviceops/register", "destination": "/ServiceOps/dist/index.html" },
     { "source": "/serviceops/forgot-password", "destination": "/ServiceOps/dist/index.html" },
