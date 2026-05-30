@@ -1,5 +1,5 @@
 // ============================================================
-//  Alzaro SoloOps — Login / Register
+//  Alzaro SoloOps — Login / Registers
 //  Loaded by app.html via <script type="text/babel">.
 //  Uses CDN globals (React, ReactDOM) + window.sb from supabase.js
 //  — no import statements (browser Babel can't resolve modules).
