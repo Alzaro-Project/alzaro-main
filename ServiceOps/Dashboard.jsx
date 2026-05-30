@@ -175,6 +175,30 @@ const errBanner = { fontSize: 11.5, color: "var(--red)", background: "var(--red-
 const emptyCard = { color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" };
 const rowActions = (DB, onEdit, onDel) => DB ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={onEdit} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={onDel} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null;
 
+/* Shared confirm dialog. useConfirm() returns [confirmNode, ask].
+   ask(message, onConfirm) opens the dialog; on confirm it runs onConfirm. */
+function useConfirm() {
+  const [state, setState] = useState(null); // { message, onConfirm }
+  const ask = (message, onConfirm) => setState({ message, onConfirm });
+  const node = state ? (
+    <div onClick={() => setState(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 90, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 22, width: 420, maxWidth: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", gap: 11, alignItems: "flex-start", marginBottom: 16 }}>
+          <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--red-soft)", color: "var(--red)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className="ti ti-alert-triangle" style={{ fontSize: 18 }} /></span>
+          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--txt)" }}>{state.message}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <span onClick={() => setState(null)}><Btn icon="ti-x" label="Cancel" /></span>
+          <span onClick={() => { const f = state.onConfirm; setState(null); f && f(); }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer", background: "var(--red)", color: "#fff", border: "0.5px solid var(--red)" }}><i className="ti ti-trash" style={{ fontSize: 15 }} />Delete</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  ) : null;
+  return [node, ask];
+}
+
 /* Shared: load the customer list once, for dropdowns across pages */
 function useCustomers() {
   const [customers, setCustomers] = useState([]);
@@ -389,6 +413,7 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [confirmNode, ask] = useConfirm();
   const blank = { name: "", area: "", contact: "", email: "", type: "Homeowner", site: "", postcode: "", prop_type: "House" };
   const [form, setForm] = useState(blank);
 
@@ -430,7 +455,18 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
     }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
-  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_customers").delete().eq("id", id); refresh(); } };
+  const askDelete = (c) => {
+    if (!c.id || !DB_READY) return;
+    db.from("svc_properties").select("id").eq("customer_id", c.id).then(({ data }) => {
+      const n = (data || []).length;
+      const msg = <span>Delete customer <strong>{c.name}</strong>?{n > 0 ? <> This will also delete their <strong>{n} propert{n === 1 ? "y" : "ies"}</strong>.</> : ""} Their quotes, jobs and invoices will remain but won't be linked to a customer. This can't be undone.</span>;
+      ask(msg, async () => {
+        await db.from("svc_properties").delete().eq("customer_id", c.id);
+        await db.from("svc_customers").delete().eq("id", c.id);
+        refresh();
+      });
+    });
+  };
 
   const list = (rows || []).filter((c) => ((c.name || "") + (c.area || "") + (c.site || "") + (c.type || "")).toLowerCase().includes(q.toLowerCase()));
 
@@ -486,12 +522,13 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
               <Td color="var(--txt-2)">{c.site || "—"}</Td>
               <Td color="var(--txt-2)">{c.jobs != null ? c.jobs : "—"}</Td>
               <Td>{c.spend != null ? gbp(c.spend) : "—"}</Td>
-              <Td>{c.id && rowActions(DB_READY, () => openEdit(c), () => remove(c.id))}</Td>
+              <Td>{c.id && rowActions(DB_READY, () => openEdit(c), () => askDelete(c))}</Td>
             </tr>
           ))}
         </Table>
       )}
       {detail && <CustomerDetail customer={detail} onClose={() => setDetail(null)} go={go} />}
+      {confirmNode}
     </div>
   );
 }
@@ -564,6 +601,7 @@ function CustomerDetail({ customer, onClose, go }) {
 /* ================================================================== */
 function PropertiesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
+  const [confirmNode, ask] = useConfirm();
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
@@ -594,7 +632,26 @@ function PropertiesPage({ user }) {
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
-  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_properties").delete().eq("id", id); refresh(); } };
+  const askDelete = (p) => {
+    if (!p.id || !DB_READY) return;
+    const finishProp = async () => { await db.from("svc_properties").delete().eq("id", p.id); refresh(); };
+    if (!p.customer_id) {
+      ask(<span>Delete property <strong>{p.address}</strong>? This can't be undone.</span>, finishProp);
+      return;
+    }
+    db.from("svc_properties").select("id").eq("customer_id", p.customer_id).then(({ data }) => {
+      const others = (data || []).filter((x) => String(x.id) !== String(p.id)).length;
+      if (others > 0) {
+        ask(<span>Delete property <strong>{p.address}</strong>? <strong>{p.customer}</strong> has {others} other propert{others === 1 ? "y" : "ies"}, which will be kept. This can't be undone.</span>, finishProp);
+      } else {
+        ask(<span>This is <strong>{p.customer}</strong>'s only property. Delete the property <strong>and the customer</strong>? Their quotes, jobs and invoices will remain but won't be linked to a customer. This can't be undone.</span>, async () => {
+          await db.from("svc_properties").delete().eq("id", p.id);
+          await db.from("svc_customers").delete().eq("id", p.customer_id);
+          refresh();
+        });
+      }
+    });
+  };
 
   const data = rows || [];
   const list = data.filter((p) => ((p.address || "") + (p.postcode || "") + (p.customer || "") + (p.prop_type || "")).toLowerCase().includes(q.toLowerCase()));
@@ -636,11 +693,12 @@ function PropertiesPage({ user }) {
               <Td color="var(--txt-2)">{p.postcode || "—"}</Td>
               <Td><Pill text={p.prop_type || "—"} tone={p.prop_type === "Commercial" || p.prop_type === "HMO" ? "blue" : "green"} /></Td>
               <Td color="var(--txt-2)">{p.customer || "—"}</Td>
-              <Td>{p.id && rowActions(DB_READY, () => openEdit(p), () => remove(p.id))}</Td>
+              <Td>{p.id && rowActions(DB_READY, () => openEdit(p), () => askDelete(p))}</Td>
             </tr>
           ))}
         </Table>
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -679,6 +737,8 @@ function QuotesPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_quotes").delete().eq("id", id); refresh(); } };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (q) => ask(<span>Delete quote <strong>{q.ref || "(no ref)"}</strong> for <strong>{q.customer || "—"}</strong>? This can't be undone.</span>, () => remove(q.id));
 
   const data = rows || [];
   const open = data.filter((q) => q.status === "Sent" || q.status === "Draft");
@@ -726,11 +786,12 @@ function QuotesPage({ user }) {
               <Td>{gbp(q.amount || 0)}</Td>
               <Td color="var(--txt-2)">{q.quote_date || "—"}</Td>
               <Td><Pill text={q.status || "Draft"} tone={toneFor[q.status] || "amber"} /></Td>
-              <Td>{q.id && rowActions(DB_READY, () => openEdit(q), () => remove(q.id))}</Td>
+              <Td>{q.id && rowActions(DB_READY, () => openEdit(q), () => askDelete(q))}</Td>
             </tr>
           ))}
         </Table>
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -772,6 +833,8 @@ function JobsPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_jobs").delete().eq("id", id); refresh(); } };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (j) => ask(<span>Delete job <strong>{j.title}</strong>{j.customer ? <> for <strong>{j.customer}</strong></> : ""}? This can't be undone.</span>, () => remove(j.id));
   const move = async (j, dir) => {
     const idx = stages.indexOf(j.status); const next = stages[idx + dir];
     if (!next || !j.id || !DB_READY) return;
@@ -834,7 +897,7 @@ function JobsPage({ user }) {
                           </div>
                           <div style={{ display: "flex", gap: 10 }}>
                             <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
-                            <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                            <i className="ti ti-trash" onClick={() => askDelete(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
                           </div>
                         </div>
                       )}
@@ -847,6 +910,7 @@ function JobsPage({ user }) {
           })}
         </div>
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -888,6 +952,8 @@ function DiaryPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_bookings").delete().eq("id", id); refresh(); } };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (b) => ask(<span>Delete booking <strong>{b.title}</strong>{b.booking_date ? <> on <strong>{b.booking_date}</strong></> : ""}? This can't be undone.</span>, () => remove(b.id));
 
   const data = rows || [];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
@@ -939,7 +1005,7 @@ function DiaryPage({ user }) {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <span style={{ fontSize: 11, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><i className="ti ti-user-cog" style={{ fontSize: 13 }} />{b.engineer || "Unassigned"}</span>
-                      {rowActions(DB_READY, () => openEdit(b), () => remove(b.id))}
+                      {rowActions(DB_READY, () => openEdit(b), () => askDelete(b))}
                     </div>
                   </div>
                 );
@@ -948,6 +1014,7 @@ function DiaryPage({ user }) {
           </div>
         ))
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -988,6 +1055,8 @@ function InvoicingPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_invoices").delete().eq("id", id); refresh(); } };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (v) => ask(<span>Delete invoice <strong>{v.ref || "(no ref)"}</strong> for <strong>{v.customer || "—"}</strong> ({gbp(+v.amount || 0)})? This can't be undone.</span>, () => remove(v.id));
 
   const data = rows || [];
   const collected = data.filter((v) => v.status === "Paid").reduce((s, v) => s + (v.amount || 0), 0);
@@ -1035,11 +1104,12 @@ function InvoicingPage({ user }) {
               <Td>{gbp(v.amount || 0)}</Td>
               <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
               <Td><Pill text={v.status} tone={v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : v.status === "Sent" ? "blue" : "amber"} /></Td>
-              <Td>{v.id && rowActions(DB_READY, () => openEdit(v), () => remove(v.id))}</Td>
+              <Td>{v.id && rowActions(DB_READY, () => openEdit(v), () => askDelete(v))}</Td>
             </tr>
           ))}
         </Table>
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -1081,6 +1151,8 @@ function CertificatesPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_certificates").delete().eq("id", id); refresh(); } };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (c) => ask(<span>Delete <strong>{c.cert_type}</strong>{c.customer || c.site ? <> for <strong>{c.customer || c.site}</strong></> : ""}? This can't be undone.</span>, () => remove(c.id));
 
   const iconForType = (ty) => /gas|cp12|boiler/i.test(ty) ? "ti-flame" : /eicr|eic|pat|electric/i.test(ty) ? "ti-bolt" : /completion/i.test(ty) ? "ti-circle-check" : "ti-shield-check";
   const daysLeft = (iso) => Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
@@ -1134,13 +1206,14 @@ function CertificatesPage({ user }) {
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days < 0 ? `expired ${-c.days}d ago` : `in ${c.days} days`}</span>
                 <Pill text={status} tone={tone} />
-                {rowActions(DB_READY, () => openEdit(c), () => remove(c.id))}
+                {rowActions(DB_READY, () => openEdit(c), () => askDelete(c))}
               </div>
             </div>
           );
         })}
       </div>
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -1243,6 +1316,8 @@ function DocumentsPage({ user }) {
     await db.from("svc_documents").delete().eq("id", d.id);
     load();
   };
+  const [confirmNode, ask] = useConfirm();
+  const askDelete = (d) => ask(<span>Delete document <strong>{d.name}</strong>? The file will be permanently removed from storage. This can't be undone.</span>, () => remove(d));
 
   const pickFile = (onPick) => {
     const inp = document.createElement("input");
@@ -1295,7 +1370,7 @@ function DocumentsPage({ user }) {
                 <div style={{ display: "flex", gap: 8, borderTop: "0.5px solid var(--line)", paddingTop: 10 }}>
                   <span onClick={() => openView(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--brand)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-eye" style={{ fontSize: 15 }} />View</span>
                   <span onClick={() => !busy && pickFile((f) => doUpload(f, d.cat, null, d))} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--txt-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-replace" style={{ fontSize: 15 }} />Replace</span>
-                  <span onClick={() => remove(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--red)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-trash" style={{ fontSize: 15 }} />Delete</span>
+                  <span onClick={() => askDelete(d)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--red)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><i className="ti ti-trash" style={{ fontSize: 15 }} />Delete</span>
                 </div>
               </div>
             );
@@ -1303,6 +1378,7 @@ function DocumentsPage({ user }) {
         </div>
       )}
       {viewer && <DocViewer doc={viewer.doc} url={viewer.url} onClose={() => setViewer(null)} />}
+      {confirmNode}
     </div>
   );
 }
