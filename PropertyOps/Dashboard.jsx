@@ -247,7 +247,7 @@ function DashboardPage({ range, go, user }) {
           ) : expiringSoon.map((c, i) => {
             const t = toneVar(certTone(c.days));
             return (
-              <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+              <div key={c.id || i} onClick={() => go("compliance")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                   <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${toneFor[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
                   <div><div style={{ fontSize: 12.5 }}>{c.type}{c.property ? " · " + c.property : ""}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.reference || "—"}</div></div>
@@ -258,19 +258,27 @@ function DashboardPage({ range, go, user }) {
           })}
         </Panel>
         <Panel title="Portfolio Summary">
-          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Properties</span><span style={{ fontWeight: 600 }}>{totalProps}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Let / Vacant</span><span style={{ fontWeight: 600 }}>{letProps} / {totalProps - letProps}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Certificates tracked</span><span style={{ fontWeight: 600 }}>{certs.length}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Open maintenance</span><span style={{ fontWeight: 600 }}>{openMaint}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--txt-2)" }}>Payments logged</span><span style={{ fontWeight: 600 }}>{pays.length}</span></div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {[
+              { label: "Properties", val: totalProps, page: "properties" },
+              { label: "Let / Vacant", val: `${letProps} / ${totalProps - letProps}`, page: "properties" },
+              { label: "Certificates tracked", val: certs.length, page: "compliance" },
+              { label: "Open maintenance", val: openMaint, page: "maintenance" },
+              { label: "Payments logged", val: pays.length, page: "finance" },
+            ].map((r, i) => (
+              <div key={i} onClick={() => go(r.page)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "8px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel-2)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                <span style={{ color: "var(--txt-2)" }}>{r.label}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ fontWeight: 600 }}>{r.val}</span><i className="ti ti-chevron-right" style={{ fontSize: 13, color: "var(--txt-3)" }} /></span>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-        <Metric label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
-        <Metric label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
-        <Metric label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} color="var(--txt)" subColor={score >= 90 ? "var(--green)" : "var(--amber)"} />
+        <span style={{ cursor: "pointer" }} onClick={() => go("maintenance")}><Metric label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" /></span>
+        <span style={{ cursor: "pointer" }} onClick={() => go("compliance")}><Metric label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" /></span>
+        <span style={{ cursor: "pointer" }} onClick={() => go("properties")}><Metric label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} color="var(--txt)" subColor={score >= 90 ? "var(--green)" : "var(--amber)"} /></span>
       </div>
     </div>
   );
@@ -593,7 +601,7 @@ function TenantsPage({ user, go }) {
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
   const properties = usePropertyList();
-  const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_start: "", tenancy_end: "", rent_status: "Up to date", rtr_status: "Pending" };
+  const blank = { name: "", property_id: "", email: "", phone: "", rent: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -611,13 +619,13 @@ function TenantsPage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
+  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", rent: t.rent || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     if (!payload.tenancy_end) delete payload.tenancy_end;
     if (!payload.tenancy_start) delete payload.tenancy_start;
     let error;
@@ -656,6 +664,15 @@ function TenantsPage({ user, go }) {
             <label style={fld}>Tenancy end date<input style={inp} type="date" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} /></label>
             <label style={fld}>Rent status<select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Right to Rent<select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Deposit received (£)<input style={inp} type="number" placeholder="e.g. 1500" value={form.deposit_amount} onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })} /></label>
+            <label style={{ ...fld, justifyContent: "flex-end" }}>Protected under DPS
+              <div onClick={() => setForm({ ...form, deposit_protected: !form.deposit_protected })} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ width: 38, height: 22, borderRadius: 11, background: form.deposit_protected ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0 }}>
+                  <span style={{ position: "absolute", top: 2, left: form.deposit_protected ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                </span>
+                <span style={{ fontSize: 12, color: "var(--txt)" }}>{form.deposit_protected ? "Protected" : "Not protected"}</span>
+              </div>
+            </label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update tenant" : "Save tenant"} primary /></span></div>
         </div>
@@ -702,6 +719,7 @@ function TenantsPage({ user, go }) {
                           <DetailRow main={t.email || "No email"} sub="Email" />
                           <DetailRow main={t.phone || "No phone"} sub="Phone" />
                           <DetailRow main={propName} sub="Property" pill={t.rent ? gbp(t.rent) + " pcm" : ""} tone="blue" />
+                          {(t.deposit_amount || t.deposit_protected) && <DetailRow main={t.deposit_amount ? gbp(t.deposit_amount) : "—"} sub="Deposit" pill={t.deposit_protected ? "DPS protected" : "Not protected"} tone={t.deposit_protected ? "green" : "amber"} />}
                         </DetailBox>
                         <DetailBox title="Payments" icon="ti-coin" empty={tPays.length === 0} emptyText="No payments linked." onClick={() => go && go("finance")}>
                           {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
@@ -877,7 +895,7 @@ function FinancePage({ user, go }) {
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [] });
   const properties = usePropertyList();
-  const blank = { tenant: "", property_id: "", amount: "", due_date: "", status: "Paid" };
+  const blank = { tenant: "", property_id: "", amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -895,14 +913,16 @@ function FinancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", status: p.status || "Paid" }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status: p.status || "Pending" }); setEditId(p.id); setAdding(true); setErr(""); };
 
   const save = async () => {
-    if (!form.tenant.trim()) { setErr("Tenant name is required."); return; }
+    if (!form.tenant.trim()) { setErr("Tenant is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    const invoiceNo = form.invoice_no || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
     if (!payload.due_date) delete payload.due_date;
+    if (!payload.billing_date) delete payload.billing_date;
     let error;
     if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_payments").insert([{ ...payload, user_id: user.id }]));
@@ -910,12 +930,15 @@ function FinancePage({ user, go }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
+  const markReceived = async (p) => { if (p.id && DB_READY) { await db.from("prop_payments").update({ status: "Paid" }).eq("id", p.id); refresh(); } };
+
   const remove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
 
   const data = rows || [];
   const collected = data.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
   const overdue = data.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const expected = collected + overdue;
+  const pending = data.filter((p) => p.status === "Pending").reduce((s, p) => s + (p.amount || 0), 0);
+  const expected = collected + overdue + pending;
   const rate = expected ? Math.round((collected / expected) * 100) : 0;
   const paidCount = data.filter((p) => p.status === "Paid").length;
   const overdueCount = data.filter((p) => p.status === "Overdue").length;
@@ -942,12 +965,14 @@ function FinancePage({ user, go }) {
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <label style={fld}>Tenant<input style={inp} placeholder="e.g. Sarah Connor" value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })} /></label>
+            <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1250" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label style={fld}>Billing date (optional)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
-            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Paid", "Overdue", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
+          <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update payment" : "Save payment"} primary /></span></div>
         </div>
       )}
@@ -977,7 +1002,7 @@ function FinancePage({ user, go }) {
                   <Td>{gbp(p.amount || 0)}</Td>
                   <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
                   <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
-                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>{(p.status === "Pending" || p.status === "Overdue") && <i className="ti ti-circle-check" onClick={() => markReceived(p)} style={{ fontSize: 16, color: "var(--green)", cursor: "pointer" }} title="Mark received" />}<i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
                 </tr>
                 {isOpen && (
                   <tr>
