@@ -45,7 +45,14 @@ function Login() {
       }
       goTo('/soloops/dashboard')
     } catch (err) {
-      setError(err.message || 'Login failed')
+      const msg = err.message || 'Login failed'
+      // Keep Supabase's deliberate ambiguity (don't reveal if an email exists),
+      // but make it friendlier and point new users to Register.
+      if (/invalid login credentials/i.test(msg)) {
+        setError('Email or password is incorrect. New here? Use the Register tab to create an account.')
+      } else {
+        setError(msg)
+      }
     }
     setLoading(false)
   }
@@ -77,7 +84,7 @@ function Login() {
         ? 'http://localhost:5173'
         : `${window.location.protocol}//${window.location.host}`
       const { error: err } = await window.sb.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/soloops/login`,
+        redirectTo: `${siteUrl}/soloops/reset-password`,
       })
       if (err) throw err
       setSuccess('Password reset link sent! Check your email inbox (and spam folder).')
