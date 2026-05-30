@@ -10,7 +10,7 @@ const { useState } = React
 const ADMIN_EMAILS = ['admin@alzaro.co.uk']
 
 function Login() {
-  const [tab, setTab] = useState('login')
+  const [tab, setTab] = useState(window.__START_TAB === 'register' ? 'register' : 'login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
@@ -32,9 +32,17 @@ function Login() {
     if (!email || !password) return setError('Please enter email and password')
     setLoading(true); setError(''); setSuccess('')
     try {
-      const { error: err } = await window.sb.auth.signInWithPassword({ email, password })
+      const { data, error: err } = await window.sb.auth.signInWithPassword({ email, password })
       if (err) throw err
+
+      // Only allow accounts that belong to SoloOps.
+      // (The shared database also holds TyreOps/GarageOps/PropertyOps accounts.)
       const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase())
+      const product = data?.user?.user_metadata?.product
+      if (!isAdmin && product !== 'soloops') {
+        await window.sb.auth.signOut()
+        throw new Error('No SoloOps account found for this email. Please use the Register tab to create one.')
+      }
       goTo('dashboard.html')
     } catch (err) {
       setError(err.message || 'Login failed')
