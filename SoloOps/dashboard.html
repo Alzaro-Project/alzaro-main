@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alzaro SoloOps — Dashboard</title>
+  <meta name="description" content="The modern operating system for self-employed businesses. Track income, expenses, mileage and tax." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0908; --surface:#121110; --surface2:#1a1816; --surface3:#23201d;
+      --border:rgba(255,255,255,.06); --border-light:rgba(255,255,255,.1);
+      --text:#faf9f7; --text2:#a8a29e; --text3:#68635d;
+      --orange:#f97316; --orange-light:#fb923c; --amber:#f59e0b;
+      --orange-subtle:rgba(249,115,22,.08);
+      --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+      --radius:16px; --radius-sm:8px;
+    }
+    *{box-sizing:border-box; margin:0; padding:0;}
+    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased;}
+    .mono{font-family:'Fira Code',monospace;}
+    ::-webkit-scrollbar{width:8px;height:8px;}
+    ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
+    a{color:inherit;text-decoration:none;}
+    .fade-in{animation:fade .5s ease both;}
+    @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="supabase.js"></script>
+  <script type="text/babel" src="Dashboard.jsx"></script>
+</body>
+</html>
