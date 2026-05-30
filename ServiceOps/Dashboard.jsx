@@ -799,12 +799,94 @@ function QuotesPage({ user }) {
 /* ================================================================== */
 /*  JOBS  (kanban)                                                    */
 /* ================================================================== */
+
+/* Dialog: raise an invoice against a job (Deposit / Part / Final / Full) */
+function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
+  const total = +job.value || 0;
+  const outstanding = Math.max(0, total - alreadyInvoiced);
+  const [invType, setInvType] = useState(alreadyInvoiced > 0 ? "Final" : "Full");
+  const [mode, setMode] = useState("amount"); // amount | percent (for deposit)
+  const [amount, setAmount] = useState(outstanding ? String(outstanding) : "");
+  const [percent, setPercent] = useState("30");
+  const [ref, setRef] = useState("");
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+
+  // when switching to Deposit default to percent mode; Final/Full default to outstanding
+  const pickType = (t) => {
+    setInvType(t);
+    if (t === "Deposit") { setMode("percent"); }
+    else if (t === "Final" || t === "Full") { setMode("amount"); setAmount(String(outstanding)); }
+  };
+  const computedAmount = mode === "percent" ? Math.round(total * (+percent || 0)) / 100 : (+amount || 0);
+
+  const save = async () => {
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    if (computedAmount <= 0) { setErr("Enter an amount greater than zero."); return; }
+    setBusy(true); setErr("");
+    const prefix = { Deposit: "DEP", Part: "PRT", Final: "INV", Full: "INV" }[invType] || "INV";
+    const payload = {
+      ref: ref.trim() || `${prefix}-${Date.now().toString().slice(-5)}`,
+      customer_id: job.customer_id || null, customer: job.customer || "",
+      property_id: job.property_id || null, site: job.site || "",
+      job_id: job.id, inv_type: invType,
+      amount: computedAmount, status: "Sent", user_id: user.id,
+    };
+    const { error } = await db.from("svc_invoices").insert([payload]);
+    if (error) { setErr(error.message); setBusy(false); return; }
+    // if this invoice clears the balance, mark job Invoiced
+    if (alreadyInvoiced + computedAmount >= total && total > 0) await db.from("svc_jobs").update({ status: "Invoiced" }).eq("id", job.id);
+    setBusy(false); onDone();
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 460, maxWidth: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Invoice for: {job.title}</div>
+        <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginBottom: 14 }}>{job.customer || "—"}{job.site ? ` · ${job.site}` : ""}</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Job total</div><div style={{ fontSize: 15, fontWeight: 600 }}>{gbp(total)}</div></div>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Invoiced</div><div style={{ fontSize: 15, fontWeight: 600, color: "var(--blue)" }}>{gbp(alreadyInvoiced)}</div></div>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Outstanding</div><div style={{ fontSize: 15, fontWeight: 600, color: "var(--amber)" }}>{gbp(outstanding)}</div></div>
+        </div>
+        {err && <div style={errBanner}>{err}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={fld}>Invoice type<select style={inp} value={invType} onChange={(e) => pickType(e.target.value)}>{["Full", "Deposit", "Part", "Final"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label style={fld}>Reference (optional)<input style={inp} placeholder="auto-generated" value={ref} onChange={(e) => setRef(e.target.value)} /></label>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {invType === "Deposit" && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <span onClick={() => setMode("percent")} style={{ cursor: "pointer", fontSize: 11.5, padding: "5px 11px", borderRadius: 7, background: mode === "percent" ? "var(--brand)" : "var(--panel-2)", color: mode === "percent" ? "#fff" : "var(--txt-2)", border: "0.5px solid var(--line)" }}>Percentage</span>
+              <span onClick={() => setMode("amount")} style={{ cursor: "pointer", fontSize: 11.5, padding: "5px 11px", borderRadius: 7, background: mode === "amount" ? "var(--brand)" : "var(--panel-2)", color: mode === "amount" ? "#fff" : "var(--txt-2)", border: "0.5px solid var(--line)" }}>Fixed amount</span>
+            </div>
+          )}
+          {mode === "percent" ? (
+            <label style={fld}>Deposit percentage of job total
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input style={{ ...inp, width: 100 }} type="number" value={percent} onChange={(e) => setPercent(e.target.value)} /><span style={{ fontSize: 13, color: "var(--txt-2)" }}>% = <strong style={{ color: "var(--txt)" }}>{gbp(computedAmount)}</strong></span>
+              </div>
+            </label>
+          ) : (
+            <label style={fld}>Amount (£)<input style={inp} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+          <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
+          <span onClick={save}><Btn icon="ti-send" label={busy ? "Creating…" : `Raise ${invType} invoice`} primary /></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JobsPage({ user }) {
   const stages = ["New", "Scheduled", "In Progress", "Completed", "Invoiced"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [invoiceFor, setInvoiceFor] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -815,7 +897,11 @@ function JobsPage({ user }) {
     if (!DB_READY) { setRows([]); return; }
     db.from("svc_jobs").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+    db.from("svc_invoices").select("job_id,amount").then(({ data }) => setInvoices(data || []));
   }, []);
+
+  const invoicedForJob = (jobId) => invoices.filter((v) => String(v.job_id) === String(jobId)).reduce((s, v) => s + (+v.amount || 0), 0);
+  const reloadInvoices = () => db.from("svc_invoices").select("job_id,amount").then(({ data }) => setInvoices(data || []));
 
   const refresh = async () => { const { data } = await db.from("svc_jobs").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
@@ -885,10 +971,19 @@ function JobsPage({ user }) {
                       </div>
                       <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 4 }}>{j.customer || "—"}</div>
                       <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginBottom: 6 }}>{j.site || ""}</div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--txt-2)", marginBottom: j.id && DB_READY ? 9 : 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "var(--txt-2)", marginBottom: 6 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 6 }}><i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.engineer || "Unassigned"}</span>
                         {j.value ? <span style={{ fontWeight: 600, color: "var(--txt)" }}>{gbp(j.value)}</span> : null}
                       </div>
+                      {j.id && (+j.value || 0) > 0 && (() => {
+                        const inv = invoicedForJob(j.id); const out = Math.max(0, (+j.value || 0) - inv);
+                        return inv > 0 ? (
+                          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
+                            <span>Invoiced {gbp(inv)}</span>
+                            <span style={{ color: out > 0 ? "var(--amber)" : "var(--green)" }}>{out > 0 ? `${gbp(out)} left` : "Paid in full"}</span>
+                          </div>
+                        ) : null;
+                      })()}
                       {j.id && DB_READY && (
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 8 }}>
                           <div style={{ display: "flex", gap: 8 }}>
@@ -896,6 +991,7 @@ function JobsPage({ user }) {
                             {stages.indexOf(j.status) < stages.length - 1 && <i className="ti ti-arrow-right" onClick={() => move(j, 1)} style={{ fontSize: 14, color: "var(--brand)", cursor: "pointer" }} title="Move forward" />}
                           </div>
                           <div style={{ display: "flex", gap: 10 }}>
+                            <i className="ti ti-receipt" onClick={() => setInvoiceFor(j)} style={{ fontSize: 14, color: "var(--green)", cursor: "pointer" }} title="Create invoice" />
                             <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
                             <i className="ti ti-trash" onClick={() => askDelete(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
                           </div>
@@ -910,6 +1006,7 @@ function JobsPage({ user }) {
           })}
         </div>
       )}
+      {invoiceFor && <CreateInvoiceForJob user={user} job={invoiceFor} alreadyInvoiced={invoicedForJob(invoiceFor.id)} onClose={() => setInvoiceFor(null)} onDone={() => { setInvoiceFor(null); refresh(); reloadInvoices(); }} />}
       {confirmNode}
     </div>
   );
@@ -1096,10 +1193,11 @@ function InvoicingPage({ user }) {
       ) : data.length === 0 ? (
         <div style={emptyCard}>No invoices yet. Click "New invoice" to raise your first one.</div>
       ) : (
-        <Table cols={["Ref", "Customer", "Amount", "Due date", "Status", ""]}>
+        <Table cols={["Ref", "Type", "Customer", "Amount", "Due date", "Status", ""]}>
           {data.map((v, i) => (
             <tr key={v.id || i}>
               <Td><span style={{ fontWeight: 500, fontFamily: "monospace" }}>{v.ref || "—"}</span></Td>
+              <Td>{v.inv_type ? <Pill text={v.inv_type} tone={v.inv_type === "Deposit" ? "amber" : v.inv_type === "Part" ? "blue" : "green"} /> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
               <Td>{v.customer}</Td>
               <Td>{gbp(v.amount || 0)}</Td>
               <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
