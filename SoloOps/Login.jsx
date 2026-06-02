@@ -1,5 +1,5 @@
 // ============================================================
-//  Alzaro SoloOps — Login / Registers
+//  Alzaro SoloOps — Login / Register
 //  Loaded by app.html via <script type="text/babel">.
 //  Uses CDN globals (React, ReactDOM) + window.sb from supabase.js
 //  — no import statements (browser Babel can't resolve modules).
@@ -62,10 +62,16 @@ function Login() {
     if (password.length < 6) return setError('Password must be at least 6 characters')
     setLoading(true); setError(''); setSuccess('')
     try {
+      const siteUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:5173'
+        : `${window.location.protocol}//${window.location.host}`
       const { error: err } = await window.sb.auth.signUp({
         email,
         password,
-        options: { data: { business_name: businessName.trim(), product: 'soloops' } }
+        options: {
+          emailRedirectTo: `${siteUrl}/soloops/login`,
+          data: { business_name: businessName.trim(), product: 'soloops' }
+        }
       })
       if (err) throw err
       setSuccess('Check your email to confirm your account, then log in.')
