@@ -35,19 +35,32 @@ function Login() {
       const { data, error: err } = await window.sb.auth.signInWithPassword({ email, password })
       if (err) throw err
 
-      // Only allow accounts that belong to SoloOps.
-      // (The shared database also holds TyreOps/GarageOps/PropertyOps accounts.)
       const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase())
-      const product = data?.user?.user_metadata?.product
-      if (!isAdmin && product !== 'soloops') {
+      if (isAdmin) { goTo('/soloops/admin'); return }
+
+      // Multi-vertical: an account may exist (via any Alzaro product) but
+      // must have SIGNED UP for SoloOps. We check the soloops_access table.
+      // (Legacy accounts with metadata product='soloops' are backfilled there.)
+      const { data: access } = await window.sb
+        .from('soloops_access').select('user_id').eq('user_id', data.user.id).maybeSingle()
+
+      if (!access) {
+        // New signups have metadata product='soloops' but no access row yet
+        // (it can't be made before email confirmation). Create it now.
+        if (data.user.user_metadata?.product === 'soloops') {
+          await window.sb.from('soloops_access').insert({
+            user_id: data.user.id,
+            business_name: data.user.user_metadata?.business_name || null
+          })
+          goTo('/soloops/dashboard')
+          return
+        }
         await window.sb.auth.signOut()
-        throw new Error('No SoloOps account found for this email. Please use the Register tab to create one.')
+        throw new Error('This email works on Alzaro, but you haven\u2019t signed up for SoloOps yet. Use the Register tab to add SoloOps to your account.')
       }
-      goTo(isAdmin ? '/soloops/admin' : '/soloops/dashboard')
+      goTo('/soloops/dashboard')
     } catch (err) {
       const msg = err.message || 'Login failed'
-      // Keep Supabase's deliberate ambiguity (don't reveal if an email exists),
-      // but make it friendlier and point new users to Register.
       if (/invalid login credentials/i.test(msg)) {
         setError('Email or password is incorrect. New here? Use the Register tab to create an account.')
       } else {
@@ -65,6 +78,32 @@ function Login() {
       const siteUrl = window.location.hostname === 'localhost'
         ? 'http://localhost:5173'
         : `${window.location.protocol}//${window.location.host}`
+
+      // First, try to sign in — this tells us if the email already exists
+      // on Alzaro (from any vertical) with this password.
+      const { data: signInData, error: signInErr } =
+        await window.sb.auth.signInWithPassword({ email, password })
+
+      if (!signInErr && signInData?.user) {
+        // Email already exists on Alzaro. Add SoloOps access to this account.
+        const uid = signInData.user.id
+        const { data: existing } = await window.sb
+          .from('soloops_access').select('user_id').eq('user_id', uid).maybeSingle()
+        if (existing) {
+          await window.sb.auth.signOut()
+          setSuccess('You already have SoloOps on this account \u2014 just log in.')
+          setTab('login'); setBusinessName(''); setPassword('')
+          setLoading(false); return
+        }
+        const { error: insErr } = await window.sb
+          .from('soloops_access').insert({ user_id: uid, business_name: businessName.trim() })
+        if (insErr) throw insErr
+        // signed in + access granted → straight to dashboard
+        goTo('/soloops/dashboard')
+        return
+      }
+
+      // Otherwise it's a brand-new account → normal signup (with confirm email).
       const { error: err } = await window.sb.auth.signUp({
         email,
         password,
