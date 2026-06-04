@@ -132,21 +132,22 @@ function App() {
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
       {/* SIDEBAR */}
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
-        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 22px' }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
-        {NAV.map(([k,label]) => (
-          <div key={k} data-nav onClick={()=>setView(k)} style={{
-            padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer',
-            color: view===k ? 'var(--text)' : 'var(--text2)',
-            background: view===k ? 'var(--surface3)' : 'transparent',
-            border: view===k ? '1px solid var(--border-light)' : '1px solid transparent'
-          }}>{label}</div>
-        ))}
-        <div style={{ flex:1 }} />
-        <div style={{ fontSize:'12px', color:'var(--text3)', padding:'0 12px 8px', wordBreak:'break-all' }}>{session.user.email}</div>
-        <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
+        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 22px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
+          {NAV.map(([k,label]) => (
+            <div key={k} data-nav onClick={()=>setView(k)} style={{
+              padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
+              color: view===k ? 'var(--text)' : 'var(--text2)',
+              background: view===k ? 'var(--surface3)' : 'transparent',
+              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent'
+            }}>{label}</div>
+          ))}
+        </div>
+        <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
+        <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
           {theme==='dark' ? '☀ Light mode' : '🌙 Dark mode'}
         </button>
-        <button onClick={signOut} style={{...btnSec, width:'100%'}}>Sign out</button>
+        <button onClick={signOut} style={{...btnSec, width:'100%', flexShrink:0}}>Sign out</button>
       </aside>
 
       {/* MAIN */}
