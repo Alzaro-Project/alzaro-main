@@ -28,6 +28,8 @@ function App() {
   const [session, setSession] = useState(undefined) // undefined=loading, null=logged out
   const [view, setView] = useState('dashboard')
   const [yearFilter, setYearFilter] = useState('all')
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo, setRangeTo] = useState('')
   const [invoices, setInvoices] = useState([])
   const [expenses, setExpenses] = useState([])
   const [mileage, setMileage] = useState([])
@@ -91,7 +93,15 @@ function App() {
     ...expenses.map(e=>yOf(e.spent_on)),
     ...mileage.map(m=>yOf(m.journey_date)),
   ].filter(Boolean))].sort().reverse()
-  const inYear = (d) => yearFilter==='all' || yOf(d)===yearFilter
+  const inYear = (d) => {
+    if (!d) return false
+    if (yearFilter === 'custom') {
+      if (rangeFrom && d < rangeFrom) return false
+      if (rangeTo && d > rangeTo) return false
+      return true
+    }
+    return yearFilter==='all' || yOf(d)===yearFilter
+  }
   const fInvoices = invoices.filter(i=>inYear(i.issue_date))
   const fExpenses = expenses.filter(e=>inYear(e.spent_on))
   const fMileage  = mileage.filter(m=>inYear(m.journey_date))
@@ -148,7 +158,15 @@ function App() {
             <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              <option value="custom">Custom range…</option>
             </select>
+            {yearFilter==='custom' && (
+              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+                <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
+                <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
+                <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)} title="To" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
+              </div>
+            )}
             <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
             <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
           </div>
@@ -475,6 +493,31 @@ function Donut({ rows }) {
   )
 }
 function Empty({msg}) { return <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text3)', fontSize:'14px' }}>{msg}</div> }
+
+// Date field that accepts BOTH typed input (DD/MM/YYYY or YYYY-MM-DD) and the calendar.
+// Stores value as YYYY-MM-DD (what the DB expects).
+function DateField({ value, onChange, style }) {
+  const toText = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return d&&m&&y ? `${d}/${m}/${y}` : iso }
+  const [text, setText] = React.useState(toText(value))
+  React.useEffect(()=>{ setText(toText(value)) }, [value])
+  const parse = (t) => {
+    t = t.trim()
+    let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)      // DD/MM/YYYY
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`
+    m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)          // YYYY-MM-DD
+    if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`
+    return null
+  }
+  return (
+    <div style={{ display:'flex', gap:'6px', ...style }}>
+      <input style={{...inp, flex:1}} placeholder="DD/MM/YYYY" value={text}
+        onChange={e=>{ setText(e.target.value); const iso=parse(e.target.value); if(iso) onChange(iso) }}
+        onBlur={()=>{ const iso=parse(text); if(iso) onChange(iso); else setText(toText(value)) }} />
+      <input type="date" value={value||''} onChange={e=>onChange(e.target.value)}
+        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 8px', color:'var(--text)', width:'42px', cursor:'pointer' }} title="Pick from calendar" />
+    </div>
+  )
+}
 function Th({cols}) { return <tr>{cols.map((c,i)=><th key={i} style={{ textAlign: i>=cols.length-2?'right':'left', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, padding:'0 14px 12px', borderBottom:'1px solid var(--border)' }}>{c}</th>)}</tr> }
 function Td({children,mono,muted,right,style}) { return <td style={{ padding:'14px', borderBottom:'1px solid var(--border)', fontSize:'13.5px', textAlign:right?'right':'left', color:muted?'var(--text3)':'var(--text)', fontFamily:mono?'Fira Code, monospace':'inherit', ...style }}>{children}</td> }
 function Row({left,mid,right,status}) {
@@ -525,7 +568,7 @@ function ExpenseForm({onClose,onSaved,uid,expenses}) {
       {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
     </select>
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Amount (£)" value={amount} onChange={e=>setAmount(e.target.value)} />
-    <input style={{...inp, marginTop:'12px'}} type="date" value={date} onChange={e=>setDate(e.target.value)} />
+    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
     <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save expense'}</button>
   </Modal>
 }
@@ -555,7 +598,7 @@ function InvoiceForm({onClose,onSaved,uid,invoices}) {
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
     </select>
-    <input style={{...inp, marginTop:'12px'}} type="date" value={date} onChange={e=>setDate(e.target.value)} />
+    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
     <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save income'}</button>
   </Modal>
 }
@@ -886,7 +929,7 @@ function Receipts({ uid, expenses, onMatched }) {
           </div>
           <div>
             <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Date (optional)</div>
-            <input style={inp} type="date" value={date} onChange={e=>setDate(e.target.value)} />
+            <DateField value={date} onChange={setDate} />
           </div>
           <button style={btnPri} onClick={findMatches}>Find match</button>
         </div>
