@@ -25,7 +25,14 @@
       --radius:16px; --radius-sm:8px;
     }
     *{box-sizing:border-box; margin:0; padding:0;}
-    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased;}
+    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased; transition: background .25s ease, color .25s ease;}
+    /* ---- light mode ---- */
+    body.light{
+      --bg:#f6f5f3; --surface:#ffffff; --surface2:#f0eeea; --surface3:#e7e3dd;
+      --border:rgba(0,0,0,.08); --border-light:rgba(0,0,0,.14);
+      --text:#1a1816; --text2:#5c574f; --text3:#8a847a;
+      --orange-subtle:rgba(249,115,22,.10);
+    }
     .mono{font-family:'Fira Code',monospace;}
     ::-webkit-scrollbar{width:8px;height:8px;}
     ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
