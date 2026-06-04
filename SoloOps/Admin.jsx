@@ -1,5 +1,5 @@
 // ============================================================
-//  Alzaro SoloOps — Admin Panels
+//  Alzaro SoloOps — Admin Panel
 //  Loaded by admin.html. Secure: relies on Supabase RLS +
 //  soloops_is_admin(). A non-admin session simply gets no rows
 //  (and is bounced out). No service key in the browser.
@@ -37,7 +37,7 @@ function Admin() {
       setAllowed(true)
       // admin RLS lets these reads return ALL rows
       const [p, i, e, m] = await Promise.all([
-        window.sb.from('soloops_profiles').select('*').order('created_at',{ascending:false}),
+        window.sb.from('soloops_access').select('*').order('signed_up_at',{ascending:false}),
         window.sb.from('soloops_invoices').select('*'),
         window.sb.from('soloops_expenses').select('*'),
         window.sb.from('soloops_mileage').select('*'),
@@ -104,8 +104,8 @@ function Admin() {
           <button onClick={()=>setSelected(null)} style={{...btnSec, marginBottom:'18px'}}>← Back to all users</button>
           <div style={{ fontSize:'18px', fontWeight:800 }}>{selected.business_name || '(no business name)'}</div>
           <div style={{ color:'var(--text2)', fontSize:'13px', marginBottom:'4px' }}>{selected.email}</div>
-          <div style={{ color:'var(--text3)', fontSize:'12px', marginBottom:'20px' }}>Joined {fmtDate(selected.created_at)}</div>
-          {(() => { const a = userAgg(selected.id); return (
+          <div style={{ color:'var(--text3)', fontSize:'12px', marginBottom:'20px' }}>Joined {fmtDate(selected.signed_up_at)}</div>
+          {(() => { const a = userAgg(selected.user_id); return (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'14px' }}>
               <MiniStat label="Revenue (paid)" v={gbp(a.revenue)} />
               <MiniStat label="Invoices" v={a.invoices} />
@@ -128,11 +128,11 @@ function Admin() {
                 ))}
               </tr></thead>
               <tbody>
-                {profiles.map(p => { const a = userAgg(p.id); return (
-                  <tr key={p.id}>
+                {profiles.map(p => { const a = userAgg(p.user_id); return (
+                  <tr key={p.user_id}>
                     <td style={td}>{p.business_name || '—'}</td>
                     <td style={{...td, color:'var(--text2)'}}>{p.email}</td>
-                    <td style={{...td, color:'var(--text3)'}}>{fmtDate(p.created_at)}</td>
+                    <td style={{...td, color:'var(--text3)'}}>{fmtDate(p.signed_up_at)}</td>
                     <td style={{...td, textAlign:'right', fontFamily:'Fira Code, monospace'}}>{gbp(a.revenue)}</td>
                     <td style={{...td, textAlign:'right', fontFamily:'Fira Code, monospace'}}>{gbp(a.expenses)}</td>
                     <td style={{...td, textAlign:'right'}}><button onClick={()=>setSelected(p)} style={{...btnSec, padding:'6px 12px'}}>View</button></td>
