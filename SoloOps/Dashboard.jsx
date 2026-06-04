@@ -35,7 +35,7 @@ function App() {
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState('dark')
   useEffect(() => {
-    document.body.classList.toggle('light', theme === 'light')
+    document.documentElement.classList.toggle('light', theme === 'light')
   }, [theme])
 
   // ---- auth gate ----
