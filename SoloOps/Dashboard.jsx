@@ -217,7 +217,7 @@ function App() {
             <div style={card}>
               {fInvoices.length===0 ? <Empty msg="No income yet. Click “+ Income” to add one." />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Invoice','Client','Issued','Total','Status']} /></thead>
+                <thead><Th cols={['Reference','Client','Issued','Total','Status']} /></thead>
                 <tbody>{fInvoices.map(i => (
                   <tr key={i.id}>
                     <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
@@ -451,7 +451,7 @@ function MonthlyChart({ invoices, expenses }) {
         </div>
       </div>
       <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Revenue vs expenses, last 6 months</div>
-      {!hasData ? <Empty msg="No data yet — add invoices and expenses to see your trend." />
+      {!hasData ? <Empty msg="No data yet — add income and expenses to see your trend." />
       : <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-around', height:'170px', gap:'12px' }}>
         {months.map((m,idx) => (
           <div key={m.key} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', height:'100%' }}>
@@ -623,7 +623,7 @@ function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
     )}
     <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setPicked(null)}} />
     <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
-    <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} placeholder="Reference number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
