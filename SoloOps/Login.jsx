@@ -48,7 +48,7 @@ function Login() {
         // New signups have metadata product='soloops' but no access row yet
         // (it can't be made before email confirmation). Create it now.
         if (data.user.user_metadata?.product === 'soloops') {
-          await window.sb.from('soloops_access').insert({
+          await window.sb.from('soloops_access').insert({ email: data.user.email,
             user_id: data.user.id,
             business_name: data.user.user_metadata?.business_name || null
           })
@@ -96,7 +96,7 @@ function Login() {
           setLoading(false); return
         }
         const { error: insErr } = await window.sb
-          .from('soloops_access').insert({ user_id: uid, business_name: businessName.trim() })
+          .from('soloops_access').insert({ user_id: uid, email: email.trim().toLowerCase(), business_name: businessName.trim() })
         if (insErr) throw insErr
         // signed in + access granted → straight to dashboard
         goTo('/soloops/dashboard')
