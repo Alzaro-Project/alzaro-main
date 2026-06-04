@@ -101,7 +101,7 @@ function App() {
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 22px' }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
         {NAV.map(([k,label]) => (
-          <div key={k} onClick={()=>setView(k)} style={{
+          <div key={k} data-nav onClick={()=>setView(k)} style={{
             padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer',
             color: view===k ? 'var(--text)' : 'var(--text2)',
             background: view===k ? 'var(--surface3)' : 'transparent',
@@ -130,25 +130,23 @@ function App() {
           {/* ===== DASHBOARD ===== */}
           {view==='dashboard' && <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
-              <KPI label="Revenue (paid)" value={gbp(revenue)} />
-              <KPI label="Expenses" value={gbp(totalExp)} />
-              <KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} />
-              <KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" />
+              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} /></div>
+              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} /></div>
+              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} /></div>
+              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" /></div>
             </div>
+
+            {/* monthly revenue vs expenses chart */}
+            <MonthlyChart invoices={invoices} expenses={expenses} />
+
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
-              <div style={card}>
+              <div data-card style={card}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
                 {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
-                  : catRows.map(([c,v]) => (
-                  <div key={c} style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px', fontSize:'13px' }}>
-                    <span style={{ width:'11px', height:'11px', borderRadius:'3px', background: CAT_COLORS[c]||'#68635d' }} />
-                    <span style={{ flex:1, color:'var(--text2)' }}>{c}</span>
-                    <span className="mono" style={{ fontWeight:600 }}>{gbp(v)}</span>
-                  </div>
-                ))}
+                  : <Donut rows={catRows} />}
               </div>
-              <div style={card}>
+              <div data-card style={card}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <div style={{fontWeight:700}}>Outstanding invoices</div>
                   <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
@@ -328,12 +326,112 @@ function App() {
 }
 
 // ---------- small components ----------
+function useCountUp(value, duration=900) {
+  // animate numbers in £x,xxx or plain-number strings up from 0
+  const [display, setDisplay] = React.useState(value)
+  React.useEffect(() => {
+    const m = String(value).match(/-?[\d,]+(\.\d+)?/)
+    if (!m) { setDisplay(value); return }
+    const target = parseFloat(m[0].replace(/,/g,'')) || 0
+    const prefix = String(value).slice(0, m.index)
+    const suffix = String(value).slice(m.index + m[0].length)
+    const decimals = (m[0].split('.')[1]||'').length
+    const start = performance.now()
+    let raf
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      const cur = target * eased
+      const fmt = cur.toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+      setDisplay(prefix + fmt + suffix)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return display
+}
+
 function KPI({label,value,color,sub}) {
-  return <div style={{...card, padding:'20px'}}>
+  const shown = useCountUp(value)
+  return <div data-card style={{...card, padding:'20px'}}>
     <div style={{ fontSize:'12px', color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600 }}>{label}</div>
-    <div className="mono" style={{ fontSize:'26px', fontWeight:600, marginTop:'6px', letterSpacing:'-0.5px', color: color||'var(--text)' }}>{value}</div>
+    <div className="mono" style={{ fontSize:'26px', fontWeight:600, marginTop:'6px', letterSpacing:'-0.5px', color: color||'var(--text)' }}>{shown}</div>
     {sub && <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{sub}</div>}
   </div>
+}
+function MonthlyChart({ invoices, expenses }) {
+  const ym = d => (d||'').slice(0,7)
+  const now = new Date()
+  const months = []
+  for (let i=5; i>=0; i--) {
+    const dt = new Date(now.getFullYear(), now.getMonth()-i, 1)
+    months.push({ key: dt.toISOString().slice(0,7), label: dt.toLocaleDateString('en-GB',{month:'short'}) })
+  }
+  const rev = {}, exp = {}
+  invoices.filter(i=>i.status==='paid').forEach(i => { const k=ym(i.issue_date); rev[k]=(rev[k]||0)+Number(i.total||0) })
+  expenses.forEach(e => { const k=ym(e.spent_on); exp[k]=(exp[k]||0)+Number(e.amount||0) })
+  const max = Math.max(1, ...months.map(m => Math.max(rev[m.key]||0, exp[m.key]||0)))
+  const hasData = months.some(m => (rev[m.key]||0) || (exp[m.key]||0))
+  return (
+    <div data-card style={{...card, marginBottom:'16px'}}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+        <div style={{fontWeight:700}}>Monthly trend</div>
+        <div style={{ display:'flex', gap:'14px', fontSize:'12px', color:'var(--text3)' }}>
+          <span style={{display:'flex',alignItems:'center',gap:'6px'}}><span style={{width:'10px',height:'10px',borderRadius:'2px',background:'var(--green)'}}/>Revenue</span>
+          <span style={{display:'flex',alignItems:'center',gap:'6px'}}><span style={{width:'10px',height:'10px',borderRadius:'2px',background:'var(--orange)'}}/>Expenses</span>
+        </div>
+      </div>
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Revenue vs expenses, last 6 months</div>
+      {!hasData ? <Empty msg="No data yet — add invoices and expenses to see your trend." />
+      : <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-around', height:'170px', gap:'12px' }}>
+        {months.map((m,idx) => (
+          <div key={m.key} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', height:'100%' }}>
+            <div style={{ flex:1, display:'flex', alignItems:'flex-end', gap:'4px', width:'100%', justifyContent:'center' }}>
+              <div className="bar-grow" title={'Revenue '+gbp(rev[m.key]||0)} style={{ width:'14px', height:`${Math.round(((rev[m.key]||0)/max)*100)}%`, minHeight:(rev[m.key]?'4px':'0'), background:'var(--green)', borderRadius:'4px 4px 0 0', animationDelay:`${idx*70}ms` }} />
+              <div className="bar-grow" title={'Expenses '+gbp(exp[m.key]||0)} style={{ width:'14px', height:`${Math.round(((exp[m.key]||0)/max)*100)}%`, minHeight:(exp[m.key]?'4px':'0'), background:'var(--orange)', borderRadius:'4px 4px 0 0', animationDelay:`${idx*70+35}ms` }} />
+            </div>
+            <div style={{ fontSize:'12px', color:'var(--text3)' }}>{m.label}</div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  )
+}
+function Donut({ rows }) {
+  const total = rows.reduce((s,[,v])=>s+v, 0) || 1
+  let offset = 0
+  const R = 52, C = 2*Math.PI*R
+  const [shown, setShown] = React.useState(false)
+  React.useEffect(()=>{ const t=setTimeout(()=>setShown(true), 50); return ()=>clearTimeout(t) }, [])
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:'22px', flexWrap:'wrap' }}>
+      <svg width="140" height="140" viewBox="0 0 140 140" style={{ flexShrink:0 }}>
+        <g transform="rotate(-90 70 70)">
+          {rows.map(([c,v]) => {
+            const frac = v/total
+            const len = shown ? frac*C : 0
+            const seg = <circle key={c} cx="70" cy="70" r={R} fill="none"
+              stroke={CAT_COLORS[c]||'#68635d'} strokeWidth="16"
+              strokeDasharray={`${len} ${C-len}`} strokeDashoffset={-offset}
+              style={{ transition:'stroke-dasharray .8s cubic-bezier(.4,0,.2,1)' }} />
+            offset += shown ? frac*C : 0
+            return seg
+          })}
+        </g>
+        <text x="70" y="74" textAnchor="middle" fontSize="14" fontWeight="700" fill="var(--text)" fontFamily="Fira Code">{gbp(total)}</text>
+      </svg>
+      <div style={{ flex:1, minWidth:'160px' }}>
+        {rows.map(([c,v]) => (
+          <div key={c} style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px', fontSize:'13px' }}>
+            <span style={{ width:'11px', height:'11px', borderRadius:'3px', background: CAT_COLORS[c]||'#68635d' }} />
+            <span style={{ flex:1, color:'var(--text2)' }}>{c}</span>
+            <span className="mono" style={{ fontWeight:600 }}>{gbp(v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 function Empty({msg}) { return <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text3)', fontSize:'14px' }}>{msg}</div> }
 function Th({cols}) { return <tr>{cols.map((c,i)=><th key={i} style={{ textAlign: i>=cols.length-2?'right':'left', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, padding:'0 14px 12px', borderBottom:'1px solid var(--border)' }}>{c}</th>)}</tr> }
