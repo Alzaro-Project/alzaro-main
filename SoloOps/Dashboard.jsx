@@ -33,6 +33,10 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // 'expense' | 'invoice' | null
   const [toast, setToast] = useState('')
+  const [theme, setTheme] = useState('dark')
+  useEffect(() => {
+    document.body.classList.toggle('light', theme === 'light')
+  }, [theme])
 
   // ---- auth gate ----
   useEffect(() => {
@@ -110,6 +114,9 @@ function App() {
         ))}
         <div style={{ flex:1 }} />
         <div style={{ fontSize:'12px', color:'var(--text3)', padding:'0 12px 8px', wordBreak:'break-all' }}>{session.user.email}</div>
+        <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
+          {theme==='dark' ? '☀ Light mode' : '🌙 Dark mode'}
+        </button>
         <button onClick={signOut} style={{...btnSec, width:'100%'}}>Sign out</button>
       </aside>
 
@@ -130,23 +137,23 @@ function App() {
           {/* ===== DASHBOARD ===== */}
           {view==='dashboard' && <>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
-              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} /></div>
-              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} /></div>
-              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} /></div>
-              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" /></div>
+              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
+              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>
+              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
+              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
             </div>
 
             {/* monthly revenue vs expenses chart */}
-            <MonthlyChart invoices={invoices} expenses={expenses} />
+            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={invoices} expenses={expenses} /></div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
-              <div data-card style={card}>
+              <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
                 {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
                   : <Donut rows={catRows} />}
               </div>
-              <div data-card style={card}>
+              <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <div style={{fontWeight:700}}>Outstanding invoices</div>
                   <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
@@ -352,9 +359,9 @@ function useCountUp(value, duration=900) {
   return display
 }
 
-function KPI({label,value,color,sub}) {
+function KPI({label,value,color,sub,onClick}) {
   const shown = useCountUp(value)
-  return <div data-card style={{...card, padding:'20px'}}>
+  return <div data-card onClick={onClick} style={{...card, padding:'20px', cursor: onClick?'pointer':'default'}}>
     <div style={{ fontSize:'12px', color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.6px', fontWeight:600 }}>{label}</div>
     <div className="mono" style={{ fontSize:'26px', fontWeight:600, marginTop:'6px', letterSpacing:'-0.5px', color: color||'var(--text)' }}>{shown}</div>
     {sub && <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{sub}</div>}
