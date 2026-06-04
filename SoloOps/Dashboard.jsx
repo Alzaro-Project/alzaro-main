@@ -527,8 +527,22 @@ function Reports({ invoices, expenses, mileage }) {
 
   return (
     <div style={card}>
-      <div style={{fontWeight:700, marginBottom:'4px'}}>Reports</div>
-      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets).</div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px', gap:'12px', flexWrap:'wrap' }}>
+        <div style={{fontWeight:700}}>Reports</div>
+        <button style={btnPri} onClick={async () => {
+          try {
+            const zip = new window.JSZip()
+            reports.forEach(r => { const [fn, rows] = r.build(); zip.file(fn, rows.map(row => row.map(c => {
+              const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s
+            }).join(',')).join('\n')) })
+            const blob = await zip.generateAsync({ type:'blob' })
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+            a.download = 'soloops-accountant-pack-' + new Date().toISOString().slice(0,10) + '.zip'; a.click()
+            setMsg('Accountant pack downloaded (all reports zipped)'); setTimeout(()=>setMsg(''), 3000)
+          } catch (e) { setMsg('Could not build pack: ' + (e.message||'')); setTimeout(()=>setMsg(''), 4000) }
+        }}>⬇ Accountant export pack</button>
+      </div>
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets). The accountant pack zips them all together.</div>
       {msg && <div style={{ background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--green)', marginBottom:'14px' }}>✓ {msg}</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px' }}>
         {reports.map(r => (
@@ -547,33 +561,88 @@ function Reports({ invoices, expenses, mileage }) {
 
 // ---------- DOCUMENTS ----------
 function Documents({ uid, invoices, expenses }) {
-  // Documents = a searchable index of everything generated/recorded in SoloOps.
-  // (Full file storage needs Supabase Storage — this indexes records you have.)
   const [q, setQ] = React.useState('')
+  const [files, setFiles] = React.useState([])
+  const [loading, setLoading] = React.useState(true)
+  const [busy, setBusy] = React.useState(false)
+  const [docType, setDocType] = React.useState('Statement')
+  const [err, setErr] = React.useState('')
 
-  const docs = [
-    ...invoices.map(i => ({ type:'Invoice', name: (i.number||'Invoice')+' · '+(i.client_name||''), date: i.issue_date, amount: i.total })),
-    ...expenses.filter(e=>e.has_receipt).map(e => ({ type:'Receipt', name: (e.receipt_name||'receipt')+' · '+e.merchant, date: e.spent_on, amount: e.amount })),
-  ].sort((a,b) => String(b.date).localeCompare(String(a.date)))
+  const load = () => {
+    setLoading(true)
+    window.sb.from('soloops_documents').select('*').order('uploaded_at',{ascending:false})
+      .then(({ data }) => { setFiles(data||[]); setLoading(false) })
+  }
+  React.useEffect(load, [])
 
-  const filtered = docs.filter(d => !q || (d.name+' '+d.type).toLowerCase().includes(q.toLowerCase()))
+  const upload = async (e) => {
+    const f = e.target.files?.[0]; if (!f) return
+    setBusy(true); setErr('')
+    try {
+      const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${uid}/${crypto.randomUUID()}-${safe}`
+      const { error: upErr } = await window.sb.storage.from('soloops-files').upload(path, f)
+      if (upErr) throw upErr
+      await window.sb.from('soloops_documents').insert({
+        user_id: uid, type: docType, name: f.name, storage_path: path, size_bytes: f.size
+      })
+      load()
+    } catch (e) { setErr(e.message || 'Upload failed') }
+    setBusy(false)
+  }
+
+  const download = async (path, name) => {
+    try {
+      const { data, error } = await window.sb.storage.from('soloops-files').createSignedUrl(path, 60)
+      if (error) throw error
+      const a = document.createElement('a'); a.href = data.signedUrl; a.download = name || 'file'; a.target = '_blank'; a.click()
+    } catch (e) { setErr(e.message || 'Could not get download link') }
+  }
+
+  const remove = async (id, path) => {
+    setBusy(true)
+    try {
+      await window.sb.storage.from('soloops-files').remove([path])
+      await window.sb.from('soloops_documents').delete().eq('id', id)
+      load()
+    } catch (e) { setErr(e.message || 'Could not delete') }
+    setBusy(false)
+  }
+
+  const kb = b => b ? (b/1024 < 1024 ? Math.round(b/1024)+' KB' : (b/1048576).toFixed(1)+' MB') : '—'
+  const filtered = files.filter(d => !q || (d.name+' '+d.type).toLowerCase().includes(q.toLowerCase()))
 
   return (
     <div style={card}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px', gap:'12px', flexWrap:'wrap' }}>
         <div style={{fontWeight:700}}>Documents</div>
-        <input style={{...inp, width:'220px', padding:'8px 12px'}} placeholder="Search documents…" value={q} onChange={e=>setQ(e.target.value)} />
+        <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+          <input style={{...inp, width:'180px', padding:'8px 12px'}} placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)} />
+          <select style={{...inp, width:'auto', padding:'8px 10px'}} value={docType} onChange={e=>setDocType(e.target.value)}>
+            <option>Statement</option><option>Invoice</option><option>Receipt</option><option>Report</option><option>Other</option>
+          </select>
+          <label style={{...btnPri, cursor:'pointer', opacity:busy?.7:1}}>
+            {busy ? 'Uploading…' : 'Upload'}
+            <input type="file" onChange={upload} disabled={busy} style={{ display:'none' }} />
+          </label>
+        </div>
       </div>
-      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Invoices and matched receipts, searchable. (Full file storage is a future add-on.)</div>
-      {filtered.length===0 ? <Empty msg={q ? 'No documents match your search.' : 'No documents yet. Create invoices and attach receipts to see them here.'} />
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Securely stored, searchable, downloadable. Files are private to your account.</div>
+      {err && <ErrBox m={err} />}
+      {loading ? <div style={{color:'var(--text2)',padding:'14px'}}>Loading…</div>
+      : filtered.length===0 ? <Empty msg={q ? 'No documents match your search.' : 'No files yet. Use Upload to add statements, invoices or receipts — or attach receipts from the Receipts tab.'} />
       : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-        <thead><Th cols={['Type','Name','Date','Amount']} /></thead>
-        <tbody>{filtered.map((d,i) => (
-          <tr key={i}>
+        <thead><Th cols={['Type','Name','Uploaded','Size','']} /></thead>
+        <tbody>{filtered.map(d => (
+          <tr key={d.id}>
             <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{d.type}</span></Td>
             <Td>{d.name}</Td>
-            <Td muted mono>{d.date}</Td>
-            <Td mono right>{gbp(d.amount)}</Td>
+            <Td muted mono>{(d.uploaded_at||'').slice(0,10)}</Td>
+            <Td muted mono>{kb(d.size_bytes)}</Td>
+            <Td right>
+              <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>download(d.storage_path, d.name)}>Download</button>
+              <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', fontSize:'13px' }} onClick={()=>remove(d.id, d.storage_path)}>✕</button>
+            </Td>
           </tr>))}</tbody>
       </table>}
     </div>
@@ -582,6 +651,7 @@ function Documents({ uid, invoices, expenses }) {
 
 // ---------- RECEIPT MATCHING ----------
 function Receipts({ uid, expenses, onMatched }) {
+  const [fileObj, setFileObj] = React.useState(null)
   const [fileName, setFileName] = React.useState('')
   const [amount, setAmount] = React.useState('')
   const [date, setDate] = React.useState('')
@@ -594,7 +664,7 @@ function Receipts({ uid, expenses, onMatched }) {
 
   const onFile = (e) => {
     const f = e.target.files?.[0]
-    if (f) { setFileName(f.name); setErr(''); setSuggestions(null) }
+    if (f) { setFileObj(f); setFileName(f.name); setErr(''); setSuggestions(null) }
   }
 
   const daysBetween = (a, b) => {
@@ -607,14 +677,13 @@ function Receipts({ uid, expenses, onMatched }) {
     if (!amount) { setErr('Enter the receipt amount so we can find matching expenses.'); return }
     setErr('')
     const amt = parseFloat(amount)
-    // score expenses without a receipt: exact amount + close date = best
     const scored = withoutReceipt
       .map(e => {
         const amtDiff = Math.abs(Number(e.amount) - amt)
         const dayDiff = date ? daysBetween(e.spent_on, date) : 0
         return { e, amtDiff, dayDiff }
       })
-      .filter(s => s.amtDiff < 0.01 || (s.amtDiff <= 1 && s.dayDiff <= 3)) // exact, or within £1 and 3 days
+      .filter(s => s.amtDiff < 0.01 || (s.amtDiff <= 1 && s.dayDiff <= 3))
       .sort((a,b) => (a.amtDiff - b.amtDiff) || (a.dayDiff - b.dayDiff))
       .slice(0, 5)
     setSuggestions(scored)
@@ -623,11 +692,26 @@ function Receipts({ uid, expenses, onMatched }) {
   const attach = async (expenseId) => {
     setBusy(true); setErr('')
     try {
+      let storagePath = null
+      // Upload the actual file to Storage (if one was chosen)
+      if (fileObj) {
+        const safe = fileObj.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        storagePath = `${uid}/${crypto.randomUUID()}-${safe}`
+        const { error: upErr } = await window.sb.storage
+          .from('soloops-files').upload(storagePath, fileObj)
+        if (upErr) throw upErr
+        // record it in the documents index
+        await window.sb.from('soloops_documents').insert({
+          user_id: uid, type: 'Receipt', name: fileObj.name,
+          storage_path: storagePath, size_bytes: fileObj.size, expense_id: expenseId
+        })
+      }
+      // flag the expense as having a receipt
       const { error } = await window.sb.from('soloops_expenses')
         .update({ has_receipt: true, receipt_name: fileName || 'receipt' })
         .eq('id', expenseId)
       if (error) throw error
-      setFileName(''); setAmount(''); setDate(''); setSuggestions(null)
+      setFileObj(null); setFileName(''); setAmount(''); setDate(''); setSuggestions(null)
       onMatched && onMatched()
     } catch (e) { setErr(e.message || 'Could not attach receipt') }
     setBusy(false)
