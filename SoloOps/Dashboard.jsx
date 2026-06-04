@@ -27,6 +27,7 @@ const NAV = [
 function App() {
   const [session, setSession] = useState(undefined) // undefined=loading, null=logged out
   const [view, setView] = useState('dashboard')
+  const [yearFilter, setYearFilter] = useState('all')
   const [invoices, setInvoices] = useState([])
   const [expenses, setExpenses] = useState([])
   const [mileage, setMileage] = useState([])
@@ -78,16 +79,34 @@ function App() {
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
   const signOut = async () => { await window.sb.auth.signOut(); window.location.href = '/soloops/login' }
 
-  // ---- derived totals ----
-  const revenue = invoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
-  const totalExp = expenses.reduce((s,e)=>s+Number(e.amount||0),0)
+  // ---- adjustable tax rates (user-set, stored on account) ----
+  const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
+  const [nicRate, setNicRate] = useState(session?.user?.user_metadata?.nic_rate ?? 9)
+  const [allowance, setAllowance] = useState(session?.user?.user_metadata?.tax_allowance ?? 12570)
+
+  // ---- year filter ----
+  const yOf = d => (d||'').slice(0,4)
+  const availableYears = [...new Set([
+    ...invoices.map(i=>yOf(i.issue_date)),
+    ...expenses.map(e=>yOf(e.spent_on)),
+    ...mileage.map(m=>yOf(m.journey_date)),
+  ].filter(Boolean))].sort().reverse()
+  const inYear = (d) => yearFilter==='all' || yOf(d)===yearFilter
+  const fInvoices = invoices.filter(i=>inYear(i.issue_date))
+  const fExpenses = expenses.filter(e=>inYear(e.spent_on))
+  const fMileage  = mileage.filter(m=>inYear(m.journey_date))
+
+  // ---- derived totals (year-filtered) ----
+  const revenue = fInvoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
+  const totalExp = fExpenses.reduce((s,e)=>s+Number(e.amount||0),0)
   const profit = revenue - totalExp
-  const estTax = Math.max(0, profit * 0.20 + Math.max(0,(profit-12570))*0.09) // rough estimate only
-  const outstanding = invoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
+  const taxable = Math.max(0, profit - Number(allowance||0))
+  const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
+  const outstanding = fInvoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
 
   // category breakdown
   const byCat = {}
-  expenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
+  fExpenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
   const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
 
   if (session === undefined)
@@ -125,9 +144,13 @@ function App() {
         {/* topbar */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
-          <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+            <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+              <option value="all">All years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
             <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
-            <button style={btnPri} onClick={()=>setModal('invoice')}>+ Invoice</button>
+            <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
           </div>
         </div>
 
@@ -144,7 +167,7 @@ function App() {
             </div>
 
             {/* monthly revenue vs expenses chart */}
-            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={invoices} expenses={expenses} /></div>
+            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
               <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
@@ -159,8 +182,8 @@ function App() {
                   <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
                 </div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Awaiting payment</div>
-                {invoices.filter(i=>i.status!=='paid').length===0 ? <Empty msg="No outstanding invoices." />
-                  : invoices.filter(i=>i.status!=='paid').slice(0,6).map(i => (
+                {fInvoices.filter(i=>i.status!=='paid').length===0 ? <Empty msg="No outstanding invoices." />
+                  : fInvoices.filter(i=>i.status!=='paid').slice(0,6).map(i => (
                   <Row key={i.id} left={i.client_name||'—'} mid={i.number||''} right={gbp(i.total)} status={i.status} />
                 ))}
               </div>
@@ -170,10 +193,10 @@ function App() {
           {/* ===== INCOME ===== */}
           {view==='income' && (
             <div style={card}>
-              {invoices.length===0 ? <Empty msg="No invoices yet. Click “+ Invoice” to create one." />
+              {fInvoices.length===0 ? <Empty msg="No income yet. Click “+ Income” to add one." />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><Th cols={['Invoice','Client','Issued','Total','Status']} /></thead>
-                <tbody>{invoices.map(i => (
+                <tbody>{fInvoices.map(i => (
                   <tr key={i.id}>
                     <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
                     <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
@@ -186,10 +209,10 @@ function App() {
           {/* ===== EXPENSES ===== */}
           {view==='expenses' && (
             <div style={card}>
-              {expenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
+              {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
-                <tbody>{expenses.map(e => (
+                <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
                     <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
@@ -226,14 +249,14 @@ function App() {
 
           {/* ===== MILEAGE ===== */}
           {view==='mileage' && (() => {
-            const totalMiles = mileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
+            const totalMiles = fMileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
             // HMRC AMAP: 45p/mile first 10,000 miles, 25p after (cars/vans)
             const first = Math.min(totalMiles, 10000)
             const over = Math.max(0, totalMiles - 10000)
             const claim = first * 0.45 + over * 0.25
             const downloadReport = () => {
               const rows = [['Date','From','To','Purpose','Miles']]
-              mileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
+              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
               rows.push([])
               rows.push(['Total miles', totalMiles])
               rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
@@ -260,14 +283,14 @@ function App() {
                     <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
                   </div>
                   <div style={{ display:'flex', gap:'10px' }}>
-                    {mileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
+                    {fMileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
                     <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
                   </div>
                 </div>
-                {mileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
+                {fMileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
                 : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                   <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
-                  <tbody>{mileage.map(m => (
+                  <tbody>{fMileage.map(m => (
                     <tr key={m.id}>
                       <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
@@ -288,16 +311,33 @@ function App() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
               <div style={card}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Estimated tax</div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Rough estimate — not tax advice</div>
-                <Line label="Taxable profit" v={gbp(profit)} />
-                <Line label="Income tax (est.)" v={gbp(Math.max(0,profit*0.20))} />
-                <Line label="National Insurance (est.)" v={gbp(Math.max(0,(profit-12570)*0.09))} />
+                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Using your own rates — adjust below</div>
+                <Line label="Taxable profit (after allowance)" v={gbp(taxable)} />
+                <Line label={`Income tax (est. @ ${taxRate}%)`} v={gbp(taxable*(Number(taxRate||0)/100))} />
+                <Line label={`National Insurance (est. @ ${nicRate}%)`} v={gbp(taxable*(Number(nicRate||0)/100))} />
                 <div style={{ borderTop:'1px solid var(--border)', marginTop:'10px', paddingTop:'12px' }}>
                   <Line label="Total estimated" v={gbp(estTax)} bold />
                 </div>
               </div>
               <div style={card}>
-                <div style={{fontWeight:700, marginBottom:'16px'}}>Self Assessment readiness</div>
+                <div style={{fontWeight:700, marginBottom:'16px'}}>Your tax rates</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'14px' }}>
+                  <div>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Income tax %</div>
+                    <input style={inp} type="number" value={taxRate} onChange={e=>setTaxRate(e.target.value)} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>NIC %</div>
+                    <input style={inp} type="number" value={nicRate} onChange={e=>setNicRate(e.target.value)} />
+                  </div>
+                  <div style={{ gridColumn:'1/-1' }}>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Tax-free allowance (£)</div>
+                    <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
+                  </div>
+                </div>
+                <button style={btnSec} onClick={async()=>{ await window.sb.auth.updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
+                <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
+                <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
                 <Check ok={invoices.length>0} t="Income recorded" />
                 <Check ok={expenses.length>0} t="Expenses recorded" />
                 <Check ok={mileage.length>0} t="Mileage logged" />
@@ -316,8 +356,8 @@ function App() {
       </div>
 
       {/* MODALS */}
-      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={session.user.id} />}
-      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Invoice created')}} uid={session.user.id} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={session.user.id} expenses={expenses} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={session.user.id} invoices={invoices} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={session.user.id} mileage={mileage} />}
 
       {/* TOAST */}
@@ -452,10 +492,11 @@ function Line({label,v,bold}) { return <div style={{ display:'flex', justifyCont
 function Check({ok,t}) { return <div style={{ display:'flex', alignItems:'center', gap:'12px', fontSize:'14px', padding:'8px 0' }}><span style={{ width:'22px', height:'22px', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', background: ok?'rgba(34,197,94,.12)':'var(--surface3)', color: ok?'var(--green)':'var(--text3)', fontWeight:700, fontSize:'13px' }}>{ok?'✓':'!'}</span>{t}</div> }
 
 // ---------- add-expense form (with smart category suggestion) ----------
-function ExpenseForm({onClose,onSaved,uid}) {
+function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
   const [amount,setAmount]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+  const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
 
   // smart suggestion: check learned rules as user types merchant
   const suggest = async (m) => {
@@ -478,7 +519,8 @@ function ExpenseForm({onClose,onSaved,uid}) {
   }
   return <Modal title="Add expense" onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <input style={inp} placeholder="Merchant (e.g. Adobe UK)" value={merchant} onChange={e=>suggest(e.target.value)} />
+    <input style={inp} list="past-merchants" placeholder="Supplier / merchant (e.g. Adobe UK)" value={merchant} onChange={e=>suggest(e.target.value)} />
+    <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
     <select style={{...inp, marginTop:'12px'}} value={category} onChange={e=>setCategory(e.target.value)}>
       {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
     </select>
@@ -489,11 +531,12 @@ function ExpenseForm({onClose,onSaved,uid}) {
 }
 
 // ---------- add-invoice form ----------
-function InvoiceForm({onClose,onSaved,uid}) {
+function InvoiceForm({onClose,onSaved,uid,invoices}) {
   const [client,setClient]=useState(''); const [number,setNumber]=useState('')
   const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
   const [date,setDate]=useState(new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+  const pastClients = [...new Set((invoices||[]).map(i=>i.client_name).filter(Boolean))].sort()
   const save = async () => {
     if(!client||!total) return setErr('Client and total are required')
     setBusy(true); setErr('')
@@ -503,16 +546,17 @@ function InvoiceForm({onClose,onSaved,uid}) {
     if(error){ setErr(error.message); setBusy(false); return }
     onSaved()
   }
-  return <Modal title="Create invoice" onClose={onClose}>
+  return <Modal title="Add income" onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <input style={inp} placeholder="Client name" value={client} onChange={e=>setClient(e.target.value)} />
+    <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>setClient(e.target.value)} />
+    <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
     <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
     </select>
     <input style={{...inp, marginTop:'12px'}} type="date" value={date} onChange={e=>setDate(e.target.value)} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save invoice'}</button>
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save income'}</button>
   </Modal>
 }
 
@@ -1178,6 +1222,9 @@ function BankImport({ uid, existingExpenses, onImported }) {
 // ---------- SETTINGS ----------
 function Settings({ session, signOut, flash }) {
   const [name, setName] = React.useState(session.user.user_metadata?.business_name || '')
+  const [address, setAddress] = React.useState(session.user.user_metadata?.company_address || '')
+  const [vatNo, setVatNo] = React.useState(session.user.user_metadata?.vat_number || '')
+  const [logoUrl, setLogoUrl] = React.useState(session.user.user_metadata?.logo_url || '')
   const [email, setEmail] = React.useState(session.user.email || '')
   const [pw, setPw] = React.useState('')
   const [pw2, setPw2] = React.useState('')
@@ -1191,12 +1238,29 @@ function Settings({ session, signOut, flash }) {
   const saveName = async () => {
     setBusy('name'); setErr('')
     try {
-      const { error } = await window.sb.auth.updateUser({ data: { business_name: name.trim() } })
+      const { error } = await window.sb.auth.updateUser({ data: {
+        business_name: name.trim(), company_address: address.trim(), vat_number: vatNo.trim()
+      } })
       if (error) throw error
-      // also update the access row so the admin panel reflects it
       await window.sb.from('soloops_access').update({ business_name: name.trim() }).eq('user_id', session.user.id)
-      note('Business name updated')
-    } catch (e) { fail(e.message || 'Could not update name') }
+      note('Business details saved')
+    } catch (e) { fail(e.message || 'Could not save details') }
+    setBusy('')
+  }
+
+  const uploadLogo = async (e) => {
+    const f = e.target.files?.[0]; if (!f) return
+    setBusy('logo'); setErr('')
+    try {
+      const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${session.user.id}/logo-${safe}`
+      const { error: upErr } = await window.sb.storage.from('soloops-files').upload(path, f, { upsert:true })
+      if (upErr) throw upErr
+      const { data } = await window.sb.storage.from('soloops-files').createSignedUrl(path, 60*60*24*365)
+      const url = data?.signedUrl || ''
+      await window.sb.auth.updateUser({ data: { logo_url: url } })
+      setLogoUrl(url); note('Logo uploaded')
+    } catch (e) { fail(e.message || 'Could not upload logo') }
     setBusy('')
   }
 
@@ -1239,11 +1303,30 @@ function Settings({ session, signOut, flash }) {
       {/* Profile */}
       <div data-card style={card}>
         <div style={sectionTitle}>Business profile</div>
+        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on your invoices.</div>
         <div style={{ marginBottom:'12px' }}>
           <div style={lbl}>Business name</div>
           <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your business name" />
         </div>
-        <button style={{...btnPri, opacity:busy==='name'?.7:1}} disabled={busy==='name'} onClick={saveName}>{busy==='name'?'Saving…':'Save name'}</button>
+        <div style={{ marginBottom:'12px' }}>
+          <div style={lbl}>Company address</div>
+          <textarea style={{...inp, minHeight:'70px', resize:'vertical', fontFamily:'inherit'}} value={address} onChange={e=>setAddress(e.target.value)} placeholder="Street, city, postcode" />
+        </div>
+        <div style={{ marginBottom:'12px' }}>
+          <div style={lbl}>VAT number (optional)</div>
+          <input style={inp} value={vatNo} onChange={e=>setVatNo(e.target.value)} placeholder="GB123456789" />
+        </div>
+        <div style={{ marginBottom:'12px' }}>
+          <div style={lbl}>Logo</div>
+          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+            {logoUrl && <img src={logoUrl} alt="logo" style={{ height:'42px', width:'42px', objectFit:'contain', borderRadius:'8px', background:'var(--surface3)', padding:'4px' }} />}
+            <label style={{...btnSec, cursor:'pointer', opacity:busy==='logo'?.7:1}}>
+              {busy==='logo' ? 'Uploading…' : (logoUrl ? 'Replace logo' : 'Upload logo')}
+              <input type="file" accept="image/*" onChange={uploadLogo} disabled={busy==='logo'} style={{ display:'none' }} />
+            </label>
+          </div>
+        </div>
+        <button style={{...btnPri, opacity:busy==='name'?.7:1}} disabled={busy==='name'} onClick={saveName}>{busy==='name'?'Saving…':'Save business details'}</button>
       </div>
 
       {/* Account / email */}
