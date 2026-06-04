@@ -19,7 +19,7 @@ const btnPri = { background:grad, color:'#000', fontWeight:700, fontSize:'14px',
 const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:700, fontSize:'13px', padding:'9px 14px', borderRadius:'10px', border:'1px solid var(--border-light)', cursor:'pointer' }
 
 const NAV = [
-  ['dashboard','Dashboard'], ['income','Income'], ['expenses','Expenses'],
+  ['dashboard','Dashboard'], ['income','Income'], ['clients','Clients'], ['expenses','Expenses'],
   ['banking','Banking'], ['recurring','Recurring'], ['receipts','Receipts'], ['mileage','Mileage'],
   ['reports','Reports'], ['documents','Documents'], ['tax','Tax'], ['settings','Settings']
 ]
@@ -33,6 +33,7 @@ function App() {
   const [invoices, setInvoices] = useState([])
   const [expenses, setExpenses] = useState([])
   const [mileage, setMileage] = useState([])
+  const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // 'expense' | 'invoice' | null
   const [toast, setToast] = useState('')
@@ -66,14 +67,16 @@ function App() {
         return
       }
     }
-    const [inv, exp, mil] = await Promise.all([
+    const [inv, exp, mil, cli] = await Promise.all([
       window.sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false }),
       window.sb.from('soloops_expenses').select('*').order('spent_on', { ascending: false }),
       window.sb.from('soloops_mileage').select('*').order('journey_date', { ascending: false }),
+      window.sb.from('soloops_clients').select('*').order('name', { ascending: true }),
     ])
     setInvoices(inv.data || [])
     setExpenses(exp.data || [])
     setMileage(mil.data || [])
+    setClients(cli.data || [])
     setLoading(false)
   }
   useEffect(() => { if (session) loadAll() }, [session])
@@ -223,6 +226,11 @@ function App() {
                   </tr>))}</tbody>
               </table>}
             </div>
+          )}
+
+          {/* ===== CLIENTS ===== */}
+          {view==='clients' && (
+            <Clients uid={session.user.id} clients={clients} invoices={invoices} onChange={loadAll} flash={flash} />
           )}
 
           {/* ===== EXPENSES ===== */}
@@ -376,7 +384,7 @@ function App() {
 
       {/* MODALS */}
       {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={session.user.id} expenses={expenses} />}
-      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={session.user.id} invoices={invoices} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={session.user.id} invoices={invoices} clients={clients} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={session.user.id} mileage={mileage} />}
 
       {/* TOAST */}
@@ -515,7 +523,7 @@ function DateField({ value, onChange, style }) {
         onChange={e=>{ setText(e.target.value); const iso=parse(e.target.value); if(iso) onChange(iso) }}
         onBlur={()=>{ const iso=parse(text); if(iso) onChange(iso); else setText(toText(value)) }} />
       <input type="date" value={value||''} onChange={e=>onChange(e.target.value)}
-        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 8px', color:'var(--text)', width:'42px', cursor:'pointer' }} title="Pick from calendar" />
+        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 10px', color:'var(--text)', width:'52px', minWidth:'52px', cursor:'pointer', colorScheme:'inherit' }} title="Pick from calendar" />
     </div>
   )
 }
@@ -575,12 +583,19 @@ function ExpenseForm({onClose,onSaved,uid,expenses}) {
 }
 
 // ---------- add-invoice form ----------
-function InvoiceForm({onClose,onSaved,uid,invoices}) {
+function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
   const [client,setClient]=useState(''); const [number,setNumber]=useState('')
   const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
   const [date,setDate]=useState(new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+  const [picked,setPicked]=useState(null)
   const pastClients = [...new Set((invoices||[]).map(i=>i.client_name).filter(Boolean))].sort()
+  const savedClients = clients||[]
+  const onPick = (id) => {
+    const c = savedClients.find(x=>x.id===id)
+    setPicked(c||null)
+    if (c) setClient(c.name)
+  }
   const save = async () => {
     if(!client||!total) return setErr('Client and total are required')
     setBusy(true); setErr('')
@@ -592,7 +607,21 @@ function InvoiceForm({onClose,onSaved,uid,invoices}) {
   }
   return <Modal title="Add income" onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>setClient(e.target.value)} />
+    {savedClients.length>0 && (
+      <select style={{...inp, marginBottom:'12px'}} value={picked?.id||''} onChange={e=>onPick(e.target.value)}>
+        <option value="">— Pick a saved client (optional) —</option>
+        {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    )}
+    {picked && (
+      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
+        {picked.email && <div>✉ {picked.email}</div>}
+        {picked.phone && <div>☎ {picked.phone}</div>}
+        {picked.address && <div>📍 {picked.address}</div>}
+        {picked.notes && <div style={{color:'var(--text3)'}}>{picked.notes}</div>}
+      </div>
+    )}
+    <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setPicked(null)}} />
     <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
     <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
@@ -754,6 +783,7 @@ function Documents({ uid, invoices, expenses }) {
   const [busy, setBusy] = React.useState(false)
   const [docType, setDocType] = React.useState('Statement')
   const [err, setErr] = React.useState('')
+  const [preview, setPreview] = React.useState(null) // {url, name, isImage, isPdf}
 
   const load = () => {
     setLoading(true)
@@ -784,6 +814,17 @@ function Documents({ uid, invoices, expenses }) {
       if (error) throw error
       const a = document.createElement('a'); a.href = data.signedUrl; a.download = name || 'file'; a.target = '_blank'; a.click()
     } catch (e) { setErr(e.message || 'Could not get download link') }
+  }
+
+  const openPreview = async (path, name) => {
+    try {
+      const { data, error } = await window.sb.storage.from('soloops-files').createSignedUrl(path, 60*10)
+      if (error) throw error
+      const ext = (name||'').split('.').pop().toLowerCase()
+      const isImage = ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)
+      const isPdf = ext === 'pdf'
+      setPreview({ url: data.signedUrl, name, isImage, isPdf })
+    } catch (e) { setErr(e.message || 'Could not open preview') }
   }
 
   const remove = async (id, path) => {
@@ -823,15 +864,35 @@ function Documents({ uid, invoices, expenses }) {
         <tbody>{filtered.map(d => (
           <tr key={d.id}>
             <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{d.type}</span></Td>
-            <Td>{d.name}</Td>
+            <Td><span onClick={()=>openPreview(d.storage_path,d.name)} style={{cursor:'pointer'}}>{d.name}</span></Td>
             <Td muted mono>{(d.uploaded_at||'').slice(0,10)}</Td>
             <Td muted mono>{kb(d.size_bytes)}</Td>
             <Td right>
+              <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>openPreview(d.storage_path, d.name)}>Preview</button>
               <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>download(d.storage_path, d.name)}>Download</button>
               <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', fontSize:'13px' }} onClick={()=>remove(d.id, d.storage_path)}>✕</button>
             </Td>
           </tr>))}</tbody>
       </table>}
+
+      {preview && (
+        <div onClick={()=>setPreview(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'30px' }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'14px', padding:'18px', maxWidth:'900px', width:'100%', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
+              <div style={{ fontWeight:700 }}>{preview.name}</div>
+              <div style={{ display:'flex', gap:'8px' }}>
+                <a href={preview.url} target="_blank" rel="noopener" style={{...btnSec, padding:'6px 12px', textDecoration:'none'}}>Open in tab</a>
+                <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'6px 10px', cursor:'pointer' }} onClick={()=>setPreview(null)}>✕</button>
+              </div>
+            </div>
+            <div style={{ flex:1, overflow:'auto', background:'var(--surface2)', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {preview.isImage ? <img src={preview.url} alt={preview.name} style={{ maxWidth:'100%', maxHeight:'78vh', objectFit:'contain' }} />
+              : preview.isPdf ? <iframe src={preview.url} title={preview.name} style={{ width:'100%', height:'78vh', border:'none', borderRadius:'10px' }} />
+              : <div style={{ padding:'50px', textAlign:'center', color:'var(--text3)' }}>Can't preview this file type.<br/>Use "Open in tab" or Download.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1412,6 +1473,105 @@ function Settings({ session, signOut, flash }) {
       <div style={{ gridColumn:'1/-1' }}>
         <button onClick={signOut} style={btnSec}>Sign out</button>
       </div>
+    </div>
+  )
+}
+
+// ---------- CLIENTS ----------
+function Clients({ uid, clients, invoices, onChange, flash }) {
+  const [editing, setEditing] = React.useState(null) // client obj or 'new' or null
+  const [selected, setSelected] = React.useState(null)
+  const blank = { name:'', email:'', phone:'', address:'', notes:'' }
+  const [form, setForm] = React.useState(blank)
+  const [busy, setBusy] = React.useState(false)
+  const [err, setErr] = React.useState('')
+
+  const open = (c) => { setEditing(c||'new'); setForm(c ? {...c} : blank); setErr('') }
+  const save = async () => {
+    if (!form.name.trim()) { setErr('Client name is required'); return }
+    setBusy(true); setErr('')
+    try {
+      if (editing === 'new') {
+        const { error } = await window.sb.from('soloops_clients').insert({
+          user_id: uid, name: form.name.trim(), email: form.email?.trim(), phone: form.phone?.trim(), address: form.address?.trim(), notes: form.notes?.trim()
+        })
+        if (error) throw error
+      } else {
+        const { error } = await window.sb.from('soloops_clients').update({
+          name: form.name.trim(), email: form.email?.trim(), phone: form.phone?.trim(), address: form.address?.trim(), notes: form.notes?.trim()
+        }).eq('id', editing.id)
+        if (error) throw error
+      }
+      setEditing(null); onChange && onChange(); flash && flash('Client saved')
+    } catch (e) { setErr(e.message || 'Could not save client') }
+    setBusy(false)
+  }
+  const del = async (id) => {
+    setBusy(true)
+    try { await window.sb.from('soloops_clients').delete().eq('id', id); setSelected(null); onChange && onChange() }
+    catch (e) { setErr(e.message||'Could not delete') }
+    setBusy(false)
+  }
+
+  const clientInvoices = (name) => invoices.filter(i => (i.client_name||'') === name)
+  const lbl = { fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns: selected?'1fr 1fr':'1fr', gap:'16px', alignItems:'start' }}>
+      <div data-card style={card}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+          <div style={{fontWeight:700}}>Clients</div>
+          <button style={btnPri} onClick={()=>open(null)}>+ New client</button>
+        </div>
+        {err && editing===null && <ErrBox m={err} />}
+        {clients.length===0 ? <Empty msg="No clients yet. Add one to attach to your invoices." />
+        : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead><Th cols={['Name','Email','Phone','']} /></thead>
+          <tbody>{clients.map(c => (
+            <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>setSelected(c)}>
+              <Td>{c.name}</Td><Td muted>{c.email||'—'}</Td><Td muted>{c.phone||'—'}</Td>
+              <Td right><button style={{...btnSec, padding:'5px 11px'}} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button></Td>
+            </tr>))}</tbody>
+        </table>}
+      </div>
+
+      {/* detail panel */}
+      {selected && (
+        <div data-card style={card}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
+            <div style={{ fontWeight:700, fontSize:'17px' }}>{selected.name}</div>
+            <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'5px 10px', cursor:'pointer' }} onClick={()=>setSelected(null)}>✕</button>
+          </div>
+          <Line label="Email" v={selected.email||'—'} />
+          <Line label="Phone" v={selected.phone||'—'} />
+          <Line label="Address" v={selected.address||'—'} />
+          {selected.notes && <div style={{ marginTop:'10px', fontSize:'13px', color:'var(--text2)', background:'var(--surface2)', padding:'10px 12px', borderRadius:'8px' }}>{selected.notes}</div>}
+          <div style={{ marginTop:'16px', fontWeight:700, fontSize:'13px' }}>Invoices ({clientInvoices(selected.name).length})</div>
+          {clientInvoices(selected.name).length===0 ? <div style={{fontSize:'13px',color:'var(--text3)',marginTop:'8px'}}>No invoices for this client yet.</div>
+          : <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'8px' }}>
+            <tbody>{clientInvoices(selected.name).map(i => (
+              <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
+            ))}</tbody>
+          </table>}
+          <div style={{ marginTop:'16px', display:'flex', gap:'8px' }}>
+            <button style={btnSec} onClick={()=>open(selected)}>Edit</button>
+            <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={()=>del(selected.id)}>Delete</button>
+          </div>
+        </div>
+      )}
+
+      {/* edit modal */}
+      {editing!==null && (
+        <Modal title={editing==='new'?'New client':'Edit client'} onClose={()=>setEditing(null)}>
+          {err && <ErrBox m={err} />}
+          <input style={inp} placeholder="Client / company name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} />
+          <input style={{...inp,marginTop:'12px'}} placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
+          <input style={{...inp,marginTop:'12px'}} placeholder="Phone" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} />
+          <textarea style={{...inp,marginTop:'12px',minHeight:'60px',resize:'vertical'}} placeholder="Address" value={form.address} onChange={e=>setForm({...form,address:e.target.value})} />
+          <textarea style={{...inp,marginTop:'12px',minHeight:'50px',resize:'vertical'}} placeholder="Notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} />
+          <button style={{...btnPri,marginTop:'14px',width:'100%',opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save client'}</button>
+        </Modal>
+      )}
     </div>
   )
 }
