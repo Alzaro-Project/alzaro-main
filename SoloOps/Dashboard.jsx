@@ -20,7 +20,7 @@ const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:7
 
 const NAV = [
   ['dashboard','Dashboard'], ['income','Income'], ['expenses','Expenses'],
-  ['banking','Banking'], ['recurring','Recurring'], ['mileage','Mileage'], ['tax','Tax'], ['settings','Settings']
+  ['banking','Banking'], ['recurring','Recurring'], ['receipts','Receipts'], ['mileage','Mileage'], ['tax','Tax'], ['settings','Settings']
 ]
 
 function App() {
@@ -185,7 +185,7 @@ function App() {
                 <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
                 <tbody>{expenses.map(e => (
                   <tr key={e.id}>
-                    <Td muted mono>{e.spent_on}</Td><Td>{e.merchant}</Td>
+                    <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
                   </tr>))}</tbody>
@@ -203,21 +203,65 @@ function App() {
             <Recurring expenses={expenses} />
           )}
 
-          {/* ===== MILEAGE ===== */}
-          {view==='mileage' && (
-            <div style={card}>
-              {mileage.length===0 ? <Empty msg="No journeys logged yet." />
-              : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
-                <tbody>{mileage.map(m => (
-                  <tr key={m.id}>
-                    <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
-                    <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
-                    <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
-                  </tr>))}</tbody>
-              </table>}
-            </div>
+          {/* ===== RECEIPTS / MATCHING ===== */}
+          {view==='receipts' && (
+            <Receipts uid={session.user.id} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
           )}
+
+          {/* ===== MILEAGE ===== */}
+          {view==='mileage' && (() => {
+            const totalMiles = mileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
+            // HMRC AMAP: 45p/mile first 10,000 miles, 25p after (cars/vans)
+            const first = Math.min(totalMiles, 10000)
+            const over = Math.max(0, totalMiles - 10000)
+            const claim = first * 0.45 + over * 0.25
+            const downloadReport = () => {
+              const rows = [['Date','From','To','Purpose','Miles']]
+              mileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
+              rows.push([])
+              rows.push(['Total miles', totalMiles])
+              rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
+              rows.push(['Over 10,000 miles @ 25p', (over*0.25).toFixed(2)])
+              rows.push(['Total claim (GBP)', claim.toFixed(2)])
+              const csv = rows.map(r => r.join(',')).join('\n')
+              const blob = new Blob([csv], { type:'text/csv' })
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(blob)
+              a.download = 'soloops-mileage-report.csv'
+              a.click()
+            }
+            return (
+            <>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+                <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
+                <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
+                <KPI label="Journeys" value={mileage.length} />
+              </div>
+              <div style={card}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+                  <div>
+                    <div style={{fontWeight:700}}>Mileage log</div>
+                    <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
+                  </div>
+                  <div style={{ display:'flex', gap:'10px' }}>
+                    {mileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
+                    <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
+                  </div>
+                </div>
+                {mileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
+                : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
+                  <tbody>{mileage.map(m => (
+                    <tr key={m.id}>
+                      <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
+                      <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
+                      <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
+                    </tr>))}</tbody>
+                </table>}
+              </div>
+            </>
+            )
+          })()}
 
           {/* ===== TAX ===== */}
           {view==='tax' && (
@@ -264,6 +308,7 @@ function App() {
       {/* MODALS */}
       {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={session.user.id} />}
       {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Invoice created')}} uid={session.user.id} />}
+      {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={session.user.id} mileage={mileage} />}
 
       {/* TOAST */}
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
@@ -373,6 +418,135 @@ function Modal({title,children,onClose}) {
   </div>
 }
 function ErrBox({m}) { return <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)', marginBottom:'14px' }}>{m}</div> }
+
+// ---------- RECEIPT MATCHING ----------
+function Receipts({ uid, expenses, onMatched }) {
+  const [fileName, setFileName] = React.useState('')
+  const [amount, setAmount] = React.useState('')
+  const [date, setDate] = React.useState('')
+  const [suggestions, setSuggestions] = React.useState(null)
+  const [busy, setBusy] = React.useState(false)
+  const [err, setErr] = React.useState('')
+
+  const withReceipt = expenses.filter(e => e.has_receipt)
+  const withoutReceipt = expenses.filter(e => !e.has_receipt)
+
+  const onFile = (e) => {
+    const f = e.target.files?.[0]
+    if (f) { setFileName(f.name); setErr(''); setSuggestions(null) }
+  }
+
+  const daysBetween = (a, b) => {
+    const d1 = new Date(a), d2 = new Date(b)
+    if (isNaN(d1) || isNaN(d2)) return 999
+    return Math.abs((d1 - d2) / 86400000)
+  }
+
+  const findMatches = () => {
+    if (!amount) { setErr('Enter the receipt amount so we can find matching expenses.'); return }
+    setErr('')
+    const amt = parseFloat(amount)
+    // score expenses without a receipt: exact amount + close date = best
+    const scored = withoutReceipt
+      .map(e => {
+        const amtDiff = Math.abs(Number(e.amount) - amt)
+        const dayDiff = date ? daysBetween(e.spent_on, date) : 0
+        return { e, amtDiff, dayDiff }
+      })
+      .filter(s => s.amtDiff < 0.01 || (s.amtDiff <= 1 && s.dayDiff <= 3)) // exact, or within £1 and 3 days
+      .sort((a,b) => (a.amtDiff - b.amtDiff) || (a.dayDiff - b.dayDiff))
+      .slice(0, 5)
+    setSuggestions(scored)
+  }
+
+  const attach = async (expenseId) => {
+    setBusy(true); setErr('')
+    try {
+      const { error } = await window.sb.from('soloops_expenses')
+        .update({ has_receipt: true, receipt_name: fileName || 'receipt' })
+        .eq('id', expenseId)
+      if (error) throw error
+      setFileName(''); setAmount(''); setDate(''); setSuggestions(null)
+      onMatched && onMatched()
+    } catch (e) { setErr(e.message || 'Could not attach receipt') }
+    setBusy(false)
+  }
+
+  return (
+    <>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+        <KPI label="Expenses with receipt" value={withReceipt.length} color="var(--green)" />
+        <KPI label="Missing a receipt" value={withoutReceipt.length} color="var(--amber)" />
+        <KPI label="Total expenses" value={expenses.length} />
+      </div>
+
+      <div style={card}>
+        <div style={{fontWeight:700, marginBottom:'4px'}}>Match a receipt</div>
+        <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Upload your receipt and enter its amount &amp; date — we'll find the matching expense to attach it to.</div>
+        {err && <ErrBox m={err} />}
+        <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr 1fr auto', gap:'12px', alignItems:'end' }}>
+          <div>
+            <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Receipt file</div>
+            <label style={{...inp, display:'flex', alignItems:'center', cursor:'pointer', color: fileName?'var(--text)':'var(--text3)' }}>
+              {fileName || 'Choose a file…'}
+              <input type="file" accept="image/*,.pdf" onChange={onFile} style={{ display:'none' }} />
+            </label>
+          </div>
+          <div>
+            <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Amount (£)</div>
+            <input style={inp} type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Date (optional)</div>
+            <input style={inp} type="date" value={date} onChange={e=>setDate(e.target.value)} />
+          </div>
+          <button style={btnPri} onClick={findMatches}>Find match</button>
+        </div>
+
+        {suggestions && (
+          <div style={{ marginTop:'20px' }}>
+            {suggestions.length === 0 ? (
+              <div style={{ color:'var(--text3)', fontSize:'13.5px', padding:'14px', background:'var(--surface2)', borderRadius:'10px' }}>
+                No matching expense found for that amount. Check the amount, or add the expense first (it may not be recorded yet).
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'10px' }}>Suggested matches — click to attach the receipt:</div>
+                {suggestions.map((s,i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', marginBottom:'8px' }}>
+                    <div>
+                      <div style={{ fontWeight:600, fontSize:'14px' }}>{s.e.merchant}</div>
+                      <div style={{ fontSize:'12px', color:'var(--text3)' }}>{s.e.spent_on} · {s.e.category} {s.amtDiff < 0.01 ? '· exact amount' : '· close match'}</div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                      <span className="mono" style={{ fontWeight:600 }}>{gbp(s.e.amount)}</span>
+                      <button style={{...btnPri, padding:'7px 14px', opacity:busy?.7:1}} disabled={busy} onClick={()=>attach(s.e.id)}>Attach</button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{...card, marginTop:'16px'}}>
+        <div style={{fontWeight:700, marginBottom:'4px'}}>Expenses missing a receipt</div>
+        <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Good to attach these for your records / HMRC</div>
+        {withoutReceipt.length === 0 ? <Empty msg="Every expense has a receipt attached. Nice." />
+        : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
+          <tbody>{withoutReceipt.slice(0,15).map(e => (
+            <tr key={e.id}>
+              <Td muted mono>{e.spent_on}</Td><Td>{e.merchant}</Td>
+              <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
+              <Td mono right>{gbp(e.amount)}</Td>
+            </tr>))}</tbody>
+        </table>}
+      </div>
+    </>
+  )
+}
 
 // ---------- RECURRING / SUBSCRIPTION DETECTION ----------
 function Recurring({ expenses }) {
