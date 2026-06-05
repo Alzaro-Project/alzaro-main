@@ -1798,24 +1798,24 @@ function Dashboard({ user, signOut }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
-        <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
-        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Field Service Pro</div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 18px" }}>{DEMO.user.tier}</span>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
+        <div className="brand" style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 14, flexShrink: 0 }}>Field Service Pro</div>
+        <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
+        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0 }}>
           {NAV.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent", flexShrink: 0 }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ fontSize: 13 }}>{n.label}</span>
               </div>
             );
           })}
         </nav>
-        <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : DEMO.user.email}</div>
+        <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 12, marginTop: 10, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
             <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
