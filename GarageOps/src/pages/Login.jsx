@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
 import { checkIsAdmin } from '../lib/db'
-import garageOpsIcon from '../assets/alzaro-garageops-icon.jpg'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
@@ -191,21 +190,30 @@ export default function Login() {
         zIndex: 1,
         boxShadow: '0 20px 48px rgba(0,0,0,0.4)',
       }}>
-        {/* Logo — Alzaro GarageOps icon (cropped from full logo, no text) */}
+        {/* Logo — Alzaro GarageOps wordmark, matches sidebar styling */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginBottom: '20px',
+          textAlign: 'center',
+          marginBottom: '24px',
         }}>
-          <img
-  src={garageOpsIcon}
-  alt="Alzaro GarageOps"
-  style={{
-    width: '200px',
-    height: 'auto',
-    display: 'block',
-  }}
-/>
+          <div style={{
+            fontFamily: "'Space Grotesk', -apple-system, sans-serif",
+            fontSize: '32px',
+            fontWeight: 700,
+            letterSpacing: '-1px',
+            lineHeight: 1.1,
+          }}>
+            <span style={{ color: BRAND.text }}>Alzaro </span>
+            <span style={{ color: BRAND.red }}>GarageOps</span>
+          </div>
+          <div style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '10px',
+            color: BRAND.text3,
+            marginTop: '6px',
+            letterSpacing: '0.4px',
+          }}>
+            Garage Management Pro
+          </div>
         </div>
 
         {showForgotPassword ? (
