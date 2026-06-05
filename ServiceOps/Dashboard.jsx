@@ -1663,7 +1663,7 @@ function AuthScreen() {
   };
 
   const authInp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "Inter", outline: "none" };
-  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(139,127,232,.3)" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
   const Banner = ({ text, good }) => (
     <div style={{ background: good ? "var(--green-soft)" : "var(--red-soft)", border: "1px solid " + (good ? "var(--green)" : "var(--red)"), borderRadius: 8, padding: "11px 14px", fontSize: 13, color: good ? "var(--green)" : "var(--red)", marginBottom: 14, lineHeight: 1.4 }}>{good ? "✓ " : ""}{text}</div>
   );
@@ -1711,7 +1711,7 @@ function AuthScreen() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ background: "var(--brand-soft)", border: "1px solid rgba(139,127,232,.25)", borderRadius: 8, padding: "11px 14px", fontSize: 12, color: "var(--brand)", textAlign: "center", fontWeight: 500 }}>
+                <div style={{ background: "var(--brand-soft)", border: "1px solid rgba(34,197,94,.25)", borderRadius: 8, padding: "11px 14px", fontSize: 12, color: "var(--brand)", textAlign: "center", fontWeight: 500 }}>
                   🔧 Start your <strong>14-day free trial</strong> — full access, no card required
                 </div>
                 <input style={authInp} placeholder="Business name *" value={company} onChange={(e) => setCompany(e.target.value)} />
@@ -1802,7 +1802,7 @@ function Dashboard({ user, signOut }) {
         <div className="brand" style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 14, flexShrink: 0 }}>Field Service Pro</div>
         <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
+        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#0f4429", background: "#a7e8c4", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0 }}>
           {NAV.map((n) => {
             const on = n.id === active;
