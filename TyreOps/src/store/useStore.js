@@ -553,12 +553,10 @@ export const useStore = create(
         const garageId = get().garageId
         if (garageId) {
           try {
-            if (Object.keys(updates).length === 1 && updates.status) {
-              await db.updateInvoiceStatus(id, updates.status)
-            }
+            await db.updateInvoice(garageId, id, updates)
           } catch (err) {
             console.error('Failed to update invoice:', err)
-            showToast('Failed to update invoice status.')
+            showToast('Failed to update invoice.')
           }
         }
       },
@@ -569,7 +567,7 @@ export const useStore = create(
         const garageId = get().garageId
         if (garageId) {
           try {
-            await db.deleteInvoice(id)
+            await db.deleteInvoice(garageId, id)
           } catch (err) {
             console.error('Failed to delete invoice:', err)
             showToast('Failed to delete invoice from database.')
