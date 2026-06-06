@@ -1604,7 +1604,7 @@ function SettingsPage() {
 /*  AUTH SCREEN  (login + sign up)                                    */
 /* ================================================================== */
 function AuthScreen() {
-  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register");
+  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register" || window.location.pathname.endsWith("/register"));
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -1643,7 +1643,23 @@ function AuthScreen() {
     if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
-    const { error } = await db.auth.signUp({ email, password: pw, options: { data: { company_name: company.trim(), product: "serviceops" } } });
+    const { data, error } = await db.auth.signUp({ email, password: pw, options: { data: { company_name: company.trim(), product: "serviceops" } } });
+    // an existing Alzaro account (from another Ops product) shows up as an error
+    // or as a signUp result with no identities — handle both
+    const alreadyExists = (error && /already/i.test(error.message)) ||
+      (!error && data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+    if (alreadyExists) {
+      // sign them in with their existing Alzaro password and activate ServiceOps on it
+      const { data: si, error: siErr } = await db.auth.signInWithPassword({ email, password: pw });
+      if (siErr) {
+        setBusy(false);
+        return setMsg("An Alzaro account with this email already exists (from another Alzaro product). Enter that account's password here to activate ServiceOps on it — the password you entered didn't match.");
+      }
+      await db.from("svc_licences").insert([{ user_id: si.user.id }]); // duplicate-safe: errors ignored below
+      setBusy(false);
+      window.location.href = "/serviceops/login"; // fresh load → straight into the app
+      return;
+    }
     setBusy(false);
     if (error) return setMsg(error.message);
     setOk("Check your email to confirm your account, then log in.");
@@ -2042,26 +2058,22 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
 /*  ROOT — decides: login screen or dashboard                         */
 /* ================================================================== */
 /* Shown to Alzaro accounts from other products that don't have ServiceOps yet */
-function ActivateScreen({ user, onActivated, signOut }) {
+function ActivateScreen({ user, signOut }) {
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const activate = async () => {
-    setBusy(true); setErr("");
-    const { error } = await db.from("svc_licences").insert([{ user_id: user.id }]);
-    setBusy(false);
-    if (error && !String(error.message).includes("duplicate")) { setErr(error.message); return; }
-    onActivated();
+  const goRegister = async () => {
+    setBusy(true);
+    await db.auth.signOut();
+    window.location.href = "/serviceops/register";
   };
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 430, maxWidth: "100%", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
         <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
         <div style={{ width: 54, height: 54, borderRadius: 14, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", margin: "18px auto 16px" }}><i className="ti ti-rocket" style={{ fontSize: 26 }} /></div>
-        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>You don't have ServiceOps yet</div>
-        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but this account isn't registered for ServiceOps.</div>
-        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> now — no card needed.</div>
-        {err && <div style={{ background: "var(--red-soft)", border: "1px solid rgba(224,82,82,.3)", color: "var(--red)", borderRadius: 8, padding: "10px 12px", fontSize: 12, marginBottom: 14 }}>{err}</div>}
-        <button onClick={activate} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Setting up…" : "Start my free trial"}</button>
+        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>This account isn't registered for ServiceOps</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but ServiceOps needs its own registration.</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Register now to start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> — no card needed.</div>
+        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
         <div onClick={signOut} style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 16, cursor: "pointer" }}>Not you? <span style={{ color: "var(--brand)" }}>Sign out</span></div>
       </div>
     </div>
@@ -2104,7 +2116,7 @@ function App() {
   if (member === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
-  if (!member) return <ActivateScreen user={session.user} signOut={signOut} onActivated={() => setMember(true)} />;
+  if (!member) return <ActivateScreen user={session.user} signOut={signOut} />;
   return <Dashboard user={session.user} signOut={signOut} />;
 }
 
