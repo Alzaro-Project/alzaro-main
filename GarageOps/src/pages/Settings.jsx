@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import { SMTP_PRESETS, validateSmtpConfig, buildSmtpConfig } from '../lib/email'
@@ -12,11 +11,8 @@ const TABS = [
 ]
 
 export default function Settings() {
-  const location = useLocation()
   const { settings, tier, setTier, updateSettings } = useStore()
-  // Open the tab passed via navigate('/settings', { state: { tab: 'subscription' } })
-  // — used by the UpgradeScreen CTA to deep-link to the Subscription tab.
-  const [activeTab, setActiveTab] = useState(location.state?.tab || 'garage')
+  const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
   const [showSmtpPassword, setShowSmtpPassword] = useState(false)
 
@@ -46,14 +42,14 @@ export default function Settings() {
     letterSpacing: '.8px', 
     textTransform: 'uppercase', 
     color: 'var(--text2)', 
-    fontFamily: 'JetBrains Mono, monospace', 
+    fontFamily: 'DM Mono, monospace', 
     marginBottom: '16px' 
   }
 
   const TIERS = [
-    { key: 'bronze', label: '🥉 Bronze', price: '£60/mo', color: '#cd7f32', features: ['Up to 50 invoices/month', 'Customer & vehicle database', 'Basic dashboard', 'MOT date tracking', '1 user account'] },
-    { key: 'silver', label: '🥈 Silver', price: '£75/mo', color: '#c0c0c0', features: ['Everything in Bronze', 'Unlimited invoices', 'Reports & insights', 'VAT export', 'Automated MOT reminders', '2 user accounts'] },
-    { key: 'gold', label: '🥇 Gold', price: '£90/mo', color: 'var(--accent)', features: ['Everything in Silver', 'Advanced reports & P&L', 'CSV / PDF export', 'WhatsApp automation', 'DVLA vehicle lookup', 'Unlimited users'] },
+    { key: 'bronze', label: '🥉 Bronze', price: '£60/mo', color: '#cd7f32', features: ['50 invoices/month', 'Basic inventory', 'FIFO automatic', '1 user'] },
+    { key: 'silver', label: '🥈 Silver', price: '£75/mo', color: '#c0c0c0', features: ['Unlimited invoices', 'Batch override', 'Supplier tracking', 'Used tyres', 'VAT reports', '2 users'] },
+    { key: 'gold', label: '🥇 Gold', price: '£90/mo', color: 'var(--accent)', features: ['Everything in Silver', 'Full P&L dashboard', 'VAT Margin Scheme', 'Reports & export', 'Unlimited users'] },
   ]
 
   // Test SMTP connection
@@ -139,7 +135,7 @@ export default function Settings() {
               cursor: 'pointer',
               transition: 'all .15s',
               background: activeTab === tab.key ? 'var(--accent)' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : 'var(--text2)',
+              color: activeTab === tab.key ? '#000' : 'var(--text2)',
             }}
           >
             {tab.label}
@@ -692,7 +688,7 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
               )}
               
               <div style={{ 
-                fontFamily: 'Space Grotesk, sans-serif', 
+                fontFamily: 'Syne, sans-serif', 
                 fontWeight: 700, 
                 fontSize: '18px',
                 color: t.color,
@@ -702,7 +698,7 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
               </div>
               
               <div style={{ 
-                fontFamily: 'JetBrains Mono, monospace', 
+                fontFamily: 'DM Mono, monospace', 
                 fontSize: '24px', 
                 fontWeight: 600,
                 color: 'var(--text)',
@@ -763,13 +759,13 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
         }}>
           <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '14px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>Next Invoice</div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '16px', fontWeight: 600 }}>
+            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 600 }}>
               1st April 2026
             </div>
           </div>
           <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '14px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>Payment Method</div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '16px', fontWeight: 600 }}>
+            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 600 }}>
               •••• 4242
             </div>
           </div>
@@ -809,7 +805,7 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '20px' }}>💳</span>
                 <div>
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>Visa •••• 4242</div>
+                  <div style={{ fontFamily: 'DM Mono, monospace', fontWeight: 600 }}>Visa •••• 4242</div>
                   <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Expires 12/2027</div>
                 </div>
               </div>
@@ -863,9 +859,9 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
               <tbody>
                 {billingInvoices.map(inv => (
                   <tr key={inv.id}>
-                    <td style={{ padding: '10px 8px', fontFamily: 'JetBrains Mono, monospace' }}>{inv.id}</td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'DM Mono, monospace' }}>{inv.id}</td>
                     <td style={{ padding: '10px 8px', color: 'var(--text2)' }}>{inv.date}</td>
-                    <td style={{ padding: '10px 8px', fontFamily: 'JetBrains Mono, monospace' }}>£{inv.amount}</td>
+                    <td style={{ padding: '10px 8px', fontFamily: 'DM Mono, monospace' }}>£{inv.amount}</td>
                     <td style={{ padding: '10px 8px' }}>
                       <span style={{ 
                         fontSize: '10px', 
@@ -976,7 +972,7 @@ function Modal({ title, children, onClose }) {
         padding: '24px' 
       }}>
         <div style={{ 
-          fontFamily: 'Space Grotesk, sans-serif', 
+          fontFamily: 'Syne, sans-serif', 
           fontSize: '18px', 
           fontWeight: 700, 
           marginBottom: '16px',
