@@ -58,7 +58,7 @@ export default function Purchases() {
   const allRecords = [
     ...batches.map(b => {
       const sk = skus.find(s => s.id === b.skuId)
-      return { ...b, type: 'new', tyreLabel: sk ? skuLabel(sk) : 'Unknown', totalCost: b.qty * b.cost }
+      return { ...b, type: 'new', tyreLabel: sk ? skuLabel(sk) : 'Unknown', totalCost: (b.qty || 0) * (b.cost || 0) }
     }),
     ...usedTyres.map(u => ({
       id: u.id, type: 'used', date: u.date, qty: 1, remaining: u.sold ? 0 : 1,
@@ -79,7 +79,7 @@ export default function Purchases() {
     )
   })
 
-  const totalSpend = allRecords.reduce((a, r) => a + r.totalCost, 0)
+  const totalSpend = allRecords.reduce((a, r) => a + (r.totalCost || 0), 0)
   const activeBatches = batches.filter(b => b.remaining > 0).length
 
   return (
@@ -146,8 +146,8 @@ export default function Purchases() {
                   <td style={{ padding: '10px', fontWeight: 600, fontSize: '12px' }}>{r.tyreLabel}</td>
                   <td style={{ padding: '10px' }}><Badge variant={r.type === 'used' ? 'teal' : 'blue'}>{r.type === 'used' ? '♻ Used' : 'New'}</Badge></td>
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>{r.qty}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{r.cost.toFixed(2)}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{r.totalCost.toFixed(2)}</td>
+                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{(r.cost || 0).toFixed(2)}</td>
+                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{(r.totalCost || 0).toFixed(2)}</td>
                   <td style={{ padding: '10px', fontSize: '11px' }}>{r.supplier || '—'}</td>
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
                     {r.invoiceUrl ? (
