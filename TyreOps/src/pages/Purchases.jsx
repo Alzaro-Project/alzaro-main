@@ -149,7 +149,21 @@ export default function Purchases() {
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{r.cost.toFixed(2)}</td>
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{r.totalCost.toFixed(2)}</td>
                   <td style={{ padding: '10px', fontSize: '11px' }}>{r.supplier || '—'}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text2)' }}>{r.ref || '—'}</td>
+                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
+                    {r.invoiceUrl ? (
+                      <a
+                        href={r.invoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View supplier invoice"
+                        style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}
+                      >
+                        📄 {r.ref && r.ref !== '—' ? r.ref : 'Invoice'}
+                      </a>
+                    ) : (
+                      <span style={{ color: 'var(--text2)' }}>{r.ref || '—'}</span>
+                    )}
+                  </td>
                   <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
                     <span style={{ display: 'inline-flex', gap: '6px' }}>
                       {r.type === 'new' && (
