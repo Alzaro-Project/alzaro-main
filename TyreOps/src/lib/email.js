@@ -339,7 +339,9 @@ export function generateInvoiceEmailHTML(invoice, settings, lines, totals) {
   <div class="payment-info">
     <div class="payment-title">Payment Information</div>
     <div style="font-size: 13px;">
-      Please make payment within the due date. For any queries, contact us at ${garageEmail || phone || 'the garage'}.
+      ${settings.emailFooter
+        ? String(settings.emailFooter).replace(/\n/g, '<br>')
+        : `Please make payment within the due date. For any queries, contact us at ${garageEmail || phone || 'the garage'}.`}
     </div>
   </div>
 
@@ -373,7 +375,7 @@ Subtotal: £${subtotal.toFixed(2)}
 VAT: £${vat.toFixed(2)}
 TOTAL: £${total.toFixed(2)}
 
-Thank you for your business!
+${settings.emailFooter || 'Thank you for your business!'}
 `
   return text.trim()
 }
