@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import { SMTP_PRESETS, validateSmtpConfig, buildSmtpConfig } from '../lib/email'
@@ -15,6 +15,30 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
   const [showSmtpPassword, setShowSmtpPassword] = useState(false)
+
+  // Local draft of settings — edits stay here until Save is clicked
+  const [draft, setDraft] = useState(settings)
+  const [dirty, setDirty] = useState(false)
+  const [saveStatus, setSaveStatus] = useState(null) // null | 'saving' | 'saved'
+
+  // Re-sync draft when settings arrive from Supabase (only if nothing unsaved)
+  useEffect(() => {
+    if (!dirty) setDraft(settings)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings])
+
+  const setField = (patch) => {
+    setDraft(d => ({ ...d, ...patch }))
+    setDirty(true)
+  }
+
+  const saveSettings = async () => {
+    setSaveStatus('saving')
+    await updateSettings(draft)
+    setDirty(false)
+    setSaveStatus('saved')
+    setTimeout(() => setSaveStatus(null), 2500)
+  }
 
   const inputStyle = { 
     background: 'var(--surface2)', 
@@ -54,15 +78,15 @@ export default function Settings() {
 
   // Test SMTP connection
   const testSmtpConnection = async () => {
-    const smtpConfig = buildSmtpConfig(settings.smtpProvider || 'custom', {
-      host: settings.smtpHost,
-      port: settings.smtpPort,
-      secure: settings.smtpSecure,
-      user: settings.smtpUser,
-      pass: settings.smtpPass,
-      fromName: settings.smtpFromName || settings.name,
-      fromEmail: settings.smtpFromEmail || settings.email,
-      replyTo: settings.smtpReplyTo,
+    const smtpConfig = buildSmtpConfig(draft.smtpProvider || 'custom', {
+      host: draft.smtpHost,
+      port: draft.smtpPort,
+      secure: draft.smtpSecure,
+      user: draft.smtpUser,
+      pass: draft.smtpPass,
+      fromName: draft.smtpFromName || draft.name,
+      fromEmail: draft.smtpFromEmail || draft.email,
+      replyTo: draft.smtpReplyTo,
     })
 
     const validation = validateSmtpConfig(smtpConfig)
@@ -89,7 +113,7 @@ export default function Settings() {
   const handleSmtpProviderChange = (provider) => {
     const preset = SMTP_PRESETS[provider]
     if (preset) {
-      updateSettings({
+      setField({
         smtpProvider: provider,
         smtpHost: preset.host,
         smtpPort: preset.port,
@@ -100,7 +124,7 @@ export default function Settings() {
 
   // Check if SMTP is configured
   const getEmailStatus = () => {
-    const hasSmtp = settings.smtpHost && settings.smtpUser && settings.smtpPass
+    const hasSmtp = draft.smtpHost && draft.smtpUser && draft.smtpPass
 
     if (hasSmtp) return { configured: true, method: 'SMTP', variant: 'green' }
     return { configured: false, method: 'Gmail fallback', variant: 'yellow' }
@@ -110,7 +134,32 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Manage your garage profile and preferences" />
+      <PageHeader title="Settings" subtitle="Manage your garage profile and preferences">
+        {dirty && saveStatus !== 'saving' && (
+          <span style={{ alignSelf: 'center', fontSize: '12px', color: 'var(--text3)' }}>Unsaved changes</span>
+        )}
+        {saveStatus === 'saved' && (
+          <span style={{ alignSelf: 'center', fontSize: '12px', color: 'var(--green)', fontWeight: 600 }}>✓ Saved</span>
+        )}
+        <button
+          onClick={saveSettings}
+          disabled={!dirty || saveStatus === 'saving'}
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--accent-text)',
+            fontWeight: 700,
+            fontSize: '13px',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: dirty ? 'pointer' : 'default',
+            opacity: !dirty || saveStatus === 'saving' ? 0.5 : 1,
+            transition: 'opacity .15s',
+          }}
+        >
+          {saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
+        </button>
+      </PageHeader>
 
       {/* Tab Navigation */}
       <div style={{ 
@@ -159,8 +208,8 @@ export default function Settings() {
                 <label style={labelStyle}>Garage Name</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.name || ''} 
-                  onChange={e => updateSettings({ name: e.target.value })} 
+                  value={draft.name || ''} 
+                  onChange={e => setField({ name: e.target.value })} 
                   placeholder="Smith Tyres MK"
                 />
               </div>
@@ -169,8 +218,8 @@ export default function Settings() {
                 <label style={labelStyle}>Address</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.addr || ''} 
-                  onChange={e => updateSettings({ addr: e.target.value })} 
+                  value={draft.addr || ''} 
+                  onChange={e => setField({ addr: e.target.value })} 
                   placeholder="123 High Street"
                 />
               </div>
@@ -179,8 +228,8 @@ export default function Settings() {
                 <label style={labelStyle}>City</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.city || ''} 
-                  onChange={e => updateSettings({ city: e.target.value })} 
+                  value={draft.city || ''} 
+                  onChange={e => setField({ city: e.target.value })} 
                   placeholder="Milton Keynes"
                 />
               </div>
@@ -189,8 +238,8 @@ export default function Settings() {
                 <label style={labelStyle}>Postcode</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.post || ''} 
-                  onChange={e => updateSettings({ post: e.target.value })} 
+                  value={draft.post || ''} 
+                  onChange={e => setField({ post: e.target.value })} 
                   placeholder="MK1 1AA"
                 />
               </div>
@@ -199,8 +248,8 @@ export default function Settings() {
                 <label style={labelStyle}>Phone</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.phone || ''} 
-                  onChange={e => updateSettings({ phone: e.target.value })} 
+                  value={draft.phone || ''} 
+                  onChange={e => setField({ phone: e.target.value })} 
                   placeholder="01908 123456"
                 />
               </div>
@@ -210,8 +259,8 @@ export default function Settings() {
                 <input 
                   style={inputStyle} 
                   type="email"
-                  value={settings.email || ''} 
-                  onChange={e => updateSettings({ email: e.target.value })} 
+                  value={draft.email || ''} 
+                  onChange={e => setField({ email: e.target.value })} 
                   placeholder="info@smithtyres.co.uk"
                 />
               </div>
@@ -282,7 +331,7 @@ export default function Settings() {
                 <label style={labelStyle}>Email Provider</label>
                 <select 
                   style={inputStyle}
-                  value={settings.smtpProvider || 'custom'}
+                  value={draft.smtpProvider || 'custom'}
                   onChange={e => handleSmtpProviderChange(e.target.value)}
                 >
                   <option value="custom">Custom SMTP Server</option>
@@ -302,7 +351,7 @@ export default function Settings() {
                 </select>
                 
                 {/* Provider-specific notes */}
-                {settings.smtpProvider && SMTP_PRESETS[settings.smtpProvider]?.notes && (
+                {draft.smtpProvider && SMTP_PRESETS[draft.smtpProvider]?.notes && (
                   <div style={{ 
                     marginTop: '8px', 
                     padding: '10px 12px', 
@@ -312,7 +361,7 @@ export default function Settings() {
                     fontSize: '11px',
                     color: 'var(--accent)'
                   }}>
-                    💡 {SMTP_PRESETS[settings.smtpProvider].notes}
+                    💡 {SMTP_PRESETS[draft.smtpProvider].notes}
                   </div>
                 )}
               </div>
@@ -323,8 +372,8 @@ export default function Settings() {
                   <label style={labelStyle}>SMTP Host</label>
                   <input 
                     style={inputStyle} 
-                    value={settings.smtpHost || ''} 
-                    onChange={e => updateSettings({ smtpHost: e.target.value })} 
+                    value={draft.smtpHost || ''} 
+                    onChange={e => setField({ smtpHost: e.target.value })} 
                     placeholder="smtp.gmail.com"
                   />
                 </div>
@@ -333,8 +382,8 @@ export default function Settings() {
                   <input 
                     style={inputStyle} 
                     type="number"
-                    value={settings.smtpPort || 587} 
-                    onChange={e => updateSettings({ smtpPort: parseInt(e.target.value) || 587 })} 
+                    value={draft.smtpPort || 587} 
+                    onChange={e => setField({ smtpPort: parseInt(e.target.value) || 587 })} 
                     placeholder="587"
                   />
                 </div>
@@ -342,8 +391,8 @@ export default function Settings() {
                   <label style={labelStyle}>Security</label>
                   <select 
                     style={inputStyle}
-                    value={settings.smtpSecure ? 'ssl' : 'tls'}
-                    onChange={e => updateSettings({ smtpSecure: e.target.value === 'ssl' })}
+                    value={draft.smtpSecure ? 'ssl' : 'tls'}
+                    onChange={e => setField({ smtpSecure: e.target.value === 'ssl' })}
                   >
                     <option value="tls">TLS (Port 587)</option>
                     <option value="ssl">SSL (Port 465)</option>
@@ -357,8 +406,8 @@ export default function Settings() {
                   <label style={labelStyle}>Username / Email</label>
                   <input 
                     style={inputStyle} 
-                    value={settings.smtpUser || ''} 
-                    onChange={e => updateSettings({ smtpUser: e.target.value })} 
+                    value={draft.smtpUser || ''} 
+                    onChange={e => setField({ smtpUser: e.target.value })} 
                     placeholder="your-email@gmail.com"
                   />
                 </div>
@@ -368,8 +417,8 @@ export default function Settings() {
                     <input 
                       style={{ ...inputStyle, paddingRight: '40px' }} 
                       type={showSmtpPassword ? 'text' : 'password'}
-                      value={settings.smtpPass || ''} 
-                      onChange={e => updateSettings({ smtpPass: e.target.value })} 
+                      value={draft.smtpPass || ''} 
+                      onChange={e => setField({ smtpPass: e.target.value })} 
                       placeholder="••••••••••••"
                     />
                     <button
@@ -399,9 +448,9 @@ export default function Settings() {
                   <label style={labelStyle}>From Name</label>
                   <input 
                     style={inputStyle} 
-                    value={settings.smtpFromName || ''} 
-                    onChange={e => updateSettings({ smtpFromName: e.target.value })} 
-                    placeholder={settings.name || 'GarageIQ'}
+                    value={draft.smtpFromName || ''} 
+                    onChange={e => setField({ smtpFromName: e.target.value })} 
+                    placeholder={draft.name || 'GarageIQ'}
                   />
                 </div>
                 <div>
@@ -409,8 +458,8 @@ export default function Settings() {
                   <input 
                     style={inputStyle} 
                     type="email"
-                    value={settings.smtpFromEmail || ''} 
-                    onChange={e => updateSettings({ smtpFromEmail: e.target.value })} 
+                    value={draft.smtpFromEmail || ''} 
+                    onChange={e => setField({ smtpFromEmail: e.target.value })} 
                     placeholder="invoices@yourdomain.com"
                   />
                 </div>
@@ -421,8 +470,8 @@ export default function Settings() {
                 <input 
                   style={inputStyle} 
                   type="email"
-                  value={settings.smtpReplyTo || ''} 
-                  onChange={e => updateSettings({ smtpReplyTo: e.target.value })} 
+                  value={draft.smtpReplyTo || ''} 
+                  onChange={e => setField({ smtpReplyTo: e.target.value })} 
                   placeholder="support@yourdomain.com"
                 />
               </div>
@@ -455,8 +504,8 @@ export default function Settings() {
                   <label style={labelStyle}>Default From Name</label>
                   <input 
                     style={inputStyle} 
-                    value={settings.emailFromName || settings.name || ''} 
-                    onChange={e => updateSettings({ emailFromName: e.target.value })} 
+                    value={draft.emailFromName || draft.name || ''} 
+                    onChange={e => setField({ emailFromName: e.target.value })} 
                     placeholder="Smith Tyres MK"
                   />
                 </div>
@@ -465,8 +514,8 @@ export default function Settings() {
                   <input 
                     style={inputStyle} 
                     type="email"
-                    value={settings.emailReplyTo || settings.email || ''} 
-                    onChange={e => updateSettings({ emailReplyTo: e.target.value })} 
+                    value={draft.emailReplyTo || draft.email || ''} 
+                    onChange={e => setField({ emailReplyTo: e.target.value })} 
                     placeholder="invoices@smithtyres.co.uk"
                   />
                 </div>
@@ -474,8 +523,8 @@ export default function Settings() {
                   <label style={labelStyle}>Email Footer Text</label>
                   <textarea 
                     style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} 
-                    value={settings.emailFooter || ''} 
-                    onChange={e => updateSettings({ emailFooter: e.target.value })} 
+                    value={draft.emailFooter || ''} 
+                    onChange={e => setField({ emailFooter: e.target.value })} 
                     placeholder="Thank you for your business! Payment is due within 14 days."
                   />
                 </div>
@@ -497,8 +546,8 @@ export default function Settings() {
                 <label style={labelStyle}>VAT Scheme</label>
                 <select 
                   style={inputStyle} 
-                  value={settings.vatScheme || 'standard'} 
-                  onChange={e => updateSettings({ vatScheme: e.target.value })}
+                  value={draft.vatScheme || 'standard'} 
+                  onChange={e => setField({ vatScheme: e.target.value })}
                 >
                   <option value="standard">Standard Rate (20%)</option>
                   <option value="flatrate">Flat Rate Scheme</option>
@@ -510,22 +559,22 @@ export default function Settings() {
                 <label style={labelStyle}>VAT Number</label>
                 <input 
                   style={inputStyle} 
-                  value={settings.vatNumber || ''} 
-                  onChange={e => updateSettings({ vatNumber: e.target.value })} 
+                  value={draft.vatNumber || ''} 
+                  onChange={e => setField({ vatNumber: e.target.value })} 
                   placeholder="GB123456789"
                 />
               </div>
 
               {/* Only show flat rate % if flat rate scheme selected */}
-              {settings.vatScheme === 'flatrate' && (
+              {draft.vatScheme === 'flatrate' && (
                 <div>
                   <label style={labelStyle}>Flat Rate Percentage</label>
                   <input 
                     style={inputStyle} 
                     type="number"
                     step="0.1"
-                    value={settings.flatRate || 8.5} 
-                    onChange={e => updateSettings({ flatRate: parseFloat(e.target.value) })} 
+                    value={draft.flatRate || 8.5} 
+                    onChange={e => setField({ flatRate: parseFloat(e.target.value) })} 
                     placeholder="8.5"
                   />
                   <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px' }}>
@@ -537,7 +586,7 @@ export default function Settings() {
 
             {/* VAT Scheme Info */}
             <div style={{ marginTop: '20px' }}>
-              {settings.vatScheme === 'standard' && (
+              {draft.vatScheme === 'standard' && (
                 <div style={{ 
                   background: 'rgba(96,165,250,0.08)', 
                   border: '1px solid rgba(96,165,250,0.2)', 
@@ -553,7 +602,7 @@ export default function Settings() {
                 </div>
               )}
 
-              {settings.vatScheme === 'flatrate' && (
+              {draft.vatScheme === 'flatrate' && (
                 <div style={{ 
                   background: 'rgba(245,200,66,0.08)', 
                   border: '1px solid rgba(245,200,66,0.2)', 
@@ -569,7 +618,7 @@ export default function Settings() {
                 </div>
               )}
 
-              {settings.vatScheme === 'exempt' && (
+              {draft.vatScheme === 'exempt' && (
                 <div style={{ 
                   background: 'var(--surface2)', 
                   border: '1px solid var(--border)', 
