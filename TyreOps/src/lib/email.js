@@ -547,67 +547,52 @@ export async function sendInvoiceEmail(invoice, settings, lines, totals, preferr
   const htmlContent = generateInvoiceEmailHTML(invoice, settings, lines, totals)
   const textContent = generateInvoiceEmailText(invoice, settings, lines, totals)
 
-  // If a preferred method is specified, try only that
-  if (preferredMethod) {
-    try {
-      switch (preferredMethod) {
-        case 'smtp':
-          await sendViaSmtp(custEmail, custName, subject, htmlContent, textContent)
-          return { success: true, method: 'smtp' }
-        case 'emailjs':
-          await sendViaEmailJS(custEmail, custName, subject, htmlContent, textContent)
-          return { success: true, method: 'emailjs' }
-        case 'resend':
-          await sendViaResend(custEmail, custName, subject, htmlContent)
-          return { success: true, method: 'resend' }
-        case 'gmail':
-          openGmailCompose(custEmail, subject, textContent)
-          return { success: true, method: 'gmail_compose', note: 'Opened Gmail compose window' }
-        case 'mailto':
-          openMailto(custEmail, subject, textContent)
-          return { success: true, method: 'mailto', note: 'Opened default mail client' }
-      }
-    } catch (err) {
-      return { success: false, method: preferredMethod, error: err.message }
-    }
+  // Manual options, if explicitly requested
+  if (preferredMethod === 'gmail') {
+    openGmailCompose(custEmail, subject, textContent)
+    return { success: true, method: 'gmail_compose', note: 'Opened Gmail compose window' }
+  }
+  if (preferredMethod === 'mailto') {
+    openMailto(custEmail, subject, textContent)
+    return { success: true, method: 'mailto', note: 'Opened default mail client' }
   }
 
-  // Try SMTP first (if configured)
-  if (isSmtpConfigured()) {
-    try {
-      await sendViaSmtp(custEmail, custName, subject, htmlContent, textContent)
-      return { success: true, method: 'smtp' }
-    } catch (err) {
-      console.error('SMTP failed:', err)
-      // Fall through to next method
+  // Send via the Alzaro email API (Vercel function → Resend).
+  // From: "<Garage Name> <invoices@alzaro.co.uk>"
+  // Reply-To: the garage's own email, so customer replies go to them.
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: custEmail,
+        subject,
+        html: htmlContent,
+        text: textContent,
+        fromName: settings.emailFromName || settings.name || 'Alzaro TyreOps',
+        replyTo: settings.emailReplyTo || settings.email || undefined,
+      }),
+    })
+
+    let data = {}
+    try { data = await res.json() } catch { /* non-JSON response */ }
+
+    if (!res.ok) {
+      throw new Error(data.error || `Server responded with status ${res.status}`)
+    }
+
+    return { success: true, method: 'api', id: data.id }
+  } catch (err) {
+    console.error('Email send failed:', err)
+    // Fallback: show the preview modal so the user can send manually
+    return {
+      success: true,
+      method: 'gmail_compose',
+      note: `Couldn't send automatically (${err.message}) — showing preview`,
+      needsManualSend: true,
+      error: err.message,
     }
   }
-
-  // Try EmailJS (if configured)
-  if (EMAIL_CONFIG.EMAILJS_SERVICE_ID && EMAIL_CONFIG.EMAILJS_PUBLIC_KEY) {
-    try {
-      await sendViaEmailJS(custEmail, custName, subject, htmlContent, textContent)
-      return { success: true, method: 'emailjs' }
-    } catch (err) {
-      console.error('EmailJS failed:', err)
-      // Fall through to next method
-    }
-  }
-
-  // Try Resend API (if configured)
-  if (EMAIL_CONFIG.RESEND_API_KEY) {
-    try {
-      await sendViaResend(custEmail, custName, subject, htmlContent)
-      return { success: true, method: 'resend' }
-    } catch (err) {
-      console.error('Resend API failed:', err)
-      // Fall through to fallback
-    }
-  }
-
-  // Fallback: Return preview mode (don't auto-open new tab)
-  // The UI will show an email preview modal with options
-  return { success: true, method: 'gmail_compose', note: 'No email service configured - showing preview', needsManualSend: true }
 }
 
 // Helper to load external script
