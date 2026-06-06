@@ -5,10 +5,51 @@ import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
 
 export default function Purchases() {
-  const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, garageId } = useStore()
+  const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, updateBatch, deleteBatch, updateUsedTyre, deleteUsedTyre, garageId } = useStore()
   const [search, setSearch] = useState('')
   const [showBatch, setShowBatch] = useState(false)
   const [showUsed, setShowUsed] = useState(false)
+  const [editingBatch, setEditingBatch] = useState(null)
+  const [editingUsed, setEditingUsed] = useState(null)
+  const [restock, setRestock] = useState(null)
+
+  // + Stock: reorder the same tyre — opens a new batch prefilled with
+  // this purchase's SKU and supplier
+  const handleRestock = (r) => {
+    const b = batches.find(x => x.id === r.id)
+    if (b) setRestock({ skuId: b.skuId, supplier: b.supplier || '' })
+  }
+
+  const handleEdit = (r) => {
+    if (r.type === 'used') {
+      const u = usedTyres.find(x => x.id === r.id)
+      if (u) setEditingUsed(u)
+    } else {
+      const b = batches.find(x => x.id === r.id)
+      if (b) setEditingBatch(b)
+    }
+  }
+
+  const handleDelete = (r) => {
+    if (r.type === 'used') {
+      const u = usedTyres.find(x => x.id === r.id)
+      if (!u) return
+      if (u.sold) return alert('This used tyre has been sold on an invoice, so the record can\'t be deleted.')
+      if (confirm(`Delete this used tyre (${r.tyreLabel})? Used stock will go down by 1.`)) {
+        deleteUsedTyre(u.id)
+      }
+    } else {
+      const b = batches.find(x => x.id === r.id)
+      if (!b) return
+      const sold = b.qty - b.remaining
+      if (sold > 0) {
+        return alert(`${sold} tyre${sold === 1 ? ' has' : 's have'} been sold from this batch on invoices, so it can't be deleted. You can edit its details instead.`)
+      }
+      if (confirm(`Delete this batch of ${b.qty}? Stock for this tyre will go down by ${b.remaining}.`)) {
+        deleteBatch(b.id)
+      }
+    }
+  }
 
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
 
@@ -90,7 +131,7 @@ export default function Purchases() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr>{['Date', 'Tyre', 'Type', 'Qty', 'Cost/ea', 'Total', 'Supplier', 'Ref', 'Remaining'].map(h => (
+              <tr>{['Date', 'Tyre', 'Type', 'Qty', 'Cost/ea', 'Total', 'Supplier', 'Ref', 'Actions'].map(h => (
                 <th key={h} style={{ textAlign: 'left', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>{h}</th>
               ))}</tr>
             </thead>
@@ -109,8 +150,14 @@ export default function Purchases() {
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{r.totalCost.toFixed(2)}</td>
                   <td style={{ padding: '10px', fontSize: '11px' }}>{r.supplier || '—'}</td>
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px', color: 'var(--text2)' }}>{r.ref || '—'}</td>
-                  <td style={{ padding: '10px' }}>
-                    <Badge variant={r.remaining === 0 ? 'gray' : 'green'}>{r.remaining}/{r.qty}</Badge>
+                  <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                    <span style={{ display: 'inline-flex', gap: '6px' }}>
+                      {r.type === 'new' && (
+                        <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
+                      )}
+                      <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
+                      <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -130,11 +177,45 @@ export default function Purchases() {
         addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
         setShowUsed(false)
       }} />}
+
+      {/* Edit Batch Modal */}
+      {editingBatch && <BatchModal skus={skus} preSkuId="" garageId={garageId} initial={editingBatch} onClose={() => setEditingBatch(null)} onSave={(data) => {
+        const sold = editingBatch.qty - editingBatch.remaining
+        if (data.qty < sold) {
+          alert(`Quantity can't go below ${sold} — that many have already been sold from this batch.`)
+          return
+        }
+        const updates = { ...data, remaining: data.qty - sold }
+        // Don't wipe an existing uploaded invoice unless a new one was added
+        if (!updates.invoiceUrl) delete updates.invoiceUrl
+        updateBatch(editingBatch.id, updates)
+        setEditingBatch(null)
+      }} />}
+
+      {/* Edit Used Tyre Modal */}
+      {editingUsed && <UsedModal initial={editingUsed} onClose={() => setEditingUsed(null)} onSave={(data) => {
+        updateUsedTyre(editingUsed.id, data)
+        setEditingUsed(null)
+      }} />}
+
+      {/* Restock (+ Stock) Modal — new batch, prefilled with same tyre & supplier */}
+      {restock && <BatchModal skus={skus} preSkuId={restock.skuId} garageId={garageId} initial={{ skuId: restock.skuId, supplier: restock.supplier }} onClose={() => setRestock(null)} onSave={(data) => {
+        addBatch({ id: 'B' + Date.now(), ...data, remaining: data.qty })
+        setRestock(null)
+      }} />}
     </div>
   )
 }
-function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
-  const [form, setForm] = useState({ skuId: preSkuId || '', date: new Date().toISOString().split('T')[0], qty: '', cost: '', supplier: '', ref: '', notes: '' })
+function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
+  const [form, setForm] = useState(initial ? {
+    skuId: initial.skuId || '',
+    date: initial.date || new Date().toISOString().split('T')[0],
+    qty: initial.qty ?? '',
+    cost: initial.cost ?? '',
+    supplier: initial.supplier || '',
+    ref: initial.ref || '',
+    notes: initial.notes || '',
+  } : { skuId: preSkuId || '', date: new Date().toISOString().split('T')[0], qty: '', cost: '', supplier: '', ref: '', notes: '' })
   const [invoiceFile, setInvoiceFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -238,8 +319,21 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
   )
 }
 
-function UsedModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
+function UsedModal({ onClose, onSave, initial }) {
+  const [form, setForm] = useState(initial ? {
+    brand: initial.brand || '',
+    model: initial.model || '',
+    w: initial.w ?? '',
+    p: initial.p ?? '',
+    r: initial.r ?? '',
+    tread: initial.tread ?? '',
+    year: initial.year || new Date().getFullYear(),
+    cost: initial.cost ?? 0,
+    sell: initial.sell ?? '',
+    sourceCust: initial.sourceCust || '',
+    date: initial.date || new Date().toISOString().split('T')[0],
+    notes: initial.notes || '',
+  } : { brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
   // Dropdown suggestions: people we've bought from before + existing customers
