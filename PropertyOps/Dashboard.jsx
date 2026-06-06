@@ -1,6 +1,32 @@
 const { useState, useEffect } = React;
 
 /* ================================================================== */
+/*  MOBILE HELPERS                                                    */
+/* ================================================================== */
+const MOBILE_BP = 880; // below this width = phone/small-tablet layout
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== "undefined" && window.innerWidth <= MOBILE_BP);
+  useEffect(() => {
+    const onR = () => setM(window.innerWidth <= MOBILE_BP);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+  return m;
+}
+// Injected once: stops iOS auto-zoom on inputs + lets wide tables scroll smoothly
+if (typeof document !== "undefined" && !document.getElementById("propops-mobile-css")) {
+  const st = document.createElement("style");
+  st.id = "propops-mobile-css";
+  st.textContent = `
+    @media (max-width: ${MOBILE_BP}px) {
+      input, select, textarea { font-size: 16px !important; }
+    }
+    .tbl-scroll { -webkit-overflow-scrolling: touch; }
+  `;
+  document.head.appendChild(st);
+}
+
+/* ================================================================== */
 /*  DEMO DATA  — replace with Supabase queries in phase 2             */
 /* ================================================================== */
 const DEMO = {
@@ -151,9 +177,10 @@ function Pill({ text, tone }) {
 }
 
 function Table({ cols, children }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+    <div className="tbl-scroll" style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden", overflowX: "auto" }}>
+      <table style={{ width: "100%", minWidth: isMobile ? 680 : undefined, borderCollapse: "collapse", fontSize: 12.5 }}>
         <thead>
           <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
             {cols.map((c, i) => <th key={i} style={{ textAlign: i === 0 ? "left" : "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--txt-3)", fontWeight: 600 }}>{c}</th>)}
@@ -184,6 +211,7 @@ const propLabel = (props, id) => { const p = props.find((x) => String(x.id) === 
 /*  DASHBOARD                                                         */
 /* ================================================================== */
 function DashboardPage({ range, go, user }) {
+  const isMobile = useIsMobile();
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -234,13 +262,13 @@ function DashboardPage({ range, go, user }) {
         <h2 style={{ fontSize: 19, fontWeight: 600 }}>{greet}, {name}</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{totalProps} propert{totalProps === 1 ? "y" : "ies"} · {attention} item{attention === 1 ? "" : "s"} need attention · {range}</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Compliance Score" value={<>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : certs.length ? "At risk" : "No certs tracked"} color={score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Rent Arrears" value={gbp(arrears)} sub={`${arrearsCount} overdue`} color={arrears ? "var(--red)" : "var(--green)"} />
         <Metric label="Occupancy" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} color="var(--blue)" />
         <Metric label="Monthly Income" value={gbp(income)} sub="From let properties" color="var(--brand)" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
         <Panel title="Expiring Certificates" action="View all" onAction={() => go("compliance")}>
           {expiringSoon.length === 0 ? (
             <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 30 days. {certs.length === 0 && "Add certificates in Compliance to track them here."}</div>
@@ -275,7 +303,7 @@ function DashboardPage({ range, go, user }) {
           </div>
         </Panel>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
         <span style={{ cursor: "pointer" }} onClick={() => go("maintenance")}><Metric label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" /></span>
         <span style={{ cursor: "pointer" }} onClick={() => go("compliance")}><Metric label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" /></span>
         <span style={{ cursor: "pointer" }} onClick={() => go("properties")}><Metric label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} color="var(--txt)" subColor={score >= 90 ? "var(--green)" : "var(--amber)"} /></span>
@@ -288,6 +316,7 @@ function DashboardPage({ range, go, user }) {
 /*  PROPERTIES                                                        */
 /* ================================================================== */
 function PropertiesPage({ user, go }) {
+  const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);   // null = loading
   const [err, setErr] = useState("");
@@ -350,7 +379,7 @@ function PropertiesPage({ user, go }) {
       {adding && (
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit property" : "New property"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 10 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -391,7 +420,7 @@ function PropertiesPage({ user, go }) {
                 {isOpen && (
                   <tr>
                     <td colSpan={8} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
-                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
+                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
                         <DetailBox title="Tenants" icon="ti-users" empty={pT.length === 0} emptyText="No tenants linked." onClick={() => go && go("tenants")}>
                           {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
                         </DetailBox>
@@ -451,6 +480,7 @@ function CompliancePage({ user, go }) {
     "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug",
     "Buildings Insurance": "ti-umbrella", "HMO Licence": "ti-license", "Fire Risk Assessment": "ti-fire-extinguisher",
   };
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -518,7 +548,7 @@ function CompliancePage({ user, go }) {
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
         <Metric label="Compliance Score" value={<>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Urgent (≤7 days)" value={urgent} sub="Act now" color="var(--red)" />
         <Metric label="Due Soon (≤30 days)" value={soon} sub="Schedule renewal" color="var(--amber)" />
@@ -528,7 +558,7 @@ function CompliancePage({ user, go }) {
       {adding && (
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit certificate" : "New certificate"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.keys(TYPES).map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Reference / notes<input style={inp} placeholder="e.g. CP12 certificate" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
@@ -570,7 +600,7 @@ function CompliancePage({ user, go }) {
                 </div>
                 {isOpen && (
                   <div className="fade-in" style={{ padding: "12px 0 16px 26px", borderBottom: i < items.length - 1 ? "0.5px solid var(--line)" : "none" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12 }}>
                       <DetailBox title="Tenant(s)" icon="ti-users" empty={cT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
                         {cT.map((x, j) => <DetailRow key={j} main={x.name} sub={x.rent ? gbp(x.rent) + " pcm" : ""} pill={x.rent_status} tone={x.rent_status === "Overdue" ? "red" : "green"} />)}
                       </DetailBox>
@@ -594,6 +624,7 @@ function CompliancePage({ user, go }) {
 /*  TENANTS                                                           */
 /* ================================================================== */
 function TenantsPage({ user, go }) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -654,7 +685,7 @@ function TenantsPage({ user, go }) {
       {adding && (
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit tenant" : "New tenant"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
@@ -714,7 +745,7 @@ function TenantsPage({ user, go }) {
                 {isOpen && (
                   <tr>
                     <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
-                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
+                      <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
                         <DetailBox title="Contact" icon="ti-address-book">
                           <DetailRow main={t.email || "No email"} sub="Email" />
                           <DetailRow main={t.phone || "No phone"} sub="Phone" />
@@ -747,6 +778,7 @@ function TenantsPage({ user, go }) {
 /*  MAINTENANCE (kanban)                                              */
 /* ================================================================== */
 function MaintenancePage({ user, go }) {
+  const isMobile = useIsMobile();
   const stages = ["Reported", "Assigned", "In Progress", "Completed"];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
   const [rows, setRows] = useState(null);
@@ -816,7 +848,7 @@ function MaintenancePage({ user, go }) {
       {adding && (
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New maintenance job"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 10 }}>
             <label style={fld}>Issue / job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
@@ -830,7 +862,7 @@ function MaintenancePage({ user, go }) {
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading jobs…</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 11 }}>
           {stages.map((s) => {
             const jobs = (rows || []).filter((m) => m.status === s);
             return (
@@ -888,6 +920,7 @@ function MaintenancePage({ user, go }) {
 /*  FINANCE                                                           */
 /* ================================================================== */
 function FinancePage({ user, go }) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -954,7 +987,7 @@ function FinancePage({ user, go }) {
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
         <Metric label="Expected" value={gbp(expected)} sub={`${data.length} payment${data.length === 1 ? "" : "s"}`} color="var(--txt)" />
         <Metric label="Collected" value={gbp(collected)} sub={`${paidCount} paid`} color="var(--green)" />
         <Metric label="Arrears" value={gbp(overdue)} sub={`${overdueCount} overdue`} color="var(--red)" />
@@ -964,7 +997,7 @@ function FinancePage({ user, go }) {
       {adding && (
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1250" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
@@ -1008,7 +1041,7 @@ function FinancePage({ user, go }) {
                   <tr>
                     <td colSpan={7} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
                           <DetailBox title="Tenant(s)" icon="ti-users" empty={pT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
                             {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
                           </DetailBox>
@@ -1109,7 +1142,7 @@ function DocumentsPage({ user }) {
     <div className="fade-in">
       <input ref={fileRef} type="file" style={{ display: "none" }} onChange={onPick} />
       <PageHead title="Documents" sub="Secure legal document vault — private to your account." right={
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <select value={pickCat} onChange={(e) => setPickCat(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }}>
             {cats.slice(1).map((c) => <option key={c}>{c}</option>)}
           </select>
@@ -1325,9 +1358,9 @@ function ReportsPage({ user }) {
   return (
     <div className="fade-in" style={{ position: "relative" }}>
       <PageHead title="Reports" sub="Generate, preview and export reports from your live data."
-        right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
+        right={<div style={{ display: "flex", gap: 5, fontSize: 12, flexWrap: "wrap" }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
       {period === "Custom" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px", flexWrap: "wrap" }}>
           <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>From</span>
           <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }} />
           <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>To</span>
@@ -1371,6 +1404,7 @@ function ReportsPage({ user }) {
 /*  SETTINGS                                                          */
 /* ================================================================== */
 function SettingsPage({ user }) {
+  const isMobile = useIsMobile();
   const [org, setOrg] = useState({ company_name: "", vat_number: "" });
   const [notif, setNotif] = useState({ notify_compliance: true, notify_rent: true, reminder_lead: "30 / 7 days before expiry" });
   const [loaded, setLoaded] = useState(false);
@@ -1434,7 +1468,7 @@ function SettingsPage({ user }) {
     <div className="fade-in">
       <PageHead title="Settings" sub="Manage your organisation, team and subscription." />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
         {/* Organisation — editable */}
         <div style={card}>
           {head("ti-building", "Organisation")}
@@ -1497,7 +1531,7 @@ function SettingsPage({ user }) {
 
       {/* Subscription */}
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
         {tiers.map((t) => {
           const isCurrent = t.name === currentPlan;
           return (
@@ -1670,6 +1704,8 @@ const PAGES = {
 };
 
 function Dashboard({ user, signOut }) {
+  const isMobile = useIsMobile();
+  const [navOpen, setNavOpen] = useState(false);
   const [active, setActive] = useState("dashboard");
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(() => {
@@ -1735,7 +1771,11 @@ function Dashboard({ user, signOut }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
+      {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 80 }} />}
+      <aside style={{ width: 240, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", overflowY: "auto",
+        ...(isMobile
+          ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 90, transform: navOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: navOpen ? "0 0 40px rgba(0,0,0,.5)" : "none" }
+          : { width: 210, position: "sticky", top: 0, height: "100vh" }) }}>
         <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Property Operations Pro</div>
         <div style={{ fontSize: 15, fontWeight: 600 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
@@ -1744,7 +1784,7 @@ function Dashboard({ user, signOut }) {
           {NAV.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => setActive(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
+              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "12px 11px" : "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ fontSize: 13 }}>{n.label}</span>
               </div>
@@ -1762,9 +1802,14 @@ function Dashboard({ user, signOut }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-          <div style={{ flex: 1, position: "relative" }}>
+      <main style={{ flex: 1, padding: isMobile ? "14px 12px" : "18px 22px", maxWidth: 1180, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
+          {isMobile && (
+            <div onClick={() => setNavOpen(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: 8, background: "var(--panel-2)", border: "0.5px solid var(--line)", cursor: "pointer", flexShrink: 0 }}>
+              <i className="ti ti-menu-2" style={{ fontSize: 19, color: "var(--txt)" }} />
+            </div>
+          )}
+          <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
               <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search properties, tenants, certificates…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
@@ -1790,7 +1835,7 @@ function Dashboard({ user, signOut }) {
               {alerts.length > 0 && <span style={{ position: "absolute", top: -4, right: -5, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--red)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{alerts.length}</span>}
             </div>
             {showNotif && (
-              <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 40, overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: "min(320px, calc(100vw - 40px))", background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 40, overflow: "hidden" }}>
                 <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--line)", fontSize: 12, fontWeight: 600 }}>Notifications {alerts.length > 0 && <span style={{ color: "var(--txt-3)", fontWeight: 400 }}>· {alerts.length}</span>}</div>
                 <div style={{ maxHeight: 320, overflow: "auto" }}>
                   {alerts.length === 0 ? (
@@ -1811,7 +1856,7 @@ function Dashboard({ user, signOut }) {
           </div>
         </div>
         {active === "dashboard" && (
-          <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12 }}>
+          <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12, flexWrap: "wrap" }}>
             {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
           </div>
         )}
