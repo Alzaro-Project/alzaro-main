@@ -765,8 +765,13 @@ export default function Invoices() {
       return updatedInv
     }
     
-    // New invoice
-    const id = 'INV-' + String(invoices.length + 1).padStart(3, '0')
+    // New invoice — next number is highest existing + 1 (never reuses an ID,
+    // even after deletions or refreshes)
+    const highest = invoices.reduce((max, i) => {
+      const n = parseInt(String(i.id).replace(/\D/g, ''), 10)
+      return Number.isFinite(n) && n > max ? n : max
+    }, 0)
+    const id = 'INV-' + String(highest + 1).padStart(3, '0')
     const inv = { 
       id, 
       status: finalStatus, 
