@@ -140,6 +140,10 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef(null)
 
+  // Previously used suppliers, for the dropdown
+  const allBatches = useStore(s => s.batches)
+  const supplierOptions = [...new Set(allBatches.map(b => b.supplier).filter(Boolean))].sort()
+
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
 
@@ -202,7 +206,12 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
         <Field label="Cost/ea (£)"><input style={inputStyle} type="number" step="0.01" value={form.cost} onChange={e => f('cost', e.target.value)} placeholder="85.00" /></Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }} className="form-grid-2">
-        <Field label="Supplier"><input style={inputStyle} value={form.supplier} onChange={e => f('supplier', e.target.value)} placeholder="Aldridge Tyres Ltd" /></Field>
+        <Field label="Supplier">
+          <input style={inputStyle} list="supplier-history" value={form.supplier} onChange={e => f('supplier', e.target.value)} placeholder="Aldridge Tyres Ltd" />
+          <datalist id="supplier-history">
+            {supplierOptions.map(s => <option key={s} value={s} />)}
+          </datalist>
+        </Field>
         <Field label="Invoice Ref"><input style={inputStyle} value={form.ref} onChange={e => f('ref', e.target.value)} placeholder="ALD-2025-0123" /></Field>
       </div>
       <div style={{ marginTop: '12px' }}>
@@ -232,6 +241,14 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
 function UsedModal({ onClose, onSave }) {
   const [form, setForm] = useState({ brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+
+  // Dropdown suggestions: people we've bought from before + existing customers
+  const usedTyresAll = useStore(s => s.usedTyres)
+  const customersAll = useStore(s => s.customers)
+  const sourceOptions = [...new Set([
+    ...usedTyresAll.map(u => u.sourceCust),
+    ...customersAll.map(c => c.name),
+  ].filter(Boolean))].sort()
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   return (
     <Modal title="Add Used / Part-Ex Tyre" onClose={onClose} onSave={() => {
@@ -250,7 +267,12 @@ function UsedModal({ onClose, onSave }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
         <Field label="Tread (mm)"><input style={inputStyle} type="number" step="0.1" value={form.tread} onChange={e => f('tread', e.target.value)} placeholder="5.5" /></Field>
         <Field label="Year"><input style={inputStyle} type="number" value={form.year} onChange={e => f('year', e.target.value)} /></Field>
-        <Field label="Source Customer"><input style={inputStyle} value={form.sourceCust} onChange={e => f('sourceCust', e.target.value)} placeholder="Dave Patel" /></Field>
+        <Field label="Source Customer">
+          <input style={inputStyle} list="source-customer-history" value={form.sourceCust} onChange={e => f('sourceCust', e.target.value)} placeholder="Dave Patel" />
+          <datalist id="source-customer-history">
+            {sourceOptions.map(s => <option key={s} value={s} />)}
+          </datalist>
+        </Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
         <Field label="Cost (£)"><input style={inputStyle} type="number" step="0.01" value={form.cost} onChange={e => f('cost', e.target.value)} placeholder="0.00" /></Field>
