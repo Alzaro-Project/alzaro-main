@@ -40,6 +40,36 @@ export default function Settings() {
     setTimeout(() => setSaveStatus(null), 2500)
   }
 
+  // Save button row shown at the bottom of each tab
+  const renderSaveRow = () => (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', marginTop: '16px' }}>
+      {dirty && saveStatus !== 'saving' && (
+        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Unsaved changes</span>
+      )}
+      {saveStatus === 'saved' && (
+        <span style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 600 }}>✓ Saved</span>
+      )}
+      <button
+        onClick={saveSettings}
+        disabled={!dirty || saveStatus === 'saving'}
+        style={{
+          background: 'var(--accent)',
+          color: 'var(--accent-text)',
+          fontWeight: 700,
+          fontSize: '13px',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          border: 'none',
+          cursor: dirty ? 'pointer' : 'default',
+          opacity: !dirty || saveStatus === 'saving' ? 0.5 : 1,
+          transition: 'opacity .15s',
+        }}
+      >
+        {saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
+      </button>
+    </div>
+  )
+
   const inputStyle = { 
     background: 'var(--surface2)', 
     border: '1px solid var(--border)', 
@@ -266,21 +296,7 @@ export default function Settings() {
               </div>
             </div>
 
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '12px 16px', 
-              background: 'rgba(34,197,94,0.08)', 
-              border: '1px solid rgba(34,197,94,0.2)',
-              borderRadius: '8px', 
-              fontSize: '12px', 
-              color: 'var(--green)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span>✓</span>
-              <span>Settings save automatically</span>
-            </div>
+            {renderSaveRow()}
           </Card>
         )}
 
@@ -530,6 +546,8 @@ export default function Settings() {
                 </div>
               </div>
             </Card>
+
+            {renderSaveRow()}
           </div>
         )}
 
@@ -652,6 +670,8 @@ export default function Settings() {
                 </div>
               </div>
             )}
+
+            {renderSaveRow()}
           </Card>
         )}
 
