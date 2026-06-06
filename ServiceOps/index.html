@@ -213,16 +213,34 @@
       .pricing-cards { grid-template-columns: 1fr; max-width: 400px; }
     }
     @media (max-width: 768px) {
+      .container { padding: 0 18px; }
       .nav-center { display: none; }
-      .hero { padding: 120px 0 80px; }
-      .hero-stats { flex-wrap: wrap; gap: 32px; }
-      .hero-actions { flex-direction: column; align-items: center; }
+      .logo { font-size: 17px; }
+      .nav-right { gap: 6px; }
+      .nav-right .btn { padding: 9px 13px; font-size: 13px; }
+      .hero { padding: 110px 0 70px; }
+      .hero h1 { letter-spacing: -1.5px; }
+      .hero-desc { font-size: 16px; }
+      .hero-stats { flex-wrap: wrap; gap: 28px; }
+      .hero-actions { flex-direction: column; align-items: center; gap: 12px; }
       .hero-actions .btn { width: 100%; max-width: 300px; }
+      .trust-items { gap: 18px 28px; }
+      .features { padding: 72px 0; }
+      .section-header { margin-bottom: 48px; }
+      .feature-row { gap: 32px; margin-bottom: 64px; }
+      .feature-title { font-size: 26px; }
       .features-grid { grid-template-columns: 1fr; }
+      .mini-feature { padding: 22px; }
+      .pricing { padding: 80px 0; }
+      .pricing-cards { gap: 24px; }
+      .how-section { padding: 80px 0; }
       .step { gap: 20px; } .step::before { left: 23px; }
       .step-number { width: 48px; height: 48px; font-size: 18px; }
+      .cta-section { padding: 90px 0; }
       .footer-content { flex-direction: column; gap: 24px; text-align: center; }
-      .cta-buttons { flex-direction: column; align-items: center; }
+      .footer-links { flex-wrap: wrap; justify-content: center; gap: 18px; }
+      .cta-buttons { flex-direction: column; align-items: center; gap: 12px; }
+      .cta-buttons .btn { width: 100%; max-width: 300px; }
     }
   </style>
 </head>
