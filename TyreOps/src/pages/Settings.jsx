@@ -108,14 +108,13 @@ export default function Settings() {
   ]
 
   // Test SMTP connection
-  // Send a real test email through the /api/send-email endpoint.
-  // Success = the whole chain works (Vercel function → Resend → inbox).
-  // Failure = we surface the actual reason.
+  // Tests the garage's own SMTP details for real via /api/test-smtp:
+  // connects + logs in to their server, then sends a test email FROM their
+  // address TO their address. Failures come back with the actual reason.
   const testSmtpConnection = async () => {
-    const to = draft.email || draft.smtpUser
-    if (!to) {
+    if (!draft.smtpHost || !draft.smtpUser || !draft.smtpPass) {
       setSmtpTestStatus('error')
-      setSmtpTestError('Add your garage email (Garage tab) first so we know where to send the test.')
+      setSmtpTestError('Fill in the SMTP host, username and password first.')
       return
     }
 
@@ -123,14 +122,16 @@ export default function Settings() {
     setSmtpTestError('')
 
     try {
-      const res = await fetch('/api/send-email', {
+      const res = await fetch('/api/test-smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to,
-          subject: 'TyreOps test email ✓',
-          text: `This is a test email from ${draft.name || 'your garage'} on Alzaro TyreOps. If you're reading this, your email service is connected and working.`,
-          fromName: draft.name || 'Alzaro TyreOps',
+          host: draft.smtpHost,
+          port: draft.smtpPort || 587,
+          secure: !!draft.smtpSecure,
+          user: draft.smtpUser,
+          pass: draft.smtpPass,
+          fromName: draft.smtpFromName || draft.name || '',
         }),
       })
 
@@ -143,13 +144,13 @@ export default function Settings() {
 
       setSmtpTestStatus('success')
       setSmtpTestError('')
-      setTimeout(() => setSmtpTestStatus(null), 6000)
+      setTimeout(() => setSmtpTestStatus(null), 8000)
     } catch (err) {
       setSmtpTestStatus('error')
       if (err.message === 'Failed to fetch') {
-        setSmtpTestError('Could not reach /api/send-email — the email function may not be deployed yet.')
+        setSmtpTestError('Could not reach /api/test-smtp — the function may not be deployed yet.')
       } else if (err.message.includes('status 404')) {
-        setSmtpTestError('Email endpoint not found (404) — /api/send-email is missing from the deployment.')
+        setSmtpTestError('Test endpoint not found (404) — /api/test-smtp is missing from the deployment.')
       } else {
         setSmtpTestError(err.message)
       }
@@ -516,18 +517,18 @@ export default function Settings() {
                   onClick={testSmtpConnection}
                   disabled={smtpTestStatus === 'testing'}
                 >
-                  {smtpTestStatus === 'testing' ? '⏳ Sending test...' : 
+                  {smtpTestStatus === 'testing' ? '⏳ Connecting...' : 
                    smtpTestStatus === 'success' ? '✓ Connected!' :
-                   smtpTestStatus === 'error' ? '✗ Failed — try again' : '📨 Send Test Email'}
+                   smtpTestStatus === 'error' ? '✗ Failed — try again' : '🔌 Test Connection'}
                 </Btn>
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                  Sends a real test email to {draft.email || 'your garage email'}
+                  Connects to your email server and sends a test email from {draft.smtpUser || 'your address'}
                 </span>
               </div>
 
               {smtpTestStatus === 'success' && (
                 <div style={{ marginTop: '12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--green)' }}>
-                  ✓ Test email sent to <strong>{draft.email || draft.smtpUser}</strong> — check your inbox (and spam folder) to confirm it arrived.
+                  ✓ Connected and authenticated. A test email was sent from <strong>{draft.smtpUser}</strong> to itself — check that inbox to confirm. Don't forget to <strong>Save Changes</strong> so these details are kept.
                 </div>
               )}
 
