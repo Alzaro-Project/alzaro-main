@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
+import WelcomeBanner from '../components/WelcomeBanner'
 
 // ============================================================
 // Dashboard — GarageOps v2
@@ -209,6 +210,9 @@ export default function Dashboard() {
   // ============================================================
   return (
     <div style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--text)' }}>
+
+      {/* ===== GETTING-STARTED GUIDE (auto-hides when complete or dismissed) ===== */}
+      <WelcomeBanner />
 
       {/* ===== TOP BAR ===== */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
