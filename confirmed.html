@@ -85,14 +85,28 @@
     </div>
     <h1>Your email is confirmed</h1>
     <p>Thanks for verifying your email. Your account is ready to go.</p>
-    <div class="redirect">Redirecting to the homepage in <strong id="count">6</strong> seconds…</div>
-    <a class="btn" href="https://alzaro.co.uk">Go now</a>
+    <div class="redirect">Taking you to the login page in <strong id="count">5</strong> seconds…</div>
+    <a class="btn" id="go-btn" href="https://alzaro.co.uk">Go to login now</a>
   </div>
 
   <script>
-    var seconds = 6;
-    var redirectTo = "https://alzaro.co.uk";
-    var el = document.getElementById("count");
+    // Which product did they sign up to? (set by the registration form
+    // via emailRedirectTo: /confirmed?product=tyreops etc.)
+    var KNOWN_PRODUCTS = ['tyreops', 'garageops', 'serviceops', 'soloops', 'propertyops', 'stockops'];
+    var params = new URLSearchParams(window.location.search);
+    var product = (params.get('product') || '').toLowerCase();
+
+    // Send them to their product's login (homepage as a safe fallback
+    // for old emails that carry no product tag)
+    var redirectTo = KNOWN_PRODUCTS.indexOf(product) !== -1
+      ? '/' + product + '/login?confirmed=1'
+      : 'https://alzaro.co.uk';
+
+    var goBtn = document.getElementById('go-btn');
+    goBtn.href = redirectTo;
+
+    var seconds = 5;
+    var el = document.getElementById('count');
     var timer = setInterval(function () {
       seconds -= 1;
       if (el) el.textContent = seconds;
