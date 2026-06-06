@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
-import { SMTP_PRESETS, validateSmtpConfig, buildSmtpConfig } from '../lib/email'
+import { SMTP_PRESETS } from '../lib/email'
 
 const TABS = [
   { key: 'garage', label: '🏢 Garage', icon: '🏢' },
@@ -14,6 +14,7 @@ export default function Settings() {
   const { settings, tier, setTier, updateSettings } = useStore()
   const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
+  const [smtpTestError, setSmtpTestError] = useState('')
   const [showSmtpPassword, setShowSmtpPassword] = useState(false)
 
   // Local draft of settings — edits stay here until Save is clicked
@@ -107,36 +108,52 @@ export default function Settings() {
   ]
 
   // Test SMTP connection
+  // Send a real test email through the /api/send-email endpoint.
+  // Success = the whole chain works (Vercel function → Resend → inbox).
+  // Failure = we surface the actual reason.
   const testSmtpConnection = async () => {
-    const smtpConfig = buildSmtpConfig(draft.smtpProvider || 'custom', {
-      host: draft.smtpHost,
-      port: draft.smtpPort,
-      secure: draft.smtpSecure,
-      user: draft.smtpUser,
-      pass: draft.smtpPass,
-      fromName: draft.smtpFromName || draft.name,
-      fromEmail: draft.smtpFromEmail || draft.email,
-      replyTo: draft.smtpReplyTo,
-    })
-
-    const validation = validateSmtpConfig(smtpConfig)
-    if (!validation.valid) {
-      alert('SMTP configuration incomplete:\n' + validation.errors.join('\n'))
+    const to = draft.email || draft.smtpUser
+    if (!to) {
+      setSmtpTestStatus('error')
+      setSmtpTestError('Add your garage email (Garage tab) first so we know where to send the test.')
       return
     }
 
     setSmtpTestStatus('testing')
-    
-    // In a real app, this would call the /api/test-smtp endpoint
-    // For now, simulate the test
-    setTimeout(() => {
-      if (smtpConfig.host && smtpConfig.auth.user && smtpConfig.auth.pass) {
-        setSmtpTestStatus('success')
-      } else {
-        setSmtpTestStatus('error')
+    setSmtpTestError('')
+
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          subject: 'TyreOps test email ✓',
+          text: `This is a test email from ${draft.name || 'your garage'} on Alzaro TyreOps. If you're reading this, your email service is connected and working.`,
+          fromName: draft.name || 'Alzaro TyreOps',
+        }),
+      })
+
+      let data = {}
+      try { data = await res.json() } catch { /* non-JSON response */ }
+
+      if (!res.ok) {
+        throw new Error(data.error || `Server responded with status ${res.status}`)
       }
-      setTimeout(() => setSmtpTestStatus(null), 3000)
-    }, 2000)
+
+      setSmtpTestStatus('success')
+      setSmtpTestError('')
+      setTimeout(() => setSmtpTestStatus(null), 6000)
+    } catch (err) {
+      setSmtpTestStatus('error')
+      if (err.message === 'Failed to fetch') {
+        setSmtpTestError('Could not reach /api/send-email — the email function may not be deployed yet.')
+      } else if (err.message.includes('status 404')) {
+        setSmtpTestError('Email endpoint not found (404) — /api/send-email is missing from the deployment.')
+      } else {
+        setSmtpTestError(err.message)
+      }
+    }
   }
 
   // Handle SMTP provider preset selection
@@ -493,20 +510,32 @@ export default function Settings() {
               </div>
 
               {/* Test Button */}
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <Btn 
                   variant="teal" 
                   onClick={testSmtpConnection}
                   disabled={smtpTestStatus === 'testing'}
                 >
-                  {smtpTestStatus === 'testing' ? '⏳ Testing...' : 
+                  {smtpTestStatus === 'testing' ? '⏳ Sending test...' : 
                    smtpTestStatus === 'success' ? '✓ Connected!' :
-                   smtpTestStatus === 'error' ? '✗ Failed' : '🔌 Test Connection'}
+                   smtpTestStatus === 'error' ? '✗ Failed — try again' : '📨 Send Test Email'}
                 </Btn>
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                  Tests connection to SMTP server
+                  Sends a real test email to {draft.email || 'your garage email'}
                 </span>
               </div>
+
+              {smtpTestStatus === 'success' && (
+                <div style={{ marginTop: '12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--green)' }}>
+                  ✓ Test email sent to <strong>{draft.email || draft.smtpUser}</strong> — check your inbox (and spam folder) to confirm it arrived.
+                </div>
+              )}
+
+              {smtpTestStatus === 'error' && smtpTestError && (
+                <div style={{ marginTop: '12px', background: 'rgba(255,95,95,0.08)', border: '1px solid rgba(255,95,95,0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--red)' }}>
+                  ✗ Not connected: {smtpTestError}
+                </div>
+              )}
             </Card>
 
 
