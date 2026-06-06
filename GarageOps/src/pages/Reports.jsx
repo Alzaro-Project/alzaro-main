@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
-import { PageHeader, Card, Btn, Badge, StatCard } from '../components/UI'
+import { PageHeader, Card, Btn, Badge, StatCard, TierGate } from '../components/UI'
 
 // Date range presets
 const DATE_PRESETS = [
@@ -101,6 +101,14 @@ function getDateRange(preset, customFrom, customTo) {
 }
 
 export default function Reports() {
+  return (
+    <TierGate min="silver" feature="Reports">
+      <ReportsContent />
+    </TierGate>
+  )
+}
+
+function ReportsContent() {
   const { invoices, customers, skus, batches, usedTyres, tier, settings } = useStore()
   const [datePreset, setDatePreset] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
@@ -419,7 +427,7 @@ export default function Reports() {
 
       {/* Date Range Selector */}
       <Card style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace', marginBottom: '12px' }}>
           Date Range
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: datePreset === 'custom' ? '12px' : 0 }}>
@@ -496,7 +504,7 @@ export default function Reports() {
       {/* Export Format Selector */}
       <Card style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>
             Export Format
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -548,7 +556,7 @@ export default function Reports() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '15px', fontWeight: 700 }}>
+                    <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '15px', fontWeight: 700 }}>
                       {report.label}
                     </div>
                     {isLocked && (
@@ -578,7 +586,7 @@ export default function Reports() {
 
       {/* Quick Actions */}
       <Card style={{ marginTop: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace', marginBottom: '12px' }}>
           Quick Export
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
