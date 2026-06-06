@@ -153,8 +153,8 @@ function Pill({ text, tone }) {
 
 function Table({ cols, children }) {
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflowX: "auto" }}>
+      <table style={{ width: "100%", minWidth: cols.length > 4 ? 640 : 0, borderCollapse: "collapse", fontSize: 12.5 }}>
         <thead>
           <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
             {cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--txt-3)", fontWeight: 600 }}>{c}</th>)}
@@ -197,6 +197,17 @@ function useConfirm() {
     </div>
   ) : null;
   return [node, ask];
+}
+
+/* Shared: is the viewport phone-sized? */
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== "undefined" && window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setM(window.innerWidth <= 768);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
+  return m;
 }
 
 /* Shared: load the customer list once, for dropdowns across pages */
@@ -1875,6 +1886,8 @@ const PAGES = {
 function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
   const [isAdmin, setIsAdmin] = useState(false);
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // is this account an admin? (svc_admins row visible only to its owner)
   useEffect(() => {
@@ -1930,7 +1943,7 @@ function Dashboard({ user, signOut }) {
   const totalHits = hits.customers.length + hits.jobs.length + hits.invoices.length + hits.quotes.length + hits.properties.length;
 
   // navigate: always clear search + close notifications so the overlay never lingers
-  const goTo = (page) => { setSearch(""); setShowNotif(false); setActive(page); };
+  const goTo = (page) => { setSearch(""); setShowNotif(false); setMenuOpen(false); setActive(page); };
   // open a specific customer's detail from search
   const [openCustomerId, setOpenCustomerId] = useState(null);
   const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); };
@@ -1942,7 +1955,10 @@ function Dashboard({ user, signOut }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflow: "hidden" }}>
+      {isMobile && menuOpen && <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 120 }} />}
+      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", ...(isMobile
+        ? { position: "fixed", top: 0, left: 0, height: "100dvh", zIndex: 130, transform: menuOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: menuOpen ? "12px 0 40px rgba(0,0,0,.45)" : "none" }
+        : { position: "sticky", top: 0, height: "100vh", overflow: "hidden" }) }}>
         <div className="brand" style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 14, flexShrink: 0 }}>Field Service Pro</div>
         <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
@@ -1969,11 +1985,12 @@ function Dashboard({ user, signOut }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, position: "relative" }}>
+      <main style={{ flex: 1, minWidth: 0, padding: isMobile ? "14px 12px" : "18px 22px", maxWidth: 1180 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: 16, position: "relative" }}>
+          {isMobile && <i className="ti ti-menu-2" onClick={() => setMenuOpen(true)} style={{ fontSize: 23, color: "var(--txt)", cursor: "pointer", flexShrink: 0 }} title="Menu" />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
             <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customers, jobs, invoices, quotes, properties…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={isMobile ? "Search…" : "Search customers, jobs, invoices, quotes, properties…"} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
             {search && <i className="ti ti-x" onClick={() => setSearch("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
           </div>
           <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
@@ -2020,7 +2037,7 @@ function Dashboard({ user, signOut }) {
           <>
             {active === "dashboard" && (
               <div style={{ marginBottom: 18 }}>
-                <div style={{ display: "flex", gap: 5, fontSize: 12 }}>
+                <div style={{ display: "flex", gap: 5, fontSize: 12, flexWrap: "wrap" }}>
                   {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
                 </div>
                 {range === "Custom" && (
