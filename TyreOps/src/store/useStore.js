@@ -164,6 +164,15 @@ export const useStore = create(
                 vatScheme: data.garage.vat_scheme || 'standard',
                 vatNumber: data.garage.vat_number || '',
                 flatRate: data.garage.flat_rate || 8.5,
+                // Email / SMTP settings
+                smtpHost: data.garage.smtp_host || '',
+                smtpPort: data.garage.smtp_port || 587,
+                smtpSecure: data.garage.smtp_secure || false,
+                smtpUser: data.garage.smtp_user || '',
+                smtpPass: data.garage.smtp_pass || '',
+                emailFromName: data.garage.email_from_name || '',
+                emailReplyTo: data.garage.email_reply_to || '',
+                emailFooter: data.garage.email_footer || '',
               },
               user: { name: data.garage.name, email },
             }
@@ -285,6 +294,15 @@ export const useStore = create(
             if (updates.vatScheme !== undefined) dbUpdates.vat_scheme = updates.vatScheme
             if (updates.vatNumber !== undefined) dbUpdates.vat_number = updates.vatNumber
             if (updates.flatRate !== undefined) dbUpdates.flat_rate = updates.flatRate
+            // Email / SMTP settings
+            if (updates.smtpHost !== undefined) dbUpdates.smtp_host = updates.smtpHost
+            if (updates.smtpPort !== undefined) dbUpdates.smtp_port = updates.smtpPort
+            if (updates.smtpSecure !== undefined) dbUpdates.smtp_secure = updates.smtpSecure
+            if (updates.smtpUser !== undefined) dbUpdates.smtp_user = updates.smtpUser
+            if (updates.smtpPass !== undefined) dbUpdates.smtp_pass = updates.smtpPass
+            if (updates.emailFromName !== undefined) dbUpdates.email_from_name = updates.emailFromName
+            if (updates.emailReplyTo !== undefined) dbUpdates.email_reply_to = updates.emailReplyTo
+            if (updates.emailFooter !== undefined) dbUpdates.email_footer = updates.emailFooter
 
             await db.updateGarage(garageId, dbUpdates)
           } catch (err) {
