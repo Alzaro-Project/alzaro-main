@@ -103,7 +103,7 @@ export default function Inventory() {
                           activeBatches.map((b, i) => (
                             <span 
                               key={b.id} 
-                              title={`Supplier: ${b.supplier || 'N/A'} | Ref: ${b.ref || 'N/A'}${b.invoiceUrl ? ' | Click to view invoice' : ''}`} 
+                              title={`Supplier: ${b.supplier || 'N/A'} | Ref: ${b.ref || 'N/A'}`} 
                               onClick={() => setViewingBatch(b)}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px', borderRadius: '5px', fontSize: '10px', fontFamily: 'DM Mono, monospace',
@@ -113,7 +113,7 @@ export default function Inventory() {
                                 cursor: 'pointer',
                                 whiteSpace: 'nowrap',
                               }}>
-                              {i === 0 ? '⚡' : ''}{b.invoiceUrl ? '📄' : ''}{b.date} · £{b.cost} · {b.remaining}pc
+                              {i === 0 ? '⚡' : ''}{b.date} · £{b.cost} · {b.remaining}pc
                             </span>
                           ))
                         }
@@ -774,39 +774,6 @@ function BatchDetailsModal({ batch, skus, onClose }) {
           <div style={{ fontSize: '12px', color: 'var(--text2)' }}>{batch.notes}</div>
         </div>
       )}
-
-      {/* Purchase Invoice Section */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '8px' }}>Purchase Invoice</div>
-        {batch.invoiceUrl ? (
-          <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '16px', textAlign: 'center' }}>
-            <a 
-              href={batch.invoiceUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                background: 'var(--accent)',
-                color: '#000',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '13px',
-                textDecoration: 'none',
-              }}
-            >
-              📄 View Purchase Invoice
-            </a>
-            <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '8px' }}>Opens in new tab</div>
-          </div>
-        ) : (
-          <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: 'var(--text3)', fontSize: '12px' }}>
-            No invoice uploaded for this batch
-          </div>
-        )}
-      </div>
 
       {/* VAT Breakdown */}
       <div>
