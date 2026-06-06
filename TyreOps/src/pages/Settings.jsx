@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import { SMTP_PRESETS } from '../lib/email'
+import { supabase } from '../lib/supabase'
 
 const TABS = [
   { key: 'garage', label: '🏢 Garage', icon: '🏢' },
@@ -11,10 +12,46 @@ const TABS = [
 ]
 
 export default function Settings() {
-  const { settings, tier, setTier, updateSettings } = useStore()
+  const { settings, tier, setTier, updateSettings, garageId } = useStore()
   const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
   const [smtpTestError, setSmtpTestError] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError, setLogoError] = useState('')
+
+  // Upload company logo to Supabase Storage, save its public URL to settings
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoError('')
+
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Please choose an image file (PNG or JPG).')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('Logo must be under 2MB.')
+      return
+    }
+
+    setLogoUploading(true)
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const path = `${garageId}.${ext}`
+      const { error } = await supabase.storage
+        .from('logos')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+
+      const { data } = supabase.storage.from('logos').getPublicUrl(path)
+      // Cache-bust so a replaced logo shows immediately
+      setField({ logoUrl: `${data.publicUrl}?v=${Date.now()}` })
+    } catch (err) {
+      setLogoError('Upload failed: ' + (err.message || 'unknown error'))
+    }
+    setLogoUploading(false)
+    e.target.value = '' // allow re-selecting the same file
+  }
   const [showSmtpPassword, setShowSmtpPassword] = useState(false)
 
   // Local draft of settings — edits stay here until Save is clicked
@@ -312,6 +349,52 @@ export default function Settings() {
                   placeholder="info@smithtyres.co.uk"
                 />
               </div>
+            </div>
+
+            {/* Company Logo */}
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+              <label style={labelStyle}>Company Logo</label>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '10px' }}>
+                Shown at the top of your invoices and invoice emails. PNG or JPG, max 2MB.
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                {draft.logoUrl ? (
+                  <img
+                    src={draft.logoUrl}
+                    alt="Company logo"
+                    style={{ maxHeight: '64px', maxWidth: '200px', objectFit: 'contain', background: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px' }}
+                  />
+                ) : (
+                  <div style={{ width: '120px', height: '64px', border: '1px dashed var(--border)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text3)' }}>
+                    No logo yet
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: 'var(--text)' }}>
+                    {logoUploading ? '⏳ Uploading...' : draft.logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLogoUpload} disabled={logoUploading} style={{ display: 'none' }} />
+                  </label>
+                  {draft.logoUrl && (
+                    <button
+                      onClick={() => setField({ logoUrl: '' })}
+                      style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {logoError && (
+                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--red)' }}>{logoError}</div>
+              )}
+              {draft.logoUrl && dirty && (
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text3)' }}>
+                  Remember to click Save Changes to keep your logo.
+                </div>
+              )}
             </div>
 
             {renderSaveRow()}
