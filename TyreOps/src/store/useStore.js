@@ -133,6 +133,12 @@ export const useStore = create(
           motReminders: [],
         })
 
+        await get().loadData(email)
+      },
+
+      // Load all garage data from Supabase. Called on login AND on app
+      // start (page refresh), so data isn't lost when the page reloads.
+      loadData: async (email) => {
         try {
           const data = await db.loadAllGarageData(email)
           console.log('Loaded garage data:', data)
