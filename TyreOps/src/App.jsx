@@ -119,6 +119,18 @@ function AppLayout() {
 
 export default function App() {
   const user = useStore(s => s.user)
+  const isAdmin = useStore(s => s.isAdmin)
+  const loadData = useStore(s => s.loadData)
+
+  // On page load/refresh: if a user session was restored from localStorage,
+  // re-fetch their data from Supabase (customers, inventory, invoices, etc.)
+  useEffect(() => {
+    if (user?.email && !isAdmin) {
+      loadData(user.email)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <BrowserRouter basename="/tyreops">
       <Routes>
