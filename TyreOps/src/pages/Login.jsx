@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
@@ -16,6 +16,16 @@ export default function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const { login } = useStore()
   const navigate = useNavigate()
+
+  // Arrived from the email confirmation page? Show a welcome banner.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('confirmed') === '1') {
+      setSuccess('Email confirmed — you can sign in now.')
+      // Tidy the URL so a refresh doesn't re-show the banner
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const inp = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
@@ -53,6 +63,10 @@ export default function Login() {
     if (password.length < 6) return setError('Password must be at least 6 characters')
     setLoading(true); setError(''); setSuccess('')
     try {
+      const siteUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:5173'
+        : `${window.location.protocol}//${window.location.host}`
+
       const { error: err } = await supabase.auth.signUp({
         email,
         password,
@@ -60,7 +74,8 @@ export default function Login() {
           data: {
             garage_name: garageName.trim(),
             product: 'tyreops'
-          }
+          },
+          emailRedirectTo: `${siteUrl}/confirmed?product=tyreops`
         }
       })
       if (err) throw err
