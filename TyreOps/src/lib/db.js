@@ -209,14 +209,24 @@ export async function insertCustomer(garageId, customer) {
   
   const { data, error } = await supabase.from('customers').insert({
     garage_id: garageId, name: customer.name, email: customer.email,
-    phone: customer.phone, reg: customer.reg, vehicle: customer.vehicle
+    phone: customer.phone, reg: customer.reg, vehicle: customer.vehicle,
+    vehicles: customer.vehicles || []
   }).select().single()
   if (error) throw error
   return data
 }
 
 export async function updateCustomer(id, updates) {
-  const { error } = await supabase.from('customers').update(updates).eq('id', id)
+  // Only send columns that exist on the customers table — anything else
+  // (internal/UI-only fields) would make Supabase reject the whole update.
+  const allowed = ['name', 'email', 'phone', 'reg', 'vehicle', 'vehicles']
+  const dbUpdates = {}
+  for (const key of allowed) {
+    if (updates[key] !== undefined) dbUpdates[key] = updates[key]
+  }
+  if (Object.keys(dbUpdates).length === 0) return
+
+  const { error } = await supabase.from('customers').update(dbUpdates).eq('id', id)
   if (error) throw error
 }
 
