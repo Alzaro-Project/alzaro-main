@@ -730,6 +730,43 @@ export default function Invoices() {
   const vat = calcVAT(lines, settings.vatScheme, settings.flatRate, tier)
   const total = sub + vat
 
+  // Deduct inventory for an invoice's lines:
+  //  - new tyres come off batch stock (chosen batch, or FIFO oldest-first)
+  //  - used tyres get marked as sold
+  // Called exactly once per invoice, when it first becomes sent/paid.
+  const deductStockForLines = (invLines) => {
+    const store = useStore.getState()
+    ;(invLines || []).forEach(l => {
+      // Used tyre line
+      if (l.usedId) {
+        const u = store.usedTyres.find(u => u.id === l.usedId)
+        if (u && !u.sold) store.updateUsedTyre(u.id, { sold: true })
+        return
+      }
+      // Service or custom lines carry no stock
+      if (!l.batchId && !l.skuId) return
+
+      const qtyNeeded = parseInt(l.qty, 10) || 0
+      if (qtyNeeded <= 0) return
+
+      if (l.batchId) {
+        store.decrementBatch(l.batchId, qtyNeeded)
+      } else {
+        // No specific batch chosen — consume FIFO across this SKU's batches
+        let left = qtyNeeded
+        const fifo = store.batches
+          .filter(b => b.skuId === l.skuId && b.remaining > 0)
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+        for (const b of fifo) {
+          if (left <= 0) break
+          const take = Math.min(b.remaining, left)
+          store.decrementBatch(b.id, take)
+          left -= take
+        }
+      }
+    })
+  }
+
   const saveInv = (status) => {
     if (!lines.length) { alert('Add at least one item'); return }
     if (!form.custName) { alert('Enter customer name'); return }
@@ -755,14 +792,9 @@ export default function Invoices() {
         paidAt: finalStatus === 'paid' ? new Date().toISOString() : editingInvoice.paidAt
       }
       
-      // Mark used tyres as sold if status changed to sent/paid
+      // Deduct stock (new tyre batches + used tyres) when a draft becomes sent/paid
       if ((finalStatus === 'sent' || finalStatus === 'paid') && editingInvoice.status === 'draft') {
-        lines.forEach(l => {
-          if (l.usedId) {
-            const u = usedTyres.find(u => u.id === l.usedId)
-            if (u) useStore.getState().updateUsedTyre(u.id, { sold: true })
-          }
-        })
+        deductStockForLines(lines)
       }
       
       updateInvoice(editingInvoice.id, updatedInv)
@@ -787,18 +819,17 @@ export default function Invoices() {
     }
     
     if (finalStatus === 'sent' || finalStatus === 'paid') {
-      lines.forEach(l => {
-        if (l.usedId) {
-          const u = usedTyres.find(u => u.id === l.usedId)
-          if (u) useStore.getState().updateUsedTyre(u.id, { sold: true })
-        }
-      })
+      deductStockForLines(lines)
     }
     addInvoice(inv)
     return inv
   }
 
   const handleMarkPaid = (invoice, paymentMethod) => {
+    // If it's still a draft, stock hasn't been deducted yet
+    if (invoice.status === 'draft') {
+      deductStockForLines(invoice.lines)
+    }
     updateInvoice(invoice.id, { 
       status: 'paid', 
       paymentMethod,
@@ -815,8 +846,9 @@ export default function Invoices() {
       return
     }
     setSendingInv(inv)
-    // Update status to sent if it was draft
+    // Update status to sent if it was draft — and deduct stock at that point
     if (inv.status === 'draft') {
+      deductStockForLines(inv.lines)
       updateInvoice(inv.id, { status: 'sent' })
     }
   }
