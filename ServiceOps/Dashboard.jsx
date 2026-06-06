@@ -1730,16 +1730,95 @@ function AuthScreen() {
 }
 
 /* ================================================================== */
+/*  ADMIN  (only visible to accounts in svc_admins)                   */
+/* ================================================================== */
+function AdminPage() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    db.rpc("svc_admin_overview").then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
+      setData(typeof data === "string" ? JSON.parse(data) : data);
+    });
+  }, []);
+
+  const users = (data && data.users) || [];
+  const now = new Date();
+  const days = (d) => Math.floor((now - new Date(d)) / 86400000);
+  const newThisMonth = users.filter((u) => days(u.created_at) <= 30).length;
+  const sum = (k) => users.reduce((s, u) => s + (+u[k] || 0), 0);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  const statCard = (label, value, color) => (
+    <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
+      <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: color || "var(--txt)" }}>{value}</div>
+    </div>
+  );
+
+  return (
+    <div className="fade-in">
+      <PageHead title="Admin" sub={data ? `${users.length} registered user${users.length === 1 ? "" : "s"} on ServiceOps` : "Loading platform data…"} />
+      {err && <div style={errBanner}>{err.includes("Not authorised") ? "Your account isn't an admin." : err}</div>}
+      {data && (
+        <>
+          <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+            {statCard("Total users", users.length, "var(--brand)")}
+            {statCard("New (30 days)", newThisMonth, "var(--blue)")}
+            {statCard("Customers", sum("customers"))}
+            {statCard("Jobs", sum("jobs"))}
+          </div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
+            {statCard("Properties", sum("properties"))}
+            {statCard("Quotes", sum("quotes"))}
+            {statCard("Invoices", sum("invoices"))}
+            {statCard("Invoiced value", gbp(sum("invoice_total")), "var(--green)")}
+          </div>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 10 }}>All users — newest first</div>
+          <Table cols={["User", "Joined", "Last sign-in", "Customers", "Properties", "Jobs", "Quotes", "Invoices", "£ Invoiced"]}>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <Td><span style={{ fontWeight: 500 }}>{u.email}</span>{days(u.created_at) <= 30 && <span style={{ marginLeft: 8 }}><Pill text="New" tone="green" /></span>}</Td>
+                <Td color="var(--txt-2)">{fmtDate(u.created_at)}</Td>
+                <Td color="var(--txt-2)">{fmtDate(u.last_sign_in_at)}</Td>
+                <Td>{u.customers}</Td>
+                <Td>{u.properties}</Td>
+                <Td>{u.jobs}</Td>
+                <Td>{u.quotes}</Td>
+                <Td>{u.invoices}</Td>
+                <Td><span style={{ fontWeight: 600, color: "var(--green)" }}>{gbp(+u.invoice_total || 0)}</span></Td>
+              </tr>
+            ))}
+          </Table>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  APP SHELL                                                         */
 /* ================================================================== */
 const PAGES = {
   customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
-  reports: ReportsPage, settings: SettingsPage,
+  reports: ReportsPage, settings: SettingsPage, admin: AdminPage,
 };
 
 function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // is this account an admin? (svc_admins row visible only to its owner)
+  useEffect(() => {
+    if (!DB_READY || !user) return;
+    db.from("svc_admins").select("user_id").eq("user_id", user.id)
+      .then(({ data }) => setIsAdmin((data || []).length > 0));
+  }, [user]);
+
+  const navItems = isAdmin ? [...NAV, { id: "admin", label: "Admin", icon: "ti-shield-lock" }] : NAV;
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
@@ -1804,7 +1883,7 @@ function Dashboard({ user, signOut }) {
         <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
         <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#0f4429", background: "#a7e8c4", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0 }}>
-          {NAV.map((n) => {
+          {navItems.map((n) => {
             const on = n.id === active;
             return (
               <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent", flexShrink: 0 }}>
