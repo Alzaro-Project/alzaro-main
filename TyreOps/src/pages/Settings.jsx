@@ -649,12 +649,12 @@ export default function Settings() {
                   />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label style={labelStyle}>Email Footer Text</label>
+                  <label style={labelStyle}>Payment Information Text (shown in the highlighted box on invoices)</label>
                   <textarea 
                     style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} 
                     value={draft.emailFooter || ''} 
                     onChange={e => setField({ emailFooter: e.target.value })} 
-                    placeholder="Thank you for your business! Payment is due within 14 days."
+                    placeholder="e.g. Bank transfer: Sort 12-34-56 · Account 12345678. Payment due within 14 days."
                   />
                 </div>
               </div>
