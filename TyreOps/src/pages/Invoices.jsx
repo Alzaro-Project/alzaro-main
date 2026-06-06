@@ -621,6 +621,7 @@ export default function Invoices() {
   const [sendingInv, setSendingInv] = useState(null) // For email sending modal
   const [lines, setLines] = useState([])
   const [form, setForm] = useState({ custId: '', custName: '', custEmail: '', reg: '', date: '', due: '', notes: '', paymentMethod: 'pending' })
+  const [manualReg, setManualReg] = useState(false)
 
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isBronze = tier === 'bronze'
@@ -640,6 +641,7 @@ export default function Invoices() {
     }
     const today = new Date().toISOString().split('T')[0]
     setForm({ custId: '', custName: '', custEmail: '', reg: '', date: today, due: today, notes: '', paymentMethod: 'pending' })
+    setManualReg(false)
     setLines([])
     setEditingInvoice(null)
     setShowModal(true)
@@ -667,12 +669,14 @@ export default function Invoices() {
   }
 
   const handleCustomerSelect = (customer) => {
+    const firstVehicleReg = (customer.vehicles || []).find(v => v.reg)?.reg || ''
+    setManualReg(false)
     setForm(f => ({ 
       ...f, 
       custId: customer.id, 
       custName: customer.name, 
       custEmail: customer.email || '', 
-      reg: customer.reg || '' 
+      reg: customer.reg || firstVehicleReg
     }))
   }
 
@@ -943,8 +947,53 @@ export default function Invoices() {
               />
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Vehicle Reg</label>
-                <input style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%', textTransform: 'uppercase' }}
-                  value={form.reg} onChange={e => setForm(f => ({ ...f, reg: e.target.value.toUpperCase() }))} placeholder="MK21 ABC" />
+                {(() => {
+                  const selectedCustomer = customers.find(c => c.id === form.custId)
+                  const customerVehicles = (selectedCustomer?.vehicles || []).filter(v => v.reg)
+                  const fieldStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+                  const regInList = customerVehicles.some(v => v.reg === form.reg)
+                  const showDropdown = customerVehicles.length > 0 && !manualReg && (regInList || !form.reg)
+
+                  if (showDropdown) {
+                    return (
+                      <select
+                        style={{ ...fieldStyle, cursor: 'pointer' }}
+                        value={form.reg}
+                        onChange={e => {
+                          if (e.target.value === '__manual__') {
+                            setManualReg(true)
+                            setForm(f => ({ ...f, reg: '' }))
+                          } else {
+                            setForm(f => ({ ...f, reg: e.target.value }))
+                          }
+                        }}
+                      >
+                        <option value="">Select vehicle...</option>
+                        {customerVehicles.map((v, i) => (
+                          <option key={i} value={v.reg}>
+                            {v.reg}{(v.make || v.model) ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                          </option>
+                        ))}
+                        <option value="__manual__">Other — type manually</option>
+                      </select>
+                    )
+                  }
+
+                  return (
+                    <>
+                      <input style={{ ...fieldStyle, textTransform: 'uppercase' }}
+                        value={form.reg} onChange={e => setForm(f => ({ ...f, reg: e.target.value.toUpperCase() }))} placeholder="MK21 ABC" />
+                      {customerVehicles.length > 0 && (
+                        <button
+                          onClick={() => { setManualReg(false); setForm(f => ({ ...f, reg: '' })) }}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', padding: '4px 0 0', textDecoration: 'underline' }}
+                        >
+                          ← choose from saved vehicles
+                        </button>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
 
