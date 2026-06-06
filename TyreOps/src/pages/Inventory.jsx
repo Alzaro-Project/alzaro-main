@@ -79,7 +79,7 @@ export default function Inventory() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr>{['Brand', 'Model', 'Size', 'Type', 'Batches / Info', 'FIFO Cost', 'Sell', 'Margin', 'Qty', 'Status'].map(h => (
+              <tr>{['Brand', 'Model', 'Size', 'Type', 'Batches / Info', 'FIFO Cost', 'Sell', 'Margin', 'Qty', 'Status', ''].map(h => (
                 <th key={h} style={{ textAlign: 'left', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', padding: '8px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}</tr>
             </thead>
@@ -124,6 +124,9 @@ export default function Inventory() {
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 40 ? 'var(--green)' : margin > 20 ? 'var(--accent)' : 'var(--red)' }}>{margin}%</span></td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>{qty}</td>
                     <td style={{ padding: '10px' }}><Badge variant={statusBadge[0]}>{statusBadge[1]}</Badge></td>
+                    <td style={{ padding: '10px' }}>
+                      <Btn sm variant="ghost" onClick={() => { setEditingSKU(sk); setShowSKU(true) }}>✏️ Edit</Btn>
+                    </td>
                   </tr>
                 )
               })}
@@ -145,12 +148,13 @@ export default function Inventory() {
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 50 ? 'var(--green)' : 'var(--accent)' }}>{margin}%</span></td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>1</td>
                     <td style={{ padding: '10px' }}><Badge variant="green">AVAIL</Badge></td>
+                    <td style={{ padding: '10px' }} />
                   </tr>
                 )
               })}
 
               {filteredSKUs.length === 0 && filteredUsed.length === 0 && (
-                <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text3)', padding: '30px' }}>
+                <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--text3)', padding: '30px' }}>
                   {search ? 'No tyres match your search' : 'No tyres in inventory. Add your first SKU!'}
                 </td></tr>
               )}
