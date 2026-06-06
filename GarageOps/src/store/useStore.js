@@ -189,6 +189,29 @@ export const useStore = create(
                 vatScheme: data.garage.vat_scheme || 'standard',
                 vatNumber: data.garage.vat_number || '',
                 flatRate: data.garage.flat_rate || 8.5,
+                // Branding
+                logoUrl: data.garage.logo_url || '',
+                // SMTP email sending
+                smtpProvider: data.garage.smtp_provider || '',
+                smtpHost: data.garage.smtp_host || '',
+                smtpPort: data.garage.smtp_port || 587,
+                smtpSecure: !!data.garage.smtp_secure,
+                smtpUser: data.garage.smtp_user || '',
+                smtpPass: data.garage.smtp_pass || '',
+                smtpFromName: data.garage.smtp_from_name || '',
+                smtpFromEmail: data.garage.smtp_from_email || '',
+                smtpReplyTo: data.garage.smtp_reply_to || '',
+                // Email defaults
+                emailFromName: data.garage.email_from_name || '',
+                emailReplyTo: data.garage.email_reply_to || '',
+                emailFooter: data.garage.email_footer || '',
+                // Pricing
+                defaultMarkupPct: data.garage.default_markup_pct != null ? Number(data.garage.default_markup_pct) : 40,
+                // Bookings & MOT reminders
+                bookingSlotMinutes: data.garage.booking_slot_minutes || 30,
+                bookingDayStart: (data.garage.booking_day_start || '08:00:00').slice(0, 5),
+                bookingDayEnd: (data.garage.booking_day_end || '18:00:00').slice(0, 5),
+                motReminderDays: data.garage.mot_reminder_days || 30,
               },
               user: { name: data.garage.name, email },
             }
@@ -312,6 +335,29 @@ export const useStore = create(
             if (updates.vatScheme !== undefined) dbUpdates.vat_scheme = updates.vatScheme
             if (updates.vatNumber !== undefined) dbUpdates.vat_number = updates.vatNumber
             if (updates.flatRate !== undefined) dbUpdates.flat_rate = updates.flatRate
+            // Branding
+            if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
+            // SMTP email sending
+            if (updates.smtpProvider !== undefined) dbUpdates.smtp_provider = updates.smtpProvider
+            if (updates.smtpHost !== undefined) dbUpdates.smtp_host = updates.smtpHost
+            if (updates.smtpPort !== undefined) dbUpdates.smtp_port = updates.smtpPort
+            if (updates.smtpSecure !== undefined) dbUpdates.smtp_secure = updates.smtpSecure
+            if (updates.smtpUser !== undefined) dbUpdates.smtp_user = updates.smtpUser
+            if (updates.smtpPass !== undefined) dbUpdates.smtp_pass = updates.smtpPass
+            if (updates.smtpFromName !== undefined) dbUpdates.smtp_from_name = updates.smtpFromName
+            if (updates.smtpFromEmail !== undefined) dbUpdates.smtp_from_email = updates.smtpFromEmail
+            if (updates.smtpReplyTo !== undefined) dbUpdates.smtp_reply_to = updates.smtpReplyTo
+            // Email defaults
+            if (updates.emailFromName !== undefined) dbUpdates.email_from_name = updates.emailFromName
+            if (updates.emailReplyTo !== undefined) dbUpdates.email_reply_to = updates.emailReplyTo
+            if (updates.emailFooter !== undefined) dbUpdates.email_footer = updates.emailFooter
+            // Pricing
+            if (updates.defaultMarkupPct !== undefined) dbUpdates.default_markup_pct = updates.defaultMarkupPct
+            // Bookings & MOT reminders
+            if (updates.bookingSlotMinutes !== undefined) dbUpdates.booking_slot_minutes = updates.bookingSlotMinutes
+            if (updates.bookingDayStart !== undefined) dbUpdates.booking_day_start = updates.bookingDayStart
+            if (updates.bookingDayEnd !== undefined) dbUpdates.booking_day_end = updates.bookingDayEnd
+            if (updates.motReminderDays !== undefined) dbUpdates.mot_reminder_days = updates.motReminderDays
 
             await db.updateGarage(garageId, dbUpdates)
           } catch (err) {
