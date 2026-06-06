@@ -284,25 +284,30 @@ export async function insertInvoice(garageId, inv) {
   }
 }
 
-export async function updateInvoice(id, updates) {
+export async function updateInvoice(garageId, id, updates) {
   const dbUpdates = {}
   if (updates.status !== undefined) dbUpdates.status = updates.status
   if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod
   if (updates.paidAt !== undefined) dbUpdates.paid_at = updates.paidAt
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes
-  
-  const { error } = await supabase.from('invoices').update(dbUpdates).eq('id', id)
+  if (Object.keys(dbUpdates).length === 0) return
+
+  const { error } = await supabase.from('invoices').update(dbUpdates)
+    .eq('garage_id', garageId).eq('id', id)
   if (error) throw error
 }
 
-export async function updateInvoiceStatus(id, status) {
-  const { error } = await supabase.from('invoices').update({ status }).eq('id', id)
+export async function updateInvoiceStatus(garageId, id, status) {
+  const { error } = await supabase.from('invoices').update({ status })
+    .eq('garage_id', garageId).eq('id', id)
   if (error) throw error
 }
 
-export async function deleteInvoice(id) {
-  await supabase.from('invoice_lines').delete().eq('invoice_id', id)
-  const { error } = await supabase.from('invoices').delete().eq('id', id)
+export async function deleteInvoice(garageId, id) {
+  await supabase.from('invoice_lines').delete()
+    .eq('garage_id', garageId).eq('invoice_id', id)
+  const { error } = await supabase.from('invoices').delete()
+    .eq('garage_id', garageId).eq('id', id)
   if (error) throw error
 }
 
