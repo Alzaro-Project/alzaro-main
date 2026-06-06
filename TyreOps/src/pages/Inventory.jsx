@@ -56,7 +56,7 @@ export default function Inventory() {
         <StatCard label="New Stock" value={totalNew} delta={`${batches.filter(b => b.remaining > 0).length} active batches`} color="var(--accent)" />
         <StatCard label="Used / Part-Ex" value={totalUsed} delta="available" color="var(--teal)" />
         <StatCard label="Low Stock SKUs" value={lowCount} delta="need reorder" color={lowCount > 0 ? 'var(--red)' : 'var(--green)'} />
-        <StatCard label="Stock Value" value={`£${totalVal.toFixed(2)}`} delta="at cost price" color="var(--blue)" />
+        <StatCard label="Stock Value" value={`£${(totalVal || 0).toFixed(2)}`} delta="at cost price" color="var(--blue)" />
       </div>
 
       {/* Tabs */}
@@ -119,8 +119,8 @@ export default function Inventory() {
                         }
                       </div>
                     </td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>£{fifo.toFixed(2)}</td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)', whiteSpace: 'nowrap' }}>£{sk.sell.toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>£{(fifo || 0).toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)', whiteSpace: 'nowrap' }}>£{(sk.sell || 0).toFixed(2)}</td>
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 40 ? 'var(--green)' : margin > 20 ? 'var(--accent)' : 'var(--red)' }}>{margin}%</span></td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>{qty}</td>
                     <td style={{ padding: '10px' }}><Badge variant={statusBadge[0]}>{statusBadge[1]}</Badge></td>
@@ -130,7 +130,7 @@ export default function Inventory() {
 
               {/* Used tyres */}
               {(tab === 'all' || tab === 'used') && filteredUsed.map(u => {
-                const margin = u.sell > 0 ? Math.round((u.sell - u.cost) / u.sell * 100) : 0
+                const margin = u.sell > 0 ? Math.round((u.sell - (u.cost || 0)) / u.sell * 100) : 0
                 return (
                   <tr key={u.id} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
                     <td style={{ padding: '10px', fontWeight: 600 }}>{u.brand}</td>
@@ -140,8 +140,8 @@ export default function Inventory() {
                     <td style={{ padding: '10px', fontSize: '11px', color: 'var(--text2)' }}>
                       {u.tread}mm · {u.year} · {u.sourceCust || 'Part-ex'}
                     </td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{u.cost.toFixed(2)}</td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--teal)' }}>£{u.sell.toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{(u.cost || 0).toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--teal)' }}>£{(u.sell || 0).toFixed(2)}</td>
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 50 ? 'var(--green)' : 'var(--accent)' }}>{margin}%</span></td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>1</td>
                     <td style={{ padding: '10px' }}><Badge variant="green">AVAIL</Badge></td>
@@ -514,7 +514,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
                     <td style={{ padding: '6px 8px' }}>{row.brand}</td>
                     <td style={{ padding: '6px 8px' }}>{row.model}</td>
                     <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>{row.w}/{row.p}R{row.r}</td>
-                    <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>£{row.sell.toFixed(2)}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>£{(row.sell || 0).toFixed(2)}</td>
                     <td style={{ padding: '6px 8px' }}>{row.season}</td>
                     <td style={{ padding: '6px 8px' }}>
                       <button 
@@ -746,7 +746,7 @@ function BatchDetailsModal({ batch, skus, onClose }) {
         </div>
         <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase' }}>Cost Per Tyre</div>
-          <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px', color: 'var(--accent)' }}>£{batch.cost?.toFixed(2)}</div>
+          <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px', color: 'var(--accent)' }}>£{(batch.cost || 0).toFixed(2)}</div>
         </div>
         <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase' }}>Original Qty</div>
@@ -781,15 +781,15 @@ function BatchDetailsModal({ batch, skus, onClose }) {
         <div style={{ background: 'rgba(96,165,250,.08)', border: '1px solid rgba(96,165,250,.2)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
             <span style={{ color: 'var(--text2)' }}>Batch cost (ex VAT)</span>
-            <span style={{ fontFamily: 'DM Mono, monospace' }}>£{(batch.qty * batch.cost).toFixed(2)}</span>
+            <span style={{ fontFamily: 'DM Mono, monospace' }}>£{((batch.qty || 0) * (batch.cost || 0)).toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
             <span style={{ color: 'var(--text2)' }}>Input VAT @ 20%</span>
-            <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>£{(batch.qty * batch.cost * 0.2).toFixed(2)}</span>
+            <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>£{((batch.qty || 0) * (batch.cost || 0) * 0.2).toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600, borderTop: '1px solid var(--border)', paddingTop: '8px', marginTop: '8px' }}>
             <span>Total paid (inc VAT)</span>
-            <span style={{ fontFamily: 'DM Mono, monospace' }}>£{(batch.qty * batch.cost * 1.2).toFixed(2)}</span>
+            <span style={{ fontFamily: 'DM Mono, monospace' }}>£{((batch.qty || 0) * (batch.cost || 0) * 1.2).toFixed(2)}</span>
           </div>
         </div>
       </div>
