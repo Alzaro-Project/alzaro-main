@@ -4,6 +4,7 @@ import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { sendInvoiceEmail, generateInvoiceEmailHTML, generateInvoiceEmailText
 } from '../lib/email'
+import { supabase } from '../lib/supabase'
 
 const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red' }
 const PAYMENT_METHODS = ['pending', 'cash', 'card', 'bank_transfer']
@@ -622,6 +623,66 @@ export default function Invoices() {
   const [lines, setLines] = useState([])
   const [form, setForm] = useState({ custId: '', custName: '', custEmail: '', reg: '', date: '', due: '', notes: '', paymentMethod: 'pending' })
 
+  // ============================================================
+  // Unbilled purchases — offered when raising/editing an invoice
+  // ============================================================
+  const garageId = useStore(s => s.garageId)
+  const [unbilledPurchases, setUnbilledPurchases] = useState([])
+  const [markupPct, setMarkupPct] = useState(40)
+
+  // Load the garage's default markup once
+  useEffect(() => {
+    if (!garageId) return
+    supabase.from('garages').select('default_markup_pct').eq('id', garageId).single()
+      .then(({ data }) => { if (data) setMarkupPct(Number(data.default_markup_pct ?? 40)) })
+  }, [garageId])
+
+  // Load all unbilled purchases whenever the invoice modal opens
+  useEffect(() => {
+    if (!showModal || !garageId) { setUnbilledPurchases([]); return }
+    supabase.from('purchases').select('*')
+      .eq('garage_id', garageId).is('invoice_id', null)
+      .then(({ data, error }) => {
+        if (error) { console.error('Load unbilled purchases:', error); return }
+        setUnbilledPurchases(data || [])
+      })
+  }, [showModal, garageId])
+
+  // Purchases matching the selected customer or reg, minus ones already added
+  const normReg = (r) => (r || '').replace(/\s+/g, '').toUpperCase()
+  const addedPurchaseIds = lines.filter(l => l.purchaseId).map(l => l.purchaseId)
+  const jobPurchases = unbilledPurchases.filter(p => {
+    if (addedPurchaseIds.includes(p.id)) return false
+    const matchCust = form.custId && p.customer_id === form.custId
+    const matchReg = form.reg && p.vehicle_reg && normReg(p.vehicle_reg) === normReg(form.reg)
+    return matchCust || matchReg
+  })
+
+  const suggestedPrice = (p) => Math.round((Number(p.net) || 0) * (1 + markupPct / 100) * 100) / 100
+
+  const addPurchaseLine = (p) => {
+    setLines(l => [...l, {
+      id: 'pl-' + p.id,
+      type: 'service',
+      desc: p.description + (p.supplier ? ` (${p.supplier})` : ''),
+      qty: 1,
+      unit: suggestedPrice(p),
+      cost: Number(p.net) || 0,
+      lineType: 'service',
+      purchaseId: p.id,
+    }])
+  }
+
+  const addAllPurchaseLines = () => { jobPurchases.forEach(p => addPurchaseLine(p)) }
+
+  // After saving an invoice, mark its purchases as billed
+  const stampPurchases = (invoiceId) => {
+    const ids = lines.filter(l => l.purchaseId).map(l => l.purchaseId)
+    if (!ids.length) return
+    supabase.from('purchases').update({ invoice_id: invoiceId }).in('id', ids)
+      .then(({ error }) => { if (error) console.error('Stamp purchases:', error) })
+  }
+
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isBronze = tier === 'bronze'
   const isGold = tier === 'gold'
@@ -762,6 +823,7 @@ export default function Invoices() {
       }
       
       updateInvoice(editingInvoice.id, updatedInv)
+      stampPurchases(editingInvoice.id)
       return updatedInv
     }
     
@@ -786,6 +848,7 @@ export default function Invoices() {
       })
     }
     addInvoice(inv)
+    stampPurchases(id)
     return inv
   }
 
@@ -887,7 +950,7 @@ export default function Invoices() {
                         {inv.status !== 'paid' && (
                           <ActionBtn icon="✓" label="Paid" variant="success" onClick={() => setPayingInv(inv)} />
                         )}
-                        <ActionBtn icon="🗑" label="Delete" variant="danger" onClick={() => { if (confirm('Delete invoice ' + inv.id + '?')) deleteInvoice(inv.id) }} />
+                        <ActionBtn icon="🗑" label="Delete" variant="danger" onClick={() => { if (confirm('Delete invoice ' + inv.id + '?')) { deleteInvoice(inv.id); supabase.from('purchases').update({ invoice_id: null }).eq('invoice_id', inv.id).then(({ error }) => { if (error) console.error('Release purchases:', error) }) } }} />
                       </div>
                     </td>
                   </tr>
@@ -997,6 +1060,40 @@ export default function Invoices() {
               }}>
                 <span>✓</span>
                 <span>Invoice will be marked as <strong>Paid</strong> ({PAYMENT_LABELS[form.paymentMethod]})</span>
+              </div>
+            )}
+
+            {/* Unbilled purchases for this job */}
+            {jobPurchases.length > 0 && (
+              <div style={{ background: 'rgba(255,179,0,0.06)', border: '1px solid rgba(255,179,0,0.25)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--amber)', fontFamily: 'DM Mono, monospace' }}>
+                    🛒 Unbilled purchases for this job ({jobPurchases.length})
+                  </div>
+                  {jobPurchases.length > 1 && (
+                    <Btn sm variant="secondary" onClick={addAllPurchaseLines}>+ Add all</Btn>
+                  )}
+                </div>
+                {jobPurchases.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
+                        {p.supplier} · {p.purchase_date}{p.vehicle_reg ? ` · ${p.vehicle_reg}` : ''} · cost £{(Number(p.net) || 0).toFixed(2)} net
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '12px', fontFamily: 'DM Mono, monospace', fontWeight: 600 }}>£{suggestedPrice(p).toFixed(2)}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text3)' }}>cost +{markupPct}%</div>
+                      </div>
+                      <Btn sm variant="secondary" onClick={() => addPurchaseLine(p)}>+ Add</Btn>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '8px' }}>
+                  Items are added at cost + your default markup — you can change the price on the line afterwards.
+                </div>
               </div>
             )}
 
