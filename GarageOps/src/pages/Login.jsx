@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin, getGarageByEmail } from '../lib/db'
+import { checkIsAdmin, getGarageForProduct, joinProduct } from '../lib/db'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
@@ -33,6 +33,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [joinMode, setJoinMode] = useState(false)   // existing Alzaro login, no GarageOps garage yet
+  const [joinName, setJoinName] = useState('')      // garage name for the new GarageOps trial
   const { login } = useStore()
   const navigate = useNavigate()
 
@@ -76,15 +78,14 @@ export default function Login() {
         login(email, true)
         navigate('/admin')
       } else {
-        // STRICT PRODUCT RULE — this is the GarageOps app.
-        // Accounts registered to another Alzaro product cannot log in here;
-        // each product requires its own signup and subscription.
-        const garage = await getGarageByEmail(email)
-        if (garage && garage.product && garage.product !== 'garageops') {
-          await supabase.auth.signOut()
-          throw new Error(
-            'This account is registered to Alzaro TyreOps. GarageOps needs its own signup — please register with a different email, or contact support@alzaro.co.uk.'
-          )
+        // MULTI-PRODUCT — look for this login's GarageOps garage specifically.
+        // If they're an Alzaro user from another product (e.g. TyreOps),
+        // offer to start a separate GarageOps trial on the same login.
+        const garage = await getGarageForProduct(email, 'garageops')
+        if (!garage) {
+          setJoinMode(true)
+          setLoading(false)
+          return
         }
         login(email, false)
         navigate('/dashboard')
@@ -93,6 +94,27 @@ export default function Login() {
       setError(err.message || 'Login failed')
     }
     setLoading(false)
+  }
+
+  // Existing Alzaro user starting their GarageOps trial
+  const doJoin = async () => {
+    if (!joinName.trim()) return setError('Please enter your garage name')
+    setLoading(true); setError('')
+    try {
+      await joinProduct('garageops', joinName.trim())
+      login(email, false)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message || 'Could not set up your GarageOps account')
+      setLoading(false)
+    }
+  }
+
+  const cancelJoin = async () => {
+    try { await supabase.auth.signOut() } catch { /* ignore */ }
+    setJoinMode(false)
+    setJoinName('')
+    setError('')
   }
 
   const doRegister = async () => {
@@ -226,7 +248,66 @@ export default function Login() {
           </div>
         </div>
 
-        {showForgotPassword ? (
+        {joinMode ? (
+          // ==================== JOIN GARAGEOPS VIEW ====================
+          // Signed in fine, but this login has no GarageOps garage yet.
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '36px', marginBottom: '8px' }}>👋</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>
+                You're already with Alzaro
+              </div>
+              <div style={{ fontSize: '13px', color: BRAND.text2, lineHeight: 1.5 }}>
+                <strong style={{ color: BRAND.text }}>{email}</strong> is registered to another
+                Alzaro product. Start a separate <strong style={{ color: BRAND.redLight }}>14-day
+                GarageOps trial</strong> on this same login? Your other product and its data
+                stay completely separate.
+              </div>
+            </div>
+
+            {error && <ErrorBanner text={error} />}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input
+                style={inputStyle}
+                placeholder="Garage name for GarageOps *"
+                value={joinName}
+                onChange={e => setJoinName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doJoin()}
+                autoFocus
+              />
+              <button
+                className="primary"
+                onClick={doJoin}
+                disabled={loading}
+                style={{ ...primaryBtnStyle, opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? 'Setting up...' : 'Start GarageOps Trial →'}
+              </button>
+              <button
+                onClick={cancelJoin}
+                disabled={loading}
+                style={{
+                  background: 'none', border: 'none',
+                  color: BRAND.text2, fontSize: '12px', cursor: 'pointer',
+                  padding: '8px', textAlign: 'center',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Not now — sign me out
+              </button>
+              <div style={{
+                fontSize: '11px',
+                color: BRAND.text3,
+                textAlign: 'center',
+                fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: '0.3px',
+              }}>
+                Separate trial · Separate subscription · No card required
+              </div>
+            </div>
+          </>
+        ) : showForgotPassword ? (
           // ==================== FORGOT PASSWORD VIEW ====================
           <>
             <div style={{ marginBottom: '20px' }}>
@@ -359,6 +440,9 @@ export default function Login() {
                   fontWeight: 500,
                 }}>
                   🔧 Start your <strong>14-day free trial</strong> — full access, no card required
+                  <div style={{ fontSize: '11px', color: BRAND.text2, marginTop: '6px', fontWeight: 400 }}>
+                    Already use another Alzaro product? Just <strong>sign in</strong> with that email — we'll set up GarageOps on your existing login.
+                  </div>
                 </div>
                 <input
                   style={inputStyle}
