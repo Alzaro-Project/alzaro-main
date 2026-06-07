@@ -18,6 +18,8 @@ function Login() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [joinMode, setJoinMode] = useState(false)     // existing Alzaro login, no SoloOps access yet
+  const [pendingUser, setPendingUser] = useState(null) // the signed-in user awaiting a SoloOps trial
 
   const goTo = (path) => { window.location.href = path }
 
@@ -55,8 +57,12 @@ function Login() {
           goTo('/soloops/dashboard')
           return
         }
-        await window.sb.auth.signOut()
-        throw new Error('This email works on Alzaro, but you haven\u2019t signed up for SoloOps yet. Use the Register tab to add SoloOps to your account.')
+        // Existing Alzaro account from another product — offer a SoloOps
+        // trial inline (stay signed in; the join screen adds the access row).
+        setPendingUser(data.user)
+        setJoinMode(true)
+        setLoading(false)
+        return
       }
       goTo('/soloops/dashboard')
     } catch (err) {
@@ -67,6 +73,34 @@ function Login() {
         setError(msg)
       }
     }
+    setLoading(false)
+  }
+
+  // Existing Alzaro user starting their SoloOps trial (inline)
+  const doJoin = async () => {
+    if (!businessName.trim()) return setError('Please enter your business name')
+    if (!pendingUser) return setError('Something went wrong — please sign in again')
+    setLoading(true); setError('')
+    try {
+      const { error: insErr } = await window.sb.from('soloops_access').insert({
+        user_id: pendingUser.id,
+        email: pendingUser.email,
+        business_name: businessName.trim(),
+      })
+      if (insErr) throw insErr
+      goTo('/soloops/dashboard')
+    } catch (err) {
+      setError(err.message || 'Could not set up your SoloOps account')
+      setLoading(false)
+    }
+  }
+
+  const cancelJoin = async () => {
+    try { await window.sb.auth.signOut() } catch (e) { /* ignore */ }
+    setJoinMode(false)
+    setPendingUser(null)
+    setBusinessName('')
+    setError('')
     setLoading(false)
   }
 
@@ -147,7 +181,33 @@ function Login() {
         </div>
         <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '24px' }}>Business Operations for Sole Traders</div>
 
-        {showForgotPassword ? (
+        {joinMode ? (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '36px', marginBottom: '8px' }}>👋</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>
+                You're already with Alzaro
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--text)' }}>{pendingUser?.email}</strong> is registered to another
+                Alzaro product. Start a separate <strong style={{ color: 'var(--orange-light)' }}>14-day
+                SoloOps trial</strong> on this same login? Your other products and their data stay
+                completely separate.
+              </div>
+            </div>
+            {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>{error}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input style={inp} placeholder="Business name for SoloOps *" value={businessName} onChange={e => setBusinessName(e.target.value)} onKeyDown={e => e.key === 'Enter' && doJoin()} autoFocus />
+              <button onClick={doJoin} disabled={loading} style={{ background: grad, color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}>
+                {loading ? 'Setting up...' : 'Start SoloOps Trial →'}
+              </button>
+              <button onClick={cancelJoin} disabled={loading} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px', textAlign: 'center' }}>
+                Not now — sign me out
+              </button>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>Separate trial · Separate subscription · No card required</div>
+            </div>
+          </>
+        ) : showForgotPassword ? (
           <>
             <div style={{ marginBottom: '20px' }}>
               <button onClick={() => { setShowForgotPassword(false); setError(''); setSuccess('') }}
@@ -197,6 +257,9 @@ function Login() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ background: 'var(--orange-subtle)', border: '1px solid rgba(249,115,22,.2)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--orange-light)', textAlign: 'center' }}>
                   🎉 Start your <strong>14-day free trial</strong> with full access to all features
+                  <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px' }}>
+                    Already use another Alzaro product? Just <strong>sign in</strong> — we'll set up SoloOps on your existing login.
+                  </div>
                 </div>
                 <input style={inp} placeholder="Business name *" value={businessName} onChange={e => setBusinessName(e.target.value)} />
                 <input style={inp} type="email" placeholder="Email address *" value={email} onChange={e => setEmail(e.target.value)} />
