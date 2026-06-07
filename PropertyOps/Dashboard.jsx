@@ -1605,7 +1605,7 @@ function AuthScreen() {
     if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
-    const { error } = await db.auth.signUp({ email, password: pw, options: { data: { company_name: company.trim(), product: "propertyops" } } });
+    const { error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=propertyops`, data: { company_name: company.trim(), product: "propertyops" } } });
     setBusy(false);
     if (error) return setMsg(error.message);
     setOk("Check your email to confirm your account, then log in.");
