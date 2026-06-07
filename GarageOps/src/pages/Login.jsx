@@ -126,6 +126,7 @@ export default function Login() {
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.protocol}//${window.location.host}/confirmed?product=garageops`,
           data: {
             garage_name: garageName.trim(),
             product: 'garageops'
