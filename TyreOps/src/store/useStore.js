@@ -143,6 +143,15 @@ export const useStore = create(
           const data = await db.loadAllGarageData(email)
           console.log('Loaded garage data:', data)
 
+          // MULTI-PRODUCT — loadAllGarageData fetches this email's TyreOps
+          // garage specifically. Null means no TyreOps membership yet; the
+          // login page offers the "start your TyreOps trial" flow.
+          if (!data) {
+            showToast('No TyreOps account on this login yet — sign in again to set one up.')
+            await get().logout()
+            return
+          }
+
           if (data) {
             const baseState = {
               // Shared
