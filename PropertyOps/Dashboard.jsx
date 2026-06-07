@@ -1867,10 +1867,75 @@ function Dashboard({ user, signOut }) {
 }
 
 /* ================================================================== */
+/*  MEMBERSHIP GATE — multi-product accounts                          */
+/*  One Alzaro login can hold several products. PropertyOps access    */
+/*  requires a row in product_members for this user. Users who        */
+/*  originally registered via PropertyOps are let in silently; users  */
+/*  from other Alzaro products get a "start your trial" offer.        */
+/* ================================================================== */
+function JoinScreen({ user, onJoined, signOut }) {
+  const [company, setCompany] = useState(user?.user_metadata?.company_name || "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const doJoin = async () => {
+    setMsg("");
+    if (!company.trim()) return setMsg("Please enter your company name.");
+    setBusy(true);
+    const { error } = await db.from("product_members").insert([{
+      user_id: user.id,
+      email: user.email,
+      product: "propertyops",
+      company_name: company.trim(),
+    }]);
+    setBusy(false);
+    if (error) return setMsg(error.message || "Could not set up your PropertyOps account.");
+    onJoined();
+  };
+
+  const inp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "Inter", outline: "none" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(139,127,232,.3)" };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 20 }}>
+      <div className="fade-in" style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "40px 36px", width: 440, maxWidth: "100%", boxShadow: "0 20px 48px rgba(0,0,0,0.4)" }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div className="brand" style={{ fontSize: 28, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
+          <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 4 }}>Property Operations Infrastructure</div>
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>👋</div>
+          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>You're already with Alzaro</div>
+          <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--txt)" }}>{user.email}</strong> is registered to another
+            Alzaro product. Start a separate <strong style={{ color: "var(--brand)" }}>14-day
+            PropertyOps trial</strong> on this same login? Your other products and their data
+            stay completely separate.
+          </div>
+        </div>
+
+        {msg && (
+          <div style={{ background: "var(--red-soft)", border: "1px solid var(--red)", borderRadius: 8, padding: "11px 14px", fontSize: 13, color: "var(--red)", marginBottom: 14 }}>{msg}</div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input style={inp} placeholder="Company name for PropertyOps *" value={company} onChange={(e) => setCompany(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doJoin()} autoFocus />
+          <button onClick={doJoin} disabled={busy} style={primaryBtn}>{busy ? "Setting up…" : "Start PropertyOps Trial →"}</button>
+          <button onClick={signOut} disabled={busy} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "Inter" }}>Not now — sign me out</button>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center" }}>Separate trial · Separate subscription · No card required</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  ROOT — decides: login screen or dashboard                         */
 /* ================================================================== */
 function App() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
+  const [member, setMember] = useState(undefined);   // undefined = checking, true/false
 
   useEffect(() => {
     if (!DB_READY) { setSession(null); return; }
@@ -1879,12 +1944,45 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Membership check whenever the signed-in user changes
+  useEffect(() => {
+    if (!session?.user) { setMember(undefined); return; }
+    let cancelled = false;
+    const check = async () => {
+      const { data, error } = await db.from("product_members")
+        .select("id").eq("user_id", session.user.id).eq("product", "propertyops").maybeSingle();
+      if (cancelled) return;
+      if (error) { console.error("Membership check:", error); setMember(false); return; }
+      if (data) { setMember(true); return; }
+      // No membership row — if they originally registered via PropertyOps,
+      // create it silently (covers pre-existing users and fresh signups).
+      if (session.user.user_metadata?.product === "propertyops") {
+        const { error: insErr } = await db.from("product_members").insert([{
+          user_id: session.user.id,
+          email: session.user.email,
+          product: "propertyops",
+          company_name: session.user.user_metadata?.company_name || "My Company",
+        }]);
+        if (!cancelled) setMember(!insErr);
+        if (insErr) console.error("Auto-join:", insErr);
+        return;
+      }
+      setMember(false); // came from another Alzaro product — offer the trial
+    };
+    check();
+    return () => { cancelled = true; };
+  }, [session]);
+
   const signOut = () => db.auth.signOut();
 
   if (session === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!session) return <AuthScreen />;
+  if (member === undefined) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+  }
+  if (!member) return <JoinScreen user={session.user} onJoined={() => setMember(true)} signOut={signOut} />;
   return <Dashboard user={session.user} signOut={signOut} />;
 }
 
