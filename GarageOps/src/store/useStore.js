@@ -168,6 +168,15 @@ export const useStore = create(
           const data = await db.loadAllGarageData(email)
           console.log('Loaded garage data:', data)
 
+          // STRICT PRODUCT RULE — GarageOps only.
+          // Accounts registered to another Alzaro product (e.g. TyreOps)
+          // cannot use GarageOps; they must sign up separately.
+          if (data && data.product && data.product !== 'garageops') {
+            showToast('This account is registered to Alzaro TyreOps. GarageOps requires its own signup — please register separately.')
+            await get().logout()
+            return
+          }
+
           if (data) {
             const baseState = {
               // Shared
