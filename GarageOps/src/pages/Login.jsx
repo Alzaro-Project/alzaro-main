@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin } from '../lib/db'
+import { checkIsAdmin, getGarageByEmail } from '../lib/db'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
@@ -76,6 +76,16 @@ export default function Login() {
         login(email, true)
         navigate('/admin')
       } else {
+        // STRICT PRODUCT RULE — this is the GarageOps app.
+        // Accounts registered to another Alzaro product cannot log in here;
+        // each product requires its own signup and subscription.
+        const garage = await getGarageByEmail(email)
+        if (garage && garage.product && garage.product !== 'garageops') {
+          await supabase.auth.signOut()
+          throw new Error(
+            'This account is registered to Alzaro TyreOps. GarageOps needs its own signup — please register with a different email, or contact support@alzaro.co.uk.'
+          )
+        }
         login(email, false)
         navigate('/dashboard')
       }
