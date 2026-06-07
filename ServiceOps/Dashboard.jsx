@@ -1654,7 +1654,7 @@ function AuthScreen() {
     if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
-    const { data, error } = await db.auth.signUp({ email, password: pw, options: { data: { company_name: company.trim(), product: "serviceops" } } });
+    const { data, error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=serviceops`, data: { company_name: company.trim(), product: "serviceops" } } });
     // an existing Alzaro account (from another Ops product) shows up as an error
     // or as a signUp result with no identities — handle both
     const alreadyExists = (error && /already/i.test(error.message)) ||
