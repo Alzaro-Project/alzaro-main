@@ -63,6 +63,38 @@ export async function getGarageByEmail(email) {
   return garage
 }
 
+// ============================================================
+// MULTI-PRODUCT (Option B)
+// ------------------------------------------------------------
+// One email can hold one garage per product. These helpers find
+// the garage for a specific product, and create one when an
+// existing Alzaro user joins this product for the first time.
+// ============================================================
+export async function getGarageForProduct(email, product) {
+  const { data: links, error: linkErr } = await supabase
+    .from('garage_users').select('garage_id').eq('email', email)
+  if (linkErr) throw linkErr
+  if (!links || links.length === 0) return null
+
+  const ids = links.map(l => l.garage_id)
+  const { data: garages, error: gErr } = await supabase
+    .from('garages').select('*').in('id', ids).eq('product', product)
+  if (gErr) throw gErr
+  return (garages && garages[0]) || null
+}
+
+// Creates a new trial garage for this product on the signed-in user's
+// account (via the join_product database function). Idempotent: if a
+// garage for this product already exists, its id is returned instead.
+export async function joinProduct(product, garageName) {
+  const { data, error } = await supabase.rpc('join_product', {
+    p_product: product,
+    p_garage_name: garageName || '',
+  })
+  if (error) throw error
+  return data
+}
+
 export async function updateGarage(garageId, updates) {
   const { error } = await supabase.from('garages').update(updates).eq('id', garageId)
   if (error) throw error
@@ -790,12 +822,10 @@ export async function deleteMotReminder(id) {
 //   labour_rates, jobs, mot_reminders, customers, invoices)
 // Shared tables (customers, invoices) are loaded in both cases.
 // ============================================================
-export async function loadAllGarageData(email) {
+export async function loadAllGarageData(email, product = 'tyreops') {
   try {
-    const garage = await getGarageByEmail(email)
+    const garage = await getGarageForProduct(email, product)
     if (!garage) return null
-
-    const product = garage.product || 'tyreops'
 
     if (product === 'garageops') {
       const [
