@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useServices } from '../hooks/useServices'
+import { useCatalog } from '../hooks/useCatalog'
 
 // ============================================================
 // Items — Catalog of Parts / Services / Labour / Consumables
@@ -41,7 +42,6 @@ function money(n) {
 // ============================================================
 export default function Items() {
   const [tab, setTab] = useState('services')
-  const active = TABS.find(t => t.key === tab)
 
   return (
     <div style={{ fontFamily: "'Space Grotesk', sans-serif", color: T.text }}>
@@ -73,7 +73,10 @@ export default function Items() {
         ))}
       </div>
 
-      {tab === 'services' ? <ServicesTab /> : <PlaceholderTab active={active} />}
+      {tab === 'services' && <ServicesTab />}
+      {tab === 'parts' && <CatalogTab type="parts" />}
+      {tab === 'labour' && <CatalogTab type="labour" />}
+      {tab === 'consumables' && <CatalogTab type="consumables" />}
     </div>
   )
 }
@@ -331,21 +334,301 @@ function ServiceForm({ mode, initial, onClose, onSave }) {
 }
 
 // ============================================================
-// PLACEHOLDER TAB (Parts / Labour / Consumables)
+// CATALOG TAB (Parts / Labour / Consumables)
+// ------------------------------------------------------------
+// One generic tab driven by config — list, add/edit modal,
+// archive/restore/hard-delete, mirroring the Services tab.
 // ============================================================
-function PlaceholderTab({ active }) {
+
+const CATALOG_CONFIG = {
+  parts: {
+    table: 'parts',
+    singular: 'part',
+    icon: 'ti-box',
+    emptyHint: 'Parts you sell repeatedly — brake pads, oil filters, wipers, bulbs',
+    headers: ['Part', 'Cost', 'Sell', ''],
+    renderCells: (r) => [
+      <div key="n">
+        <div style={{ fontWeight: 500 }}>{r.name}</div>
+        {r.part_number && <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px', fontFamily: 'monospace' }}>{r.part_number}</div>}
+      </div>,
+      <span key="c" style={{ fontFamily: 'monospace', color: T.text2, fontSize: '12px' }}>{money(r.cost)}</span>,
+      <span key="s" style={{ fontFamily: 'monospace', color: T.text2, fontSize: '12px' }}>{money(r.sell)}</span>,
+    ],
+    fields: [
+      { key: 'name', label: 'Part name *', placeholder: 'e.g. Front brake pads — Bosch', autoFocus: true },
+      { key: 'part_number', label: 'Part number', placeholder: 'Optional' },
+      { key: 'cost', label: 'Your cost (£)', type: 'money', placeholder: '0.00', half: true },
+      { key: 'sell', label: 'Sell price (£)', type: 'money', placeholder: '0.00', half: true },
+    ],
+    blank: { name: '', part_number: '', cost: '', sell: '', sort_order: 100 },
+  },
+  labour: {
+    table: 'labour_rates',
+    singular: 'labour rate',
+    icon: 'ti-clock',
+    emptyHint: 'Hourly rates — e.g. Standard labour, Diagnostics, Apprentice',
+    headers: ['Rate', '£ / hour', '', ''],
+    renderCells: (r) => [
+      <div key="n" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontWeight: 500 }}>{r.name}</span>
+        {r.is_default && (
+          <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', padding: '2px 7px', borderRadius: '10px', background: 'rgba(229,57,53,0.12)', color: T.red }}>DEFAULT</span>
+        )}
+      </div>,
+      <span key="r" style={{ fontFamily: 'monospace', color: T.text2, fontSize: '12px' }}>{money(r.hourly_rate)}/hr</span>,
+      <span key="x" />,
+    ],
+    fields: [
+      { key: 'name', label: 'Rate name *', placeholder: 'e.g. Standard labour', autoFocus: true },
+      { key: 'hourly_rate', label: 'Rate per hour (£) *', type: 'money', placeholder: '60.00' },
+      { key: 'is_default', label: 'Make this the default rate', type: 'check' },
+    ],
+    blank: { name: '', hourly_rate: '', is_default: false, sort_order: 100 },
+  },
+  consumables: {
+    table: 'consumables',
+    singular: 'consumable',
+    icon: 'ti-droplet',
+    emptyHint: 'Oils, screen wash, grease, sundries — priced per unit',
+    headers: ['Consumable', 'Unit', 'Price', ''],
+    renderCells: (r) => [
+      <div key="n" style={{ fontWeight: 500 }}>{r.name}</div>,
+      <span key="u" style={{ fontFamily: 'monospace', color: T.text2, fontSize: '12px' }}>per {r.unit || 'each'}</span>,
+      <span key="p" style={{ fontFamily: 'monospace', color: T.text2, fontSize: '12px' }}>{money(r.price)}</span>,
+    ],
+    fields: [
+      { key: 'name', label: 'Name *', placeholder: 'e.g. Engine oil 5W-30', autoFocus: true },
+      { key: 'unit', label: 'Unit', type: 'select', options: ['each', 'litre', 'ml', 'kg', 'metre'], half: true },
+      { key: 'price', label: 'Price (£) *', type: 'money', placeholder: '0.00', half: true },
+    ],
+    blank: { name: '', unit: 'each', price: '', sort_order: 100 },
+  },
+}
+
+function CatalogTab({ type }) {
+  const cfg = CATALOG_CONFIG[type]
+  const { rows, loading, error, refresh, create, update, archive, restore, remove, setDefault } = useCatalog(cfg.table)
+
+  const [formMode, setFormMode] = useState(null) // null | 'create' | 'edit'
+  const [formInitial, setFormInitial] = useState({})
+  const [showArchived, setShowArchived] = useState(false)
+
+  const active = rows.filter(r => !r.archived)
+  const archived = rows.filter(r => r.archived)
+
+  const openCreate = () => { setFormInitial({ ...cfg.blank }); setFormMode('create') }
+  const openEdit = (row) => { setFormInitial(row); setFormMode('edit') }
+
+  const handleSave = async (data) => {
+    let saved
+    if (formMode === 'create') saved = await create(data)
+    else saved = await update(data.id, data)
+    // Labour: honour the "default" checkbox by clearing it on the others
+    if (type === 'labour' && data.is_default && saved?.id) {
+      await setDefault(saved.id)
+    }
+    setFormMode(null)
+  }
+
+  const handleArchive = async (row) => {
+    if (!window.confirm(`Archive "${row.name}"? It'll be hidden from pickers but old records keep the name.`)) return
+    await archive(row.id)
+  }
+  const handleHardDelete = async (row) => {
+    if (!window.confirm(`Permanently delete "${row.name}"? This cannot be undone.`)) return
+    try { await remove(row.id) } catch (err) { alert('Failed: ' + (err.message || err)) }
+  }
+
+  return (
+    <>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ fontSize: '12px', color: T.text2 }}>
+          {active.length} {cfg.singular}{active.length === 1 ? '' : 's'} in catalog{archived.length > 0 ? ` · ${archived.length} archived` : ''}
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {archived.length > 0 && (
+            <button onClick={() => setShowArchived(s => !s)} style={ghostBtn}>
+              <i className={`ti ${showArchived ? 'ti-eye-off' : 'ti-archive'}`} /> {showArchived ? 'Hide' : 'Show'} archived
+            </button>
+          )}
+          <button onClick={openCreate} style={primaryBtn}>
+            <i className="ti ti-plus" aria-hidden="true" /> Add {cfg.singular}
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{ background: 'rgba(229,57,53,0.1)', border: `1px solid rgba(229,57,53,0.3)`, color: T.red, padding: '12px 14px', borderRadius: '10px', fontSize: '13px', marginBottom: '12px' }}>
+          ⚠ Couldn't load: {error}
+          <button onClick={refresh} style={{ marginLeft: '8px', background: 'transparent', border: `1px solid ${T.red}`, color: T.red, padding: '3px 9px', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>Retry</button>
+        </div>
+      )}
+
+      {/* Loading / list */}
+      {loading ? (
+        <div style={{ padding: '60px 20px', textAlign: 'center', color: T.text3, background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px' }}>
+          <i className="ti ti-loader-2" style={{ fontSize: '28px', display: 'inline-block', animation: 'spin 1s linear infinite' }} />
+          <div style={{ fontSize: '13px', marginTop: '12px' }}>Loading...</div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      ) : active.length === 0 && archived.length === 0 ? (
+        <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '40px 20px', textAlign: 'center' }}>
+          <i className={`ti ${cfg.icon}`} style={{ fontSize: '36px', color: T.text3, marginBottom: '12px' }} aria-hidden="true" />
+          <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>Nothing here yet</div>
+          <div style={{ fontSize: '12px', color: T.text2 }}>{cfg.emptyHint}</div>
+        </div>
+      ) : (
+        <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 110px',
+            gap: '12px', padding: '10px 16px',
+            borderBottom: `0.5px solid ${T.border}`,
+            fontSize: '10px', color: T.text3, fontFamily: 'monospace',
+            textTransform: 'uppercase', letterSpacing: '0.8px',
+          }}>
+            {cfg.headers.map((h, i) => <span key={i}>{h}</span>)}
+          </div>
+          {active.map(r => (
+            <CatalogRow key={r.id} row={r} cfg={cfg} type={type}
+              onEdit={openEdit} onArchive={handleArchive} onSetDefault={setDefault} />
+          ))}
+          {showArchived && archived.length > 0 && (
+            <>
+              <div style={{ padding: '12px 16px', background: T.surface2, fontSize: '10px', color: T.text3, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Archived
+              </div>
+              {archived.map(r => (
+                <CatalogRow key={r.id} row={r} cfg={cfg} type={type} archived
+                  onRestore={restore} onHardDelete={handleHardDelete} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Form modal */}
+      {formMode && (
+        <CatalogForm
+          mode={formMode}
+          cfg={cfg}
+          initial={formInitial}
+          onClose={() => setFormMode(null)}
+          onSave={handleSave}
+        />
+      )}
+    </>
+  )
+}
+
+function CatalogRow({ row, cfg, type, archived, onEdit, onArchive, onRestore, onHardDelete, onSetDefault }) {
+  const cells = cfg.renderCells(row)
   return (
     <div style={{
-      background: T.surface, border: `0.5px solid ${T.border}`,
-      borderRadius: '12px', padding: '40px 20px', textAlign: 'center',
+      display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 110px',
+      gap: '12px', padding: '12px 16px',
+      borderBottom: `0.5px solid ${T.border}`,
+      alignItems: 'center', fontSize: '13px',
+      opacity: archived ? 0.5 : 1,
     }}>
-      <i className={`ti ${active.icon}`} style={{ fontSize: '36px', color: T.text3, marginBottom: '12px' }} aria-hidden="true" />
-      <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '6px' }}>{active.label}</div>
-      <div style={{ fontSize: '13px', color: T.text2, marginBottom: '16px', maxWidth: '420px', margin: '0 auto 16px' }}>
-        {active.desc}
+      {cells[0]}
+      {cells[1]}
+      {cells[2] || <span />}
+      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+        {archived ? (
+          <>
+            <button onClick={() => onRestore(row.id)} style={iconBtn} title="Restore"><i className="ti ti-arrow-back-up" /></button>
+            <button onClick={() => onHardDelete(row)} style={{ ...iconBtn, color: T.red }} title="Delete forever"><i className="ti ti-trash" /></button>
+          </>
+        ) : (
+          <>
+            {type === 'labour' && !row.is_default && (
+              <button onClick={() => onSetDefault(row.id)} style={iconBtn} title="Make default"><i className="ti ti-star" /></button>
+            )}
+            <button onClick={() => onEdit(row)} style={iconBtn} title="Edit"><i className="ti ti-edit" /></button>
+            <button onClick={() => onArchive(row)} style={iconBtn} title="Archive"><i className="ti ti-archive" /></button>
+          </>
+        )}
       </div>
-      <div style={{ fontSize: '11px', color: T.text3, fontFamily: 'monospace' }}>
-        Editor coming in a later build pass
+    </div>
+  )
+}
+
+function CatalogForm({ mode, cfg, initial, onClose, onSave }) {
+  const [form, setForm] = useState(() => {
+    const f = { id: initial.id || null }
+    cfg.fields.forEach(fl => { f[fl.key] = initial[fl.key] ?? cfg.blank[fl.key] })
+    f.sort_order = initial.sort_order ?? 100
+    return f
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    setError('')
+    if (!String(form.name || '').trim()) { setError('Name is required'); return }
+    setSaving(true)
+    try { await onSave(form) }
+    catch (err) { setError(err.message || 'Failed to save'); setSaving(false) }
+  }
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }} style={modalOverlay}>
+      <div style={{ ...modalCard, maxWidth: '440px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div style={{ fontSize: '18px', fontWeight: 700 }}>
+            {mode === 'edit' ? `Edit ${cfg.singular}` : `New ${cfg.singular}`}
+          </div>
+          <button onClick={onClose} disabled={saving} style={closeXBtn}><i className="ti ti-x" /></button>
+        </div>
+
+        {error && (
+          <div style={{ background: 'rgba(229,57,53,0.1)', border: `1px solid rgba(229,57,53,0.3)`, color: T.red, padding: '10px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '12px' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+          {cfg.fields.map(fl => (
+            <div key={fl.key} style={{ gridColumn: fl.half ? 'span 1' : 'span 2' }}>
+              {fl.type === 'check' ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: T.text2, cursor: 'pointer', marginTop: '4px' }}>
+                  <input type="checkbox" checked={!!form[fl.key]} onChange={e => setForm(f => ({ ...f, [fl.key]: e.target.checked }))} />
+                  {fl.label}
+                </label>
+              ) : (
+                <>
+                  <div style={fieldLbl}>{fl.label}</div>
+                  {fl.type === 'select' ? (
+                    <select value={form[fl.key] || fl.options[0]} onChange={e => setForm(f => ({ ...f, [fl.key]: e.target.value }))} style={inputStyle}>
+                      {fl.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type={fl.type === 'money' ? 'number' : 'text'}
+                      step={fl.type === 'money' ? '0.01' : undefined}
+                      min={fl.type === 'money' ? '0' : undefined}
+                      value={form[fl.key] ?? ''}
+                      onChange={e => setForm(f => ({ ...f, [fl.key]: e.target.value }))}
+                      placeholder={fl.placeholder}
+                      autoFocus={fl.autoFocus}
+                      style={inputStyle}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button onClick={onClose} disabled={saving} style={ghostBtn}>Cancel</button>
+          <button onClick={submit} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving...' : (mode === 'edit' ? 'Save changes' : `Add ${cfg.singular}`)}
+          </button>
+        </div>
       </div>
     </div>
   )
