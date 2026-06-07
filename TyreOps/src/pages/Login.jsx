@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin } from '../lib/db'
+import { checkIsAdmin, getGarageForProduct, joinProduct } from '../lib/db'
 
 export default function Login() {
   const [tab, setTab] = useState('login')
@@ -14,6 +14,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [joinMode, setJoinMode] = useState(false)   // existing Alzaro login, no TyreOps garage yet
+  const [joinName, setJoinName] = useState('')      // garage name for the new TyreOps trial
   const { login } = useStore()
   const navigate = useNavigate()
 
@@ -48,6 +50,15 @@ export default function Login() {
         login(email, true)
         navigate('/admin')
       } else {
+        // MULTI-PRODUCT — look for this login's TyreOps garage specifically.
+        // If they're an Alzaro user from another product (e.g. GarageOps),
+        // offer to start a separate TyreOps trial on the same login.
+        const garage = await getGarageForProduct(email, 'tyreops')
+        if (!garage) {
+          setJoinMode(true)
+          setLoading(false)
+          return
+        }
         // Regular garage login
         login(email, false)
         navigate('/dashboard')
@@ -56,6 +67,27 @@ export default function Login() {
       setError(err.message || 'Login failed')
     }
     setLoading(false)
+  }
+
+  // Existing Alzaro user starting their TyreOps trial
+  const doJoin = async () => {
+    if (!joinName.trim()) return setError('Please enter your garage name')
+    setLoading(true); setError('')
+    try {
+      await joinProduct('tyreops', joinName.trim())
+      login(email, false)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message || 'Could not set up your TyreOps account')
+      setLoading(false)
+    }
+  }
+
+  const cancelJoin = async () => {
+    try { await supabase.auth.signOut() } catch { /* ignore */ }
+    setJoinMode(false)
+    setJoinName('')
+    setError('')
   }
 
   const doRegister = async () => {
@@ -117,8 +149,57 @@ export default function Login() {
         </div>
         <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '24px' }}>Tyre Management Platform</div>
         
-        {/* Forgot Password View */}
-        {showForgotPassword ? (
+        {/* Join TyreOps view — signed in fine, but no TyreOps garage yet */}
+        {joinMode ? (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '36px', marginBottom: '8px' }}>👋</div>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>
+                You're already with Alzaro
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--text)' }}>{email}</strong> is registered to another
+                Alzaro product. Start a separate <strong style={{ color: 'var(--accent)' }}>14-day
+                TyreOps trial</strong> on this same login? Your other product and its data stay
+                completely separate.
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ background: 'rgba(255,95,95,0.1)', border: '1px solid rgba(255,95,95,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input
+                style={inp}
+                placeholder="Garage name for TyreOps *"
+                value={joinName}
+                onChange={e => setJoinName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doJoin()}
+                autoFocus
+              />
+              <button
+                onClick={doJoin}
+                disabled={loading}
+                style={{ background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}
+              >
+                {loading ? 'Setting up...' : 'Start TyreOps Trial'}
+              </button>
+              <button
+                onClick={cancelJoin}
+                disabled={loading}
+                style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px', textAlign: 'center' }}
+              >
+                Not now — sign me out
+              </button>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>
+                Separate trial · Separate subscription · No card required
+              </div>
+            </div>
+          </>
+        ) : showForgotPassword ? (
           <>
             <div style={{ marginBottom: '20px' }}>
               <button 
@@ -242,6 +323,9 @@ export default function Login() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ background: 'rgba(45,212,191,.08)', border: '1px solid rgba(45,212,191,.2)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--teal)', textAlign: 'center' }}>
                   🎉 Start your <strong>14-day free trial</strong> with full access to all features
+                  <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px' }}>
+                    Already use another Alzaro product? Just <strong>sign in</strong> with that email — we'll set up TyreOps on your existing login.
+                  </div>
                 </div>
                 <input style={inp} placeholder="Garage name *" value={garageName} onChange={e => setGarageName(e.target.value)} />
                 <input style={inp} type="email" placeholder="Email address *" value={email} onChange={e => setEmail(e.target.value)} />
