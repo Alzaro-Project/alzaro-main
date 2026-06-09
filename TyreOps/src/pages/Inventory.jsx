@@ -3,14 +3,16 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
+import { deletePurchaseInvoice } from '../lib/db'
 
 export default function Inventory() {
-  const { skus, batches, usedTyres, tier, addSKU, updateSKU, addBatch, addUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
+  const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, addBatch, updateBatch, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
   const [tab, setTab] = useState('all')
   const [search, setSearch] = useState('')
   const [showSKU, setShowSKU] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
   const [showUsed, setShowUsed] = useState(false)
+  const [editingUsed, setEditingUsed] = useState(null)
   const [editingSKU, setEditingSKU] = useState(null)
   const [preSkuId, setPreSkuId] = useState('')
   const [viewingBatch, setViewingBatch] = useState(null)
@@ -125,7 +127,16 @@ export default function Inventory() {
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>{qty}</td>
                     <td style={{ padding: '10px' }}><Badge variant={statusBadge[0]}>{statusBadge[1]}</Badge></td>
                     <td style={{ padding: '10px' }}>
-                      <Btn sm variant="ghost" onClick={() => { setEditingSKU(sk); setShowSKU(true) }}>✏️ Edit</Btn>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <Btn sm variant="ghost" onClick={() => { setEditingSKU(sk); setShowSKU(true) }}>✏️ Edit</Btn>
+                        <Btn sm variant="danger" onClick={() => {
+                          if (qty > 0) {
+                            alert(`Cannot delete ${sk.brand} ${sk.model} — it still has ${qty} in stock. Remove the stock/batches first.`)
+                            return
+                          }
+                          if (confirm(`Delete ${sk.brand} ${sk.model}? This cannot be undone.`)) deleteSKU(sk.id)
+                        }}>✕</Btn>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -148,7 +159,14 @@ export default function Inventory() {
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 50 ? 'var(--green)' : 'var(--accent)' }}>{margin}%</span></td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>1</td>
                     <td style={{ padding: '10px' }}><Badge variant="green">AVAIL</Badge></td>
-                    <td style={{ padding: '10px' }} />
+                    <td style={{ padding: '10px' }}>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <Btn sm variant="ghost" onClick={() => { setEditingUsed(u); setShowUsed(true) }}>✏️ Edit</Btn>
+                        <Btn sm variant="danger" onClick={() => {
+                          if (confirm(`Delete this used tyre (${u.brand} ${u.model})? This cannot be undone.`)) deleteUsedTyre(u.id)
+                        }}>✕</Btn>
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
@@ -197,13 +215,15 @@ export default function Inventory() {
       }} />}
 
       {/* Add Used Tyre Modal */}
-      {showUsed && <UsedModal onClose={() => setShowUsed(false)} onSave={(data) => {
-        addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
+      {showUsed && <UsedModal tyre={editingUsed} onClose={() => { setShowUsed(false); setEditingUsed(null) }} onSave={(data) => {
+        if (editingUsed) updateUsedTyre(editingUsed.id, data)
+        else addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
         setShowUsed(false)
+        setEditingUsed(null)
       }} />}
 
       {/* View Batch Details Modal */}
-      {viewingBatch && <BatchDetailsModal batch={viewingBatch} skus={skus} onClose={() => setViewingBatch(null)} />}
+      {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} onClose={() => setViewingBatch(null)} />}
     </div>
   )
 }
@@ -699,12 +719,22 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
   )
 }
 
-function UsedModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
+function UsedModal({ tyre, onClose, onSave }) {
+  const [form, setForm] = useState(tyre
+    ? {
+        brand: tyre.brand ?? '', model: tyre.model ?? '',
+        w: tyre.w ?? '', p: tyre.p ?? '', r: tyre.r ?? '',
+        tread: tyre.tread ?? '', year: tyre.year ?? new Date().getFullYear(),
+        cost: tyre.cost ?? 0, sell: tyre.sell ?? '',
+        sourceCust: tyre.sourceCust ?? '',
+        date: tyre.date ?? new Date().toISOString().split('T')[0],
+        notes: tyre.notes ?? '',
+      }
+    : { brand: '', model: '', w: '', p: '', r: '', tread: '', year: new Date().getFullYear(), cost: 0, sell: '', sourceCust: '', date: new Date().toISOString().split('T')[0], notes: '' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   return (
-    <Modal title="Add Used / Part-Ex Tyre" onClose={onClose} onSave={() => {
+    <Modal title={tyre ? 'Edit Used / Part-Ex Tyre' : 'Add Used / Part-Ex Tyre'} onClose={onClose} onSave={() => {
       if (!form.brand || !form.model) return alert('Brand and model required')
       onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
     }}>
@@ -732,9 +762,79 @@ function UsedModal({ onClose, onSave }) {
   )
 }
 
-function BatchDetailsModal({ batch, skus, onClose }) {
+function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
   const sku = skus.find(s => s.id === batch.skuId)
   const skuLabel = sku ? `${sku.brand} ${sku.model} ${sku.w}/${sku.p}R${sku.r}` : 'Unknown Tyre'
+
+  const fileInputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleReplaceClick = () => {
+    if (busy) return
+    setError('')
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a PDF or image file (JPG, PNG, WebP)')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File too large. Maximum size is 5MB')
+      return
+    }
+    if (!garageId) {
+      setError('Cannot upload — no garage linked.')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${garageId}/${Date.now()}.${fileExt}`
+      const { error: upErr } = await supabase.storage
+        .from('purchase-invoices')
+        .upload(fileName, file)
+      if (upErr) throw upErr
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('purchase-invoices')
+        .getPublicUrl(fileName)
+
+      // Remove the old file (best effort) then point the batch at the new one
+      if (batch.invoiceUrl) await deletePurchaseInvoice(batch.invoiceUrl)
+      await updateBatch(batch.id, { invoiceUrl: publicUrl })
+    } catch (err) {
+      console.error('Invoice upload failed:', err)
+      setError('Upload failed. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRemove = async () => {
+    if (busy) return
+    if (!confirm('Remove the uploaded invoice from this batch?')) return
+    setBusy(true)
+    setError('')
+    try {
+      const old = batch.invoiceUrl
+      await updateBatch(batch.id, { invoiceUrl: null })
+      if (old) await deletePurchaseInvoice(old)
+    } catch (err) {
+      console.error('Invoice remove failed:', err)
+      setError('Could not remove the invoice. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <Modal title="Batch Details" onClose={onClose} hideActions>
@@ -778,6 +878,62 @@ function BatchDetailsModal({ batch, skus, onClose }) {
           <div style={{ fontSize: '12px', color: 'var(--text2)' }}>{batch.notes}</div>
         </div>
       )}
+
+      {/* Purchase Invoice */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '8px' }}>Purchase Invoice</div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,image/jpeg,image/png,image/webp"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+
+        {batch.invoiceUrl ? (
+          <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+            <a
+              href={batch.invoiceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+            >
+              📄 View invoice
+            </a>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <Btn sm variant="ghost" onClick={handleReplaceClick} disabled={busy}>
+                {busy ? '…' : 'Replace'}
+              </Btn>
+              <Btn sm variant="danger" onClick={handleRemove} disabled={busy}>
+                {busy ? '…' : 'Remove'}
+              </Btn>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={busy ? undefined : handleReplaceClick}
+            style={{
+              background: 'var(--surface2)',
+              border: '2px dashed var(--border)',
+              borderRadius: '8px',
+              padding: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: busy ? 'default' : 'pointer',
+              color: 'var(--text2)',
+              fontSize: '12px',
+            }}
+          >
+            <span>📄</span>
+            <span>{busy ? 'Uploading…' : 'No invoice — click to upload PDF or image'}</span>
+          </div>
+        )}
+
+        {error && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>{error}</div>}
+      </div>
 
       {/* VAT Breakdown */}
       <div>
