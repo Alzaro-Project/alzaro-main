@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useStore, TIER_ORDER } from '../store/useStore'
+import { useStore, TIER_ORDER, TIER_PRICE } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import { SMTP_PRESETS } from '../lib/email'
 import { supabase } from '../lib/supabase'
@@ -12,7 +12,7 @@ const TABS = [
 ]
 
 export default function Settings() {
-  const { settings, tier, setTier, updateSettings, garageId } = useStore()
+  const { settings, tier, setTier, updateSettings, garageId, trialEnds } = useStore()
   const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
   const [smtpTestError, setSmtpTestError] = useState('')
@@ -816,13 +816,116 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
     setChangingTier(null)
   }
 
-  // Mock invoice data
-  const billingInvoices = [
-    { id: 'INV-2026-03', date: '2026-03-01', amount: 90, status: 'paid' },
-    { id: 'INV-2026-02', date: '2026-02-01', amount: 90, status: 'paid' },
-    { id: 'INV-2026-01', date: '2026-01-01', amount: 90, status: 'paid' },
-    { id: 'INV-2025-12', date: '2025-12-01', amount: 75, status: 'paid' },
-  ]
+  // Build billing history from real subscription data.
+  // Paid subscription begins when the trial ends. If there's no trial date on
+  // record yet, fall back to the start of the current month (one invoice).
+  const monthlyPrice = TIER_PRICE[tier] || 0
+
+  const subStart = (() => {
+    const d = trialEnds ? new Date(trialEnds) : new Date()
+    if (isNaN(d.getTime())) return new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })()
+
+  const billingInvoices = (() => {
+    const out = []
+    const now = new Date()
+    const cursor = new Date(subStart)
+    // One invoice per month from subscription start up to (and including) the
+    // current month, only for months that have actually started.
+    while (cursor <= now && out.length < 36) {
+      const y = cursor.getFullYear()
+      const m = String(cursor.getMonth() + 1).padStart(2, '0')
+      out.push({
+        id: `INV-${y}-${m}`,
+        date: `${y}-${m}-01`,
+        amount: monthlyPrice,
+        tier,
+        status: 'paid',
+      })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+    // Newest first
+    return out.reverse()
+  })()
+
+  // Generate a printable invoice and open the browser print dialog
+  // (user chooses "Save as PDF"). Uses real garage details + tier pricing.
+  const downloadInvoice = (inv) => {
+    const g = settings || {}
+    const planName = (inv.tier || tier || '').charAt(0).toUpperCase() + (inv.tier || tier || '').slice(1)
+    const issued = new Date(inv.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    const esc = (s) => String(s ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))
+    const addrLines = [g.addr, g.city, g.post].filter(Boolean).map(esc).join('<br>')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(inv.id)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 40px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; }
+  .brand { font-size: 24px; font-weight: 800; }
+  .brand span { color: #4f46e5; }
+  .muted { color: #666; font-size: 12px; }
+  h1 { font-size: 18px; margin: 24px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #ddd; }
+  th { font-size: 11px; text-transform: uppercase; color: #666; }
+  .right { text-align: right; }
+  .total { font-size: 16px; font-weight: 700; }
+  .paid { display: inline-block; background: #e7f8ee; color: #16a34a; font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 10px; }
+  .foot { margin-top: 40px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
+</style></head><body>
+  <div class="head">
+    <div>
+      <div class="brand">Alzaro<span>TyreOps</span></div>
+      <div class="muted">Tyre Management Pro</div>
+    </div>
+    <div class="right">
+      <div style="font-size:20px;font-weight:700;">INVOICE</div>
+      <div class="muted">${esc(inv.id)}</div>
+      <div class="muted">Issued: ${esc(issued)}</div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;margin-top:24px;">
+    <div>
+      <div class="muted">Billed to</div>
+      <div style="font-weight:700;">${esc(g.name || 'Your Garage')}</div>
+      <div class="muted">${addrLines || ''}</div>
+      ${g.email ? `<div class="muted">${esc(g.email)}</div>` : ''}
+    </div>
+    <div class="right">
+      <div class="muted">Status</div>
+      <span class="paid">PAID</span>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>TyreOps subscription — ${esc(planName)} plan (monthly)</td><td class="right">£${inv.amount.toFixed(2)}</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td class="right total">Total</td><td class="right total">£${inv.amount.toFixed(2)}</td></tr>
+    </tfoot>
+  </table>
+
+  <div class="foot">
+    This is a system-generated invoice from AlzaroTyreOps. Thank you for your business.
+  </div>
+
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body></html>`
+
+    const w = window.open('', '_blank')
+    if (!w) {
+      alert('Please allow pop-ups to download the invoice.')
+      return
+    }
+    w.document.open()
+    w.document.write(html)
+    w.document.close()
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -942,7 +1045,11 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
           <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '14px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>Next Invoice</div>
             <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 600 }}>
-              1st April 2026
+              {(() => {
+                const d = new Date()
+                const next = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+                return `${next.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} · £${monthlyPrice}`
+              })()}
             </div>
           </div>
           <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '14px' }}>
@@ -1039,6 +1146,13 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
                 </tr>
               </thead>
               <tbody>
+                {billingInvoices.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text3)' }}>
+                      No invoices yet — your first invoice will appear once billing begins.
+                    </td>
+                  </tr>
+                )}
                 {billingInvoices.map(inv => (
                   <tr key={inv.id}>
                     <td style={{ padding: '10px 8px', fontFamily: 'DM Mono, monospace' }}>{inv.id}</td>
@@ -1058,7 +1172,7 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
                     </td>
                     <td style={{ padding: '10px 8px' }}>
                       <button 
-                        onClick={() => alert(`Downloading ${inv.id}...`)}
+                        onClick={() => downloadInvoice(inv)}
                         style={{ 
                           background: 'none', 
                           border: 'none', 
