@@ -12,7 +12,7 @@ const TABS = [
 ]
 
 export default function Settings() {
-  const { settings, tier, setTier, updateSettings, garageId, trialEnds } = useStore()
+  const { settings, tier, setTier, updateSettings, garageId } = useStore()
   const [activeTab, setActiveTab] = useState('garage')
   const [smtpTestStatus, setSmtpTestStatus] = useState(null)
   const [smtpTestError, setSmtpTestError] = useState('')
@@ -805,6 +805,8 @@ export default function Settings() {
 
 // Subscription Tab Component with mobile support and working modals
 function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
+  const settings = useStore(s => s.settings)
+  const trialEnds = useStore(s => s.trialEnds)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showInvoicesModal, setShowInvoicesModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
