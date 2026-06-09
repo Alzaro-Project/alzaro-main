@@ -164,6 +164,11 @@ export async function updateBatch(id, updates) {
   if (error) throw error
 }
 
+export async function deleteBatch(id) {
+  const { error } = await supabase.from('batches').delete().eq('id', id)
+  if (error) throw error
+}
+
 // Remove a purchase-invoice file from storage given its public URL.
 // Best-effort: failures are logged but not thrown (the DB row is what matters).
 export async function deletePurchaseInvoice(publicUrl) {
