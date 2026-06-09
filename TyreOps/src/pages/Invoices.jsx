@@ -9,6 +9,56 @@ const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red
 const PAYMENT_METHODS = ['pending', 'cash', 'card', 'bank_transfer']
 const PAYMENT_LABELS = { pending: '⏳ Pending', cash: '💵 Cash', card: '💳 Card', bank_transfer: '🏦 Bank Transfer' }
 
+// Number input that lets you edit freely (clear the field, type decimals,
+// no sticky leading zero) while keeping a clean number in the parent state.
+function NumberInput({ value, onChangeNumber, integer = false, min, fallback = 0, ...props }) {
+  const [text, setText] = useState(value === 0 || value == null ? '' : String(value))
+
+  // Keep local text in sync when the value changes from outside (e.g. selecting
+  // a tyre auto-fills its price), but don't fight the user while they're typing.
+  useEffect(() => {
+    const current = text === '' ? NaN : Number(text)
+    if (Number(value) !== current) {
+      setText(value === 0 || value == null ? '' : String(value))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
+
+  const handleChange = (e) => {
+    const raw = e.target.value
+    setText(raw)
+    if (raw === '') {
+      onChangeNumber(fallback)
+      return
+    }
+    const n = integer ? parseInt(raw, 10) : parseFloat(raw)
+    if (!isNaN(n)) onChangeNumber(n)
+  }
+
+  const handleBlur = () => {
+    if (text === '' || isNaN(Number(text))) {
+      setText(fallback === 0 ? '' : String(fallback))
+      onChangeNumber(fallback)
+    } else {
+      const n = integer ? parseInt(text, 10) : parseFloat(text)
+      setText(String(n))
+      onChangeNumber(n)
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      inputMode={integer ? 'numeric' : 'decimal'}
+      min={min}
+      value={text}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      {...props}
+    />
+  )
+}
+
 function calcVAT(lines, scheme, flatRate, tier) {
   let vat = 0
   lines.forEach(l => {
@@ -1125,13 +1175,13 @@ export default function Invoices() {
                       </div>
                       <div>
                         <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Qty</label>
-                        <input type="number" min="1" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.qty} onChange={e => updateLine(line.id, { qty: parseInt(e.target.value) || 1 })} />
+                        <NumberInput integer min="1" fallback={1} style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                          value={line.qty} onChangeNumber={v => updateLine(line.id, { qty: v })} />
                       </div>
                       <div>
                         <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
-                        <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.unit} onChange={e => updateLine(line.id, { unit: parseFloat(e.target.value) || 0 })} />
+                        <NumberInput step="0.01" min="0" fallback={0} style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                          value={line.unit} onChangeNumber={v => updateLine(line.id, { unit: v })} />
                       </div>
                       <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                     </div>
@@ -1156,13 +1206,13 @@ export default function Invoices() {
                     </div>
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Qty</label>
-                      <input type="number" min="1" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.qty} onChange={e => updateLine(line.id, { qty: parseInt(e.target.value) || 1 })} />
+                      <NumberInput integer min="1" fallback={1} style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                        value={line.qty} onChangeNumber={v => updateLine(line.id, { qty: v })} />
                     </div>
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
-                      <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.unit} onChange={e => updateLine(line.id, { unit: parseFloat(e.target.value) || 0 })} />
+                      <NumberInput step="0.01" min="0" fallback={0} style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                        value={line.unit} onChangeNumber={v => updateLine(line.id, { unit: v })} />
                     </div>
                     <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                   </div>
