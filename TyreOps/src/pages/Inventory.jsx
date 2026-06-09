@@ -295,11 +295,11 @@ function CSVImportModal({ onClose, onImport }) {
 
   // Generate CSV template
   const downloadTemplate = () => {
-    const template = `brand,model,w,p,r,sell,alert,season
-Michelin,Pilot Sport 4,225,45,18,145.00,2,summer
-Continental,PremiumContact 6,205,55,16,99.00,3,allseason
-Pirelli,Cinturato P7,215,60,16,89.00,2,summer
-Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
+    const template = `brand,model,width,profile,rim,sell_price,low_stock_alert,season,quantity,cost_per_tyre
+Michelin,Pilot Sport 4,225,45,18,145.00,2,summer,10,85.00
+Continental,PremiumContact 6,205,55,16,99.00,3,allseason,8,62.00
+Pirelli,Cinturato P7,215,60,16,89.00,2,summer,0,0.00
+Bridgestone,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
     
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -329,12 +329,28 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
         }
 
         // Parse header
-        const header = lines[0].split(',').map(h => h.trim().toLowerCase())
+        const rawHeader = lines[0].split(',').map(h => h.trim().toLowerCase())
+
+        // Map friendly column names (and legacy short names) to internal keys
+        const aliases = {
+          brand: 'brand',
+          model: 'model',
+          width: 'w', w: 'w',
+          profile: 'p', p: 'p',
+          rim: 'r', 'rim size': 'r', r: 'r',
+          sell_price: 'sell', 'sell price': 'sell', sell: 'sell', price: 'sell',
+          low_stock_alert: 'alert', 'low stock alert': 'alert', alert: 'alert',
+          season: 'season',
+          quantity: 'qty', qty: 'qty', stock: 'qty',
+          cost_per_tyre: 'cost', 'cost per tyre': 'cost', cost: 'cost',
+        }
+        const header = rawHeader.map(h => aliases[h] || h)
         const requiredFields = ['brand', 'model', 'w', 'p', 'r']
         const missingFields = requiredFields.filter(f => !header.includes(f))
         
         if (missingFields.length > 0) {
-          setErrors([`Missing required columns: ${missingFields.join(', ')}`])
+          const labels = { w: 'width', p: 'profile', r: 'rim' }
+          setErrors([`Missing required columns: ${missingFields.map(f => labels[f] || f).join(', ')}`])
           return
         }
 
@@ -357,7 +373,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
 
           // Validate required fields
           if (!row.brand || !row.model || !row.w || !row.p || !row.r) {
-            parseErrors.push(`Row ${i + 1}: Missing required field (brand, model, w, p, or r)`)
+            parseErrors.push(`Row ${i + 1}: Missing required field (brand, model, width, profile, or rim)`)
             continue
           }
 
@@ -378,6 +394,8 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
             season: ['summer', 'winter', 'allseason'].includes(row.season?.toLowerCase()) 
               ? row.season.toLowerCase() 
               : 'allseason',
+            qty: parseInt(row.qty) || 0,
+            cost: parseFloat(row.cost) || 0,
           })
         }
 
@@ -437,7 +455,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
         <div>
           <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>CSV Template</div>
           <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
-            Download the template to see the required format
+            Download the template for the correct format. Fill in <strong>quantity</strong> and <strong>cost per tyre</strong> to import opening stock too (leave quantity blank or 0 for none).
           </div>
         </div>
         <Btn variant="secondary" onClick={downloadTemplate}>📥 Download Template</Btn>
@@ -527,7 +545,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
               <thead>
                 <tr style={{ background: 'var(--surface2)' }}>
-                  {['Brand', 'Model', 'Size', 'Sell', 'Season', ''].map(h => (
+                  {['Brand', 'Model', 'Size', 'Sell', 'Qty', 'Season', ''].map(h => (
                     <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontSize: '10px', color: 'var(--text2)' }}>{h}</th>
                   ))}
                 </tr>
@@ -539,6 +557,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason`
                     <td style={{ padding: '6px 8px' }}>{row.model}</td>
                     <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>{row.w}/{row.p}R{row.r}</td>
                     <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>£{(row.sell || 0).toFixed(2)}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'DM Mono, monospace' }}>{row.qty || 0}</td>
                     <td style={{ padding: '6px 8px' }}>{row.season}</td>
                     <td style={{ padding: '6px 8px' }}>
                       <button 
