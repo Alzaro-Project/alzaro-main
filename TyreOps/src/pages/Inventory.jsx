@@ -42,9 +42,64 @@ export default function Inventory() {
     return true
   })
 
+  // Export current stock to CSV — same column layout as the import template
+  // so an exported file can be re-imported. Includes new SKUs and used tyres.
+  const exportCSV = () => {
+    const headers = ['brand', 'model', 'width', 'profile', 'rim', 'sell_price', 'low_stock_alert', 'season', 'quantity', 'cost_per_tyre', 'type']
+    const q = (v) => {
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const rows = []
+
+    // New SKUs — quantity is live stock, cost is current FIFO cost
+    skus.forEach(sk => {
+      rows.push([
+        sk.brand, sk.model, sk.w, sk.p, sk.r,
+        (sk.sell || 0).toFixed(2),
+        sk.alert ?? 2,
+        sk.season || 'allseason',
+        getTotalStock(sk.id),
+        (getFIFOCost(sk.id) || 0).toFixed(2),
+        'new',
+      ])
+    })
+
+    // Used / part-ex tyres (each is a single unit)
+    usedTyres.filter(u => !u.sold).forEach(u => {
+      rows.push([
+        u.brand, u.model, u.w, u.p, u.r,
+        (u.sell || 0).toFixed(2),
+        '',
+        '',
+        1,
+        (u.cost || 0).toFixed(2),
+        'used',
+      ])
+    })
+
+    if (rows.length === 0) {
+      alert('No stock to export yet.')
+      return
+    }
+
+    const csv = [headers, ...rows].map(r => r.map(q).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `tyre_inventory_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <PageHeader title="Tyre Inventory" subtitle="FIFO batch tracking · New & used stock">
+        <Btn variant="secondary" onClick={exportCSV}>📤 Export CSV</Btn>
         <Btn variant="primary" onClick={() => { setEditingSKU(null); setShowSKU(true) }}>+ New SKU</Btn>
       </PageHeader>
 
