@@ -851,82 +851,116 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
     return out.reverse()
   })()
 
-  // Generate a printable invoice and open the browser print dialog
-  // (user chooses "Save as PDF"). Uses real garage details + tier pricing.
-  const downloadInvoice = (inv) => {
+  // Shared invoice field helpers
+  const invoiceMeta = (inv) => {
     const g = settings || {}
     const planName = (inv.tier || tier || '').charAt(0).toUpperCase() + (inv.tier || tier || '').slice(1)
     const issued = new Date(inv.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    const esc = (s) => String(s ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))
-    const addrLines = [g.addr, g.city, g.post].filter(Boolean).map(esc).join('<br>')
+    return { g, planName, issued }
+  }
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(inv.id)}</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 40px; }
-  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; }
-  .brand { font-size: 24px; font-weight: 800; }
-  .brand span { color: #4f46e5; }
-  .muted { color: #666; font-size: 12px; }
-  h1 { font-size: 18px; margin: 24px 0 4px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 13px; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #ddd; }
-  th { font-size: 11px; text-transform: uppercase; color: #666; }
-  .right { text-align: right; }
-  .total { font-size: 16px; font-weight: 700; }
-  .paid { display: inline-block; background: #e7f8ee; color: #16a34a; font-weight: 700; font-size: 11px; padding: 3px 10px; border-radius: 10px; }
-  .foot { margin-top: 40px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
-</style></head><body>
-  <div class="head">
-    <div>
-      <div class="brand">Alzaro<span>TyreOps</span></div>
-      <div class="muted">Tyre Management Pro</div>
-    </div>
-    <div class="right">
-      <div style="font-size:20px;font-weight:700;">INVOICE</div>
-      <div class="muted">${esc(inv.id)}</div>
-      <div class="muted">Issued: ${esc(issued)}</div>
-    </div>
-  </div>
+  // Direct one-click PDF download using jsPDF (no print dialog).
+  // jsPDF is loaded lazily so it doesn't bloat the main app bundle.
+  const downloadInvoicePDF = async (inv) => {
+    const { jsPDF } = await import('jspdf')
+    const { g, planName, issued } = invoiceMeta(inv)
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const W = doc.internal.pageSize.getWidth()
+    const L = 48
+    let y = 56
 
-  <div style="display:flex;justify-content:space-between;margin-top:24px;">
-    <div>
-      <div class="muted">Billed to</div>
-      <div style="font-weight:700;">${esc(g.name || 'Your Garage')}</div>
-      <div class="muted">${addrLines || ''}</div>
-      ${g.email ? `<div class="muted">${esc(g.email)}</div>` : ''}
-    </div>
-    <div class="right">
-      <div class="muted">Status</div>
-      <span class="paid">PAID</span>
-    </div>
-  </div>
+    // Brand
+    doc.setFont('helvetica', 'bold').setFontSize(22).setTextColor(17, 17, 17)
+    doc.text('Alzaro', L, y)
+    const aw = doc.getTextWidth('Alzaro')
+    doc.setTextColor(79, 70, 229).text('TyreOps', L + aw, y)
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(120, 120, 120)
+    doc.text('Tyre Management Pro', L, y + 16)
 
-  <table>
-    <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
-    <tbody>
-      <tr><td>TyreOps subscription — ${esc(planName)} plan (monthly)</td><td class="right">£${inv.amount.toFixed(2)}</td></tr>
-    </tbody>
-    <tfoot>
-      <tr><td class="right total">Total</td><td class="right total">£${inv.amount.toFixed(2)}</td></tr>
-    </tfoot>
-  </table>
+    // Invoice meta (right aligned)
+    doc.setFont('helvetica', 'bold').setFontSize(16).setTextColor(17, 17, 17)
+    doc.text('INVOICE', W - L, y, { align: 'right' })
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(120, 120, 120)
+    doc.text(inv.id, W - L, y + 16, { align: 'right' })
+    doc.text(`Issued: ${issued}`, W - L, y + 30, { align: 'right' })
 
-  <div class="foot">
-    This is a system-generated invoice from AlzaroTyreOps. Thank you for your business.
-  </div>
+    // Divider
+    y += 48
+    doc.setDrawColor(79, 70, 229).setLineWidth(1.5).line(L, y, W - L, y)
+    y += 26
 
-  <script>window.onload = function(){ window.print(); }<\/script>
-</body></html>`
+    // Billed to
+    doc.setFontSize(9).setTextColor(120, 120, 120).text('BILLED TO', L, y)
+    doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(17, 17, 17)
+    doc.text(g.name || 'Your Garage', L, y + 16)
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(120, 120, 120)
+    let ay = y + 32
+    ;[g.addr, [g.city, g.post].filter(Boolean).join(', '), g.email]
+      .filter(Boolean)
+      .forEach(line => { doc.text(String(line), L, ay); ay += 14 })
 
-    const w = window.open('', '_blank')
-    if (!w) {
-      alert('Please allow pop-ups to download the invoice.')
-      return
-    }
-    w.document.open()
-    w.document.write(html)
-    w.document.close()
+    // Status
+    doc.setFontSize(9).setTextColor(120, 120, 120).text('STATUS', W - L, y, { align: 'right' })
+    doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(22, 163, 74)
+    doc.text('PAID', W - L, y + 16, { align: 'right' })
+
+    // Line items table
+    let ty = Math.max(ay, y + 60) + 16
+    doc.setDrawColor(221, 221, 221).setLineWidth(0.75)
+    doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(120, 120, 120)
+    doc.text('DESCRIPTION', L, ty)
+    doc.text('AMOUNT', W - L, ty, { align: 'right' })
+    ty += 8
+    doc.line(L, ty, W - L, ty)
+    ty += 22
+
+    doc.setFont('helvetica', 'normal').setFontSize(11).setTextColor(17, 17, 17)
+    doc.text(`TyreOps subscription - ${planName} plan (monthly)`, L, ty)
+    doc.text(`GBP ${inv.amount.toFixed(2)}`, W - L, ty, { align: 'right' })
+    ty += 14
+    doc.line(L, ty, W - L, ty)
+    ty += 26
+
+    // Total
+    doc.setFont('helvetica', 'bold').setFontSize(14)
+    doc.text('Total', W - L - 120, ty, { align: 'right' })
+    doc.text(`GBP ${inv.amount.toFixed(2)}`, W - L, ty, { align: 'right' })
+
+    // Footer
+    doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(150, 150, 150)
+    doc.text(
+      'This is a system-generated invoice from AlzaroTyreOps. Thank you for your business.',
+      L,
+      doc.internal.pageSize.getHeight() - 48
+    )
+
+    doc.save(`${inv.id}.pdf`)
+  }
+
+  // CSV / spreadsheet-friendly receipt download.
+  const downloadInvoiceCSV = (inv) => {
+    const { g, planName, issued } = invoiceMeta(inv)
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['Invoice', inv.id],
+      ['Issued', issued],
+      ['Billed To', g.name || 'Your Garage'],
+      ['Address', [g.addr, g.city, g.post].filter(Boolean).join(', ')],
+      ['Email', g.email || ''],
+      ['Description', `TyreOps subscription - ${planName} plan (monthly)`],
+      ['Amount (GBP)', inv.amount.toFixed(2)],
+      ['Status', 'PAID'],
+    ]
+    const csv = rows.map(r => r.map(q).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${inv.id}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -1134,9 +1168,9 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr>
-                  {['Invoice', 'Date', 'Amount', 'Status', ''].map(h => (
+                  {['Invoice', 'Date', 'Amount', 'Status', 'Download'].map(h => (
                     <th key={h} style={{ 
-                      textAlign: 'left', 
+                      textAlign: h === 'Download' ? 'right' : 'left', 
                       fontSize: '10px', 
                       fontWeight: 700, 
                       textTransform: 'uppercase', 
@@ -1173,19 +1207,34 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
                       </span>
                     </td>
                     <td style={{ padding: '10px 8px' }}>
-                      <button 
-                        onClick={() => downloadInvoice(inv)}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          color: 'var(--accent)', 
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        Download
-                      </button>
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => downloadInvoicePDF(inv)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--accent)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          PDF
+                        </button>
+                        <button
+                          onClick={() => downloadInvoiceCSV(inv)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text2)',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          CSV
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
