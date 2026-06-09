@@ -164,6 +164,22 @@ export async function updateBatch(id, updates) {
   if (error) throw error
 }
 
+// Remove a purchase-invoice file from storage given its public URL.
+// Best-effort: failures are logged but not thrown (the DB row is what matters).
+export async function deletePurchaseInvoice(publicUrl) {
+  if (!publicUrl) return
+  try {
+    const marker = '/purchase-invoices/'
+    const idx = publicUrl.indexOf(marker)
+    if (idx === -1) return
+    const path = publicUrl.slice(idx + marker.length)
+    const { error } = await supabase.storage.from('purchase-invoices').remove([path])
+    if (error) console.error('Failed to delete invoice file:', error)
+  } catch (err) {
+    console.error('Failed to delete invoice file:', err)
+  }
+}
+
 // ============================================================
 // USED TYRES  (TyreOps)
 // ============================================================
