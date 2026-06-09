@@ -393,11 +393,31 @@ export const useStore = create(
             const optimisticSku = { ...normalizedSku, id: tempId }
             set(s => ({ skus: [...s.skus, optimisticSku] }))
 
+            let skuId = tempId
             if (garageId) {
               const saved = await db.insertSKU(garageId, normalizedSku)
+              skuId = saved.id
               set(s => ({
                 skus: s.skus.map(sk => sk.id === tempId ? { ...sk, id: saved.id } : sk)
               }))
+            }
+
+            // If a quantity was provided, create an opening stock batch so the
+            // imported tyre actually shows stock (not just a definition).
+            const importQty = parseInt(sku.qty) || 0
+            if (importQty > 0) {
+              const importCost = parseFloat(sku.cost) || 0
+              await get().addBatch({
+                id: 'B' + Date.now() + Math.floor(Math.random() * 1000),
+                skuId,
+                date: new Date().toISOString().split('T')[0],
+                qty: importQty,
+                cost: importCost,
+                remaining: importQty,
+                supplier: 'CSV import',
+                ref: '',
+                notes: 'Opening stock from CSV import',
+              })
             }
 
             results.success++
