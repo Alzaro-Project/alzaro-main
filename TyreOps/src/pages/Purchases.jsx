@@ -20,6 +20,15 @@ export default function Purchases() {
     if (b) setRestock({ skuId: b.skuId, supplier: b.supplier || '' })
   }
 
+  // Duplicate a used/part-ex tyre — opens the Add Used form prefilled with this
+  // tyre's details (handy for matching pairs/sets) as a fresh, unsaved record.
+  const handleDuplicateUsed = (r) => {
+    const u = usedTyres.find(x => x.id === r.id)
+    if (!u) return
+    const { id, sold, ...rest } = u
+    setEditingUsed({ ...rest, _duplicate: true })
+  }
+
   const handleEdit = (r) => {
     if (r.type === 'used') {
       const u = usedTyres.find(x => x.id === r.id)
@@ -169,6 +178,9 @@ export default function Purchases() {
                       {r.type === 'new' && (
                         <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
                       )}
+                      {r.type === 'used' && (
+                        <Btn sm variant="success" onClick={() => handleDuplicateUsed(r)}>⧉ Duplicate</Btn>
+                      )}
                       <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
                       <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
                     </span>
@@ -206,9 +218,13 @@ export default function Purchases() {
         setEditingBatch(null)
       }} />}
 
-      {/* Edit Used Tyre Modal */}
+      {/* Edit / Duplicate Used Tyre Modal */}
       {editingUsed && <UsedModal initial={editingUsed} onClose={() => setEditingUsed(null)} onSave={(data) => {
-        updateUsedTyre(editingUsed.id, data)
+        if (editingUsed._duplicate) {
+          addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
+        } else {
+          updateUsedTyre(editingUsed.id, data)
+        }
         setEditingUsed(null)
       }} />}
 
@@ -359,7 +375,7 @@ function UsedModal({ onClose, onSave, initial }) {
   ].filter(Boolean))].sort()
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   return (
-    <Modal title="Add Used / Part-Ex Tyre" onClose={onClose} onSave={() => {
+    <Modal title={initial ? (initial._duplicate ? 'Duplicate Used / Part-Ex Tyre' : 'Edit Used / Part-Ex Tyre') : 'Add Used / Part-Ex Tyre'} onClose={onClose} onSave={() => {
       if (!form.brand || !form.model) return alert('Brand and model required')
       onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
     }}>
