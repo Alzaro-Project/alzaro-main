@@ -9,6 +9,50 @@ const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red
 const PAYMENT_METHODS = ['pending', 'cash', 'card', 'bank_transfer']
 const PAYMENT_LABELS = { pending: '⏳ Pending', cash: '💵 Cash', card: '💳 Card', bank_transfer: '🏦 Bank Transfer' }
 
+// Reusable note / payment-instruction templates for invoices.
+// Each builds from the garage's settings where useful, and is fully editable
+// after insertion. The bank-transfer template uses the saved Payment Information
+// (Settings → Email) if it's set, otherwise drops in editable placeholders.
+const NOTE_TEMPLATES = [
+  {
+    key: 'bank_transfer',
+    label: '🏦 Bank transfer details',
+    build: (s) => s?.emailFooter?.trim()
+      ? `Please transfer the total amount by bank transfer:\n${s.emailFooter.trim()}`
+      : 'Please transfer the total amount by bank transfer:\nSort code: 00-00-00\nAccount number: 00000000\nReference: your invoice number.',
+  },
+  {
+    key: 'due_14',
+    label: '🗓️ Payment due within 14 days',
+    build: () => 'Payment is due within 14 days of the invoice date. Thank you for your business.',
+  },
+  {
+    key: 'due_on_receipt',
+    label: '⚡ Payment due on receipt',
+    build: () => 'Payment is due on receipt of this invoice.',
+  },
+  {
+    key: 'card_phone',
+    label: '💳 Pay by card over the phone',
+    build: (s) => `To pay by card, please call us${s?.phone ? ` on ${s.phone}` : ''} quoting your invoice number.`,
+  },
+  {
+    key: 'cash_collection',
+    label: '💵 Cash on collection',
+    build: () => 'Payment can be made by cash on collection of your vehicle.',
+  },
+  {
+    key: 'thanks',
+    label: '🙏 Thank you note',
+    build: (s) => `Thank you for choosing ${s?.name || 'us'}. We appreciate your business and look forward to seeing you again.`,
+  },
+  {
+    key: 'warranty',
+    label: '🛡️ Warranty note',
+    build: () => 'All work and parts are covered by our standard warranty. Please retain this invoice as proof of purchase.',
+  },
+]
+
 // Number input that lets you edit freely (clear the field, type decimals,
 // no sticky leading zero) while keeping a clean number in the parent state.
 function NumberInput({ value, onChangeNumber, integer = false, min, fallback = 0, ...props }) {
@@ -1238,8 +1282,26 @@ export default function Invoices() {
 
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Notes</label>
+              <select
+                value=""
+                onChange={e => {
+                  const key = e.target.value
+                  if (!key) return
+                  const tpl = NOTE_TEMPLATES.find(t => t.key === key)
+                  if (!tpl) return
+                  const text = tpl.build(settings)
+                  setForm(f => ({ ...f, notes: f.notes ? `${f.notes}\n${text}` : text }))
+                  e.target.value = ''
+                }}
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%', marginBottom: '6px', cursor: 'pointer' }}
+              >
+                <option value="">📋 Insert a template…</option>
+                {NOTE_TEMPLATES.map(t => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
               <textarea style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%', resize: 'vertical' }}
-                rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Payment terms, notes..." />
+                rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Payment terms, notes... or pick a template above and edit it" />
             </div>
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '14px', flexWrap: 'wrap' }}>
