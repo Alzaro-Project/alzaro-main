@@ -509,6 +509,23 @@ export const useStore = create(
         }
       },
 
+      deleteBatch: async (id) => {
+        const batch = get().batches.find(b => b.id === id)
+        set(s => ({ batches: s.batches.filter(b => b.id !== id) }))
+
+        const garageId = get().garageId
+        if (garageId && !String(id).startsWith('temp-')) {
+          try {
+            await db.deleteBatch(id)
+            // Best-effort cleanup of the attached invoice file
+            if (batch?.invoiceUrl) await db.deletePurchaseInvoice(batch.invoiceUrl)
+          } catch (err) {
+            console.error('Failed to delete batch:', err)
+            showToast('Failed to delete stock batch.')
+          }
+        }
+      },
+
       // --------------------------------------------------------
       // USED TYRES
       // --------------------------------------------------------
