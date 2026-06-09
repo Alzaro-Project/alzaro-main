@@ -32,15 +32,18 @@ export default function Customers() {
   // Check for duplicate customer
   const checkDuplicate = (email, phone, excludeId = null) => {
     if (!email && !phone) return null
-    
-    const duplicate = customers.find(c => {
-      if (excludeId && c.id === excludeId) return false
-      if (email && c.email?.toLowerCase() === email.toLowerCase()) return { field: 'email', customer: c }
-      if (phone && c.phone === phone) return { field: 'phone', customer: c }
-      return false
-    })
-    
-    return duplicate || null
+
+    for (const c of customers) {
+      if (excludeId && c.id === excludeId) continue
+      if (email && c.email && c.email.toLowerCase() === email.toLowerCase()) {
+        return { field: 'email', customer: c }
+      }
+      if (phone && c.phone === phone) {
+        return { field: 'phone', customer: c }
+      }
+    }
+
+    return null
   }
 
   const openAdd = () => { 
