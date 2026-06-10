@@ -1173,7 +1173,21 @@ export default function Invoices() {
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Vehicle Reg</label>
                 {(() => {
                   const selectedCustomer = customers.find(c => c.id === form.custId)
-                  const customerVehicles = (selectedCustomer?.vehicles || []).filter(v => v.reg)
+                  // Collect this customer's known regs from every source:
+                  // saved vehicles, the legacy single reg field, and past invoices.
+                  const seen = new Set()
+                  const customerVehicles = []
+                  const addReg = (reg, make = '', model = '') => {
+                    const key = (reg || '').toUpperCase().trim()
+                    if (!key || seen.has(key)) return
+                    seen.add(key)
+                    customerVehicles.push({ reg: key, make, model })
+                  }
+                  ;(selectedCustomer?.vehicles || []).forEach(v => addReg(v.reg, v.make, v.model))
+                  if (selectedCustomer?.reg) addReg(selectedCustomer.reg, '', selectedCustomer.vehicle || '')
+                  if (selectedCustomer) {
+                    invoices.filter(i => i.custId === selectedCustomer.id && i.reg).forEach(i => addReg(i.reg))
+                  }
                   const fieldStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
                   const regInList = customerVehicles.some(v => v.reg === form.reg)
                   const showDropdown = customerVehicles.length > 0 && !manualReg && (regInList || !form.reg)
