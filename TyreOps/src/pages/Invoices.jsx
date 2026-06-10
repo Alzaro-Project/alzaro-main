@@ -9,49 +9,128 @@ const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red
 const PAYMENT_METHODS = ['pending', 'cash', 'card', 'bank_transfer']
 const PAYMENT_LABELS = { pending: '⏳ Pending', cash: '💵 Cash', card: '💳 Card', bank_transfer: '🏦 Bank Transfer' }
 
-// Reusable note / payment-instruction templates for invoices.
-// Each builds from the garage's settings where useful, and is fully editable
-// after insertion. The bank-transfer template uses the saved Payment Information
-// (Settings → Email) if it's set, otherwise drops in editable placeholders.
-const NOTE_TEMPLATES = [
+// Default note / payment-instruction templates. These are seeded into the
+// garage's account the first time templates are used (with the garage's real
+// details baked in), after which every template is editable and deletable.
+const buildDefaultTemplates = (s) => [
   {
-    key: 'bank_transfer',
+    id: 'bank_transfer',
     label: '🏦 Bank transfer details',
-    build: (s) => s?.emailFooter?.trim()
+    text: s?.emailFooter?.trim()
       ? `Please transfer the total amount by bank transfer:\n${s.emailFooter.trim()}`
       : 'Please transfer the total amount by bank transfer:\nSort code: 00-00-00\nAccount number: 00000000\nReference: your invoice number.',
   },
-  {
-    key: 'due_14',
-    label: '🗓️ Payment due within 14 days',
-    build: () => 'Payment is due within 14 days of the invoice date. Thank you for your business.',
-  },
-  {
-    key: 'due_on_receipt',
-    label: '⚡ Payment due on receipt',
-    build: () => 'Payment is due on receipt of this invoice.',
-  },
-  {
-    key: 'card_phone',
-    label: '💳 Pay by card over the phone',
-    build: (s) => `To pay by card, please call us${s?.phone ? ` on ${s.phone}` : ''} quoting your invoice number.`,
-  },
-  {
-    key: 'cash_collection',
-    label: '💵 Cash on collection',
-    build: () => 'Payment can be made by cash on collection of your vehicle.',
-  },
-  {
-    key: 'thanks',
-    label: '🙏 Thank you note',
-    build: (s) => `Thank you for choosing ${s?.name || 'us'}. We appreciate your business and look forward to seeing you again.`,
-  },
-  {
-    key: 'warranty',
-    label: '🛡️ Warranty note',
-    build: () => 'All work and parts are covered by our standard warranty. Please retain this invoice as proof of purchase.',
-  },
+  { id: 'due_14', label: '🗓️ Payment due within 14 days', text: 'Payment is due within 14 days of the invoice date. Thank you for your business.' },
+  { id: 'due_on_receipt', label: '⚡ Payment due on receipt', text: 'Payment is due on receipt of this invoice.' },
+  { id: 'card_phone', label: '💳 Pay by card over the phone', text: `To pay by card, please call us${s?.phone ? ` on ${s.phone}` : ''} quoting your invoice number.` },
+  { id: 'cash_collection', label: '💵 Cash on collection', text: 'Payment can be made by cash on collection of your vehicle.' },
+  { id: 'thanks', label: '🙏 Thank you note', text: `Thank you for choosing ${s?.name || 'us'}. We appreciate your business and look forward to seeing you again.` },
+  { id: 'warranty', label: '🛡️ Warranty note', text: 'All work and parts are covered by our standard warranty. Please retain this invoice as proof of purchase.' },
 ]
+
+// One-time migration: pick up any templates saved by the earlier
+// browser-only version so they aren't lost when moving to account storage.
+const LEGACY_TEMPLATES_KEY = 'tyreops-note-templates'
+function loadLegacyTemplates() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LEGACY_TEMPLATES_KEY) || '[]')
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+// Note templates manager — every template (including the seeded defaults) can
+// be edited or deleted. Saved to the garage's account.
+function TemplateManagerModal({ templates, settings, onSave, onClose }) {
+  const [list, setList] = useState(templates)
+  const [label, setLabel] = useState('')
+  const [text, setText] = useState('')
+  const [editingId, setEditingId] = useState(null)
+
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+
+  const resetForm = () => { setLabel(''); setText(''); setEditingId(null) }
+
+  const commit = () => {
+    if (!label.trim() || !text.trim()) { alert('Give the template a name and some text.'); return }
+    if (editingId) {
+      setList(prev => prev.map(t => t.id === editingId ? { ...t, label: label.trim(), text } : t))
+    } else {
+      setList(prev => [...prev, { id: 'tpl_' + Date.now(), label: label.trim(), text }])
+    }
+    resetForm()
+  }
+
+  const edit = (t) => { setEditingId(t.id); setLabel(t.label); setText(t.text) }
+  const remove = (id) => {
+    if (!confirm('Delete this template?')) return
+    setList(prev => prev.filter(t => t.id !== id))
+    if (editingId === id) resetForm()
+  }
+
+  const restoreDefaults = () => {
+    const defaults = buildDefaultTemplates(settings)
+    // Add back any default that's missing (by id); don't duplicate or overwrite edits
+    setList(prev => {
+      const existingIds = new Set(prev.map(t => t.id))
+      return [...prev, ...defaults.filter(d => !existingIds.has(d.id))]
+    })
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+        <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>Manage Note Templates</div>
+        <div style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '16px' }}>Saved to your account — available on any device you log in from. All templates can be edited or deleted.</div>
+
+        {list.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+            {list.map(t => (
+              <div key={t.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600 }}>{t.label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.text}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  <Btn sm variant="ghost" onClick={() => edit(t)}>✏️</Btn>
+                  <Btn sm variant="danger" onClick={() => remove(t.id)}>🗑</Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '16px' }}>No templates — add one below, or restore the defaults.</div>
+        )}
+
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.6px', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: '8px' }}>{editingId ? 'Edit Template' : 'New Template'}</div>
+          <div style={{ marginBottom: '8px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Name (shown in dropdown)</label>
+            <input style={inputStyle} value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Deposit required" />
+          </div>
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Template text</label>
+            <textarea style={{ ...inputStyle, resize: 'vertical' }} rows={3} value={text} onChange={e => setText(e.target.value)} placeholder="A 50% deposit is required to confirm your booking..." />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            {editingId && <Btn sm variant="secondary" onClick={resetForm}>Cancel edit</Btn>}
+            <Btn sm variant="primary" onClick={commit}>{editingId ? 'Update' : 'Add Template'}</Btn>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '16px', flexWrap: 'wrap' }}>
+          <Btn variant="ghost" onClick={restoreDefaults}>↺ Restore defaults</Btn>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn variant="secondary" onClick={onClose}>Close</Btn>
+            <Btn variant="primary" onClick={() => { onSave(list); onClose() }}>Save Changes</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 // Number input that lets you edit freely (clear the field, type decimals,
 // no sticky leading zero) while keeping a clean number in the parent state.
@@ -705,7 +784,7 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
 
 export default function Invoices() {
   const { invoices, customers, skus, batches, usedTyres, tier, settings,
-    addInvoice, updateInvoice, deleteInvoice, addCustomer } = useStore()
+    addInvoice, updateInvoice, deleteInvoice, addCustomer, updateSettings } = useStore()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -716,6 +795,16 @@ export default function Invoices() {
   const [lines, setLines] = useState([])
   const [form, setForm] = useState({ custId: '', custName: '', custEmail: '', reg: '', date: '', due: '', notes: '', paymentMethod: 'pending' })
   const [manualReg, setManualReg] = useState(false)
+  const [showTemplateManager, setShowTemplateManager] = useState(false)
+
+  // Note templates live in the garage's account (settings.noteTemplates).
+  // null/undefined = never saved yet → show the defaults (with this garage's
+  // details baked in) plus anything from the old browser-only storage.
+  const noteTemplates = Array.isArray(settings.noteTemplates)
+    ? settings.noteTemplates
+    : [...buildDefaultTemplates(settings), ...loadLegacyTemplates()]
+
+  const saveNoteTemplates = (list) => updateSettings({ noteTemplates: list })
 
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isBronze = tier === 'bronze'
@@ -1055,6 +1144,15 @@ export default function Invoices() {
         />
       )}
 
+      {showTemplateManager && (
+        <TemplateManagerModal
+          templates={noteTemplates}
+          settings={settings}
+          onSave={saveNoteTemplates}
+          onClose={() => setShowTemplateManager(false)}
+        />
+      )}
+
       {/* New/Edit Invoice Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); setEditingInvoice(null) } }}>
@@ -1281,23 +1379,29 @@ export default function Invoices() {
             </div>
 
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Notes</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)' }}>Notes</label>
+                <button type="button" onClick={() => setShowTemplateManager(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                  ✏️ Manage templates
+                </button>
+              </div>
               <select
                 value=""
                 onChange={e => {
-                  const key = e.target.value
-                  if (!key) return
-                  const tpl = NOTE_TEMPLATES.find(t => t.key === key)
-                  if (!tpl) return
-                  const text = tpl.build(settings)
-                  setForm(f => ({ ...f, notes: f.notes ? `${f.notes}\n${text}` : text }))
+                  const id = e.target.value
+                  if (!id) return
+                  const tpl = noteTemplates.find(t => t.id === id)
+                  if (tpl) {
+                    setForm(f => ({ ...f, notes: f.notes ? `${f.notes}\n${tpl.text}` : tpl.text }))
+                  }
                   e.target.value = ''
                 }}
                 style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%', marginBottom: '6px', cursor: 'pointer' }}
               >
                 <option value="">📋 Insert a template…</option>
-                {NOTE_TEMPLATES.map(t => (
-                  <option key={t.key} value={t.key}>{t.label}</option>
+                {noteTemplates.map(t => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
               </select>
               <textarea style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%', resize: 'vertical' }}
