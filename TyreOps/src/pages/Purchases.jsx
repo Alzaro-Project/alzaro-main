@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
-import { PageHeader, Card, Badge, Btn } from '../components/UI'
+import { PageHeader, Card, Badge, Btn, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
 
@@ -13,20 +13,34 @@ export default function Purchases() {
   const [editingUsed, setEditingUsed] = useState(null)
   const [restock, setRestock] = useState(null)
 
+  // Pending delete with Undo: the record vanishes from the list immediately,
+  // but the real deletion only runs after the toast expires. Undo cancels it
+  // entirely — nothing is touched in the database, so even attached invoice
+  // files survive.
+  const [pendingDelete, setPendingDelete] = useState(null) // { id, label, commit, timerId }
+  const scheduleDelete = (id, label, commit) => {
+    // Only one pending delete at a time — commit any previous one first
+    setPendingDelete(prev => {
+      if (prev) { clearTimeout(prev.timerId); prev.commit() }
+      const timerId = setTimeout(() => {
+        commit()
+        setPendingDelete(null)
+      }, 8000)
+      return { id, label, commit, timerId }
+    })
+  }
+  const undoDelete = () => {
+    setPendingDelete(prev => {
+      if (prev) clearTimeout(prev.timerId)
+      return null
+    })
+  }
+
   // + Stock: reorder the same tyre — opens a new batch prefilled with
   // this purchase's SKU and supplier
   const handleRestock = (r) => {
     const b = batches.find(x => x.id === r.id)
     if (b) setRestock({ skuId: b.skuId, supplier: b.supplier || '' })
-  }
-
-  // Duplicate a used/part-ex tyre — opens the Add Used form prefilled with this
-  // tyre's details (handy for matching pairs/sets) as a fresh, unsaved record.
-  const handleDuplicateUsed = (r) => {
-    const u = usedTyres.find(x => x.id === r.id)
-    if (!u) return
-    const { id, sold, ...rest } = u
-    setEditingUsed({ ...rest, _duplicate: true })
   }
 
   const handleEdit = (r) => {
@@ -44,9 +58,7 @@ export default function Purchases() {
       const u = usedTyres.find(x => x.id === r.id)
       if (!u) return
       if (u.sold) return alert('This used tyre has been sold on an invoice, so the record can\'t be deleted.')
-      if (confirm(`Delete this used tyre (${r.tyreLabel})? Used stock will go down by 1.`)) {
-        deleteUsedTyre(u.id)
-      }
+      scheduleDelete(u.id, `Deleted used tyre — ${r.tyreLabel}`, () => deleteUsedTyre(u.id))
     } else {
       const b = batches.find(x => x.id === r.id)
       if (!b) return
@@ -54,9 +66,7 @@ export default function Purchases() {
       if (sold > 0) {
         return alert(`${sold} tyre${sold === 1 ? ' has' : 's have'} been sold from this batch on invoices, so it can't be deleted. You can edit its details instead.`)
       }
-      if (confirm(`Delete this batch of ${b.qty}? Stock for this tyre will go down by ${b.remaining}.`)) {
-        deleteBatch(b.id)
-      }
+      scheduleDelete(b.id, `Deleted batch of ${b.qty} — ${r.tyreLabel}`, () => deleteBatch(b.id))
     }
   }
 
@@ -75,6 +85,7 @@ export default function Purchases() {
       ref: '—', notes: u.notes, tyreLabel: `${u.brand} ${u.model} ${u.w}/${u.p}R${u.r}`
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date))
+    .filter(r => r.id !== pendingDelete?.id)
 
   // Filter records by search
   const filtered = allRecords.filter(r => {
@@ -178,9 +189,6 @@ export default function Purchases() {
                       {r.type === 'new' && (
                         <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
                       )}
-                      {r.type === 'used' && (
-                        <Btn sm variant="success" onClick={() => handleDuplicateUsed(r)}>⧉ Duplicate</Btn>
-                      )}
                       <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
                       <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
                     </span>
@@ -218,13 +226,9 @@ export default function Purchases() {
         setEditingBatch(null)
       }} />}
 
-      {/* Edit / Duplicate Used Tyre Modal */}
+      {/* Edit Used Tyre Modal */}
       {editingUsed && <UsedModal initial={editingUsed} onClose={() => setEditingUsed(null)} onSave={(data) => {
-        if (editingUsed._duplicate) {
-          addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
-        } else {
-          updateUsedTyre(editingUsed.id, data)
-        }
+        updateUsedTyre(editingUsed.id, data)
         setEditingUsed(null)
       }} />}
 
@@ -233,6 +237,7 @@ export default function Purchases() {
         addBatch({ id: 'B' + Date.now(), ...data, remaining: data.qty })
         setRestock(null)
       }} />}
+      {pendingDelete && <UndoToast message={pendingDelete.label} onUndo={undoDelete} />}
     </div>
   )
 }
@@ -375,7 +380,7 @@ function UsedModal({ onClose, onSave, initial }) {
   ].filter(Boolean))].sort()
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   return (
-    <Modal title={initial ? (initial._duplicate ? 'Duplicate Used / Part-Ex Tyre' : 'Edit Used / Part-Ex Tyre') : 'Add Used / Part-Ex Tyre'} onClose={onClose} onSave={() => {
+    <Modal title="Add Used / Part-Ex Tyre" onClose={onClose} onSave={() => {
       if (!form.brand || !form.model) return alert('Brand and model required')
       onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
     }}>
