@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
-import { PageHeader, Card, Badge, Btn, StatCard } from '../components/UI'
+import { PageHeader, Card, Badge, Btn, StatCard, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
 import { deletePurchaseInvoice } from '../lib/db'
@@ -18,6 +18,26 @@ export default function Inventory() {
   const [viewingBatch, setViewingBatch] = useState(null)
   const [showCSVImport, setShowCSVImport] = useState(false)
 
+  // Pending delete with Undo — the item disappears immediately but isn't
+  // really deleted until the toast expires. Undo cancels it completely.
+  const [pendingDelete, setPendingDelete] = useState(null) // { id, label, commit, timerId }
+  const scheduleDelete = (id, label, commit) => {
+    setPendingDelete(prev => {
+      if (prev) { clearTimeout(prev.timerId); prev.commit() }
+      const timerId = setTimeout(() => {
+        commit()
+        setPendingDelete(null)
+      }, 8000)
+      return { id, label, commit, timerId }
+    })
+  }
+  const undoDelete = () => {
+    setPendingDelete(prev => {
+      if (prev) clearTimeout(prev.timerId)
+      return null
+    })
+  }
+
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isGold = tier === 'gold'
 
@@ -31,12 +51,14 @@ export default function Inventory() {
   const skuLabel = sk => `${sk.brand} ${sk.model} ${sk.w}/${sk.p}R${sk.r}`
 
   const filteredSKUs = skus.filter(sk => {
+    if (sk.id === pendingDelete?.id) return false
     if (search && !skuLabel(sk).toLowerCase().includes(search.toLowerCase())) return false
     if (tab === 'low' && getTotalStock(sk.id) > sk.alert) return false
     return true
   })
 
   const filteredUsed = usedTyres.filter(u => {
+    if (u.id === pendingDelete?.id) return false
     if (u.sold) return false
     if (search && !`${u.brand} ${u.model} ${u.w}/${u.p}R${u.r}`.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -189,7 +211,7 @@ export default function Inventory() {
                             alert(`Cannot delete ${sk.brand} ${sk.model} — it still has ${qty} in stock. Remove the stock/batches first.`)
                             return
                           }
-                          if (confirm(`Delete ${sk.brand} ${sk.model}? This cannot be undone.`)) deleteSKU(sk.id)
+                          scheduleDelete(sk.id, `Deleted ${sk.brand} ${sk.model}`, () => deleteSKU(sk.id))
                         }}>✕</Btn>
                       </div>
                     </td>
@@ -218,7 +240,7 @@ export default function Inventory() {
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <Btn sm variant="ghost" onClick={() => { setEditingUsed(u); setShowUsed(true) }}>✏️ Edit</Btn>
                         <Btn sm variant="danger" onClick={() => {
-                          if (confirm(`Delete this used tyre (${u.brand} ${u.model})? This cannot be undone.`)) deleteUsedTyre(u.id)
+                          scheduleDelete(u.id, `Deleted used tyre — ${u.brand} ${u.model}`, () => deleteUsedTyre(u.id))
                         }}>✕</Btn>
                       </div>
                     </td>
@@ -279,6 +301,8 @@ export default function Inventory() {
 
       {/* View Batch Details Modal */}
       {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} onClose={() => setViewingBatch(null)} />}
+
+      {pendingDelete && <UndoToast message={pendingDelete.label} onUndo={undoDelete} />}
     </div>
   )
 }
