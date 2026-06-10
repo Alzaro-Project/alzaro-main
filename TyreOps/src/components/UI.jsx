@@ -71,3 +71,20 @@ export function Badge({ children, variant = 'gray' }) {
     </span>
   )
 }
+// Bottom-centre toast with an Undo action. Shown while a delete is pending —
+// the actual deletion only happens once the toast expires.
+export function UndoToast({ message, onUndo }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+      background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '10px',
+      padding: '10px 16px', display: 'flex', gap: '14px', alignItems: 'center',
+      zIndex: 700, boxShadow: '0 8px 24px rgba(0,0,0,.35)', maxWidth: '90vw',
+    }}>
+      <span style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{message}</span>
+      <button onClick={onUndo} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 700, fontSize: '12px', cursor: 'pointer', letterSpacing: '.5px', flexShrink: 0 }}>
+        UNDO
+      </button>
+    </div>
+  )
+}
