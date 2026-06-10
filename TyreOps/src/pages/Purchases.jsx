@@ -58,7 +58,9 @@ export default function Purchases() {
       const u = usedTyres.find(x => x.id === r.id)
       if (!u) return
       if (u.sold) return alert('This used tyre has been sold on an invoice, so the record can\'t be deleted.')
-      scheduleDelete(u.id, `Deleted used tyre — ${r.tyreLabel}`, () => deleteUsedTyre(u.id))
+      if (confirm(`Delete this used tyre (${r.tyreLabel})? Used stock will go down by 1.`)) {
+        scheduleDelete(u.id, `Deleted used tyre — ${r.tyreLabel}`, () => deleteUsedTyre(u.id))
+      }
     } else {
       const b = batches.find(x => x.id === r.id)
       if (!b) return
@@ -66,7 +68,9 @@ export default function Purchases() {
       if (sold > 0) {
         return alert(`${sold} tyre${sold === 1 ? ' has' : 's have'} been sold from this batch on invoices, so it can't be deleted. You can edit its details instead.`)
       }
-      scheduleDelete(b.id, `Deleted batch of ${b.qty} — ${r.tyreLabel}`, () => deleteBatch(b.id))
+      if (confirm(`Delete this batch of ${b.qty}? Stock for this tyre will go down by ${b.remaining}.`)) {
+        scheduleDelete(b.id, `Deleted batch of ${b.qty} — ${r.tyreLabel}`, () => deleteBatch(b.id))
+      }
     }
   }
 
