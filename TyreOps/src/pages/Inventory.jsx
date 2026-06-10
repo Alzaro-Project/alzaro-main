@@ -211,7 +211,7 @@ export default function Inventory() {
                             alert(`Cannot delete ${sk.brand} ${sk.model} — it still has ${qty} in stock. Remove the stock/batches first.`)
                             return
                           }
-                          scheduleDelete(sk.id, `Deleted ${sk.brand} ${sk.model}`, () => deleteSKU(sk.id))
+                          if (confirm(`Delete ${sk.brand} ${sk.model}?`)) scheduleDelete(sk.id, `Deleted ${sk.brand} ${sk.model}`, () => deleteSKU(sk.id))
                         }}>✕</Btn>
                       </div>
                     </td>
@@ -240,7 +240,7 @@ export default function Inventory() {
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <Btn sm variant="ghost" onClick={() => { setEditingUsed(u); setShowUsed(true) }}>✏️ Edit</Btn>
                         <Btn sm variant="danger" onClick={() => {
-                          scheduleDelete(u.id, `Deleted used tyre — ${u.brand} ${u.model}`, () => deleteUsedTyre(u.id))
+                          if (confirm(`Delete this used tyre (${u.brand} ${u.model})?`)) scheduleDelete(u.id, `Deleted used tyre — ${u.brand} ${u.model}`, () => deleteUsedTyre(u.id))
                         }}>✕</Btn>
                       </div>
                     </td>
