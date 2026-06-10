@@ -183,6 +183,7 @@ export const useStore = create(
                 emailReplyTo: data.garage.email_reply_to || '',
                 emailFooter: data.garage.email_footer || '',
                 logoUrl: data.garage.logo_url || '',
+                noteTemplates: data.garage.note_templates || null,
               },
               user: { name: data.garage.name, email },
             }
@@ -314,6 +315,7 @@ export const useStore = create(
             if (updates.emailReplyTo !== undefined) dbUpdates.email_reply_to = updates.emailReplyTo
             if (updates.emailFooter !== undefined) dbUpdates.email_footer = updates.emailFooter
             if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
+            if (updates.noteTemplates !== undefined) dbUpdates.note_templates = updates.noteTemplates
 
             await db.updateGarage(garageId, dbUpdates)
           } catch (err) {
