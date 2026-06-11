@@ -12,13 +12,19 @@ const PERIODS = [
   { key: 'quarter', label: 'Quarter' },
   { key: '6months', label: '6 Months' },
   { key: 'year', label: 'This Year' },
+  { key: 'custom', label: 'Custom' },
 ]
 
-function filterByPeriod(invoices, period) {
+function filterByPeriod(invoices, period, customFrom, customTo) {
   const now = new Date()
   return invoices.filter(inv => {
     if (inv.status !== 'paid' && inv.status !== 'sent') return false
     const d = new Date(inv.date)
+    if (period === 'custom') {
+      if (customFrom && d < new Date(customFrom + 'T00:00:00')) return false
+      if (customTo && d > new Date(customTo + 'T23:59:59')) return false
+      return true
+    }
     if (period === 'today') return d.toDateString() === now.toDateString()
     if (period === 'week') { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w }
     if (period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -39,7 +45,12 @@ export default function Dashboard() {
   const [revenueLimit, setRevenueLimit] = useState(5)
   const [cogsLimit, setCogsLimit] = useState(5)
 
-  const filtered = filterByPeriod(invoices, dashPeriod)
+  // Custom date range (defaults to the last 30 days)
+  const toISO = (dt) => dt.toISOString().slice(0, 10)
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return toISO(d) })
+  const [customTo, setCustomTo] = useState(() => toISO(new Date()))
+
+  const filtered = filterByPeriod(invoices, dashPeriod, customFrom, customTo)
 
   // Calculate invoice-level metrics
   const invoiceMetrics = filtered.map(inv => {
@@ -79,7 +90,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle={`${settings?.name || 'Your Garage'} — ${PERIODS.find(p => p.key === dashPeriod)?.label}`} />
+      <PageHeader title="Dashboard" subtitle={`${settings?.name || 'Your Garage'} — ${dashPeriod === 'custom' ? `${customFrom} → ${customTo}` : PERIODS.find(p => p.key === dashPeriod)?.label}`} />
 
       <WelcomeBanner />
 
@@ -100,6 +111,18 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Custom range pickers — only when Custom is selected */}
+      {dashPeriod === 'custom' && (
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>From</span>
+          <input type="date" value={customFrom} max={customTo} onChange={e => setCustomFrom(e.target.value)}
+            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none' }} />
+          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>To</span>
+          <input type="date" value={customTo} min={customFrom} onChange={e => setCustomTo(e.target.value)}
+            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none' }} />
+        </div>
+      )}
 
       {/* Stat Cards - Clickable Revenue and COGS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '18px' }} className="stat-grid">
