@@ -315,7 +315,12 @@ function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
   return (
     <Modal title={sku ? 'Edit Tyre SKU' : 'New Tyre SKU'} onClose={onClose} onSave={() => {
       if (!form.brand || !form.model) return alert('Brand and model required')
-      onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), sell: parseFloat(form.sell), alert: parseInt(form.alert) })
+      const w = parseInt(form.w), p = parseInt(form.p), r = parseInt(form.r)
+      if (isNaN(w) || isNaN(p) || isNaN(r)) return alert('Width, profile and rim are required — enter all three size numbers (e.g. 225 / 45 / 18)')
+      const sell = parseFloat(form.sell)
+      if (isNaN(sell) || sell < 0) return alert('Sell price is required')
+      const alertLevel = parseInt(form.alert)
+      onSave({ ...form, w, p, r, sell, alert: isNaN(alertLevel) ? 2 : alertLevel })
     }}>
       {/* CSV Import option - only show when adding new SKU */}
       {!sku && onShowCSVImport && (
