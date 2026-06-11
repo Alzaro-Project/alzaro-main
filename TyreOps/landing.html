@@ -515,9 +515,32 @@
       .testimonial-card { padding: 44px 26px; }
       .cta-content { padding: 60px 24px; }
       .cta-buttons { flex-direction: column; align-items: center; }
-      .inventory-row { grid-template-columns: 1.6fr 1fr 0.5fr 0.7fr; font-size: 12px; padding: 11px 12px; }
+      .inventory-row { grid-template-columns: 1.6fr 1fr 0.5fr 0.7fr; font-size: 12px; padding: 11px 12px; min-width: 420px; }
+      .inventory-preview { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .pricing-card { padding: 30px 24px; }
       .legal-page { padding-top: 120px; }
+      /* flatten 3D depth on touch layouts — no hover, avoids perspective offsets */
+      .feature-card, .feature-card-header, .feature-card-body { transform: none !important; }
+      .feature-row { gap: 28px; }
+      .hero h1 { font-size: clamp(36px, 10.5vw, 52px); }
+      .hero-desc { font-size: 15.5px; }
+      .section-header { margin-bottom: 48px; }
+      .features { padding-top: 70px; }
+      .feature-card-body { padding: 16px; }
+      .stats-grid { gap: 8px; }
+      .stat-card { padding: 11px; }
+      .stat-value { font-size: 16px; }
+      .pricing-section, .how-section { padding: 80px 0; }
+      .testimonial-quote { font-size: 16.5px; }
+      .testimonial-card::before { font-size: 100px; }
+    }
+    @media (max-width: 420px) {
+      .logo { font-size: 15px; }
+      .nav-right .btn { font-size: 11.5px; padding: 8px 11px; }
+      nav { padding: 12px 0; }
+      .hero-stat-value { font-size: 20px; }
+      .feature-title { font-size: 22px; }
+      .pricing-amount { font-size: 40px; }
     }
 
   </style>
