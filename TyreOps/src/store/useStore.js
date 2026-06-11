@@ -67,11 +67,10 @@ export const useStore = create(
       garageId: null,
       garageStatus: null,
       trialEnds: null,
-      product: 'tyreops',  // NEW: 'tyreops' | 'garageops' — drives UI and which data to load
       welcomeBannerDismissed: false,  // Onboarding banner dismissal flag
 
       // --------------------------------------------------------
-      // SHARED DATA STATE (both products)
+      // DATA STATE
       // --------------------------------------------------------
       settings: {
         name: '', addr: '', city: '',
@@ -80,25 +79,9 @@ export const useStore = create(
       },
       customers: [],
       invoices: [],
-      licences: [],
-
-      // --------------------------------------------------------
-      // TYREOPS DATA STATE
-      // --------------------------------------------------------
       skus: [],
       batches: [],
       usedTyres: [],
-
-      // --------------------------------------------------------
-      // GARAGEOPS DATA STATE (NEW)
-      // --------------------------------------------------------
-      vehicles: [],
-      services: [],
-      parts: [],
-      partBatches: [],
-      labourRates: [],
-      jobs: [],
-      motReminders: [],
 
       // --------------------------------------------------------
       // DASHBOARD
@@ -124,13 +107,6 @@ export const useStore = create(
           skus: [],
           batches: [],
           usedTyres: [],
-          vehicles: [],
-          services: [],
-          parts: [],
-          partBatches: [],
-          labourRates: [],
-          jobs: [],
-          motReminders: [],
         })
 
         await get().loadData(email)
@@ -141,7 +117,6 @@ export const useStore = create(
       loadData: async (email) => {
         try {
           const data = await db.loadAllGarageData(email)
-          console.log('Loaded garage data:', data)
 
           // MULTI-PRODUCT — loadAllGarageData fetches this email's TyreOps
           // garage specifically. Null means no TyreOps membership yet; the
@@ -162,7 +137,6 @@ export const useStore = create(
               garageId: data.garage.id,
               garageStatus: data.garage.status,
               trialEnds: data.garage.trial_ends,
-              product: data.product || 'tyreops',
               settings: {
                 name: data.garage.name,
                 addr: data.garage.addr || '',
@@ -188,39 +162,12 @@ export const useStore = create(
               user: { name: data.garage.name, email },
             }
 
-            if (data.product === 'garageops') {
-              set({
-                ...baseState,
-                // GarageOps data
-                vehicles: data.vehicles || [],
-                services: data.services || [],
-                parts: data.parts || [],
-                partBatches: data.partBatches || [],
-                labourRates: data.labourRates || [],
-                jobs: data.jobs || [],
-                motReminders: data.motReminders || [],
-                // Clear TyreOps collections — not relevant
-                skus: [],
-                batches: [],
-                usedTyres: [],
-              })
-            } else {
-              // TyreOps (default)
-              set({
-                ...baseState,
-                skus: data.skus,
-                batches: data.batches,
-                usedTyres: data.usedTyres,
-                // Clear GarageOps collections — not relevant
-                vehicles: [],
-                services: [],
-                parts: [],
-                partBatches: [],
-                labourRates: [],
-                jobs: [],
-                motReminders: [],
-              })
-            }
+            set({
+              ...baseState,
+              skus: data.skus,
+              batches: data.batches,
+              usedTyres: data.usedTyres,
+            })
           }
         } catch (err) {
           console.error('Failed to load garage data:', err)
@@ -242,25 +189,13 @@ export const useStore = create(
           garageId: null,
           garageStatus: null,
           trialEnds: null,
-          product: 'tyreops',
-          // TyreOps data cleared
           skus: [],
           batches: [],
           usedTyres: [],
           invoices: [],
           customers: [],
-          // GarageOps data cleared
-          vehicles: [],
-          services: [],
-          parts: [],
-          partBatches: [],
-          labourRates: [],
-          jobs: [],
-          motReminders: [],
         })
-        // Redirect to login — respect whichever product the user was on
-        const productPath = get().product === 'garageops' ? '/garageops/login' : '/tyreops/login'
-        window.location.href = productPath
+        window.location.href = '/tyreops/login'
       },
 
       // --------------------------------------------------------
@@ -347,7 +282,9 @@ export const useStore = create(
             }))
           } catch (err) {
             console.error('Failed to save SKU:', err)
-            showToast('Failed to save tyre. It may not persist after refresh.')
+            // Roll back the optimistic row so the UI matches reality
+            set(s => ({ skus: s.skus.filter(sk => sk.id !== tempId) }))
+            showToast('Failed to save tyre — it was not added. ' + (err?.message || ''))
           }
         }
       },
@@ -674,13 +611,6 @@ export const useStore = create(
       },
 
       // --------------------------------------------------------
-      // LICENCES (Admin only — local state)
-      // --------------------------------------------------------
-      addLicence: (l) => set(s => ({ licences: [...s.licences, l] })),
-      updateLicence: (id, updates) => set(s => ({ licences: s.licences.map(l => l.id === id ? { ...l, ...updates } : l) })),
-      deleteLicence: (id) => set(s => ({ licences: s.licences.filter(l => l.id !== id) })),
-
-      // --------------------------------------------------------
       // DASHBOARD
       // --------------------------------------------------------
       setDashPeriod: (period) => set({ dashPeriod: period }),
@@ -732,421 +662,6 @@ export const useStore = create(
         }
       },
 
-      // ========================================================
-      // ====================== GARAGEOPS =======================
-      // ========================================================
-      // All new actions for GarageOps. Only called when product === 'garageops'.
-
-      // --------------------------------------------------------
-      // VEHICLES
-      // --------------------------------------------------------
-      addVehicle: async (vehicle) => {
-        const garageId = get().garageId
-        const tempId = vehicle.id || `temp-${Date.now()}`
-        const optimisticVehicle = { ...vehicle, id: tempId }
-        set(s => ({ vehicles: [...s.vehicles, optimisticVehicle] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertVehicle(garageId, vehicle)
-            set(s => ({
-              vehicles: s.vehicles.map(v => v.id === tempId ? saved : v)
-            }))
-            return saved
-          } catch (err) {
-            console.error('Failed to save vehicle:', err)
-            showToast('Failed to save vehicle. It may not persist.')
-          }
-        }
-      },
-
-      updateVehicle: async (id, updates) => {
-        set(s => ({ vehicles: s.vehicles.map(v => v.id === id ? { ...v, ...updates } : v) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updateVehicle(id, updates)
-          } catch (err) {
-            console.error('Failed to update vehicle:', err)
-            showToast('Failed to update vehicle.')
-          }
-        }
-      },
-
-      deleteVehicle: async (id) => {
-        set(s => ({ vehicles: s.vehicles.filter(v => v.id !== id) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.deleteVehicle(id)
-          } catch (err) {
-            console.error('Failed to delete vehicle:', err)
-            showToast('Failed to delete vehicle from database.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // SERVICES (the service menu)
-      // --------------------------------------------------------
-      addService: async (service) => {
-        const garageId = get().garageId
-        const tempId = service.id || `temp-${Date.now()}`
-        const optimisticService = { ...service, id: tempId }
-        set(s => ({ services: [...s.services, optimisticService] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertService(garageId, service)
-            set(s => ({
-              services: s.services.map(sv => sv.id === tempId ? saved : sv)
-            }))
-          } catch (err) {
-            console.error('Failed to save service:', err)
-            showToast('Failed to save service. It may not persist.')
-          }
-        }
-      },
-
-      updateService: async (id, updates) => {
-        set(s => ({ services: s.services.map(sv => sv.id === id ? { ...sv, ...updates } : sv) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updateService(id, updates)
-          } catch (err) {
-            console.error('Failed to update service:', err)
-            showToast('Failed to update service.')
-          }
-        }
-      },
-
-      deleteService: async (id) => {
-        set(s => ({ services: s.services.filter(sv => sv.id !== id) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.deleteService(id)
-          } catch (err) {
-            console.error('Failed to delete service:', err)
-            showToast('Failed to delete service.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // PARTS
-      // --------------------------------------------------------
-      addPart: async (part) => {
-        const garageId = get().garageId
-        const tempId = part.id || `temp-${Date.now()}`
-        const optimisticPart = { ...part, id: tempId }
-        set(s => ({ parts: [...s.parts, optimisticPart] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertPart(garageId, part)
-            set(s => ({
-              parts: s.parts.map(p => p.id === tempId ? saved : p)
-            }))
-          } catch (err) {
-            console.error('Failed to save part:', err)
-            showToast('Failed to save part. It may not persist.')
-          }
-        }
-      },
-
-      updatePart: async (id, updates) => {
-        set(s => ({ parts: s.parts.map(p => p.id === id ? { ...p, ...updates } : p) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updatePart(id, updates)
-          } catch (err) {
-            console.error('Failed to update part:', err)
-            showToast('Failed to update part.')
-          }
-        }
-      },
-
-      deletePart: async (id) => {
-        set(s => ({
-          parts: s.parts.filter(p => p.id !== id),
-          partBatches: s.partBatches.filter(b => b.partId !== id),
-        }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.deletePart(id)
-          } catch (err) {
-            console.error('Failed to delete part:', err)
-            showToast('Failed to delete part.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // PART BATCHES
-      // --------------------------------------------------------
-      addPartBatch: async (batch) => {
-        const garageId = get().garageId
-        const tempId = batch.id || `temp-${Date.now()}`
-        const optimisticBatch = { ...batch, id: tempId, remaining: batch.qty }
-        set(s => ({ partBatches: [...s.partBatches, optimisticBatch] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertPartBatch(garageId, batch)
-            set(s => ({
-              partBatches: s.partBatches.map(b => b.id === tempId ? saved : b)
-            }))
-          } catch (err) {
-            console.error('Failed to save part batch:', err)
-            showToast('Failed to save stock batch.')
-          }
-        }
-      },
-
-      updatePartBatch: async (id, updates) => {
-        set(s => ({ partBatches: s.partBatches.map(b => b.id === id ? { ...b, ...updates } : b) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updatePartBatch(id, updates)
-          } catch (err) {
-            console.error('Failed to update part batch:', err)
-            showToast('Failed to update stock batch.')
-          }
-        }
-      },
-
-      decrementPartBatch: async (batchId, qty) => {
-        const batch = get().partBatches.find(b => b.id === batchId)
-        if (!batch) return
-
-        const newRemaining = Math.max(0, batch.remaining - qty)
-
-        set(s => ({
-          partBatches: s.partBatches.map(b =>
-            b.id === batchId ? { ...b, remaining: newRemaining } : b
-          )
-        }))
-
-        const garageId = get().garageId
-        if (garageId && !String(batchId).startsWith('temp-')) {
-          try {
-            await db.updatePartBatch(batchId, { remaining: newRemaining })
-          } catch (err) {
-            console.error('Failed to update part batch remaining:', err)
-            showToast('Failed to update stock levels.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // LABOUR RATES
-      // --------------------------------------------------------
-      addLabourRate: async (rate) => {
-        const garageId = get().garageId
-        const tempId = rate.id || `temp-${Date.now()}`
-        const optimisticRate = { ...rate, id: tempId }
-        set(s => ({ labourRates: [...s.labourRates, optimisticRate] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertLabourRate(garageId, rate)
-            set(s => ({
-              labourRates: s.labourRates.map(r => r.id === tempId ? saved : r)
-            }))
-          } catch (err) {
-            console.error('Failed to save labour rate:', err)
-            showToast('Failed to save labour rate.')
-          }
-        }
-      },
-
-      updateLabourRate: async (id, updates) => {
-        set(s => ({ labourRates: s.labourRates.map(r => r.id === id ? { ...r, ...updates } : r) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updateLabourRate(id, updates)
-          } catch (err) {
-            console.error('Failed to update labour rate:', err)
-            showToast('Failed to update labour rate.')
-          }
-        }
-      },
-
-      deleteLabourRate: async (id) => {
-        set(s => ({ labourRates: s.labourRates.filter(r => r.id !== id) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.deleteLabourRate(id)
-          } catch (err) {
-            console.error('Failed to delete labour rate:', err)
-            showToast('Failed to delete labour rate.')
-          }
-        }
-      },
-
-      getDefaultLabourRate: () => {
-        return get().labourRates.find(r => r.isDefault && r.active)
-          || get().labourRates.find(r => r.active)
-          || null
-      },
-
-      // --------------------------------------------------------
-      // JOBS
-      // --------------------------------------------------------
-      addJob: async (job) => {
-        const garageId = get().garageId
-        set(s => ({ jobs: [...s.jobs, job] }))
-
-        if (garageId) {
-          try {
-            await db.insertJob(garageId, job)
-          } catch (err) {
-            console.error('Failed to save job:', err)
-            showToast('Failed to save job card. It may not persist.')
-          }
-        }
-      },
-
-      updateJob: async (id, updates) => {
-        set(s => ({ jobs: s.jobs.map(j => j.id === id ? { ...j, ...updates } : j) }))
-
-        const garageId = get().garageId
-        if (garageId) {
-          try {
-            // If lines changed, replace them as a batch
-            if (updates.lines !== undefined) {
-              await db.replaceJobLines(id, garageId, updates.lines)
-              // Strip lines from the jobs-table update
-              const jobUpdates = { ...updates }
-              delete jobUpdates.lines
-              if (Object.keys(jobUpdates).length > 0) {
-                await db.updateJob(id, jobUpdates)
-              }
-            } else {
-              await db.updateJob(id, updates)
-            }
-          } catch (err) {
-            console.error('Failed to update job:', err)
-            showToast('Failed to update job card.')
-          }
-        }
-      },
-
-      updateJobStatus: async (id, status) => {
-        set(s => ({ jobs: s.jobs.map(j => j.id === id ? { ...j, status } : j) }))
-
-        const garageId = get().garageId
-        if (garageId) {
-          try {
-            await db.updateJobStatus(id, status)
-          } catch (err) {
-            console.error('Failed to update job status:', err)
-            showToast('Failed to update job status.')
-          }
-        }
-      },
-
-      deleteJob: async (id) => {
-        set(s => ({ jobs: s.jobs.filter(j => j.id !== id) }))
-
-        const garageId = get().garageId
-        if (garageId) {
-          try {
-            await db.deleteJob(id)
-          } catch (err) {
-            console.error('Failed to delete job:', err)
-            showToast('Failed to delete job.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // MOT REMINDERS
-      // --------------------------------------------------------
-      addMotReminder: async (reminder) => {
-        const garageId = get().garageId
-        const tempId = reminder.id || `temp-${Date.now()}`
-        const optimistic = { ...reminder, id: tempId }
-        set(s => ({ motReminders: [...s.motReminders, optimistic] }))
-
-        if (garageId) {
-          try {
-            const saved = await db.insertMotReminder(garageId, reminder)
-            set(s => ({
-              motReminders: s.motReminders.map(r => r.id === tempId ? saved : r)
-            }))
-          } catch (err) {
-            console.error('Failed to save MOT reminder:', err)
-            showToast('Failed to save MOT reminder.')
-          }
-        }
-      },
-
-      updateMotReminder: async (id, updates) => {
-        set(s => ({ motReminders: s.motReminders.map(r => r.id === id ? { ...r, ...updates } : r) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.updateMotReminder(id, updates)
-          } catch (err) {
-            console.error('Failed to update MOT reminder:', err)
-            showToast('Failed to update MOT reminder.')
-          }
-        }
-      },
-
-      deleteMotReminder: async (id) => {
-        set(s => ({ motReminders: s.motReminders.filter(r => r.id !== id) }))
-
-        const garageId = get().garageId
-        if (garageId && !String(id).startsWith('temp-')) {
-          try {
-            await db.deleteMotReminder(id)
-          } catch (err) {
-            console.error('Failed to delete MOT reminder:', err)
-            showToast('Failed to delete MOT reminder.')
-          }
-        }
-      },
-
-      // --------------------------------------------------------
-      // GARAGEOPS FIFO + STOCK HELPERS
-      // --------------------------------------------------------
-      getPartFIFOCost: (partId) => {
-        const batches = get().partBatches
-          .filter(b => b.partId === partId && b.remaining > 0)
-          .sort((a, b) => new Date(a.date) - new Date(b.date))
-        return batches[0]?.cost || 0
-      },
-
-      getPartTotalStock: (partId) => {
-        return get().partBatches
-          .filter(b => b.partId === partId && b.remaining > 0)
-          .reduce((a, b) => a + b.remaining, 0)
-      },
-
-      getPartActiveBatches: (partId) => {
-        return get().partBatches
-          .filter(b => b.partId === partId && b.remaining > 0)
-          .sort((a, b) => new Date(a.date) - new Date(b.date))
-      },
     }),
     {
       name: 'garageiq-store',
@@ -1156,7 +671,6 @@ export const useStore = create(
         tier: state.tier,
         isAdmin: state.isAdmin,
         garageId: state.garageId,
-        product: state.product,
         settings: state.settings,
         dashPeriod: state.dashPeriod,
         dashWidgets: state.dashWidgets,
