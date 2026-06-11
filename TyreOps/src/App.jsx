@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from './store/useStore'
 import Sidebar from './components/Sidebar'
 import TrialGuard from './components/TrialGuard'
+import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import Invoices from "./pages/Invoices"
 import Inventory from './pages/Inventory'
@@ -96,6 +97,7 @@ function AppLayout() {
             <Route path="/vat" element={<VATReport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
         </div>
       </div>
@@ -132,12 +134,14 @@ export default function App() {
   }, [])
 
   return (
-    <BrowserRouter basename="/tyreops">
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/*" element={user ? <AppLayout /> : <Navigate to="/login" />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename="/tyreops">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/*" element={user ? <AppLayout /> : <Navigate to="/login" />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

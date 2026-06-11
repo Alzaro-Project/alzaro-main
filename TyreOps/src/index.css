@@ -1,7 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
 
-@import "tailwindcss";
-
 :root {
   --bg: #f4f5f7;
   --surface: #ffffff;
@@ -39,6 +37,15 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Minimal reset (replaces Tailwind preflight, which was the only part of
+   Tailwind this app used — no utility classes anywhere) */
+button, input, select, textarea { font: inherit; color: inherit; border: 0 solid var(--border); }
+button { background: none; cursor: pointer; }
+img, svg { display: block; max-width: 100%; }
+table { border-collapse: collapse; }
+a { color: inherit; }
+ul, ol { list-style: none; }
 
 body {
   background: var(--bg);
