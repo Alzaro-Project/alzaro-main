@@ -1,16 +1,37 @@
-# React + Vite
+# Alzaro TyreOps
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Tyre garage management — inventory with FIFO batch costing, invoicing, customers, purchases, and VAT reporting (standard, flat rate, and margin scheme).
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + Vite
+- Zustand (state, persisted to localStorage; data lives in Supabase)
+- Supabase (auth + database)
+- jsPDF (invoice/billing PDFs, imported dynamically)
+- react-router-dom (routed under `/tyreops`)
 
-## React Compiler
+## Project layout
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src/
+  App.jsx              Routes, layout, mobile shell, ErrorBoundary
+  components/          Sidebar, GlobalSearch, TrialGuard, WelcomeBanner, UI primitives, ErrorBoundary
+  pages/               Dashboard, Invoices, Inventory, Purchases, Customers, VATReport, Settings, Admin, Login, ResetPassword
+  store/useStore.js    Zustand store — auth, settings, all data actions
+  lib/db.js            Supabase data layer (all table access goes through here)
+  lib/email.js         Invoice email generation + sending (SMTP via /api endpoints)
+  lib/supabase.js      Supabase client (reads VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
+```
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+npm install
+npm run dev
+```
+
+Requires a `.env.local` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
+## Deployment
+
+Built by the repo-root `vercel.json` (`npm run build` with base `/TyreOps/dist/`), served at `/tyreops`. When committing changes that add or remove dependencies, always commit `package.json` and `package-lock.json` together with the source files.
