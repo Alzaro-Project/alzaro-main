@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface2: #eef0f4;
+  --surface3: #e2e5eb;
+  --border: #d8dce4;
+  --accent: #4f46e5;
+  --accent-text: #ffffff;
+  --green: #16a34a;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --teal: #0d9488;
+  --purple: #7c3aed;
+  --text: #111318;
+  --text2: #4b5263;
+  --text3: #8b92a5;
+}
+
+[data-theme="dark"] {
+  --bg: #0d0d10;
+  --surface: #16161a;
+  --surface2: #1e1e24;
+  --surface3: #26262e;
+  --border: #2e2e38;
+  --accent: #6366f1;
+  --accent-text: #ffffff;
+  --green: #3dd68c;
+  --red: #ff5f5f;
+  --blue: #60a5fa;
+  --teal: #2dd4bf;
+  --purple: #a78bfa;
+  --text: #f0f0f0;
+  --text2: #9090a0;
+  --text3: #606070;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Minimal reset (replaces Tailwind preflight, which was the only part of
+   Tailwind this app used — no utility classes anywhere) */
+button, input, select, textarea { font: inherit; color: inherit; border: 0 solid var(--border); }
+button { background: none; cursor: pointer; }
+img, svg { display: block; max-width: 100%; }
+table { border-collapse: collapse; }
+a { color: inherit; }
+ul, ol { list-style: none; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  min-height: 100vh;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.font-head { font-family: 'Syne', sans-serif; }
+.font-mono { font-family: 'DM Mono', monospace; }
