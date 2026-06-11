@@ -13,6 +13,8 @@
 // This file provides the client-side interface for all options.
 // ============================================================
 
+import { supabase } from './supabase'
+
 // Email configuration - set these in your environment or Settings
 const EMAIL_CONFIG = {
   // For EmailJS (free tier: 200 emails/month)
@@ -26,6 +28,20 @@ const EMAIL_CONFIG = {
   // Your garage's sending email (configured in SMTP)
   FROM_EMAIL: import.meta.env.VITE_FROM_EMAIL || 'invoices@alzaro.co.uk',
   FROM_NAME: import.meta.env.VITE_FROM_NAME || 'Alzaro TyreOps',
+}
+
+// ============================================================
+// AUTH HELPER
+// ============================================================
+
+/**
+ * Get the current user's access token for authenticated API calls.
+ * The /api/send-email endpoint requires this — it rejects requests
+ * that don't come from a logged-in user.
+ */
+async function getAccessToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || null
 }
 
 // ============================================================
@@ -419,12 +435,21 @@ export async function sendViaEmailJS(toEmail, toName, subject, htmlContent, text
 
 /**
  * Send via Resend API (requires Edge Function)
- * You'll need to create an API route to handle this
+ * The /api/send-email endpoint requires authentication — the current
+ * user's Supabase session token is attached to every request.
  */
 export async function sendViaResend(toEmail, toName, subject, htmlContent) {
+  const token = await getAccessToken()
+  if (!token) {
+    throw new Error('You must be logged in to send emails')
+  }
+
   const response = await fetch('/api/send-email', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify({
       to: toEmail,
       toName,
@@ -435,7 +460,7 @@ export async function sendViaResend(toEmail, toName, subject, htmlContent) {
 
   if (!response.ok) {
     const error = await response.json()
-    throw new Error(error.message || 'Failed to send email')
+    throw new Error(error.error || error.message || 'Failed to send email')
   }
 
   return response.json()
