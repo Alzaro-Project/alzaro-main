@@ -16,6 +16,7 @@ const VERTICALS = {
 }
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'
+const fmtDateTime = d => d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'
 const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }
 const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:700, fontSize:'13px', padding:'9px 14px', borderRadius:'10px', border:'1px solid var(--border-light)', cursor:'pointer' }
 const td = { padding:'13px 14px', borderBottom:'1px solid var(--border)', fontSize:'13.5px', verticalAlign:'middle' }
@@ -27,6 +28,21 @@ function Platform() {
   const [users, setUsers] = useState([])
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(null) // user_id currently toggling
+  const [expanded, setExpanded] = useState(null) // user_id currently expanded
+
+  // call the admin-users edge function with the current session token
+  const callFn = async (body) => {
+    const { data: { session } } = await window.sb.auth.getSession()
+    const res = await fetch(`${window.SB_FN_URL}/admin-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify(body || {}),
+    })
+    return res.json()
+  }
 
   // login form state
   const [email, setEmail] = useState('')
@@ -56,11 +72,9 @@ function Platform() {
   }, [session])
 
   const loadUsers = async () => {
-    const { data, error } = await window.sb
-      .from('v_platform_users')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (!error) setUsers(data || [])
+    const res = await callFn({ action: 'list' })
+    if (res && res.users) setUsers(res.users)
+    else if (res && res.error) console.error('load failed:', res.error)
   }
 
   const doLogin = async () => {
@@ -72,18 +86,14 @@ function Platform() {
 
   const signOut = async () => { await window.sb.auth.signOut(); setUsers([]); setAllowed(undefined) }
 
-  // toggle disable/enable: flips status on ALL of a user's product_members rows
+  // toggle disable/enable via edge function (real ban + status flag)
   const toggleDisabled = async (u) => {
     const disable = !u.is_disabled
-    const newStatus = disable ? 'disabled' : 'active'
     if (disable && !confirm(`Disable ${u.email}? They will be blocked from logging in to all Alzaro products. This is reversible.`)) return
     setBusy(u.user_id)
-    const { error } = await window.sb
-      .from('product_members')
-      .update({ status: newStatus })
-      .eq('user_id', u.user_id)
+    const res = await callFn({ action: disable ? 'disable' : 'enable', user_id: u.user_id })
     setBusy(null)
-    if (error) { alert('Failed: ' + error.message); return }
+    if (res && res.error) { alert('Failed: ' + res.error); return }
     await loadUsers()
   }
 
@@ -183,13 +193,19 @@ function Platform() {
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'720px' }}>
               <thead><tr>
-                {['Email','Verticals','Joined','Status',''].map((h,i)=>(
+                {['','Email','Verticals','Joined','Status',''].map((h,i)=>(
                   <th key={i} style={{ textAlign:'left', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, padding:'0 14px 12px', borderBottom:'1px solid var(--border)' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
-                {shown.map(u => (
-                  <tr key={u.user_id} style={{ opacity: u.is_disabled ? 0.55 : 1 }}>
+                {shown.map(u => {
+                  const open = expanded === u.user_id
+                  return (
+                  <React.Fragment key={u.user_id}>
+                  <tr
+                    onClick={()=>setExpanded(open ? null : u.user_id)}
+                    style={{ opacity: u.is_disabled ? 0.55 : 1, cursor:'pointer', background: open ? 'var(--surface2)' : 'transparent' }}>
+                    <td style={{...td, width:'30px', color:'var(--text3)'}}>{open ? '▾' : '▸'}</td>
                     <td style={td}>{u.email}</td>
                     <td style={td}>
                       <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
@@ -207,7 +223,7 @@ function Platform() {
                     </td>
                     <td style={{...td, textAlign:'right'}}>
                       <button
-                        onClick={()=>toggleDisabled(u)}
+                        onClick={(e)=>{ e.stopPropagation(); toggleDisabled(u) }}
                         disabled={busy===u.user_id}
                         style={{
                           ...btnSec, padding:'7px 13px',
@@ -219,7 +235,34 @@ function Platform() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  {open && (
+                    <tr>
+                      <td colSpan={6} style={{ padding:'0 14px 18px', background:'var(--surface2)', borderBottom:'1px solid var(--border)' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'14px', marginBottom:'16px' }}>
+                          <Detail label="Joined" value={fmtDate(u.created_at)} />
+                          <Detail label="Last logged in" value={u.last_sign_in_at ? fmtDateTime(u.last_sign_in_at) : 'Never'} />
+                          <Detail label="Email confirmed" value={u.email_confirmed_at ? fmtDate(u.email_confirmed_at) : 'No'} />
+                          <Detail label="Account" value={u.is_disabled ? 'Disabled' : 'Active'} color={u.is_disabled?'var(--red)':'var(--green)'} />
+                        </div>
+                        <div style={{ fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, marginBottom:'10px' }}>Products ({(u.memberships||[]).length})</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'10px' }}>
+                          {(u.memberships||[]).map((m,i) => {
+                            const meta = VERTICALS[m.product] || { label:m.product, color:'var(--text3)' }
+                            return (
+                              <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'14px' }}>
+                                <div style={{ fontWeight:800, color:meta.color, marginBottom:'8px' }}>{meta.label}</div>
+                                <Row k="Company" v={m.company_name || '—'} />
+                                <Row k="Status" v={m.status || '—'} />
+                                <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                )})}
               </tbody>
             </table>
           </div>
@@ -232,6 +275,8 @@ function Platform() {
 // ---------- small components ----------
 function Center({children}) { return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)',padding:'20px'}}>{children}</div> }
 function Stat({label,value,color}) { return <div style={{...card, padding:'18px'}}><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.6px',fontWeight:600}}>{label}</div><div style={{fontSize:'24px',fontWeight:600,marginTop:'6px',letterSpacing:'-0.5px',color:color||'var(--orange-light)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
+function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
+function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600}}>{v}</span></div> }
 function Chip({children,active,onClick,color}) { return <button onClick={onClick} style={{ fontSize:'13px', fontWeight:700, padding:'8px 14px', borderRadius:'10px', cursor:'pointer', background: active?'var(--surface3)':'var(--surface)', color: active?(color||'var(--text)'):'var(--text2)', border:'1px solid '+(active?'var(--border-light)':'var(--border)') }}>{children}</button> }
 function Field({label,value,onChange,type,onEnter}) {
   return (
