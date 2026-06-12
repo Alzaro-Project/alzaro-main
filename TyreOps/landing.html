@@ -75,13 +75,32 @@
     .hero-note b{color:var(--text2)}
 
     /* SIGNATURE: stock/batch panel */
-    .stock-scene{perspective:1200px}
-    .stock-wrap{position:relative;transform-style:preserve-3d;will-change:transform;transition:transform .4s ease}
-    .stockcard{border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(59,130,246,0.05);overflow:hidden;transform:rotate(-1deg);transition:transform .35s ease}
-    .stockcard:hover{transform:rotate(0deg) translateY(-4px)}
-    .tilt-on .stockcard{transform:none!important;transition:none}
-    .tilt-on .sc-chip{transform:translateZ(55px)}
-    .tilt-on .sc-fifo{transform:translateZ(30px)}
+    .stock-scene{perspective:1500px;position:relative}
+    .cube{position:relative;width:100%;height:380px;transform-style:preserve-3d;transition:transform 1.1s cubic-bezier(.6,.05,.2,1);transform:translateZ(-190px) rotateY(0deg)}
+    .face{position:absolute;inset:0;border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(59,130,246,0.05);overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+    .face-front{transform:rotateY(0deg) translateZ(190px)}
+    .face-right{transform:rotateY(120deg) translateZ(190px)}
+    .face-back{transform:rotateY(240deg) translateZ(190px)}
+    .sc-badge.warn{color:var(--amber);border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.08)}
+    /* P&L face */
+    .pl-big{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+    .pl-label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3)}
+    .pl-amount{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--text);letter-spacing:-0.02em}
+    .pl-sub{color:var(--text3);font-size:20px}
+    .pl-rows{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+    .pl-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
+    .pl-row:last-child{border-bottom:none}
+    .pl-row b{font-family:var(--mono);color:var(--text);font-weight:600}
+    .pl-row b.muted{color:var(--text2)}
+    /* Alerts face */
+    .alert-list{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+    .alert-row{display:flex;align-items:center;gap:11px;padding:12px 14px;font-size:12.5px;border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
+    .alert-row:last-child{border-bottom:none}
+    .alert-row .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .alert-row.crit .dot{background:#ef4444;box-shadow:0 0 8px #ef4444}
+    .alert-row.warn .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+    .alert-row .ar-name{color:var(--text2)}
+    .alert-row .ar-qty{margin-left:auto;font-family:var(--mono);color:var(--text);font-weight:600}
     .sc-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);background:rgba(0,0,0,0.22)}
     .sc-title{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
     .sc-title b{color:var(--text);font-weight:600}
@@ -257,11 +276,13 @@
       <p class="hero-note"><b>No card required</b> // full features // cancel any time</p>
     </div>
 
-    <!-- signature: FIFO batch stock panel -->
+    <!-- signature: auto-rotating 3-face panel -->
     <div class="stock-scene">
-      <div class="stock-wrap" id="stockwrap">
-        <div class="sc-chip chip-1"><span class="dot"></span>Oldest batch sells first</div>
-        <div class="stockcard" aria-label="Example TyreOps stock record">
+      <div class="sc-chip chip-1"><span class="dot"></span>Live in TyreOps</div>
+      <div class="cube" id="cube" aria-label="TyreOps live data panel">
+
+        <!-- FACE 1: FIFO stock -->
+        <div class="face face-front">
           <div class="sc-head">
             <span class="sc-title">STOCK <b>· 205/55 R16</b></span>
             <span class="sc-badge">IN STOCK</span>
@@ -282,8 +303,51 @@
             </div>
           </div>
         </div>
-        <div class="sc-chip chip-2"><span class="dot"></span>Low stock alert · 4 remaining</div>
+
+        <!-- FACE 2: P&L summary -->
+        <div class="face face-right">
+          <div class="sc-head">
+            <span class="sc-title">P&amp;L <b>· THIS MONTH</b></span>
+            <span class="sc-badge">+18.4%</span>
+          </div>
+          <div class="sc-body">
+            <div class="pl-big">
+              <span class="pl-label">Net profit</span>
+              <span class="pl-amount">£4,182<span class="pl-sub">.60</span></span>
+            </div>
+            <div class="pl-rows">
+              <div class="pl-row"><span>Sales</span><b>£11,940</b></div>
+              <div class="pl-row"><span>Cost of stock (FIFO)</span><b class="muted">£7,012</b></div>
+              <div class="pl-row"><span>VAT on margin</span><b class="muted">£745</b></div>
+            </div>
+            <div class="sc-fifo">
+              <span class="label">Best seller</span>
+              <span class="val">205/55 R16 · 38 sold</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FACE 3: Low-stock alerts -->
+        <div class="face face-back">
+          <div class="sc-head">
+            <span class="sc-title">ALERTS <b>· REORDER</b></span>
+            <span class="sc-badge warn">3 LOW</span>
+          </div>
+          <div class="sc-body">
+            <div class="alert-list">
+              <div class="alert-row crit"><span class="dot"></span><span class="ar-name">205/55 R16 · Continental</span><span class="ar-qty">4 left</span></div>
+              <div class="alert-row warn"><span class="dot"></span><span class="ar-name">195/65 R15 · Michelin</span><span class="ar-qty">6 left</span></div>
+              <div class="alert-row warn"><span class="dot"></span><span class="ar-name">225/45 R17 · Pirelli</span><span class="ar-qty">7 left</span></div>
+            </div>
+            <div class="sc-fifo">
+              <span class="label">Reorder point hit</span>
+              <span class="val">Auto-flagged · 3 SKUs</span>
+            </div>
+          </div>
+        </div>
+
       </div>
+      <div class="sc-chip chip-2"><span class="dot"></span>Updates as you trade</div>
     </div>
   </div>
 </section>
@@ -779,29 +843,26 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const finePointer = matchMedia('(pointer: fine)').matches;
 
-  // CSS tilt on the stock panel
+  // Auto-rotating 3-face panel (FIFO stock -> P&L -> alerts)
   (function(){
-    if (reduceMotion || !finePointer) return;
+    const cube = document.getElementById('cube');
     const scene = document.querySelector('.stock-scene');
-    const wrap = document.getElementById('stockwrap');
-    if (!scene || !wrap) return;
-    scene.classList.add('tilt-on');
-    let raf = null, tx = 0, ty = 0;
-    const apply = () => { wrap.style.transform = `rotateX(${ty}deg) rotateY(${tx}deg)`; raf = null; };
-    scene.addEventListener('mousemove', e => {
-      const r = scene.getBoundingClientRect();
-      tx = ((e.clientX - r.left) / r.width - 0.5) * 14;
-      ty = -((e.clientY - r.top) / r.height - 0.5) * 11;
-      wrap.style.transition = 'transform .08s ease-out';
-      if (!raf) raf = requestAnimationFrame(apply);
-    });
-    scene.addEventListener('mouseleave', () => {
-      wrap.style.transition = 'transform .5s ease';
-      wrap.style.transform = 'rotateX(0deg) rotateY(0deg)';
-    });
+    if (!cube) return;
+    if (reduceMotion){ return; } // stays on face 1, fully readable
+    const faces = [0, -120, -240];
+    let i = 0, paused = false;
+    if (scene){
+      scene.addEventListener('mouseenter', () => { paused = true; });
+      scene.addEventListener('mouseleave', () => { paused = false; });
+    }
+    setInterval(() => {
+      if (paused) return;
+      i = (i + 1) % faces.length;
+      cube.style.transform = `translateZ(-190px) rotateY(${faces[i]}deg)`;
+    }, 3200);
   })();
 
-  // WebGL hero: rotating wireframe tyre/wheel
+  // WebGL hero: slowly rotating stack of tyres (the stock wall)
   (function(){
     if (reduceMotion || typeof THREE === 'undefined') return;
     const hero = document.querySelector('.hero');
@@ -815,23 +876,31 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.set(0, 0, 9);
+    camera.position.set(0, 1.2, 10);
 
-    const wheel = new THREE.Group();
     const wire = (geo, color, opacity) =>
       new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
-    wheel.add(wire(new THREE.TorusGeometry(2.6, 0.55, 12, 44), 0x97a3b4, 0.5));   // tyre
-    wheel.add(wire(new THREE.TorusGeometry(1.7, 0.12, 8, 36), 0x3b82f6, 0.85));   // rim
-    for (let i = 0; i < 6; i++) {
-      const spoke = wire(new THREE.BoxGeometry(0.13, 3.1, 0.13), 0x60a5fa, 0.7);
-      spoke.rotation.z = (i / 6) * Math.PI * 2;
-      wheel.add(spoke);
+
+    const BLUE = 0x3b82f6, BLUEL = 0x60a5fa, GREY = 0x97a3b4;
+    const stack = new THREE.Group();
+
+    // a leaning stack of tyres, each a flat torus laid horizontally
+    const COUNT = 5;
+    const tyres = [];
+    for (let i = 0; i < COUNT; i++) {
+      const tyre = new THREE.Group();
+      // outer tread
+      tyre.add(wire(new THREE.TorusGeometry(1.55, 0.5, 9, 30), i === 0 ? BLUEL : GREY, i === 0 ? 0.85 : 0.5));
+      // inner rim hole
+      tyre.add(wire(new THREE.TorusGeometry(0.7, 0.06, 6, 24), BLUE, 0.55));
+      tyre.rotation.x = Math.PI / 2;            // lay flat
+      tyre.position.y = -2.2 + i * 1.06;        // stack upward
+      tyre.position.x = Math.sin(i * 0.9) * 0.18; // slight lean
+      tyre.userData = { off: i * 0.7 };
+      stack.add(tyre); tyres.push(tyre);
     }
-    const hub = wire(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), 0x3b82f6, 0.9);
-    hub.rotation.x = Math.PI / 2;
-    wheel.add(hub);
-    wheel.rotation.y = 0.5;
-    scene.add(wheel);
+    stack.rotation.z = 0.06;
+    scene.add(stack);
 
     const pGeo = new THREE.BufferGeometry();
     const N = 220, pos = new Float32Array(N * 3);
@@ -849,8 +918,8 @@
       const w = hero.clientWidth, h = hero.clientHeight;
       renderer.setSize(w, h);
       camera.aspect = w / h; camera.updateProjectionMatrix();
-      wheel.position.x = w > 960 ? 2.6 : 0;
-      renderer.domElement.style.opacity = w > 960 ? 0.45 : 0.25;
+      stack.position.x = w > 960 ? 2.5 : 0;
+      renderer.domElement.style.opacity = w > 960 ? 0.5 : 0.25;
     };
     addEventListener('resize', resize, { passive: true }); resize();
 
@@ -861,11 +930,12 @@
       requestAnimationFrame(animate);
       if (!running) return;
       const t = clock.getElapsedTime();
-      wheel.rotation.z = -t * 0.42;
-      wheel.rotation.y = 0.5 + Math.sin(t * 0.35) * 0.18;
+      stack.rotation.y = t * 0.3;                       // whole stack turns slowly
+      tyres.forEach(ty => { ty.position.y += 0; });     // (stack holds)
+      stack.position.y = Math.sin(t * 0.5) * 0.08;      // gentle float
       camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
-      camera.position.y += (-my * 0.6 - camera.position.y) * 0.04;
-      camera.lookAt(wheel.position.x * 0.6, 0, 0);
+      camera.position.y += (1.2 - my * 0.6 - camera.position.y) * 0.04;
+      camera.lookAt(stack.position.x * 0.6, 0.2, 0);
       renderer.render(scene, camera);
     })();
   })();
