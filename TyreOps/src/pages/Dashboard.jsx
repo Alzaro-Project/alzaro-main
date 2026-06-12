@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader } from '../components/UI'
@@ -423,45 +423,92 @@ function InvoiceDropdown({ title, invoices, valueKey, limit, setLimit, onClose, 
 }
 
 function PLChart({ invoices }) {
-  // Generate real data from invoices for last 6 months
+  // Real data from invoices for the last 6 months
   const now = new Date()
   const monthData = []
-  
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0)
     const monthName = d.toLocaleDateString('en-GB', { month: 'short' })
-    
     let rev = 0, cost = 0
     invoices.forEach(inv => {
       if (inv.status !== 'paid' && inv.status !== 'sent') return
       const invDate = new Date(inv.date)
       if (invDate >= d && invDate <= monthEnd) {
-        inv.lines.forEach(l => {
-          rev += l.qty * l.unit
-          cost += l.qty * (l.cost || 0)
-        })
+        inv.lines.forEach(l => { rev += l.qty * l.unit; cost += l.qty * (l.cost || 0) })
       }
     })
-    monthData.push({ month: monthName, rev, cost })
+    monthData.push({ month: monthName, rev, cost, profit: rev - cost })
   }
 
-  const maxVal = Math.max(...monthData.map(m => m.rev), 1) * 1.1
+  const maxVal = Math.max(...monthData.map(m => Math.max(m.rev, m.cost)), 1) * 1.1
+  const [mounted, setMounted] = useState(false)
+  const [hov, setHov] = useState(null)
+  useEffect(() => { const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t) }, [])
+
+  const h = (v) => mounted ? `${Math.max((v / maxVal) * 100, v > 0 ? 2 : 0.5)}%` : '0%'
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '160px', paddingBottom: '20px', position: 'relative' }}>
-      {monthData.map((m, i) => (
-        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', height: '100%', justifyContent: 'flex-end' }}>
-          <div style={{ width: '100%', display: 'flex', gap: '2px', alignItems: 'flex-end', flex: 1 }}>
-            <div style={{ flex: 1, background: 'rgba(245,200,66,0.7)', borderRadius: '3px 3px 0 0', height: `${(m.rev / maxVal) * 100}%`, minHeight: '2px' }} />
-            <div style={{ flex: 1, background: 'rgba(255,95,95,0.5)', borderRadius: '3px 3px 0 0', height: `${(m.cost / maxVal) * 100}%`, minHeight: '2px' }} />
+    <div style={{ position: 'relative' }}>
+      {/* Tooltip */}
+      {hov !== null && (
+        <div style={{
+          position: 'absolute', top: '-6px', left: `${(hov + 0.5) * (100 / 6)}%`, transform: 'translateX(-50%)',
+          background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '8px',
+          padding: '7px 10px', zIndex: 10, pointerEvents: 'none', whiteSpace: 'nowrap',
+          boxShadow: '0 6px 18px rgba(0,0,0,.3)', fontSize: '11px', fontFamily: 'DM Mono, monospace',
+        }}>
+          <div style={{ color: 'var(--text2)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: '3px' }}>{monthData[hov].month}</div>
+          <div style={{ color: 'var(--accent)' }}>Rev £{monthData[hov].rev.toFixed(2)}</div>
+          <div style={{ color: 'var(--red)' }}>Cost £{monthData[hov].cost.toFixed(2)}</div>
+          <div style={{ color: monthData[hov].profit >= 0 ? 'var(--green)' : 'var(--red)', borderTop: '1px solid var(--border)', marginTop: '3px', paddingTop: '3px' }}>
+            P/L {monthData[hov].profit >= 0 ? '+' : '−'}£{Math.abs(monthData[hov].profit).toFixed(2)}
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>{m.month}</div>
         </div>
-      ))}
-      <div style={{ position: 'absolute', bottom: '20px', right: 0, display: 'flex', gap: '10px' }}>
-        <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'rgba(245,200,66,0.7)', borderRadius: '2px', display: 'inline-block' }} />Rev</span>
-        <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'rgba(255,95,95,0.5)', borderRadius: '2px', display: 'inline-block' }} />Cost</span>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '160px', paddingBottom: '20px', position: 'relative' }}>
+        {/* Gridlines */}
+        {[0.25, 0.5, 0.75].map(g => (
+          <div key={g} style={{ position: 'absolute', left: 0, right: 0, bottom: `${20 + g * (160 - 20) / 160 * 100 * (140 / 160)}px`, borderTop: '1px dashed var(--border)', opacity: 0.5 }} />
+        ))}
+
+        {monthData.map((m, i) => (
+          <div
+            key={i}
+            onMouseEnter={() => setHov(i)}
+            onMouseLeave={() => setHov(null)}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+              height: '100%', justifyContent: 'flex-end', cursor: 'default',
+              opacity: hov === null || hov === i ? 1 : 0.35, transition: 'opacity .15s',
+            }}
+          >
+            <div style={{ width: '100%', display: 'flex', gap: '3px', alignItems: 'flex-end', flex: 1 }}>
+              <div style={{
+                flex: 1, borderRadius: '4px 4px 0 0', height: h(m.rev),
+                background: 'linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 45%, transparent))',
+                transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70}ms`,
+                boxShadow: hov === i ? '0 0 12px color-mix(in srgb, var(--accent) 45%, transparent)' : 'none',
+              }} />
+              <div style={{
+                flex: 1, borderRadius: '4px 4px 0 0', height: h(m.cost),
+                background: 'linear-gradient(180deg, var(--red), color-mix(in srgb, var(--red) 40%, transparent))',
+                opacity: 0.75,
+                transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70 + 40}ms`,
+              }} />
+            </div>
+            <div style={{
+              fontSize: '10px', fontFamily: 'DM Mono, monospace',
+              color: hov === i ? 'var(--text)' : 'var(--text3)', fontWeight: hov === i ? 700 : 400,
+            }}>{m.month}</div>
+          </div>
+        ))}
+
+        <div style={{ position: 'absolute', bottom: '0px', right: 0, display: 'flex', gap: '10px' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'var(--accent)', borderRadius: '2px', display: 'inline-block' }} />Rev</span>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'var(--red)', opacity: 0.75, borderRadius: '2px', display: 'inline-block' }} />Cost</span>
+        </div>
       </div>
     </div>
   )
@@ -479,27 +526,48 @@ function TopTyres({ invoices, skus }) {
     })
   })
   const top = Object.entries(ts).sort((a, b) => b[1].qty - a[1].qty).slice(0, 5)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t) }, [])
+
   if (!top.length) return <div style={{ color: 'var(--text3)', fontSize: '12px' }}>No sales data for this period</div>
+  const maxQty = top[0][1].qty || 1
+  const RANK = ['var(--accent)', 'var(--blue)', 'var(--teal)', 'var(--text3)', 'var(--text3)']
+
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-      <thead><tr>
-        {['Tyre', 'Size', 'Sold', 'Profit'].map(h => <th key={h} style={{ textAlign: 'left', fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>{h}</th>)}
-      </tr></thead>
-      <tbody>
-        {top.map(([id, s]) => {
-          const sk = skus.find(sk => sk.id === id)
-          if (!sk) return null
-          return (
-            <tr key={id}>
-              <td style={{ padding: '8px', fontWeight: 600 }}>{sk.brand} {sk.model}</td>
-              <td style={{ padding: '8px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{sk.w}/{sk.p}R{sk.r}</td>
-              <td style={{ padding: '8px', fontFamily: 'DM Mono, monospace' }}>{s.qty}</td>
-              <td style={{ padding: '8px', fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>£{s.profit.toFixed(2)}</td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {top.map(([id, s], i) => {
+        const sk = skus.find(sk => sk.id === id)
+        if (!sk) return null
+        return (
+          <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '22px', height: '22px', borderRadius: '7px', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: `color-mix(in srgb, ${RANK[i]} 16%, transparent)`,
+              color: RANK[i], fontSize: '11px', fontWeight: 700, fontFamily: 'DM Mono, monospace',
+            }}>{i + 1}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {sk.brand} {sk.model} <span style={{ color: 'var(--text3)', fontFamily: 'DM Mono, monospace', fontSize: '11px', fontWeight: 400 }}>{sk.w}/{sk.p}R{sk.r}</span>
+                </span>
+                <span style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>
+                  {s.qty} sold · <span style={{ color: s.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>£{s.profit.toFixed(2)}</span>
+                </span>
+              </div>
+              <div style={{ height: '5px', background: 'var(--surface2)', borderRadius: '99px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: '99px',
+                  width: mounted ? `${(s.qty / maxQty) * 100}%` : '0%',
+                  background: `linear-gradient(90deg, ${RANK[i]}, color-mix(in srgb, ${RANK[i]} 55%, transparent))`,
+                  transition: `width .7s cubic-bezier(.2,.8,.3,1) ${i * 90}ms`,
+                }} />
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
