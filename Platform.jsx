@@ -28,6 +28,7 @@ function Platform() {
   const [users, setUsers] = useState([])
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(null) // user_id currently toggling
+  const [planBusy, setPlanBusy] = useState(null) // user_id+product currently saving plan
   const [expanded, setExpanded] = useState(null) // user_id currently expanded
 
   // call the admin-users edge function with the current session token
@@ -93,6 +94,15 @@ function Platform() {
     setBusy(u.user_id)
     const res = await callFn({ action: disable ? 'disable' : 'enable', user_id: u.user_id })
     setBusy(null)
+    if (res && res.error) { alert('Failed: ' + res.error); return }
+    await loadUsers()
+  }
+
+  // update tier/status for one vertical
+  const setPlan = async (u, product, patch) => {
+    setPlanBusy(u.user_id + product)
+    const res = await callFn({ action: 'set-plan', user_id: u.user_id, product, ...patch })
+    setPlanBusy(null)
     if (res && res.error) { alert('Failed: ' + res.error); return }
     await loadUsers()
   }
@@ -250,10 +260,17 @@ function Platform() {
                             const meta = VERTICALS[m.product] || { label:m.product, color:'var(--text3)' }
                             return (
                               <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'14px' }}>
-                                <div style={{ fontWeight:800, color:meta.color, marginBottom:'8px' }}>{meta.label}</div>
+                                <div style={{ fontWeight:800, color:meta.color, marginBottom:'10px' }}>{meta.label}</div>
                                 <Row k="Company" v={m.company_name || '—'} />
-                                <Row k="Status" v={m.status || '—'} />
                                 <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
+                                <div style={{ marginTop:'10px', display:'grid', gap:'8px' }}>
+                                  <PlanSelect label="Tier" value={m.tier || 'bronze'} options={['bronze','silver','gold']}
+                                    disabled={planBusy===u.user_id+m.product}
+                                    onChange={val=>setPlan(u, m.product, { tier: val })} />
+                                  <PlanSelect label="Status" value={m.status || 'trial'} options={['trial','active','suspended','disabled']}
+                                    disabled={planBusy===u.user_id+m.product}
+                                    onChange={val=>setPlan(u, m.product, { status: val })} />
+                                </div>
                               </div>
                             )
                           })}
@@ -277,6 +294,18 @@ function Center({children}) { return <div style={{minHeight:'100vh',display:'fle
 function Stat({label,value,color}) { return <div style={{...card, padding:'18px'}}><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.6px',fontWeight:600}}>{label}</div><div style={{fontSize:'24px',fontWeight:600,marginTop:'6px',letterSpacing:'-0.5px',color:color||'var(--orange-light)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
 function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600}}>{v}</span></div> }
+function PlanSelect({label,value,options,onChange,disabled}) {
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
+      <span style={{fontSize:'12px',color:'var(--text3)',fontWeight:600}}>{label}</span>
+      <select value={value} disabled={disabled}
+        onChange={e=>onChange(e.target.value)}
+        style={{ flex:'0 0 110px', background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'8px', padding:'6px 8px', fontSize:'12.5px', fontWeight:600, cursor:disabled?'wait':'pointer', opacity:disabled?0.5:1, textTransform:'capitalize' }}>
+        {options.map(o => <option key={o} value={o} style={{textTransform:'capitalize'}}>{o}</option>)}
+      </select>
+    </div>
+  )
+}
 function Chip({children,active,onClick,color}) { return <button onClick={onClick} style={{ fontSize:'13px', fontWeight:700, padding:'8px 14px', borderRadius:'10px', cursor:'pointer', background: active?'var(--surface3)':'var(--surface)', color: active?(color||'var(--text)'):'var(--text2)', border:'1px solid '+(active?'var(--border-light)':'var(--border)') }}>{children}</button> }
 function Field({label,value,onChange,type,onEnter}) {
   return (
