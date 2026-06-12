@@ -99,7 +99,7 @@ export default function Login() {
         ? 'http://localhost:5173'
         : `${window.location.protocol}//${window.location.host}`
 
-      const { error: err } = await supabase.auth.signUp({
+      const { data, error: err } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -111,6 +111,14 @@ export default function Login() {
         }
       })
       if (err) throw err
+      // Supabase returns a fake "success" (user with no identities) when the
+      // email is already registered — no email is sent in that case.
+      if (data?.user && (!data.user.identities || data.user.identities.length === 0)) {
+        setError('This email already has an Alzaro account. Go to Login and sign in with your existing password — we\'ll set up TyreOps on that login. Forgot it? Use "Forgot password".')
+        setTab('login')
+        setLoading(false)
+        return
+      }
       setSuccess('Check your email to confirm your account, then log in.')
       setTab('login')
       setGarageName('')
