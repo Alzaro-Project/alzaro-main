@@ -8,7 +8,7 @@
 const { useState, useEffect } = React
 
 const VERTICALS = {
-  stockops:    { label: 'StockOps',    color: 'var(--amber)' },
+  tyreops:     { label: 'TyreOps',     color: 'var(--amber)' },
   garageops:   { label: 'GarageOps',   color: 'var(--orange)' },
   soloops:     { label: 'SoloOps',     color: 'var(--orange-light)' },
   serviceops:  { label: 'ServiceOps',  color: 'var(--blue)' },
