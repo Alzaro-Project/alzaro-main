@@ -1522,7 +1522,7 @@ function Clients({ uid, clients, invoices, onChange, flash }) {
   const lbl = { fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns: selected?'1fr 1fr':'1fr', gap:'16px', alignItems:'start' }}>
+    <div>
       <div data-card style={card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
           <div style={{fontWeight:700}}>Clients</div>
@@ -1532,38 +1532,44 @@ function Clients({ uid, clients, invoices, onChange, flash }) {
         {clients.length===0 ? <Empty msg="No clients yet. Add one to attach to your invoices." />
         : <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead><Th cols={['Name','Email','Phone','']} /></thead>
-          <tbody>{clients.map(c => (
-            <tr key={c.id} style={{cursor:'pointer'}} onClick={()=>setSelected(c)}>
-              <Td>{c.name}</Td><Td muted>{c.email||'—'}</Td><Td muted>{c.phone||'—'}</Td>
+          <tbody>{clients.map(c => {
+            const isOpen = selected===c.id
+            return (
+            <React.Fragment key={c.id}>
+            <tr style={{cursor:'pointer', background: isOpen ? 'var(--surface2)' : undefined}} onClick={()=>setSelected(isOpen ? null : c.id)}>
+              <Td><span style={{display:'inline-flex',alignItems:'center',gap:'8px'}}><span style={{color:'var(--text3)',fontSize:'11px',display:'inline-block',transition:'transform .15s ease',transform:isOpen?'rotate(90deg)':'none'}}>▶</span>{c.name}</span></Td>
+              <Td muted>{c.email||'—'}</Td><Td muted>{c.phone||'—'}</Td>
               <Td right><button style={{...btnSec, padding:'5px 11px'}} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button></Td>
-            </tr>))}</tbody>
+            </tr>
+            {isOpen && (
+            <tr>
+              <td colSpan={4} style={{ padding:0, borderBottom:'1px solid var(--border)' }}>
+                <div className="fade-in" style={{ background:'var(--surface2)', borderRadius:'12px', padding:'16px 18px', margin:'0 0 12px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'14px', marginBottom: c.notes ? '12px' : '4px' }}>
+                    <div><div style={lbl}>Email</div><div style={{fontSize:'13.5px'}}>{c.email||'—'}</div></div>
+                    <div><div style={lbl}>Phone</div><div style={{fontSize:'13.5px'}}>{c.phone||'—'}</div></div>
+                    <div><div style={lbl}>Address</div><div style={{fontSize:'13.5px', whiteSpace:'pre-wrap'}}>{c.address||'—'}</div></div>
+                  </div>
+                  {c.notes && <div style={{ fontSize:'13px', color:'var(--text2)', background:'var(--surface3)', padding:'10px 12px', borderRadius:'8px', marginBottom:'12px', whiteSpace:'pre-wrap' }}><span style={{...lbl, display:'block'}}>Notes</span>{c.notes}</div>}
+                  <div style={{ fontWeight:700, fontSize:'13px', marginBottom:'6px' }}>Invoices ({clientInvoices(c.name).length})</div>
+                  {clientInvoices(c.name).length===0 ? <div style={{fontSize:'13px',color:'var(--text3)'}}>No invoices for this client yet.</div>
+                  : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <tbody>{clientInvoices(c.name).map(i => (
+                      <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
+                    ))}</tbody>
+                  </table>}
+                  <div style={{ marginTop:'14px', display:'flex', gap:'8px' }}>
+                    <button style={btnSec} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button>
+                    <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={(e)=>{e.stopPropagation(); del(c.id)}}>Delete</button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            )}
+            </React.Fragment>
+          )})}</tbody>
         </table>}
       </div>
-
-      {/* detail panel */}
-      {selected && (
-        <div data-card style={card}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
-            <div style={{ fontWeight:700, fontSize:'17px' }}>{selected.name}</div>
-            <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'5px 10px', cursor:'pointer' }} onClick={()=>setSelected(null)}>✕</button>
-          </div>
-          <Line label="Email" v={selected.email||'—'} />
-          <Line label="Phone" v={selected.phone||'—'} />
-          <Line label="Address" v={selected.address||'—'} />
-          {selected.notes && <div style={{ marginTop:'10px', fontSize:'13px', color:'var(--text2)', background:'var(--surface2)', padding:'10px 12px', borderRadius:'8px' }}>{selected.notes}</div>}
-          <div style={{ marginTop:'16px', fontWeight:700, fontSize:'13px' }}>Invoices ({clientInvoices(selected.name).length})</div>
-          {clientInvoices(selected.name).length===0 ? <div style={{fontSize:'13px',color:'var(--text3)',marginTop:'8px'}}>No invoices for this client yet.</div>
-          : <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'8px' }}>
-            <tbody>{clientInvoices(selected.name).map(i => (
-              <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
-            ))}</tbody>
-          </table>}
-          <div style={{ marginTop:'16px', display:'flex', gap:'8px' }}>
-            <button style={btnSec} onClick={()=>open(selected)}>Edit</button>
-            <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={()=>del(selected.id)}>Delete</button>
-          </div>
-        </div>
-      )}
 
       {/* edit modal */}
       {editing!==null && (
