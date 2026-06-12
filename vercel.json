@@ -29,6 +29,10 @@
       "destination": "/confirmed.html"
     },
     {
+      "source": "/v2",
+      "destination": "/landing-v2.html"
+    },
+    {
       "source": "/tyreops",
       "destination": "/TyreOps/landing.html"
     },
