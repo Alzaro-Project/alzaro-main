@@ -623,15 +623,14 @@ export async function sendInvoiceEmail(invoice, settings, lines, totals, preferr
     }
   }
 
-  // Try Resend API (if configured)
-  if (EMAIL_CONFIG.RESEND_API_KEY) {
-    try {
-      await sendViaResend(custEmail, custName, subject, htmlContent)
-      return { success: true, method: 'resend' }
-    } catch (err) {
-      console.error('Resend API failed:', err)
-      // Fall through to fallback
-    }
+  // Try Resend API (platform email — always available; the server holds
+  // the API key and only accepts requests from logged-in users)
+  try {
+    await sendViaResend(custEmail, custName, subject, htmlContent)
+    return { success: true, method: 'resend' }
+  } catch (err) {
+    console.error('Resend API failed:', err)
+    // Fall through to fallback
   }
 
   // Fallback: Return preview mode (don't auto-open new tab)
