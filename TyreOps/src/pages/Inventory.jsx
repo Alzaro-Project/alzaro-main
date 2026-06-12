@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
@@ -6,8 +7,9 @@ import { supabase } from '../lib/supabase'
 import { deletePurchaseInvoice } from '../lib/db'
 
 export default function Inventory() {
+  const location = useLocation()
   const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, addBatch, updateBatch, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState(location.state?.tab || 'all')
   const [search, setSearch] = useState('')
   const [showSKU, setShowSKU] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
