@@ -7,1025 +7,422 @@
   <meta name="description" content="FIFO inventory tracking, VAT margin scheme, invoicing & more. Built for UK tyre garages. Start your 14-day free trial.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0d12;
+      --bg2:#0d1118;
+      --surface:#12161f;
+      --surface2:#1a2030;
+      --line:rgba(255,255,255,0.06);
+      --line2:rgba(255,255,255,0.12);
+      --text:#f4f7fb;
+      --text2:#97a3b4;
+      --text3:#586575;
+      --blue:#3b82f6;
+      --blue-light:#60a5fa;
+      --blue-subtle:rgba(59,130,246,0.08);
+      --blue-glow:rgba(59,130,246,0.35);
+      --green:#22c55e;
+      --amber:#f59e0b;
+      --mono:'JetBrains Mono',monospace;
+    }
+    html{scroll-behavior:smooth}
+    @media (prefers-reduced-motion:reduce){
+      html{scroll-behavior:auto}
+      *,*::before,*::after{animation-duration:0.001s!important;transition-duration:0.001s!important}
+    }
+    body{font-family:'Space Grotesk',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1180px;margin:0 auto;padding:0 28px}
+    .mono{font-family:var(--mono)}
+    .page{display:none}
+    .page.active{display:block}
 
-    :root {
-      --bg: #05060c;
-      --surface: rgba(17,20,34,0.55);
-      --surface2: #141828;
-      --surface3: #1b2034;
-      --border: rgba(255,255,255,0.07);
-      --border-light: rgba(255,255,255,0.13);
-      --text: #f0f2fa;
-      --text2: #8b93b4;
-      --text3: #5a6284;
-      --accent: #3b82f6;
-      --accent-light: #60a5fa;
-      --accent-glow: rgba(59,130,246,0.35);
-      --accent-subtle: rgba(59,130,246,0.08);
-      --green: #3dd68c;
-      --blue: #60a5fa;
-      --teal: #2dd4bf;
-      --red: #ff5f5f;
-      --purple: #a78bfa;
-      --grad: linear-gradient(135deg, #3b82f6, #6366f1);
-    }
+    /* NAV */
+    nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:16px 0;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+    nav.scrolled{background:rgba(10,13,18,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom-color:var(--line)}
+    nav .container{display:flex;align-items:center;justify-content:space-between}
+    .logo{font-size:20px;font-weight:700;letter-spacing:-0.01em}
+    .logo span{color:var(--blue)}
+    .nav-center{display:flex;gap:26px}
+    .nav-center a{font-size:13.5px;font-weight:500;color:var(--text2);transition:color .2s}
+    .nav-center a:hover,.nav-center a.active{color:var(--text)}
+    .nav-right{display:flex;gap:10px;align-items:center}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-radius:8px;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
+    .btn-blue{background:linear-gradient(135deg,var(--blue),#2563eb);color:#fff;font-size:13.5px;padding:10px 20px;box-shadow:0 4px 18px var(--blue-glow)}
+    .btn-blue:hover{transform:translateY(-1px);box-shadow:0 8px 26px var(--blue-glow)}
+    .btn-ghost{border:1px solid var(--line2);color:var(--text2);font-size:13.5px;padding:10px 20px}
+    .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.28)}
+    .btn-lg{font-size:15px;padding:15px 28px;border-radius:10px}
 
-    html { scroll-behavior: smooth; }
+    /* HERO */
+    .hero{padding:150px 0 80px;position:relative;overflow:hidden}
+    .hero-glow{position:absolute;inset:0;pointer-events:none;background:
+      radial-gradient(ellipse 800px 500px at 75% 20%,rgba(59,130,246,0.10) 0%,transparent 65%),
+      radial-gradient(ellipse 600px 400px at 10% 90%,rgba(59,130,246,0.05) 0%,transparent 60%)}
+    .webgl-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.45}
+    .hero .container{display:grid;grid-template-columns:1.02fr 0.98fr;gap:54px;align-items:center;position:relative;z-index:1}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--blue-light);background:var(--blue-subtle);border:1px solid rgba(59,130,246,0.25);border-radius:4px;padding:6px 13px;margin-bottom:26px}
+    .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);animation:blink 2.4s ease infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+    h1{font-size:clamp(38px,5.2vw,64px);font-weight:700;line-height:1.06;letter-spacing:-0.03em;margin-bottom:22px}
+    h1 .blue{color:var(--blue)}
+    .hero-sub{font-size:16.5px;color:var(--text2);max-width:480px;line-height:1.75;margin-bottom:34px}
+    .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
+    .hero-note{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.05em}
+    .hero-note b{color:var(--text2)}
 
-    body {
-      font-family: 'Outfit', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
+    /* SIGNATURE: stock/batch panel */
+    .stock-scene{perspective:1200px}
+    .stock-wrap{position:relative;transform-style:preserve-3d;will-change:transform;transition:transform .4s ease}
+    .stockcard{border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(59,130,246,0.05);overflow:hidden;transform:rotate(-1deg);transition:transform .35s ease}
+    .stockcard:hover{transform:rotate(0deg) translateY(-4px)}
+    .tilt-on .stockcard{transform:none!important;transition:none}
+    .tilt-on .sc-chip{transform:translateZ(55px)}
+    .tilt-on .sc-fifo{transform:translateZ(30px)}
+    .sc-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);background:rgba(0,0,0,0.22)}
+    .sc-title{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
+    .sc-title b{color:var(--text);font-weight:600}
+    .sc-badge{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--green);border:1px solid rgba(34,197,94,0.35);background:rgba(34,197,94,0.08);border-radius:4px;padding:4px 9px}
+    .sc-body{padding:18px 20px}
+    .sc-sku{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .sc-sku .name{font-size:14.5px;font-weight:600}
+    .sc-sku .size{font-family:var(--mono);font-size:11px;color:var(--text2);background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:3px 9px}
+    .sc-batches{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+    .sc-batch{display:flex;align-items:center;gap:12px;padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
+    .sc-batch:last-child{border-bottom:none}
+    .sc-batch .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .sc-batch .lbl{font-family:var(--mono);color:var(--text3);font-size:10.5px;letter-spacing:0.06em;width:62px}
+    .sc-batch .qty{margin-left:auto;font-family:var(--mono);color:var(--text2)}
+    .sc-batch .cost{font-family:var(--mono);color:var(--text);width:68px;text-align:right}
+    .sc-batch.next{background:rgba(59,130,246,0.07)}
+    .sc-batch.next .dot{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+    .sc-batch.queued .dot{background:var(--text3)}
+    .sc-fifo{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:9px;background:var(--blue-subtle);border:1px solid rgba(59,130,246,0.25)}
+    .sc-fifo .label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--blue-light)}
+    .sc-fifo .val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)}
+    .sc-chip{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;border-radius:7px;padding:9px 13px;border:1px solid var(--line2);background:var(--surface2);box-shadow:0 14px 36px rgba(0,0,0,0.5);display:flex;align-items:center;gap:8px;color:var(--text2)}
+    .sc-chip .dot{width:7px;height:7px;border-radius:50%}
+    .chip-1{top:-16px;right:6%}
+    .chip-1 .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+    .chip-2{bottom:-14px;left:5%}
+    .chip-2 .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
 
-    /* ===== ATMOSPHERE ===== */
-    body::before {
-      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background:
-        radial-gradient(ellipse 1000px 620px at 50% -8%, rgba(59,130,246,0.13) 0%, transparent 60%),
-        radial-gradient(ellipse 700px 500px at 88% 110%, rgba(99,102,241,0.07) 0%, transparent 65%);
-    }
-    body::after {
-      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.35;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
-    nav, .page, footer { position: relative; z-index: 1; }
+    /* STATS STRIP */
+    .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);padding:26px 0}
+    .strip .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+    .st{text-align:center}
+    .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:var(--blue-light)}
+    .st span{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
 
-    /* ===== SCROLL ANIMATIONS ===== */
-    .reveal { opacity: 0; transform: translateY(38px) scale(0.99); transition: opacity .75s ease, transform .75s cubic-bezier(.21,.6,.35,1); }
-    .reveal.visible { opacity: 1; transform: translateY(0) scale(1); }
-    .reveal-left { opacity: 0; transform: translateX(-46px); transition: opacity .75s ease, transform .75s cubic-bezier(.21,.6,.35,1); }
-    .reveal-left.visible { opacity: 1; transform: translateX(0); }
-    .reveal-right { opacity: 0; transform: translateX(46px); transition: opacity .75s ease, transform .75s cubic-bezier(.21,.6,.35,1); }
-    .reveal-right.visible { opacity: 1; transform: translateX(0); }
-    .reveal-scale { opacity: 0; transform: scale(0.92); transition: opacity .75s ease, transform .75s cubic-bezier(.21,.6,.35,1); }
-    .reveal-scale.visible { opacity: 1; transform: scale(1); }
-    .stagger-1 { transition-delay: 0.06s; }
-    .stagger-2 { transition-delay: 0.12s; }
-    .stagger-3 { transition-delay: 0.18s; }
-    .stagger-4 { transition-delay: 0.24s; }
-    .stagger-5 { transition-delay: 0.30s; }
-    .stagger-6 { transition-delay: 0.36s; }
+    /* SECTION SHELL */
+    section{padding:90px 0}
+    .sec-head{max-width:620px;margin-bottom:52px}
+    .kicker{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--blue-light);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .kicker::before{content:'';width:22px;height:1px;background:var(--blue)}
+    h2{font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-0.025em;line-height:1.12;margin-bottom:14px}
+    .sec-sub{font-size:15.5px;color:var(--text2);line-height:1.75}
 
-    a { color: inherit; text-decoration: none; }
+    /* BIG FEATURES */
+    .bigfeat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+    .bf{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:28px;position:relative;transition:border-color .25s,transform .2s;overflow:hidden}
+    .bf::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent 70%);opacity:0;transition:opacity .25s}
+    .bf:hover{border-color:rgba(59,130,246,0.35);transform:translateY(-3px)}
+    .bf:hover::before{opacity:1}
+    .bf-num{font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;color:var(--text3);margin-bottom:18px}
+    .bf-icon{width:44px;height:44px;border-radius:10px;border:1px solid rgba(59,130,246,0.3);background:var(--blue-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+    .bf-icon svg{width:21px;height:21px;stroke:var(--blue-light);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .bf h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em}
+    .bf p{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:14px}
+    .bf .tag{font-family:var(--mono);font-size:10.5px;color:var(--blue-light);letter-spacing:0.04em;display:inline-flex;align-items:center;gap:7px}
+    .bf .tag::before{content:'→';color:var(--blue)}
 
-    .container { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+    /* MINI FEATURES */
+    .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .mini{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:22px}
+    .mini-num{font-family:var(--mono);font-size:10px;letter-spacing:0.16em;color:var(--text3);margin-bottom:14px}
+    .mini h4{font-size:15.5px;font-weight:600;margin-bottom:8px}
+    .mini p{font-size:13px;color:var(--text2);line-height:1.7}
 
-    /* ===== PAGE SWITCHING ===== */
-    .page { display: none; }
-    .page.active { display: block; }
+    /* PRICING */
+    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+    .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
+    .plan:hover{transform:translateY(-3px)}
+    .plan.popular{border-color:rgba(59,130,246,0.45);background:linear-gradient(180deg,rgba(59,130,246,0.06),var(--surface) 40%)}
+    .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--blue);color:#fff;border-radius:5px;padding:4px 12px}
+    .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
+    .tier-dot{width:9px;height:9px;border-radius:50%}
+    .bronze .tier-dot{background:#cd7f32}
+    .silver .tier-dot{background:#c0c0c0}
+    .gold .tier-dot{background:var(--amber)}
+    .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+    .plan-price b{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-0.02em}
+    .plan-price span{font-size:13px;color:var(--text3)}
+    .plan-desc{font-size:13px;color:var(--text2);margin-bottom:22px;min-height:38px}
+    .plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px;flex:1}
+    .plan li{font-size:13.5px;color:var(--text2);display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+    .plan li::before{content:'✓';color:var(--blue-light);font-weight:700;flex-shrink:0}
+    .plan li.off{color:var(--text3);opacity:0.6}
+    .plan li.off::before{content:'—';color:var(--text3)}
+    .plan .btn{width:100%}
+    .pricing-note{text-align:center;margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.04em}
 
-    /* ===== BUTTONS ===== */
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600;
-      padding: 11px 22px; border-radius: 10px; cursor: pointer; border: none;
-      transition: transform .2s, box-shadow .2s, background .2s, color .2s, border-color .2s;
-    }
-    .btn-primary {
-      background: var(--grad); color: #fff;
-      box-shadow: 0 6px 24px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.22);
-    }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.22); }
-    .btn-secondary {
-      background: rgba(255,255,255,0.035); color: var(--text2);
-      border: 1px solid var(--border-light); backdrop-filter: blur(8px);
-    }
-    .btn-secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.24); background: rgba(255,255,255,0.06); }
-    .btn-ghost { background: transparent; color: var(--text2); }
-    .btn-ghost:hover { color: var(--text); }
-    .btn-large { font-size: 15px; padding: 15px 30px; border-radius: 12px; }
+    /* CTA */
+    .cta{text-align:center;padding:110px 0;position:relative;overflow:hidden}
+    .cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 380px at 50% 50%,rgba(59,130,246,0.10),transparent 70%);pointer-events:none}
+    .cta .container{position:relative}
+    .cta h2{margin-bottom:16px}
+    .cta p{font-size:15.5px;color:var(--text2);max-width:460px;margin:0 auto 32px}
+    .cta .hero-btns{justify-content:center;margin-bottom:18px}
 
-    /* ===== NAVBAR ===== */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 200; padding: 16px 0;
-      transition: padding .35s ease, background .35s ease, border-color .35s ease;
-      border-bottom: 1px solid transparent;
-    }
-    nav.scrolled {
-      padding: 11px 0; background: rgba(5,6,12,0.78);
-      backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4);
-      border-bottom-color: var(--border);
-    }
-    nav .container { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-    .logo { font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; letter-spacing: 0.01em; color: #fff; white-space: nowrap; }
-    .logo span { color: var(--accent-light); }
-    .nav-center {
-      display: flex; align-items: center; gap: 4px;
-      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-      border-radius: 100px; padding: 5px; backdrop-filter: blur(12px);
-    }
-    .nav-center a {
-      font-size: 13.5px; font-weight: 500; color: var(--text2);
-      padding: 7px 16px; border-radius: 100px; transition: color .2s, background .2s;
-    }
-    .nav-center a:hover { color: var(--text); }
-    .nav-center a.active { color: var(--text); background: rgba(59,130,246,0.14); box-shadow: inset 0 0 0 1px rgba(59,130,246,0.25); }
-    .nav-right { display: flex; align-items: center; gap: 10px; }
-    .nav-right .btn { font-size: 13px; padding: 9px 18px; }
+    /* FOOTER */
+    footer{border-top:1px solid var(--line);padding:42px 0 34px;background:var(--bg2)}
+    .foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+    .foot-links{display:flex;gap:22px;flex-wrap:wrap}
+    .foot-links a{font-size:13px;color:var(--text2);transition:color .2s}
+    .foot-links a:hover{color:var(--text)}
+    .foot-copy{font-family:var(--mono);font-size:10.5px;color:var(--text3);letter-spacing:0.05em;width:100%;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 
-    /* ===== HERO ===== */
-    .hero {
-      min-height: 92vh; display: flex; align-items: center; text-align: center;
-      padding: 150px 0 90px; position: relative; overflow: hidden;
-    }
-    .hero-grid {
-      position: absolute; left: 50%; bottom: -14%; width: 200vw; height: 72vh;
-      transform: translateX(-50%) perspective(620px) rotateX(62deg); transform-origin: center bottom;
-      background-image:
-        linear-gradient(rgba(96,165,250,0.10) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(96,165,250,0.10) 1px, transparent 1px);
-      background-size: 64px 64px;
-      -webkit-mask-image: radial-gradient(ellipse 55% 70% at 50% 100%, black 0%, transparent 72%);
-      mask-image: radial-gradient(ellipse 55% 70% at 50% 100%, black 0%, transparent 72%);
-      pointer-events: none; animation: heroFloor 14s linear infinite;
-    }
-    @keyframes heroFloor { from { background-position: 0 0, 0 0; } to { background-position: 0 64px, 0 0; } }
-    .hero-glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
-    .hero-glow-1 { width: 560px; height: 560px; top: -180px; left: 50%; transform: translateX(-50%); background: rgba(59,130,246,0.16); }
-    .hero-glow-2 { width: 420px; height: 420px; bottom: -160px; right: -120px; background: rgba(99,102,241,0.10); }
-    .hero-content { position: relative; z-index: 2; max-width: 860px; margin: 0 auto; }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.24);
-      border-radius: 100px; padding: 8px 18px;
-      font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 500;
-      letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-light);
-      margin-bottom: 30px; animation: heroUp .6s ease both;
-    }
-    .hero h1 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: clamp(44px, 6.4vw, 80px); font-weight: 700;
-      line-height: 1.05; letter-spacing: -0.035em; margin-bottom: 24px;
-      animation: heroUp .6s ease .08s both;
-    }
-    .hero h1 .gradient {
-      background: linear-gradient(120deg, #60a5fa 0%, #818cf8 55%, #a78bfa 100%);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent; color: transparent;
-    }
-    .hero-desc {
-      font-size: 17.5px; color: var(--text2); max-width: 540px; margin: 0 auto 38px;
-      line-height: 1.8; animation: heroUp .6s ease .16s both;
-    }
-    .hero-actions { display: flex; justify-content: center; gap: 12px; margin-bottom: 56px; flex-wrap: wrap; animation: heroUp .6s ease .24s both; }
-    .hero-stats {
-      display: flex; justify-content: center; gap: 0; max-width: 460px; margin: 0 auto;
-      border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
-      backdrop-filter: blur(16px); overflow: hidden;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
-      animation: heroUp .6s ease .32s both;
-    }
-    .hero-stat { flex: 1; padding: 20px 22px; border-right: 1px solid var(--border); }
-    .hero-stat:last-child { border-right: none; }
-    .hero-stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 25px; font-weight: 600; color: var(--accent-light); }
-    .hero-stat-label { font-size: 10.5px; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
-    @keyframes heroUp { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: translateY(0); } }
+    .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+    .reveal.in{opacity:1;transform:none}
+    a:focus-visible,button:focus-visible{outline:2px solid var(--blue-light);outline-offset:3px;border-radius:6px}
 
-    /* ===== TYRE TYPES MARQUEE ===== */
-    .types-bar {
-      overflow: hidden; padding: 16px 0; position: relative;
-      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,0.012);
-    }
-    .types-track { display: flex; gap: 48px; width: max-content; animation: typesScroll 28s linear infinite; }
-    .type-item {
-      display: flex; align-items: center; gap: 10px; white-space: nowrap;
-      font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 500;
-      letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3);
-    }
-    .type-icon { font-size: 15px; }
-    @keyframes typesScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    /* LEGAL */
+    .legal-page{padding:140px 0 90px;min-height:100vh}
+    .legal-container{max-width:760px;margin:0 auto;padding:0 28px}
+    .back-link{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text2);margin-bottom:34px;transition:color .2s}
+    .back-link:hover{color:var(--blue-light)}
+    .legal-header h1{font-size:clamp(30px,4vw,44px);margin-bottom:8px}
+    .legal-meta{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.06em;margin-bottom:38px}
+    .legal-box{border:1px solid rgba(59,130,246,0.3);background:var(--blue-subtle);border-radius:10px;padding:18px 20px;margin-bottom:34px;font-size:14px;color:var(--text2);line-height:1.7}
+    .legal-content h2{font-size:21px;margin:36px 0 12px;letter-spacing:-0.015em}
+    .legal-content h3{font-size:15.5px;font-weight:600;margin:22px 0 8px;color:var(--text)}
+    .legal-content p{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:12px}
+    .legal-content ul{margin:0 0 14px 20px}
+    .legal-content li{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:5px}
+    .legal-content a{color:var(--blue-light);text-decoration:underline;text-underline-offset:3px}
+    .legal-content strong{color:var(--text)}
 
-    /* ===== SECTION HEADERS ===== */
-    .section-header { text-align: center; max-width: 640px; margin: 0 auto 72px; }
-    .section-tag {
-      font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500;
-      letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-light); margin-bottom: 14px;
+    @media (max-width:960px){
+      .hero .container{grid-template-columns:1fr;gap:48px}
+      .stockcard{transform:none}
+      .bigfeat{grid-template-columns:1fr}
+      .minis{grid-template-columns:repeat(2,1fr)}
+      .plans{grid-template-columns:1fr}
+      .strip .container{grid-template-columns:repeat(2,1fr);gap:24px}
     }
-    .section-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(28px, 3.4vw, 42px); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 14px; }
-    .section-desc { font-size: 15.5px; color: var(--text2); line-height: 1.75; }
-
-    /* ===== FEATURES - ALTERNATING ROWS ===== */
-    .features { padding: 110px 0 40px; position: relative; }
-    .feature-row {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 72px;
-      align-items: center; margin-bottom: 110px;
+    @media (max-width:640px){
+      .nav-center{display:none}
+      .hero{padding-top:118px}
+      .minis{grid-template-columns:1fr}
+      .container{padding:0 20px}
+      .sc-chip{display:none}
     }
-    .feature-row.reverse .feature-text { order: 2; }
-    .feature-row.reverse .feature-visual { order: 1; }
-    .feature-number {
-      font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500;
-      color: var(--accent-light); background: rgba(59,130,246,0.09);
-      border: 1px solid rgba(59,130,246,0.25); width: 40px; height: 40px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center; margin-bottom: 22px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-    }
-    .feature-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; letter-spacing: -0.025em; margin-bottom: 14px; }
-    .feature-desc { font-size: 15px; color: var(--text2); line-height: 1.85; margin-bottom: 22px; }
-    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 11px; margin-bottom: 22px; }
-    .feature-list li { font-size: 14px; color: var(--text2); padding-left: 28px; position: relative; }
-    .feature-list li::before {
-      content: ''; position: absolute; left: 0; top: 4px; width: 17px; height: 17px;
-      border-radius: 50%; background: rgba(61,214,140,0.1); border: 1px solid rgba(61,214,140,0.3);
-    }
-    .feature-list li::after {
-      content: ''; position: absolute; left: 5px; top: 9px; width: 7px; height: 4px;
-      border-left: 1.6px solid var(--green); border-bottom: 1.6px solid var(--green);
-      transform: rotate(-45deg);
-    }
-    .feature-tag {
-      display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600;
-      letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px; border-radius: 20px;
-    }
-    .feature-tag.silver { background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.3); color: #cbd5e1; }
-    .feature-tag.gold { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.3); color: #fbbf24; }
-
-    /* Mock-UI cards — 3D glass panels */
-    .feature-visual { perspective: 1400px; }
-    .feature-card {
-      border: 1px solid var(--border-light); border-radius: 20px;
-      background: linear-gradient(160deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 55%);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      overflow: hidden; position: relative; transform-style: preserve-3d;
-      transition: transform .45s cubic-bezier(.21,.6,.35,1), border-color .35s, box-shadow .35s;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
-      will-change: transform;
-    }
-    .feature-card:hover { border-color: rgba(59,130,246,0.35); box-shadow: 0 40px 100px rgba(59,130,246,0.12), 0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.1); }
-    .feature-card .card-glare {
-      position: absolute; inset: -40%; z-index: 3; pointer-events: none; opacity: 0;
-      background: radial-gradient(circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.09) 0%, transparent 38%);
-      transition: opacity .35s;
-    }
-    .feature-card:hover .card-glare { opacity: 1; }
-    .feature-card-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 22px; border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,0.02); transform: translateZ(14px);
-    }
-    .feature-card-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
-    .feature-card-body { padding: 22px; transform: translateZ(20px); }
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-    .stat-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
-    .stat-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
-    .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; }
-    .stat-value.green { color: var(--green); }
-    .stat-value.blue { color: var(--blue); }
-    .inventory-preview { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    .inventory-row {
-      display: grid; grid-template-columns: 2fr 1fr 0.6fr 0.8fr; gap: 10px;
-      padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); align-items: center;
-    }
-    .inventory-row:last-child { border-bottom: none; }
-    .inventory-row.header {
-      font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--text3); font-weight: 600; background: rgba(255,255,255,0.02);
-    }
-    .inventory-badge {
-      font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
-      padding: 3px 9px; border-radius: 16px; letter-spacing: 0.06em;
-    }
-    .inventory-badge.ok { background: rgba(61,214,140,0.1); border: 1px solid rgba(61,214,140,0.3); color: var(--green); }
-    .inventory-badge.low { background: rgba(255,95,95,0.1); border: 1px solid rgba(255,95,95,0.3); color: var(--red); }
-
-    /* ===== MORE FEATURES GRID ===== */
-    .more-features { padding: 40px 0 110px; }
-    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; perspective: 1400px; }
-    .mini-feature {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
-      padding: 30px 26px; transition: transform .4s cubic-bezier(.21,.6,.35,1), border-color .3s, box-shadow .3s;
-      backdrop-filter: blur(10px); transform-style: preserve-3d; position: relative; overflow: hidden;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-    }
-    .mini-feature::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(96,165,250,0.4), transparent);
-    }
-    .mini-feature:hover {
-      border-color: rgba(59,130,246,0.28); transform: translateY(-5px) rotateX(2.5deg);
-      box-shadow: 0 24px 56px rgba(0,0,0,0.4), 0 8px 28px rgba(59,130,246,0.1), inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-    .mini-feature-icon {
-      width: 46px; height: 46px; border-radius: 12px; font-size: 21px;
-      background: rgba(59,130,246,0.09); border: 1px solid rgba(59,130,246,0.24);
-      display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
-      transform: translateZ(18px); box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-    }
-    .mini-feature-title { font-family: 'Space Grotesk', sans-serif; font-size: 16.5px; font-weight: 600; margin-bottom: 9px; }
-    .mini-feature-desc { font-size: 13.5px; color: var(--text2); line-height: 1.75; }
-
-    /* ===== PRICING ===== */
-    .pricing-section { padding: 110px 0; position: relative; }
-    .pricing-section::before {
-      content: ''; position: absolute; inset: 0; pointer-events: none;
-      background: linear-gradient(180deg, transparent, rgba(59,130,246,0.04) 50%, transparent);
-    }
-    .pricing-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: stretch; perspective: 1600px; position: relative; }
-    .pricing-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
-      padding: 36px 30px; display: flex; flex-direction: column;
-      transition: transform .45s cubic-bezier(.21,.6,.35,1), border-color .3s, box-shadow .3s;
-      backdrop-filter: blur(12px); transform-style: preserve-3d; position: relative; overflow: hidden;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
-      will-change: transform;
-    }
-    .pricing-card:hover { transform: translateY(-6px); border-color: rgba(59,130,246,0.3); box-shadow: 0 36px 80px rgba(0,0,0,0.5), 0 12px 36px rgba(59,130,246,0.1), inset 0 1px 0 rgba(255,255,255,0.08); }
-    .pricing-card.featured {
-      border-color: rgba(59,130,246,0.42);
-      background: linear-gradient(165deg, rgba(59,130,246,0.10), rgba(99,102,241,0.04) 55%, var(--surface));
-      box-shadow: 0 30px 80px rgba(59,130,246,0.14), 0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
-      transform: scale(1.035);
-    }
-    .pricing-card.featured::before {
-      content: 'Most Popular'; position: absolute; top: 18px; right: -34px;
-      transform: rotate(38deg); transform-origin: center;
-      font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600;
-      letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
-      background: var(--grad); padding: 6px 40px;
-      box-shadow: 0 4px 14px rgba(59,130,246,0.4);
-    }
-    .pricing-card.featured:hover { transform: scale(1.035) translateY(-6px); }
-    .pricing-tier { display: flex; align-items: center; gap: 9px; font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 18px; }
-    .pricing-tier-icon { font-size: 19px; }
-    .pricing-price { display: flex; align-items: baseline; gap: 5px; margin-bottom: 10px; }
-    .pricing-amount { font-family: 'Space Grotesk', sans-serif; font-size: 46px; font-weight: 700; letter-spacing: -0.03em; }
-    .pricing-period { font-size: 14px; color: var(--text3); }
-    .pricing-desc { font-size: 13.5px; color: var(--text2); margin-bottom: 26px; }
-    .pricing-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; flex: 1; }
-    .pricing-features li { font-size: 13.5px; color: var(--text2); padding-left: 26px; position: relative; }
-    .pricing-features li::before {
-      content: ''; position: absolute; left: 1px; top: 6px; width: 7px; height: 4px;
-      border-left: 1.6px solid var(--green); border-bottom: 1.6px solid var(--green);
-      transform: rotate(-45deg);
-    }
-    .pricing-features li.disabled { color: var(--text3); text-decoration: line-through; opacity: 0.6; }
-    .pricing-features li.disabled::before { border-color: var(--text3); transform: none; width: 8px; height: 0; border-left: none; border-bottom: 1.4px solid var(--text3); top: 9px; }
-    .pricing-card .btn { width: 100%; }
-
-    /* ===== HOW IT WORKS ===== */
-    .how-section { padding: 110px 0; }
-    .steps-container {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
-      border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
-      background: var(--surface); backdrop-filter: blur(10px);
-      box-shadow: 0 24px 60px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
-    }
-    .step { padding: 34px 28px; border-right: 1px solid var(--border); transition: background .3s; position: relative; }
-    .step:last-child { border-right: none; }
-    .step:hover { background: rgba(59,130,246,0.05); }
-    .step-number {
-      font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;
-      color: var(--accent-light); background: rgba(59,130,246,0.09);
-      border: 1px solid rgba(59,130,246,0.25); width: 36px; height: 36px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-    }
-    .step-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 9px; }
-    .step-desc { font-size: 13.5px; color: var(--text2); line-height: 1.7; }
-
-    /* ===== TESTIMONIAL ===== */
-    .testimonial-section { padding: 30px 0 110px; }
-    .testimonial-card {
-      max-width: 780px; margin: 0 auto; text-align: center;
-      border: 1px solid var(--border-light); border-radius: 26px; padding: 60px 56px;
-      background: linear-gradient(165deg, rgba(59,130,246,0.08), rgba(99,102,241,0.03) 55%, transparent);
-      backdrop-filter: blur(12px); position: relative; overflow: hidden;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-    .testimonial-card::before {
-      content: 'C'; position: absolute; top: 6px; left: 30px;
-      font-family: 'Space Grotesk', sans-serif; font-size: 150px; font-weight: 700;
-      color: rgba(96,165,250,0.12); line-height: 1; pointer-events: none;
-    }
-    .testimonial-quote { font-size: 19px; line-height: 1.8; color: var(--text); margin-bottom: 32px; position: relative; }
-    .testimonial-author { display: flex; align-items: center; justify-content: center; gap: 14px; text-align: left; }
-    .testimonial-avatar {
-      width: 48px; height: 48px; border-radius: 14px; background: var(--grad);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #fff;
-      box-shadow: 0 8px 24px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
-    }
-    .testimonial-name { font-size: 14.5px; font-weight: 600; }
-    .testimonial-role { font-size: 12.5px; color: var(--text3); }
-
-    /* ===== CTA ===== */
-    .cta-section { padding: 20px 0 120px; }
-    .cta-content {
-      max-width: 1180px; margin: 0 auto; padding: 84px 40px; text-align: center;
-      border: 1px solid var(--border-light); border-radius: 28px; position: relative; overflow: hidden;
-      background: linear-gradient(160deg, rgba(59,130,246,0.12), rgba(99,102,241,0.05) 55%, transparent);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 40px 100px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.09);
-    }
-    .cta-content::before {
-      content: ''; position: absolute; inset: 0; pointer-events: none;
-      background-image:
-        linear-gradient(rgba(96,165,250,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(96,165,250,0.06) 1px, transparent 1px);
-      background-size: 44px 44px;
-      -webkit-mask-image: radial-gradient(ellipse 70% 90% at 50% 50%, black 20%, transparent 80%);
-      mask-image: radial-gradient(ellipse 70% 90% at 50% 50%, black 20%, transparent 80%);
-    }
-    .cta-section .container { padding: 0 32px; }
-    .cta-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(28px, 4vw, 48px); font-weight: 700; letter-spacing: -0.035em; margin-bottom: 14px; position: relative; }
-    .cta-desc { font-size: 16px; color: var(--text2); margin-bottom: 32px; position: relative; }
-    .cta-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; position: relative; }
-
-    /* ===== LEGAL PAGES ===== */
-    .legal-page { padding: 140px 0 100px; }
-    .legal-container { max-width: 760px; margin: 0 auto; padding: 0 32px; }
-    .back-link {
-      display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500;
-      color: var(--text2); margin-bottom: 36px; transition: color .2s;
-    }
-    .back-link:hover { color: var(--accent-light); }
-    .legal-header { margin-bottom: 40px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
-    .legal-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: clamp(30px, 4vw, 42px); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 10px; }
-    .legal-meta { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text3); }
-    .legal-content h2 { font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: -0.015em; margin: 38px 0 14px; }
-    .legal-content h3 { font-size: 16px; font-weight: 600; margin: 26px 0 10px; color: var(--text); }
-    .legal-content p { font-size: 14.5px; color: var(--text2); line-height: 1.85; margin-bottom: 14px; }
-    .legal-content ul { margin: 0 0 16px 22px; }
-    .legal-content li { font-size: 14.5px; color: var(--text2); line-height: 1.8; margin-bottom: 6px; }
-    .legal-content a { color: var(--accent-light); }
-    .legal-content a:hover { text-decoration: underline; }
-    .legal-content strong { color: var(--text); }
-    .legal-box {
-      background: rgba(59,130,246,0.07); border: 1px solid rgba(59,130,246,0.22);
-      border-radius: 14px; padding: 20px 24px; margin-bottom: 28px;
-      backdrop-filter: blur(8px);
-    }
-    .legal-box p { margin-bottom: 0; }
-    .legal-box.warning { background: rgba(234,179,8,0.06); border-color: rgba(234,179,8,0.25); }
-
-    /* ===== FOOTER ===== */
-    footer { padding: 44px 0; border-top: 1px solid var(--border); background: rgba(5,6,12,0.6); }
-    .footer-content { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; }
-    .footer-links { display: flex; gap: 26px; flex-wrap: wrap; }
-    .footer-links a { font-size: 13px; color: var(--text3); transition: color .2s; }
-    .footer-links a:hover { color: var(--text); }
-    .footer-copy { font-size: 12px; color: var(--text3); }
-
-    /* ===== ACCESSIBILITY & MOTION ===== */
-    :focus-visible { outline: 2px solid var(--accent-light); outline-offset: 3px; border-radius: 6px; }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-      html { scroll-behavior: auto; }
-      .reveal, .reveal-left, .reveal-right, .reveal-scale { opacity: 1; transform: none; }
-    }
-
-    /* ===== RESPONSIVE ===== */
-    @media (max-width: 1024px) {
-      .feature-row { grid-template-columns: 1fr; gap: 40px; margin-bottom: 90px; }
-      .feature-row.reverse .feature-text { order: 1; }
-      .feature-row.reverse .feature-visual { order: 2; }
-      .features-grid { grid-template-columns: 1fr 1fr; }
-      .pricing-cards { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
-      .pricing-card.featured { transform: scale(1); }
-      .pricing-card.featured:hover { transform: translateY(-6px); }
-      .steps-container { grid-template-columns: 1fr 1fr; }
-      .step:nth-child(2) { border-right: none; }
-      .step:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
-    }
-    @media (max-width: 768px) {
-      .container { padding: 0 20px; }
-      .nav-center { display: none; }
-      nav .container { gap: 10px; }
-      .logo { font-size: 17px; }
-      .nav-right { gap: 8px; }
-      .nav-right .btn { font-size: 12.5px; padding: 9px 14px; min-height: 40px; }
-      .nav-right .btn-ghost { border: 1px solid var(--border-light); border-radius: 10px; }
-      .btn-large { width: 100%; max-width: 340px; justify-content: center; min-height: 48px; }
-      .hero { padding-top: 120px; min-height: 0; }
-      .hero-actions { flex-direction: column; align-items: center; }
-      .hero-stats { max-width: 100%; }
-      .hero-stat { padding: 16px 10px; }
-      .features { padding-top: 80px; }
-      .feature-row { margin-bottom: 70px; }
-      .features-grid { grid-template-columns: 1fr; }
-      .steps-container { grid-template-columns: 1fr; }
-      .step { border-right: none; border-bottom: 1px solid var(--border); }
-      .step:last-child { border-bottom: none; }
-      .testimonial-card { padding: 44px 26px; }
-      .cta-content { padding: 60px 24px; }
-      .cta-buttons { flex-direction: column; align-items: center; }
-      .inventory-row { grid-template-columns: 1.6fr 1fr 0.5fr 0.7fr; font-size: 12px; padding: 11px 12px; min-width: 420px; }
-      .inventory-preview { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .pricing-card { padding: 30px 24px; }
-      .legal-page { padding-top: 120px; }
-      /* flatten 3D depth on touch layouts — no hover, avoids perspective offsets */
-      .feature-card, .feature-card-header, .feature-card-body { transform: none !important; }
-      .feature-row { gap: 28px; }
-      .hero h1 { font-size: clamp(36px, 10.5vw, 52px); }
-      .hero-desc { font-size: 15.5px; }
-      .section-header { margin-bottom: 48px; }
-      .features { padding-top: 70px; }
-      .feature-card-body { padding: 16px; }
-      .stats-grid { gap: 8px; }
-      .stat-card { padding: 11px; }
-      .stat-value { font-size: 16px; }
-      .pricing-section, .how-section { padding: 80px 0; }
-      .testimonial-quote { font-size: 16.5px; }
-      .testimonial-card::before { font-size: 100px; }
-    }
-    @media (max-width: 540px) {
-      nav { padding: 12px 0; }
-      nav .container { padding: 0 14px; gap: 8px; }
-      /* show just "TyreOps" in the logo to guarantee everything fits */
-      .logo { font-size: 0; }
-      .logo span { font-size: 16px; }
-      .nav-right { gap: 6px; flex-shrink: 0; }
-      .nav-right .btn { font-size: 11px; padding: 8px 10px; min-height: 38px; white-space: nowrap; }
-      .hero-stat-value { font-size: 20px; }
-      .feature-title { font-size: 22px; }
-      .pricing-amount { font-size: 40px; }
-    }
-
   </style>
 </head>
 <body>
 
-  <!-- NAVIGATION -->
-  <nav id="nav">
-    <div class="container">
-      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>TyreOps</span></a>
-      <div class="nav-center">
-        <a href="#features" onclick="scrollToSection(event, 'features')" class="active">Features</a>
-        <a href="#pricing" onclick="scrollToSection(event, 'pricing')">Pricing</a>
-        <a href="#how" onclick="scrollToSection(event, 'how')">How it works</a>
-      </div>
-      <div class="nav-right">
-        <a href="/tyreops/login" class="btn btn-ghost">Login</a>
-        <a href="/tyreops/register" class="btn btn-primary">Start Free Trial</a>
-      </div>
+<nav id="nav">
+  <div class="container">
+    <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>TyreOps</span></a>
+    <div class="nav-center">
+      <a href="#features">Features</a>
+      <a href="#more">More</a>
+      <a href="#pricing">Pricing</a>
     </div>
-  </nav>
-
-  <!-- HOME PAGE -->
-  <div id="page-home" class="page active">
-
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-grid"></div>
-    <div class="hero-glow hero-glow-1"></div>
-    <div class="hero-glow hero-glow-2"></div>
-    
-    <div class="container">
-      <div class="hero-content">
-        <div class="hero-badge">
-          🇬🇧 Built for UK Tyre Garages
-        </div>
-        
-        <h1>
-          Stop losing money on<br>
-          <span class="gradient">tyre inventory</span>
-        </h1>
-        
-        <p class="hero-desc">
-          FIFO batch tracking, VAT margin scheme, instant invoicing. Everything you need to run a profitable tyre garage — finally in one place.
-        </p>
-        
-        <div class="hero-actions">
-          <a href="/tyreops/register" class="btn btn-primary btn-large">
-            Start 14-Day Free Trial →
-          </a>
-          <a href="#features" onclick="scrollToSection(event, 'features')" class="btn btn-secondary btn-large">
-            See How It Works
-          </a>
-        </div>
-        
-        <div class="hero-stats">
-          <div class="hero-stat">
-            <div class="hero-stat-value">14</div>
-            <div class="hero-stat-label">Day Trial</div>
-          </div>
-          <div class="hero-stat">
-            <div class="hero-stat-value">£0</div>
-            <div class="hero-stat-label">Setup Fee</div>
-          </div>
-          <div class="hero-stat">
-            <div class="hero-stat-value">2 min</div>
-            <div class="hero-stat-label">To Get Started</div>
-          </div>
-        </div>
-      </div>
+    <div class="nav-right">
+      <a href="/tyreops/login" class="btn btn-ghost">Log in</a>
+      <a href="/tyreops/register" class="btn btn-blue">Start free trial</a>
     </div>
-  </section>
-
-  <!-- TYRE TYPES MARQUEE -->
-  <section class="types-bar">
-    <div class="types-track">
-      <div class="type-item"><span class="type-icon">🚗</span> Car Tyres</div>
-      <div class="type-item"><span class="type-icon">🚐</span> Van Tyres</div>
-      <div class="type-item"><span class="type-icon">🏎️</span> Performance Tyres</div>
-      <div class="type-item"><span class="type-icon">🚛</span> 4x4 Tyres</div>
-      <div class="type-item"><span class="type-icon">❄️</span> Winter Tyres</div>
-      <div class="type-item"><span class="type-icon">☀️</span> Summer Tyres</div>
-      <div class="type-item"><span class="type-icon">♻️</span> Used Tyres</div>
-      <div class="type-item"><span class="type-icon">🏷️</span> Budget Tyres</div>
-      <div class="type-item"><span class="type-icon">⭐</span> Premium Tyres</div>
-      <div class="type-item"><span class="type-icon">🔧</span> Run-Flat Tyres</div>
-      <!-- Duplicate for seamless scroll -->
-      <div class="type-item"><span class="type-icon">🚗</span> Car Tyres</div>
-      <div class="type-item"><span class="type-icon">🚐</span> Van Tyres</div>
-      <div class="type-item"><span class="type-icon">🏎️</span> Performance Tyres</div>
-      <div class="type-item"><span class="type-icon">🚛</span> 4x4 Tyres</div>
-      <div class="type-item"><span class="type-icon">❄️</span> Winter Tyres</div>
-      <div class="type-item"><span class="type-icon">☀️</span> Summer Tyres</div>
-      <div class="type-item"><span class="type-icon">♻️</span> Used Tyres</div>
-      <div class="type-item"><span class="type-icon">🏷️</span> Budget Tyres</div>
-      <div class="type-item"><span class="type-icon">⭐</span> Premium Tyres</div>
-      <div class="type-item"><span class="type-icon">🔧</span> Run-Flat Tyres</div>
-    </div>
-  </section>
-
-  <!-- FEATURES - ALTERNATING ROWS -->
-  <section class="features" id="features">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">Features</div>
-        <h2 class="section-title">Built for how tyre garages actually work</h2>
-        <p class="section-desc">
-          Not another generic inventory system. Every feature designed specifically for UK tyre retailers.
-        </p>
-      </div>
-      
-      <!-- Feature 1: FIFO Tracking -->
-      <div class="feature-row">
-        <div class="feature-text reveal-left">
-          <div class="feature-number">01</div>
-          <h3 class="feature-title">FIFO Batch Tracking</h3>
-          <p class="feature-desc">
-            Each purchase batch tracked separately. Oldest stock sells first automatically. Know your true cost on every single sale — no more guesswork.
-          </p>
-          <ul class="feature-list">
-            <li>Automatic cost calculation per sale</li>
-            <li>Batch-level profit tracking</li>
-            <li>Supplier price history</li>
-            <li>Real-time margin visibility</li>
-          </ul>
-        </div>
-        <div class="feature-visual reveal-right">
-          <div class="feature-card">
-            <div class="feature-card-header">
-              <span class="feature-card-title">Stock Overview</span>
-              <span style="font-size:12px;color:var(--green);">● Live</span>
-            </div>
-            <div class="feature-card-body">
-              <div class="stats-grid">
-                <div class="stat-card">
-                  <div class="stat-label">Revenue</div>
-                  <div class="stat-value">£4,280</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-label">Profit</div>
-                  <div class="stat-value green">£1,842</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-label">Stock Value</div>
-                  <div class="stat-value blue">£6,120</div>
-                </div>
-              </div>
-              <div class="inventory-preview">
-                <div class="inventory-row header">
-                  <div>Tyre</div>
-                  <div>FIFO Cost</div>
-                  <div>Stock</div>
-                  <div>Status</div>
-                </div>
-                <div class="inventory-row">
-                  <div><strong>Michelin</strong> Pilot Sport 4</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">£89.00</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">18</div>
-                  <div><span class="inventory-badge ok">OK</span></div>
-                </div>
-                <div class="inventory-row">
-                  <div><strong>Continental</strong> PremiumContact</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">£62.00</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">12</div>
-                  <div><span class="inventory-badge ok">OK</span></div>
-                </div>
-                <div class="inventory-row">
-                  <div><strong>Pirelli</strong> Cinturato P7</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">£58.00</div>
-                  <div style="font-family: 'IBM Plex Mono', monospace;">1</div>
-                  <div><span class="inventory-badge low">LOW</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Feature 2: Used Tyre Management -->
-      <div class="feature-row reverse">
-        <div class="feature-text reveal-right">
-          <div class="feature-number">02</div>
-          <h3 class="feature-title">Used Tyre Management</h3>
-          <p class="feature-desc">
-            Part-exchange and used stock with full traceability. Track source customer, tread depth, and margin on every used tyre you buy and sell.
-          </p>
-          <ul class="feature-list">
-            <li>Part-exchange tracking</li>
-            <li>Tread depth records</li>
-            <li>Source customer linking</li>
-            <li>Used tyre margin reports</li>
-          </ul>
-          <span class="feature-tag silver">Silver+</span>
-        </div>
-        <div class="feature-visual reveal-left">
-          <div class="feature-card">
-            <div class="feature-card-header">
-              <span class="feature-card-title">Used Stock</span>
-              <span style="font-size:12px;color:var(--text3);">8 items</span>
-            </div>
-            <div class="feature-card-body">
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
-                  <div>
-                    <div style="font-size:14px;font-weight:600;">Goodyear Eagle F1 • 225/45R17</div>
-                    <div style="font-size:12px;color:var(--text3);">Tread: 5mm • From: Mr. Jones</div>
-                  </div>
-                  <div style="text-align:right;">
-                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£35</div>
-                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£20 margin</div>
-                  </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
-                  <div>
-                    <div style="font-size:14px;font-weight:600;">Bridgestone Turanza • 205/55R16</div>
-                    <div style="font-size:12px;color:var(--text3);">Tread: 4mm • From: Mrs. Patel</div>
-                  </div>
-                  <div style="text-align:right;">
-                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£28</div>
-                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£18 margin</div>
-                  </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:14px 16px;border-radius:10px;">
-                  <div>
-                    <div style="font-size:14px;font-weight:600;">Michelin CrossClimate • 215/60R16</div>
-                    <div style="font-size:12px;color:var(--text3);">Tread: 6mm • From: ABC Motors</div>
-                  </div>
-                  <div style="text-align:right;">
-                    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">£42</div>
-                    <div style="font-size:11px;color:var(--green);font-weight:600;">+£25 margin</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Feature 3: VAT Margin Scheme -->
-      <div class="feature-row">
-        <div class="feature-text reveal-left">
-          <div class="feature-number">03</div>
-          <h3 class="feature-title">VAT Margin Scheme</h3>
-          <p class="feature-desc">
-            Automatic VAT calculation for used tyres. Pay VAT only on profit margin, not the full sale price. Compliant with HMRC requirements.
-          </p>
-          <ul class="feature-list">
-            <li>Automatic margin scheme calculations</li>
-            <li>HMRC-compliant records</li>
-            <li>One-click VAT reports</li>
-            <li>Separate used/new VAT tracking</li>
-          </ul>
-          <span class="feature-tag gold">Gold</span>
-        </div>
-        <div class="feature-visual reveal-right">
-          <div class="feature-card">
-            <div class="feature-card-header">
-              <span class="feature-card-title">VAT Summary</span>
-              <span style="font-size:12px;color:var(--text3);">Q1 2026</span>
-            </div>
-            <div class="feature-card-body">
-              <div style="display:flex;flex-direction:column;gap:16px;">
-                <div style="background:var(--surface2);padding:20px;border-radius:12px;">
-                  <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Standard VAT (New Tyres)</div>
-                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                    <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--text);">£2,840</div>
-                    <div style="font-size:12px;color:var(--text3);">Output VAT</div>
-                  </div>
-                </div>
-                <div style="background:var(--accent-subtle);padding:20px;border-radius:12px;border:1px solid rgba(99,102,241,0.2);">
-                  <div style="font-size:12px;color:var(--accent);margin-bottom:8px;">Margin Scheme (Used Tyres)</div>
-                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                    <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--accent);">£186</div>
-                    <div style="font-size:12px;color:var(--accent);">VAT on margin only</div>
-                  </div>
-                </div>
-                <div style="text-align:center;padding-top:8px;border-top:1px solid var(--border);">
-                  <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">Saved with Margin Scheme</div>
-                  <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:var(--green);">£412 this quarter</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- MORE FEATURES GRID -->
-  <section class="more-features">
-    <div class="container">
-      <div class="features-grid">
-        <div class="mini-feature reveal stagger-1">
-          <div class="mini-feature-icon">🧾</div>
-          <h4 class="mini-feature-title">Instant Invoicing</h4>
-          <p class="mini-feature-desc">Create professional invoices in seconds. Email directly to customers. Track cash, card, or bank transfer payments.</p>
-        </div>
-        <div class="mini-feature reveal stagger-2">
-          <div class="mini-feature-icon">👥</div>
-          <h4 class="mini-feature-title">Customer Database</h4>
-          <p class="mini-feature-desc">Store customer details, vehicle reg, and full purchase history. See lifetime value at a glance.</p>
-        </div>
-        <div class="mini-feature reveal stagger-3">
-          <div class="mini-feature-icon">⚠️</div>
-          <h4 class="mini-feature-title">Low Stock Alerts</h4>
-          <p class="mini-feature-desc">Set reorder points per SKU. Never miss a sale because you're out of a popular size.</p>
-        </div>
-        <div class="mini-feature reveal stagger-4">
-          <div class="mini-feature-icon">📊</div>
-          <h4 class="mini-feature-title">P&L Dashboard</h4>
-          <p class="mini-feature-desc">See your real margins, best sellers, and slowest movers. Make smarter buying decisions.</p>
-        </div>
-        <div class="mini-feature reveal stagger-5">
-          <div class="mini-feature-icon">📱</div>
-          <h4 class="mini-feature-title">Works on Mobile</h4>
-          <p class="mini-feature-desc">Full access from your phone. Check stock, create invoices, and track payments on the go.</p>
-        </div>
-        <div class="mini-feature reveal stagger-6">
-          <div class="mini-feature-icon">📤</div>
-          <h4 class="mini-feature-title">CSV Export</h4>
-          <p class="mini-feature-desc">Export reports for your accountant in one click. Works with any accounting software.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRICING -->
-  <section class="pricing-section" id="pricing">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">Pricing</div>
-        <h2 class="section-title">Simple, transparent pricing</h2>
-        <p class="section-desc">
-          Start free for 14 days. No credit card required. Cancel anytime.
-        </p>
-      </div>
-      
-      <div class="pricing-cards">
-        <div class="pricing-card reveal stagger-1">
-          <div class="pricing-tier">
-            <span class="pricing-tier-icon">🥉</span>
-            Bronze
-          </div>
-          <div class="pricing-price">
-            <span class="pricing-amount">£60</span>
-            <span class="pricing-period">/month</span>
-          </div>
-          <p class="pricing-desc">For small garages just getting started</p>
-          <ul class="pricing-features">
-            <li>50 invoices/month</li>
-            <li>Basic inventory</li>
-            <li>FIFO automatic pricing</li>
-            <li>1 user</li>
-            <li class="disabled">Used tyre tracking</li>
-            <li class="disabled">VAT margin scheme</li>
-          </ul>
-          <a href="/tyreops/register" class="btn btn-secondary">Start Free Trial</a>
-        </div>
-        
-        <div class="pricing-card featured reveal stagger-2">
-          <div class="pricing-tier">
-            <span class="pricing-tier-icon">🥈</span>
-            Silver
-          </div>
-          <div class="pricing-price">
-            <span class="pricing-amount">£75</span>
-            <span class="pricing-period">/month</span>
-          </div>
-          <p class="pricing-desc">For growing garages with used stock</p>
-          <ul class="pricing-features">
-            <li>Unlimited invoices</li>
-            <li>Batch override control</li>
-            <li>Supplier tracking</li>
-            <li>Used tyre management</li>
-            <li>VAT reports</li>
-            <li>2 users</li>
-          </ul>
-          <a href="/tyreops/register" class="btn btn-primary">Start Free Trial</a>
-        </div>
-        
-        <div class="pricing-card reveal stagger-3">
-          <div class="pricing-tier">
-            <span class="pricing-tier-icon">🥇</span>
-            Gold
-          </div>
-          <div class="pricing-price">
-            <span class="pricing-amount">£90</span>
-            <span class="pricing-period">/month</span>
-          </div>
-          <p class="pricing-desc">Full power for serious operators</p>
-          <ul class="pricing-features">
-            <li>Everything in Silver</li>
-            <li>Full P&L dashboard</li>
-            <li>VAT Margin Scheme</li>
-            <li>Reports & CSV export</li>
-            <li>Unlimited users</li>
-            <li>Priority support</li>
-          </ul>
-          <a href="/tyreops/register" class="btn btn-secondary">Start Free Trial</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="how-section" id="how">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">How It Works</div>
-        <h2 class="section-title">Up and running in minutes</h2>
-        <p class="section-desc">
-          No complicated setup. No training required. Just sign up and go.
-        </p>
-      </div>
-      
-      <div class="steps-container">
-        <div class="step reveal">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <h3 class="step-title">Sign up</h3>
-            <p class="step-desc">Create your account in 2 minutes. No credit card needed to start your free trial.</p>
-          </div>
-        </div>
-        <div class="step reveal">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <h3 class="step-title">Add your stock</h3>
-            <p class="step-desc">Enter your SKUs and log your first purchase batch. Import existing data or start fresh.</p>
-          </div>
-        </div>
-        <div class="step reveal">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <h3 class="step-title">Create invoices</h3>
-            <p class="step-desc">Sell tyres, FIFO cost auto-calculates, and stock updates automatically.</p>
-          </div>
-        </div>
-        <div class="step reveal">
-          <div class="step-number">4</div>
-          <div class="step-content">
-            <h3 class="step-title">Track profit</h3>
-            <p class="step-desc">See your margins, P&L, and VAT reports in real-time. Make smarter decisions.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- TESTIMONIAL -->
-  <section class="testimonial-section">
-    <div class="container">
-      <div class="testimonial-card reveal-scale">
-        <p class="testimonial-quote">
-          "Finally, software that understands how tyre garages work. The FIFO tracking alone has saved us hours every week — and we're actually making more money now we can see our real margins."
-        </p>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">JT</div>
-          <div>
-            <div class="testimonial-name">James Thompson</div>
-            <div class="testimonial-role">Owner, Smith Tyres MK</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="cta-content reveal">
-      <h2 class="cta-title">Ready to take control of your garage?</h2>
-      <p class="cta-desc">Start your 14-day free trial today. No credit card required.</p>
-      <div class="cta-buttons">
-        <a href="/tyreops/register" class="btn btn-primary btn-large">Start Free Trial →</a>
-        <a href="mailto:hello@tyreops.co.uk" class="btn btn-secondary btn-large">Contact Sales</a>
-      </div>
-    </div>
-  </section>
-
   </div>
+</nav>
 
-  <!-- PRIVACY PAGE -->
+<!-- ================= HOME ================= -->
+<div id="page-home" class="page active">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="container">
+    <div>
+      <div class="eyebrow">Built for UK tyre garages · Live</div>
+      <h1>Know your true cost<br><span class="blue">on every tyre sold.</span></h1>
+      <p class="hero-sub">TyreOps tracks every purchase batch separately, sells oldest stock first, and works out your real margin automatically — so you stop guessing what you actually made on a sale.</p>
+      <div class="hero-btns">
+        <a href="/tyreops/register" class="btn btn-blue btn-lg">Start your 14-day free trial →</a>
+        <a href="#features" class="btn btn-ghost btn-lg">See what's inside</a>
+      </div>
+      <p class="hero-note"><b>No card required</b> // full features // cancel any time</p>
+    </div>
+
+    <!-- signature: FIFO batch stock panel -->
+    <div class="stock-scene">
+      <div class="stock-wrap" id="stockwrap">
+        <div class="sc-chip chip-1"><span class="dot"></span>Oldest batch sells first</div>
+        <div class="stockcard" aria-label="Example TyreOps stock record">
+          <div class="sc-head">
+            <span class="sc-title">STOCK <b>· 205/55 R16</b></span>
+            <span class="sc-badge">IN STOCK</span>
+          </div>
+          <div class="sc-body">
+            <div class="sc-sku">
+              <span class="name">Continental PremiumContact</span>
+              <span class="size">205/55 R16</span>
+            </div>
+            <div class="sc-batches">
+              <div class="sc-batch next"><span class="dot"></span><span class="lbl">FIFO #1</span><span class="qty">4 left</span><span class="cost">£62.40</span></div>
+              <div class="sc-batch queued"><span class="dot"></span><span class="lbl">BATCH #2</span><span class="qty">8 left</span><span class="cost">£64.10</span></div>
+              <div class="sc-batch queued"><span class="dot"></span><span class="lbl">BATCH #3</span><span class="qty">12 left</span><span class="cost">£66.80</span></div>
+            </div>
+            <div class="sc-fifo">
+              <span class="label">Next sale cost</span>
+              <span class="val">£62.40 · 41% margin</span>
+            </div>
+          </div>
+        </div>
+        <div class="sc-chip chip-2"><span class="dot"></span>Low stock alert · 4 remaining</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS STRIP -->
+<div class="strip">
+  <div class="container">
+    <div class="st"><b>FIFO</b><span>Costed automatically</span></div>
+    <div class="st"><b>Per batch</b><span>True margin tracking</span></div>
+    <div class="st"><b>14 days</b><span>Free trial, full access</span></div>
+    <div class="st"><b>UK</b><span>VAT margin scheme ready</span></div>
+  </div>
+</div>
+
+<!-- BIG FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">The core</div>
+      <h2>Three things tyre shops<br>can't run without.</h2>
+      <p class="sec-sub">Built around how a tyre business actually makes money — batch costs, used stock, and the VAT margin scheme.</p>
+    </div>
+    <div class="bigfeat">
+      <div class="bf reveal">
+        <div class="bf-num">CORE 01</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div>
+        <h3>FIFO Batch Tracking</h3>
+        <p>Each purchase batch is tracked separately and the oldest stock sells first, automatically. Know your true cost on every single sale — no more guesswork.</p>
+        <span class="tag">Automatic cost calculation per sale</span>
+      </div>
+      <div class="bf reveal">
+        <div class="bf-num">CORE 02</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"/></svg></div>
+        <h3>Used Tyre Management</h3>
+        <p>Part-exchange and used stock with full traceability. Track source customer, tread depth and margin on every used tyre you buy and sell.</p>
+        <span class="tag">Part-exchange tracking</span>
+      </div>
+      <div class="bf reveal">
+        <div class="bf-num">CORE 03</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg></div>
+        <h3>VAT Margin Scheme</h3>
+        <p>Automatic VAT calculation for used tyres. Pay VAT only on the profit margin, not the full sale price. Compliant with HMRC requirements.</p>
+        <span class="tag">Automatic margin scheme calculations</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MINI FEATURES -->
+<section id="more" style="padding-top:0">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">Everything else</div>
+      <h2>The day-to-day, sorted.</h2>
+    </div>
+    <div class="minis">
+      <div class="mini reveal"><div class="mini-num">01</div><h4>Instant Invoicing</h4><p>Create professional invoices in seconds. Email directly to customers. Track cash, card or bank transfer payments.</p></div>
+      <div class="mini reveal"><div class="mini-num">02</div><h4>Customer Database</h4><p>Store customer details, vehicle reg and full purchase history. See lifetime value at a glance.</p></div>
+      <div class="mini reveal"><div class="mini-num">03</div><h4>Low Stock Alerts</h4><p>Set reorder points per SKU. Never miss a sale because you're out of a popular size.</p></div>
+      <div class="mini reveal"><div class="mini-num">04</div><h4>P&amp;L Dashboard</h4><p>See your real margins, best sellers and slowest movers. Make smarter buying decisions.</p></div>
+      <div class="mini reveal"><div class="mini-num">05</div><h4>Works on Mobile</h4><p>Full access from your phone. Check stock, create invoices and track payments on the go.</p></div>
+      <div class="mini reveal"><div class="mini-num">06</div><h4>CSV Export</h4><p>Export reports for your accountant in one click. Works with any accounting software.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">Pricing</div>
+      <h2>Simple, honest pricing.</h2>
+      <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold features. No card required, cancel any time.</p>
+    </div>
+    <div class="plans">
+      <div class="plan bronze reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
+        <div class="plan-price"><b>£60</b><span>/month</span></div>
+        <p class="plan-desc">For small garages just getting started.</p>
+        <ul>
+          <li>50 invoices/month</li>
+          <li>Basic inventory</li>
+          <li>FIFO automatic pricing</li>
+          <li>1 user</li>
+          <li class="off">Used tyre tracking</li>
+          <li class="off">VAT margin scheme</li>
+        </ul>
+        <a href="/tyreops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
+      <div class="plan silver popular reveal">
+        <div class="plan-flag">Most popular</div>
+        <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
+        <div class="plan-price"><b>£75</b><span>/month</span></div>
+        <p class="plan-desc">For growing garages with used stock.</p>
+        <ul>
+          <li>Unlimited invoices</li>
+          <li>Batch override control</li>
+          <li>Supplier tracking</li>
+          <li>Used tyre management</li>
+          <li>VAT reports</li>
+          <li>2 users</li>
+        </ul>
+        <a href="/tyreops/register" class="btn btn-blue">Start free trial</a>
+      </div>
+      <div class="plan gold reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
+        <div class="plan-price"><b>£90</b><span>/month</span></div>
+        <p class="plan-desc">Full power for serious operators.</p>
+        <ul>
+          <li>Everything in Silver</li>
+          <li>Full P&amp;L dashboard</li>
+          <li>VAT Margin Scheme</li>
+          <li>Reports &amp; CSV export</li>
+          <li>Unlimited users</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="/tyreops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
+    </div>
+    <p class="pricing-note">ALL PRICES IN GBP // 14-DAY FREE TRIAL ON EVERY PLAN // CANCEL ANY TIME</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <div class="kicker reveal" style="justify-content:center">Ready when you are</div>
+    <h2 class="reveal">Stop guessing your margins.<br>Start knowing them.</h2>
+    <p class="reveal">Set up your stock, raise your first invoice, and see your true cost on every sale.</p>
+    <div class="hero-btns reveal">
+      <a href="/tyreops/register" class="btn btn-blue btn-lg">Start your 14-day free trial →</a>
+      <a href="mailto:hello@alzaro.co.uk" class="btn btn-ghost btn-lg">Ask us anything</a>
+    </div>
+    <p class="hero-note reveal">No card required // set up in minutes // UK support</p>
+  </div>
+</section>
+
+</div><!-- /page-home -->
+
   <div id="page-privacy" class="page">
     <section class="legal-page">
       <div class="legal-container">
@@ -1287,164 +684,191 @@
     </section>
   </div>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="container">
-      <div class="footer-content">
-        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>TyreOps</span></a>
-        <div class="footer-links">
-          <a href="#features" onclick="scrollToSection(event, 'features')">Features</a>
-          <a href="#pricing" onclick="scrollToSection(event, 'pricing')">Pricing</a>
-          <a href="mailto:hello@tyreops.co.uk">Contact</a>
-          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
-          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
-        </div>
-        <div class="footer-copy">© 2026 Alzaro TyreOps. Built in the UK 🇬🇧</div>
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="foot">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>TyreOps</span></a>
+      <div class="foot-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+        <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        <a href="mailto:hello@alzaro.co.uk">Contact</a>
+      </div>
+      <div class="foot-copy">
+        <span>© 2026 Alzaro Group. All rights reserved.</span>
+        <span>PART OF THE ALZARO PLATFORM FAMILY // MILTON KEYNES, UK</span>
       </div>
     </div>
-  </footer>
+  </div>
+</footer>
 
-  <script>
-    // Page navigation
-    function showPage(pageName) {
-      document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-      });
-      
-      const targetPage = document.getElementById('page-' + pageName);
-      if (targetPage) {
-        targetPage.classList.add('active');
-      }
-      
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      if (pageName === 'home') {
-        history.pushState(null, '', window.location.pathname);
-      } else {
-        history.pushState(null, '', '#' + pageName);
-      }
-      
-      // Show/hide nav links on legal pages
-      const navLinks = document.querySelector('.nav-center');
-      if (navLinks) {
-        navLinks.style.display = (pageName === 'home') ? 'flex' : 'none';
-      }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  // Page navigation (privacy / terms / home)
+  function showPage(pageName) {
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+    const targetPage = document.getElementById('page-' + pageName);
+    if (targetPage) targetPage.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (pageName === 'home') {
+      history.pushState(null, '', window.location.pathname);
+    } else {
+      history.pushState(null, '', '#' + pageName);
     }
-    
-    // Scroll to section (works from any page)
-    function scrollToSection(event, sectionId) {
-      event.preventDefault();
+    const navCenter = document.querySelector('.nav-center');
+    if (navCenter) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
+  }
 
-      // Update active pill immediately on click
-      document.querySelectorAll('.nav-center a').forEach(a => a.classList.remove('active'));
-      event.currentTarget.classList.add('active');
-
-      const homePage = document.getElementById('page-home');
-      if (!homePage.classList.contains('active')) {
-        showPage('home');
-        setTimeout(() => {
-          const target = document.getElementById(sectionId);
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (href.startsWith('#') && href.length > 1 && !href.includes('page')) {
+        e.preventDefault();
+        const homePage = document.getElementById('page-home');
+        const go = () => {
+          const target = document.querySelector(href);
           if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      } else {
-        const target = document.getElementById(sectionId);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
-    
-    // Navbar scroll effect
-    const nav = document.getElementById('nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 50);
-    });
-
-    // Active nav pill — update on click
-    const navPills = document.querySelectorAll('.nav-center a');
-    function setActiveLink(el) {
-      navPills.forEach(a => a.classList.remove('active'));
-      el.classList.add('active');
-    }
-    navPills.forEach(link => {
-      link.addEventListener('click', function() {
-        setActiveLink(this);
-      });
-    });
-
-    // Active nav pill — also track scroll so it updates as you scroll through sections
-    const sections = ['features', 'pricing', 'how'];
-    window.addEventListener('scroll', () => {
-      let current = '';
-      sections.forEach(id => {
-        const section = document.getElementById(id);
-        if (section && window.scrollY >= section.offsetTop - 200) {
-          current = id;
+        };
+        if (!homePage.classList.contains('active')) {
+          showPage('home');
+          setTimeout(go, 100);
+        } else {
+          go();
         }
-      });
-      navPills.forEach(link => {
-        const onclickAttr = link.getAttribute('onclick') || '';
-        const matchesSection = onclickAttr.includes("'" + current + "'");
-        link.classList.toggle('active', !!current && matchesSection);
-      });
+      }
     });
+  });
 
-    // Scroll reveal animations
-    const observerOptions = {
-      root: null,
-      rootMargin: '0px',
-      threshold: 0.15
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-center a');
+  window.addEventListener('scroll', () => {
+    const homePage = document.getElementById('page-home');
+    if (!homePage.classList.contains('active')) return;
+    let current = '';
+    sections.forEach(section => {
+      if (window.scrollY >= section.offsetTop - 110) current = section.getAttribute('id');
+    });
+    navLinks.forEach(link => {
+      link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+    });
+  }, {passive:true});
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold: 0.12});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.slice(1);
+    if (hash === 'privacy' || hash === 'terms') showPage(hash);
+  });
+  window.addEventListener('popstate', () => {
+    const hash = window.location.hash.slice(1);
+    if (hash === 'privacy' || hash === 'terms') showPage(hash);
+    else showPage('home');
+  });
+
+  // ===== 3D: motion gates =====
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const finePointer = matchMedia('(pointer: fine)').matches;
+
+  // CSS tilt on the stock panel
+  (function(){
+    if (reduceMotion || !finePointer) return;
+    const scene = document.querySelector('.stock-scene');
+    const wrap = document.getElementById('stockwrap');
+    if (!scene || !wrap) return;
+    scene.classList.add('tilt-on');
+    let raf = null, tx = 0, ty = 0;
+    const apply = () => { wrap.style.transform = `rotateX(${ty}deg) rotateY(${tx}deg)`; raf = null; };
+    scene.addEventListener('mousemove', e => {
+      const r = scene.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width - 0.5) * 14;
+      ty = -((e.clientY - r.top) / r.height - 0.5) * 11;
+      wrap.style.transition = 'transform .08s ease-out';
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+    scene.addEventListener('mouseleave', () => {
+      wrap.style.transition = 'transform .5s ease';
+      wrap.style.transform = 'rotateX(0deg) rotateY(0deg)';
+    });
+  })();
+
+  // WebGL hero: rotating wireframe tyre/wheel
+  (function(){
+    if (reduceMotion || typeof THREE === 'undefined') return;
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); }
+    catch (e) { return; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.domElement.className = 'webgl-canvas';
+    hero.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.set(0, 0, 9);
+
+    const wheel = new THREE.Group();
+    const wire = (geo, color, opacity) =>
+      new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    wheel.add(wire(new THREE.TorusGeometry(2.6, 0.55, 12, 44), 0x97a3b4, 0.5));   // tyre
+    wheel.add(wire(new THREE.TorusGeometry(1.7, 0.12, 8, 36), 0x3b82f6, 0.85));   // rim
+    for (let i = 0; i < 6; i++) {
+      const spoke = wire(new THREE.BoxGeometry(0.13, 3.1, 0.13), 0x60a5fa, 0.7);
+      spoke.rotation.z = (i / 6) * Math.PI * 2;
+      wheel.add(spoke);
+    }
+    const hub = wire(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), 0x3b82f6, 0.9);
+    hub.rotation.x = Math.PI / 2;
+    wheel.add(hub);
+    wheel.rotation.y = 0.5;
+    scene.add(wheel);
+
+    const pGeo = new THREE.BufferGeometry();
+    const N = 220, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * 16;
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x97a3b4, size: 0.03, transparent: true, opacity: 0.45 })));
+
+    let mx = 0, my = 0;
+    if (finePointer) addEventListener('mousemove', e => {
+      mx = (e.clientX / innerWidth - 0.5);
+      my = (e.clientY / innerHeight - 0.5);
+    }, { passive: true });
+
+    const resize = () => {
+      const w = hero.clientWidth, h = hero.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+      wheel.position.x = w > 960 ? 2.6 : 0;
+      renderer.domElement.style.opacity = w > 960 ? 0.45 : 0.25;
     };
-    
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
-      });
-    }, observerOptions);
-    
-    // Observe all reveal elements
-    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
-      revealObserver.observe(el);
-    });
-    
-    // Handle initial page load from hash
-    window.addEventListener('load', () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'privacy' || hash === 'terms') {
-        showPage(hash);
-      }
-    });
-  </script>
+    addEventListener('resize', resize, { passive: true }); resize();
 
-  <script>
-    // 3D tilt + glare on feature mock-UI cards
-    (function(){
-      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-      if (reduced || !fine) return;
-      document.querySelectorAll('.feature-card').forEach(function(card){
-        var glare = document.createElement('div');
-        glare.className = 'card-glare';
-        card.appendChild(glare);
-        var raf = null;
-        card.addEventListener('mousemove', function(e){
-          var r = card.getBoundingClientRect();
-          var px = (e.clientX - r.left) / r.width;
-          var py = (e.clientY - r.top) / r.height;
-          if (!raf) raf = requestAnimationFrame(function(){
-            var rx = (0.5 - py) * 6;
-            var ry = (px - 0.5) * 8;
-            card.style.transform = 'rotateX(' + rx + 'deg) rotateY(' + ry + 'deg) scale(1.01)';
-            glare.style.setProperty('--gx', (px*100)+'%');
-            glare.style.setProperty('--gy', (py*100)+'%');
-            raf = null;
-          });
-        });
-        card.addEventListener('mouseleave', function(){
-          card.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
-        });
-      });
+    let running = true;
+    document.addEventListener('visibilitychange', () => { running = !document.hidden; });
+    const clock = new THREE.Clock();
+    (function animate(){
+      requestAnimationFrame(animate);
+      if (!running) return;
+      const t = clock.getElapsedTime();
+      wheel.rotation.z = -t * 0.42;
+      wheel.rotation.y = 0.5 + Math.sin(t * 0.35) * 0.18;
+      camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
+      camera.position.y += (-my * 0.6 - camera.position.y) * 0.04;
+      camera.lookAt(wheel.position.x * 0.6, 0, 0);
+      renderer.render(scene, camera);
     })();
-  </script>
+  })();
+</script>
 </body>
 </html>
