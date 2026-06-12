@@ -159,20 +159,22 @@ function App() {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
           <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-            <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+            {view!=='clients' && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
               <option value="custom">Custom range…</option>
-            </select>
-            {yearFilter==='custom' && (
+            </select>}
+            {view!=='clients' && yearFilter==='custom' && (
               <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
                 <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
                 <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
                 <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)} title="To" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
               </div>
             )}
-            <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
-            <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
+            {['dashboard','income','expenses'].includes(view) && <>
+              <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
+              <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
+            </>}
           </div>
         </div>
 
@@ -634,15 +636,18 @@ function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
 }
 
 function Modal({title,children,onClose}) {
-  return <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:'20px' }}>
-    <div onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'18px', padding:'28px', width:'420px', maxWidth:'100%' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px' }}>
-        <div style={{ fontSize:'18px', fontWeight:800 }}>{title}</div>
-        <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text2)', fontSize:'20px', cursor:'pointer' }}>×</button>
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:'20px' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'18px', padding:'28px', width:'420px', maxWidth:'100%', maxHeight:'90vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px' }}>
+          <div style={{ fontSize:'18px', fontWeight:800 }}>{title}</div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text2)', fontSize:'20px', cursor:'pointer' }}>×</button>
+        </div>
+        {children}
       </div>
-      {children}
-    </div>
-  </div>
+    </div>,
+    document.body
+  )
 }
 function ErrBox({m}) { return <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)', marginBottom:'14px' }}>{m}</div> }
 
