@@ -25,6 +25,10 @@
   ],
   "rewrites": [
     {
+      "source": "/platform",
+      "destination": "/platform.html"
+    },
+    {
       "source": "/confirmed",
       "destination": "/confirmed.html"
     },
