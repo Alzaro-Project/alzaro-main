@@ -862,7 +862,7 @@
     }, 3200);
   })();
 
-  // WebGL hero: slowly rotating stack of tyres (the stock wall)
+  // WebGL hero: single rotating wireframe tyre/wheel
   (function(){
     if (reduceMotion || typeof THREE === 'undefined') return;
     const hero = document.querySelector('.hero');
@@ -876,31 +876,23 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.set(0, 1.2, 10);
+    camera.position.set(0, 0, 9);
 
+    const wheel = new THREE.Group();
     const wire = (geo, color, opacity) =>
       new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
-
-    const BLUE = 0x3b82f6, BLUEL = 0x60a5fa, GREY = 0x97a3b4;
-    const stack = new THREE.Group();
-
-    // a leaning stack of tyres, each a flat torus laid horizontally
-    const COUNT = 5;
-    const tyres = [];
-    for (let i = 0; i < COUNT; i++) {
-      const tyre = new THREE.Group();
-      // outer tread
-      tyre.add(wire(new THREE.TorusGeometry(1.55, 0.5, 9, 30), i === 0 ? BLUEL : GREY, i === 0 ? 0.85 : 0.5));
-      // inner rim hole
-      tyre.add(wire(new THREE.TorusGeometry(0.7, 0.06, 6, 24), BLUE, 0.55));
-      tyre.rotation.x = Math.PI / 2;            // lay flat
-      tyre.position.y = -2.2 + i * 1.06;        // stack upward
-      tyre.position.x = Math.sin(i * 0.9) * 0.18; // slight lean
-      tyre.userData = { off: i * 0.7 };
-      stack.add(tyre); tyres.push(tyre);
+    wheel.add(wire(new THREE.TorusGeometry(2.6, 0.55, 12, 44), 0x97a3b4, 0.5));   // tyre
+    wheel.add(wire(new THREE.TorusGeometry(1.7, 0.12, 8, 36), 0x3b82f6, 0.85));   // rim
+    for (let i = 0; i < 6; i++) {
+      const spoke = wire(new THREE.BoxGeometry(0.13, 3.1, 0.13), 0x60a5fa, 0.7);
+      spoke.rotation.z = (i / 6) * Math.PI * 2;
+      wheel.add(spoke);
     }
-    stack.rotation.z = 0.06;
-    scene.add(stack);
+    const hub = wire(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), 0x3b82f6, 0.9);
+    hub.rotation.x = Math.PI / 2;
+    wheel.add(hub);
+    wheel.rotation.y = 0.5;
+    scene.add(wheel);
 
     const pGeo = new THREE.BufferGeometry();
     const N = 220, pos = new Float32Array(N * 3);
@@ -918,8 +910,8 @@
       const w = hero.clientWidth, h = hero.clientHeight;
       renderer.setSize(w, h);
       camera.aspect = w / h; camera.updateProjectionMatrix();
-      stack.position.x = w > 960 ? 2.5 : 0;
-      renderer.domElement.style.opacity = w > 960 ? 0.5 : 0.25;
+      wheel.position.x = w > 960 ? 2.6 : 0;
+      renderer.domElement.style.opacity = w > 960 ? 0.45 : 0.25;
     };
     addEventListener('resize', resize, { passive: true }); resize();
 
@@ -930,12 +922,11 @@
       requestAnimationFrame(animate);
       if (!running) return;
       const t = clock.getElapsedTime();
-      stack.rotation.y = t * 0.3;                       // whole stack turns slowly
-      tyres.forEach(ty => { ty.position.y += 0; });     // (stack holds)
-      stack.position.y = Math.sin(t * 0.5) * 0.08;      // gentle float
+      wheel.rotation.z = -t * 0.42;
+      wheel.rotation.y = 0.5 + Math.sin(t * 0.35) * 0.18;
       camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
-      camera.position.y += (1.2 - my * 0.6 - camera.position.y) * 0.04;
-      camera.lookAt(stack.position.x * 0.6, 0.2, 0);
+      camera.position.y += (-my * 0.6 - camera.position.y) * 0.04;
+      camera.lookAt(wheel.position.x * 0.6, 0, 0);
       renderer.render(scene, camera);
     })();
   })();
