@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Alzaro Group — One Brand. Five Platforms.</title>
+<meta name="description" content="Alzaro is a UK-based group of five specialist business platforms — TyreOps, GarageOps, ServiceOps, SoloOps and PropertyOps. Each does one job, and does it well." />
+<meta name="theme-color" content="#05060c" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="Alzaro Group — One Brand. Five Platforms." />
+<meta property="og:description" content="Specialist UK business software for automotive, trades, solo work and property." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://alzaro.co.uk" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg:#05060c;
+  --bg2:#080a14;
+  --surface:#0c0f1d;
+  --surface2:#11142a;
+  --border:rgba(129,140,248,.14);
+  --border-strong:rgba(129,140,248,.30);
+  --text:#eef0fb;
+  --muted:#9aa3c4;
+  --muted2:#6f78a0;
+
+  --indigo:#6366f1;
+  --indigo-2:#818cf8;
+  --violet:#a78bfa;
+  --violet-2:#7c3aed;
+
+  /* product accents */
+  --tyre:#3b82f6;
+  --garage:#ef4444;
+  --service:#22c55e;
+  --solo:#f97316;
+  --property:#eab308;
+
+  --font-head:'Space Grotesk',sans-serif;
+  --font-body:'Outfit',sans-serif;
+  --font-mono:'DM Mono',monospace;
+
+  --maxw:1180px;
+  --radius:18px;
+  --radius-lg:26px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+
+/* ============ RESET ============ */
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.6;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+a{color:inherit;text-decoration:none}
+img,svg{display:block}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::selection{background:rgba(124,58,237,.4);color:#fff}
+:focus-visible{outline:2px solid var(--indigo-2);outline-offset:3px;border-radius:6px}
+
+/* ============ BACKDROP FX ============ */
+.bg-fx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;will-change:transform}
+.orb.a{width:620px;height:620px;top:-220px;left:-160px;background:radial-gradient(circle,#4f46e5,transparent 70%)}
+.orb.b{width:560px;height:560px;top:8%;right:-200px;background:radial-gradient(circle,#7c3aed,transparent 70%)}
+.orb.c{width:680px;height:680px;bottom:-260px;left:30%;background:radial-gradient(circle,#3b82f6,transparent 70%);opacity:.35}
+.grid-overlay{position:absolute;inset:0;
+  background-image:linear-gradient(rgba(129,140,248,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(129,140,248,.045) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 40%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 40%,transparent 100%);
+}
+.noise{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============ LAYOUT ============ */
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:24px;position:relative;z-index:2}
+section{position:relative;z-index:2}
+.eyebrow{
+  font-family:var(--font-mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--indigo-2);display:inline-flex;align-items:center;gap:9px;margin-bottom:18px;
+}
+.eyebrow::before{content:"";width:26px;height:1px;background:linear-gradient(90deg,var(--indigo-2),transparent)}
+.sec-head{max-width:640px;margin-bottom:54px}
+.sec-h{font-family:var(--font-head);font-weight:700;font-size:clamp(1.9rem,4vw,3rem);line-height:1.08;letter-spacing:-.02em}
+.sec-sub{color:var(--muted);font-size:1.08rem;margin-top:18px;max-width:560px}
+.grad-text{background:linear-gradient(120deg,#818cf8,#c084fc 40%,#f472b6 70%,#818cf8);
+  background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shimmer 8s linear infinite}
+@keyframes shimmer{to{background-position:200% center}}
+
+/* ============ NAV ============ */
+header.nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:all .4s var(--ease)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;
+  max-width:var(--maxw);margin-inline:auto;padding:18px 24px;transition:padding .4s var(--ease)}
+header.nav.scrolled{backdrop-filter:blur(16px);background:rgba(5,6,12,.72);border-bottom:1px solid var(--border)}
+header.nav.scrolled .nav-inner{padding-block:12px}
+.logo{display:flex;align-items:center;gap:11px;font-family:var(--font-head);font-weight:700;font-size:1.18rem;letter-spacing:-.01em}
+.logo-mark{width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--indigo),var(--violet-2));
+  display:grid;place-items:center;box-shadow:0 6px 22px rgba(99,102,241,.45);position:relative}
+.logo-mark span{font-family:var(--font-head);font-weight:700;color:#fff;font-size:1.1rem}
+.nav-links{display:flex;align-items:center;gap:30px}
+.nav-links a{color:var(--muted);font-size:.94rem;font-weight:500;transition:color .2s;position:relative}
+.nav-links a:hover{color:var(--text)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-5px;height:1px;width:0;background:var(--indigo-2);transition:width .25s var(--ease)}
+.nav-links a:hover::after{width:100%}
+.nav-cta{display:flex;align-items:center;gap:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:.95rem;
+  border-radius:12px;padding:11px 20px;transition:transform .2s var(--ease),box-shadow .3s,background .3s;white-space:nowrap}
+.btn-ghost{color:var(--text)}
+.btn-ghost:hover{color:var(--indigo-2)}
+.btn-primary{background:linear-gradient(135deg,var(--indigo),var(--violet-2));color:#fff;
+  box-shadow:0 8px 26px rgba(99,102,241,.4)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(99,102,241,.55)}
+.btn-lg{padding:15px 28px;font-size:1.02rem;border-radius:14px}
+.nav-burger{display:none;width:42px;height:42px;border-radius:11px;border:1px solid var(--border);align-items:center;justify-content:center}
+
+/* ============ HERO ============ */
+.hero{padding:170px 0 90px;text-align:center}
+.badge{display:inline-flex;align-items:center;gap:10px;padding:7px 16px;border-radius:100px;
+  border:1px solid var(--border-strong);background:rgba(129,140,248,.06);
+  font-size:.84rem;color:var(--muted);margin-bottom:30px;backdrop-filter:blur(6px)}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--service);box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.hero-h1{font-family:var(--font-head);font-weight:700;font-size:clamp(2.6rem,7vw,5.3rem);line-height:1.02;letter-spacing:-.03em;margin-bottom:26px}
+.hero-sub{font-size:clamp(1.05rem,2vw,1.32rem);color:var(--muted);max-width:620px;margin:0 auto 40px;line-height:1.55}
+.hero-cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.hero-note{margin-top:22px;font-family:var(--font-mono);font-size:.8rem;color:var(--muted2);letter-spacing:.04em}
+
+/* product pills under hero */
+.product-orbit{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:62px}
+.p-pill{display:inline-flex;align-items:center;gap:9px;padding:10px 18px;border-radius:100px;
+  border:1px solid var(--border);background:var(--surface);font-weight:600;font-size:.92rem;
+  transition:transform .25s var(--ease),border-color .25s,box-shadow .3s}
+.p-pill:hover{transform:translateY(-4px);border-color:var(--pc);box-shadow:0 12px 30px -8px var(--pc)}
+.p-pill i{width:9px;height:9px;border-radius:3px;background:var(--pc)}
+
+/* ============ MARQUEE / TRUST ============ */
+.trust{padding:30px 0 10px;border-block:1px solid var(--border);margin-top:80px;overflow:hidden}
+.trust-label{text-align:center;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted2);margin-bottom:22px}
+.marquee{display:flex;gap:60px;width:max-content;animation:scroll 30s linear infinite}
+.marquee:hover{animation-play-state:paused}
+@keyframes scroll{to{transform:translateX(-50%)}}
+.marquee span{font-family:var(--font-head);font-weight:600;font-size:1.15rem;color:var(--muted2);white-space:nowrap;display:inline-flex;align-items:center;gap:12px}
+.marquee span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--indigo)}
+
+/* ============ STATS ============ */
+.stats{padding:90px 0}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.stat{padding:30px 26px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(180deg,var(--surface),transparent)}
+.stat-n{font-family:var(--font-head);font-weight:700;font-size:2.6rem;letter-spacing:-.02em;
+  background:linear-gradient(120deg,#fff,#818cf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat-l{color:var(--muted);font-size:.96rem;margin-top:6px}
+
+/* ============ PLATFORMS (path select) ============ */
+.platforms{padding:90px 0}
+.plat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+.pcard{position:relative;padding:32px;border:1px solid var(--border);border-radius:var(--radius-lg);
+  background:var(--surface);overflow:hidden;transition:transform .35s var(--ease),border-color .35s;will-change:transform}
+.pcard::before{content:"";position:absolute;inset:0;opacity:0;transition:opacity .4s;
+  background:radial-gradient(120% 120% at 0% 0%,var(--pc-soft),transparent 55%)}
+.pcard:hover{transform:translateY(-6px);border-color:var(--pc)}
+.pcard:hover::before{opacity:1}
+.pcard.feature{grid-column:span 2;display:flex;gap:36px;align-items:center}
+.pcard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.pc-logo{display:inline-flex;align-items:center;gap:13px}
+.pc-icon{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;
+  background:var(--pc-soft);border:1px solid var(--pc-bd);color:var(--pc);position:relative}
+.pc-icon svg{width:26px;height:26px}
+.pc-name{font-family:var(--font-head);font-weight:700;font-size:1.32rem;letter-spacing:-.01em}
+.pc-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--pc);letter-spacing:.06em;text-transform:uppercase}
+.pc-desc{color:var(--muted);font-size:1rem;line-height:1.6;margin-bottom:24px;position:relative;z-index:1}
+.pcard.feature .pc-desc{font-size:1.08rem}
+.pc-foot{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.pc-link{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--pc);font-size:.96rem;transition:gap .25s}
+.pcard:hover .pc-link{gap:13px}
+.pc-meta{font-size:.84rem;color:var(--muted2);display:flex;align-items:center;gap:8px}
+.pc-feature-body{flex:1}
+.pc-feature-visual{flex:0 0 230px;height:180px;border-radius:18px;border:1px solid var(--pc-bd);
+  background:linear-gradient(160deg,var(--pc-soft),transparent);display:grid;place-items:center;position:relative;overflow:hidden}
+.pc-feature-visual .big-icon{width:84px;height:84px;color:var(--pc);opacity:.85}
+.pc-feature-visual::after{content:"";position:absolute;inset:0;
+  background-image:linear-gradient(var(--pc-bd) 1px,transparent 1px),linear-gradient(90deg,var(--pc-bd) 1px,transparent 1px);
+  background-size:26px 26px;opacity:.4;mask-image:radial-gradient(circle at 70% 30%,#000,transparent 70%)}
+
+/* ============ HOW ============ */
+.how{padding:90px 0}
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;counter-reset:step}
+.how-card{padding:32px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);position:relative;transition:transform .3s var(--ease),border-color .3s}
+.how-card:hover{transform:translateY(-5px);border-color:var(--border-strong)}
+.how-card::before{counter-increment:step;content:"0" counter(step);font-family:var(--font-mono);
+  font-size:.9rem;color:var(--indigo-2);background:rgba(99,102,241,.1);border:1px solid var(--border);
+  width:46px;height:46px;border-radius:12px;display:grid;place-items:center;margin-bottom:20px}
+.how-h{font-family:var(--font-head);font-weight:600;font-size:1.22rem;margin-bottom:10px}
+.how-p{color:var(--muted);font-size:.98rem}
+
+/* ============ WHY / values ============ */
+.why{padding:90px 0}
+.why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.vcard{padding:30px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(180deg,var(--surface),transparent);transition:transform .3s var(--ease),border-color .3s}
+.vcard:hover{transform:translateY(-5px);border-color:var(--border-strong)}
+.v-icon{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;color:var(--indigo-2);
+  background:rgba(99,102,241,.1);border:1px solid var(--border);margin-bottom:20px}
+.v-icon svg{width:24px;height:24px}
+.v-h{font-family:var(--font-head);font-weight:600;font-size:1.18rem;margin-bottom:9px}
+.v-p{color:var(--muted);font-size:.97rem}
+
+/* ============ CTA ============ */
+.cta{padding:60px 0 100px}
+.cta-box{position:relative;border-radius:var(--radius-lg);padding:64px 48px;text-align:center;overflow:hidden;
+  border:1px solid var(--border-strong);background:linear-gradient(135deg,rgba(99,102,241,.14),rgba(124,58,237,.08))}
+.cta-box::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(ellipse 60% 80% at 50% 0%,rgba(129,140,248,.25),transparent 70%)}
+.cta-h{font-family:var(--font-head);font-weight:700;font-size:clamp(2rem,4.5vw,3.2rem);line-height:1.06;letter-spacing:-.02em;position:relative;margin-bottom:18px}
+.cta-p{color:var(--muted);font-size:1.12rem;max-width:480px;margin:0 auto 34px;position:relative}
+.cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative}
+
+/* ============ FOOTER ============ */
+footer{border-top:1px solid var(--border);padding:64px 0 40px;position:relative;z-index:2}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
+.foot-about{max-width:300px}
+.foot-about p{color:var(--muted);font-size:.95rem;margin-top:16px}
+.foot-col h4{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2);margin-bottom:16px}
+.foot-col a{display:block;color:var(--muted);font-size:.95rem;padding:6px 0;transition:color .2s,transform .2s}
+.foot-col a:hover{color:var(--text);transform:translateX(3px)}
+.foot-bot{display:flex;align-items:center;justify-content:space-between;padding-top:28px;border-top:1px solid var(--border);flex-wrap:wrap;gap:16px}
+.foot-bot p{color:var(--muted2);font-size:.88rem;font-family:var(--font-mono)}
+.foot-socials{display:flex;gap:12px}
+.foot-socials a{width:38px;height:38px;border-radius:11px;border:1px solid var(--border);display:grid;place-items:center;color:var(--muted);transition:all .25s}
+.foot-socials a:hover{color:var(--text);border-color:var(--border-strong);transform:translateY(-2px)}
+.foot-socials svg{width:18px;height:18px}
+
+/* ============ REVEAL ANIM ============ */
+[data-reveal]{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+[data-reveal].in{opacity:1;transform:none}
+[data-reveal][data-delay="1"]{transition-delay:.08s}
+[data-reveal][data-delay="2"]{transition-delay:.16s}
+[data-reveal][data-delay="3"]{transition-delay:.24s}
+
+/* ============ RESPONSIVE ============ */
+@media(max-width:920px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .how-grid,.why-grid{grid-template-columns:1fr}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:32px}
+}
+@media(max-width:720px){
+  .nav-links{display:none}
+  .nav-burger{display:flex}
+  .nav-cta .btn-ghost{display:none}
+  .plat-grid{grid-template-columns:1fr}
+  .pcard.feature{grid-column:span 1;flex-direction:column;align-items:stretch}
+  .pc-feature-visual{flex-basis:auto;width:100%}
+  .hero{padding:140px 0 60px}
+  .cta-box{padding:46px 26px}
+  .foot-grid{grid-template-columns:1fr 1fr}
+  .foot-about{grid-column:span 2}
+}
+@media(max-width:460px){
+  .stats-grid{grid-template-columns:1fr}
+  .foot-grid{grid-template-columns:1fr}
+  .foot-about{grid-column:span 1}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto}
+  [data-reveal]{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- BACKDROP -->
+<div class="bg-fx" aria-hidden="true">
+  <div class="orb a"></div>
+  <div class="orb b"></div>
+  <div class="orb c"></div>
+  <div class="grid-overlay"></div>
+</div>
+<div class="noise" aria-hidden="true"></div>
+
+<!-- NAV -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="logo" href="#top" aria-label="Alzaro Group home">
+      <span class="logo-mark"><span>A</span></span>
+      Alzaro
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#platforms">Platforms</a>
+      <a href="#how">How it works</a>
+      <a href="#why">Why Alzaro</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="#platforms" class="btn btn-ghost">Sign in</a>
+      <a href="#contact" class="btn btn-primary">Get started</a>
+      <button class="nav-burger" id="burger" aria-label="Open menu" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <span class="badge" data-reveal><span class="dot"></span> UK-built business software · Five specialist platforms</span>
+    <h1 class="hero-h1" data-reveal data-delay="1">One brand.<br><span class="grad-text">Five platforms.</span></h1>
+    <p class="hero-sub" data-reveal data-delay="2">Alzaro builds specialist business software for the UK — covering automotive, trades, solo work and property. Each platform does one job, and does it brilliantly.</p>
+    <div class="hero-cta" data-reveal data-delay="3">
+      <a href="#platforms" class="btn btn-primary btn-lg">Explore the platforms
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a href="#contact" class="btn btn-ghost btn-lg">Talk to us</a>
+    </div>
+    <p class="hero-note" data-reveal data-delay="3">No bloat · No enterprise lock-in · Built for the way you actually work</p>
+
+    <div class="product-orbit" data-reveal data-delay="3">
+      <a href="#platforms" class="p-pill" style="--pc:var(--tyre)"><i></i>TyreOps</a>
+      <a href="#platforms" class="p-pill" style="--pc:var(--garage)"><i></i>GarageOps</a>
+      <a href="#platforms" class="p-pill" style="--pc:var(--service)"><i></i>ServiceOps</a>
+      <a href="#platforms" class="p-pill" style="--pc:var(--solo)"><i></i>SoloOps</a>
+      <a href="#platforms" class="p-pill" style="--pc:var(--property)"><i></i>PropertyOps</a>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST MARQUEE -->
+<section class="trust">
+  <div class="trust-label">Trusted by UK workshops, trades &amp; property professionals</div>
+  <div class="marquee" aria-hidden="true">
+    <span>Tyre retailers</span><span>Automotive workshops</span><span>Tradespeople</span><span>Sole traders</span><span>Letting agents</span><span>Landlords</span><span>Service engineers</span><span>Freelancers</span>
+    <span>Tyre retailers</span><span>Automotive workshops</span><span>Tradespeople</span><span>Sole traders</span><span>Letting agents</span><span>Landlords</span><span>Service engineers</span><span>Freelancers</span>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="wrap">
+    <div class="stats-grid">
+      <div class="stat" data-reveal><div class="stat-n">5</div><div class="stat-l">Specialist platforms, one standard</div></div>
+      <div class="stat" data-reveal data-delay="1"><div class="stat-n">100%</div><div class="stat-l">Built &amp; supported in the UK</div></div>
+      <div class="stat" data-reveal data-delay="2"><div class="stat-n">1</div><div class="stat-l">Job each — done properly</div></div>
+      <div class="stat" data-reveal data-delay="3"><div class="stat-n">0</div><div class="stat-l">Enterprise bloat or lock-in</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORMS -->
+<section class="platforms" id="platforms">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="eyebrow">The platforms</span>
+      <h2 class="sec-h">We don't do everything.<br>We do <span class="grad-text">five things</span> right.</h2>
+      <p class="sec-sub">Pick the platform built for your trade. Each one is purpose-made — not a generic tool bent into shape.</p>
+    </div>
+
+    <div class="plat-grid">
+
+      <!-- TyreOps (feature) -->
+      <article class="pcard feature" data-reveal style="--pc:var(--tyre);--pc-soft:rgba(59,130,246,.12);--pc-bd:rgba(59,130,246,.3)">
+        <div class="pc-feature-body">
+          <div class="pcard-top">
+            <div class="pc-logo">
+              <span class="pc-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+              </span>
+              <div><div class="pc-name">TyreOps</div><div class="pc-tag">Automotive · Tyre retail</div></div>
+            </div>
+          </div>
+          <p class="pc-desc">A purpose-built tyre garage management platform for UK tyre retailers. FIFO batch tracking, stock, bookings and invoicing — the tools to run a more profitable, more organised business.</p>
+          <div class="pc-foot">
+            <a href="https://tyreops.co.uk" target="_blank" rel="noopener" class="pc-link">Visit TyreOps
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+            </a>
+            <span class="pc-meta">Flagship platform</span>
+          </div>
+        </div>
+        <div class="pc-feature-visual" aria-hidden="true">
+          <svg class="big-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M5.6 5.6l2.5 2.5M15.9 15.9l2.5 2.5M18.4 5.6l-2.5 2.5M8.1 15.9l-2.5 2.5"/></svg>
+        </div>
+      </article>
+
+      <!-- GarageOps -->
+      <article class="pcard" data-reveal data-delay="1" style="--pc:var(--garage);--pc-soft:rgba(239,68,68,.12);--pc-bd:rgba(239,68,68,.3)">
+        <div class="pcard-top">
+          <div class="pc-logo">
+            <span class="pc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6 2 2 6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-1.4-1.4 2.3-2.3z"/></svg>
+            </span>
+            <div><div class="pc-name">GarageOps</div><div class="pc-tag">Automotive workshops</div></div>
+          </div>
+        </div>
+        <p class="pc-desc">Full-service garage management for UK automotive workshops. Job cards, technician scheduling and invoicing — less time on admin, more time on the ramp.</p>
+        <div class="pc-foot">
+          <a href="https://garageops.co.uk" target="_blank" rel="noopener" class="pc-link">Visit GarageOps
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- ServiceOps -->
+      <article class="pcard" data-reveal data-delay="2" style="--pc:var(--service);--pc-soft:rgba(34,197,94,.12);--pc-bd:rgba(34,197,94,.3)">
+        <div class="pcard-top">
+          <div class="pc-logo">
+            <span class="pc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18M3 12h18M3 17h11"/><circle cx="18.5" cy="17.5" r="2.5"/></svg>
+            </span>
+            <div><div class="pc-name">ServiceOps</div><div class="pc-tag">Trades &amp; field service</div></div>
+          </div>
+        </div>
+        <p class="pc-desc">For tradespeople who need to manage their work, clients and schedule — without the complexity of enterprise software getting in the way.</p>
+        <div class="pc-foot">
+          <a href="https://serviceops.co.uk" target="_blank" rel="noopener" class="pc-link">Visit ServiceOps
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- SoloOps -->
+      <article class="pcard" data-reveal data-delay="1" style="--pc:var(--solo);--pc-soft:rgba(249,115,22,.12);--pc-bd:rgba(249,115,22,.3)">
+        <div class="pcard-top">
+          <div class="pc-logo">
+            <span class="pc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            </span>
+            <div><div class="pc-name">SoloOps</div><div class="pc-tag">Self-employed</div></div>
+          </div>
+        </div>
+        <p class="pc-desc">Built for the self-employed — sole traders, freelancers and independent operators who need to stay on top of their business without the overhead.</p>
+        <div class="pc-foot">
+          <a href="https://soloops.co.uk" target="_blank" rel="noopener" class="pc-link">Visit SoloOps
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- PropertyOps -->
+      <article class="pcard" data-reveal data-delay="2" style="--pc:var(--property);--pc-soft:rgba(234,179,8,.12);--pc-bd:rgba(234,179,8,.3)">
+        <div class="pcard-top">
+          <div class="pc-logo">
+            <span class="pc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+            </span>
+            <div><div class="pc-name">PropertyOps</div><div class="pc-tag">Property management</div></div>
+          </div>
+        </div>
+        <p class="pc-desc">A property management platform for UK landlords, letting agents and property managers. Tenancies, rent tracking and maintenance — everything in one place.</p>
+        <div class="pc-foot">
+          <a href="https://propertyops.co.uk" target="_blank" rel="noopener" class="pc-link">Visit PropertyOps
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17L17 7M9 7h8v8"/></svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="eyebrow">How it works</span>
+      <h2 class="sec-h">One standard across every platform</h2>
+      <p class="sec-sub">Whichever Alzaro platform you choose, you get the same promise: focused software, honest pricing and real UK support.</p>
+    </div>
+    <div class="how-grid">
+      <div class="how-card" data-reveal>
+        <h3 class="how-h">Find your platform</h3>
+        <p class="how-p">Tell us your trade and we'll point you to the platform purpose-built for it — no generic one-size-fits-all tool.</p>
+      </div>
+      <div class="how-card" data-reveal data-delay="1">
+        <h3 class="how-h">Get set up fast</h3>
+        <p class="how-p">Clean onboarding, sensible defaults and import help. You're running your business properly in days, not months.</p>
+      </div>
+      <div class="how-card" data-reveal data-delay="2">
+        <h3 class="how-h">Grow with us</h3>
+        <p class="how-p">As your business expands, the platform keeps up — and the rest of the Alzaro family is right there when you need it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="why" id="why">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="eyebrow">Why Alzaro</span>
+      <h2 class="sec-h">Five specialists.<br>One standard.</h2>
+      <p class="sec-sub">We started with TyreOps, then GarageOps — then kept going into servicing, solo traders and property. Each platform came from a real gap, not a roadmap.</p>
+    </div>
+    <div class="why-grid">
+      <div class="vcard" data-reveal>
+        <div class="v-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2L12 16.6 5.7 21l2.3-7.2-6-4.4h7.6z"/></svg></div>
+        <h3 class="v-h">Built for one job</h3>
+        <p class="v-p">No bloated all-in-one. Every platform is shaped around a single trade, so it fits how you actually work.</p>
+      </div>
+      <div class="vcard" data-reveal data-delay="1">
+        <div class="v-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3 class="v-h">UK through and through</h3>
+        <p class="v-p">Designed, built and supported in the UK — for UK businesses, UK rules and UK customers.</p>
+      </div>
+      <div class="vcard" data-reveal data-delay="2">
+        <div class="v-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div>
+        <h3 class="v-h">No lock-in, no nonsense</h3>
+        <p class="v-p">Honest pricing, your data when you want it, and software that respects your time. The way it should be.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="contact">
+  <div class="wrap">
+    <div class="cta-box" data-reveal>
+      <h2 class="cta-h">Ready to explore<br>your platform?</h2>
+      <p class="cta-p">Tell us about your business and we'll help you find the right fit — or get you started today.</p>
+      <div class="cta-row">
+        <a href="#platforms" class="btn btn-primary btn-lg">Explore the platforms
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a href="mailto:hello@alzaro.co.uk" class="btn btn-ghost btn-lg">hello@alzaro.co.uk</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-about">
+        <a class="logo" href="#top"><span class="logo-mark"><span>A</span></span> Alzaro</a>
+        <p>One brand. Five specialist platforms for UK business — automotive, trades, solo work and property.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Platforms</h4>
+        <a href="https://tyreops.co.uk" target="_blank" rel="noopener">TyreOps</a>
+        <a href="https://garageops.co.uk" target="_blank" rel="noopener">GarageOps</a>
+        <a href="https://serviceops.co.uk" target="_blank" rel="noopener">ServiceOps</a>
+        <a href="https://soloops.co.uk" target="_blank" rel="noopener">SoloOps</a>
+        <a href="https://propertyops.co.uk" target="_blank" rel="noopener">PropertyOps</a>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <a href="#why">Why Alzaro</a>
+        <a href="#how">How it works</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Cookies</a>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <p>© <span id="year"></span> Alzaro Group · Built in the UK</p>
+      <div class="foot-socials">
+        <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2 3.77-2C20.3 8.7 21 11 21 14.3V21h-4v-6c0-1.4 0-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H9z"/></svg></a>
+        <a href="#" aria-label="X"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h3l-7.5 8.6L22.5 22H15l-5-6.6L4.3 22H1.3l8-9.2L1.5 2H9l4.5 6zM16.5 20h1.7L7.6 3.9H5.8z"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // year
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // nav scrolled state
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
+  onScroll();
+  window.addEventListener('scroll', onScroll, {passive:true});
+
+  // burger (mobile) — simple toggle scrolls to platforms for this static demo
+  const burger = document.getElementById('burger');
+  burger?.addEventListener('click', () => {
+    document.getElementById('platforms').scrollIntoView({behavior:'smooth'});
+  });
+
+  // scroll reveal
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const items = document.querySelectorAll('[data-reveal]');
+  if (reduce || !('IntersectionObserver' in window)) {
+    items.forEach(el => el.classList.add('in'));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+    }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+    items.forEach(el => io.observe(el));
+  }
+
+  // subtle magnetic tilt on platform cards (pointer devices only)
+  if (matchMedia('(pointer:fine)').matches && !reduce) {
+    document.querySelectorAll('.pcard').forEach(card => {
+      card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left)/r.width - .5;
+        const y = (e.clientY - r.top)/r.height - .5;
+        card.style.transform = `translateY(-6px) rotateX(${(-y*4).toFixed(2)}deg) rotateY(${(x*4).toFixed(2)}deg)`;
+      });
+      card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+    });
+  }
+</script>
+</body>
+</html>
