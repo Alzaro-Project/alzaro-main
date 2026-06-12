@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
-import { StatCard, Card, PageHeader, Btn } from '../components/UI'
+import { PageHeader } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import WelcomeBanner from '../components/WelcomeBanner'
 
@@ -33,6 +33,104 @@ function filterByPeriod(invoices, period, customFrom, customTo) {
     if (period === 'year') return d.getFullYear() === now.getFullYear()
     return true
   })
+}
+
+// Interactive stat card: 3D tilt that follows the cursor, hover lift/glow,
+// click-through navigation with an arrow hint. Pass `to` for navigation or
+// `onClick` for custom behaviour (e.g. the Revenue/COGS dropdowns).
+function DashCard({ label, value, delta, color = 'var(--text)', onClick, hint, index = 0 }) {
+  const ref = useRef(null)
+  const [transform, setTransform] = useState('')
+  const [hover, setHover] = useState(false)
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    setTransform(`perspective(700px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-4px) scale(1.02)`)
+  }
+  const onLeave = () => { setTransform(''); setHover(false) }
+
+  return (
+    <div
+      ref={ref}
+      className="dash-card"
+      onMouseMove={onMove}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={onLeave}
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px',
+        cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden',
+        transform, animationDelay: `${index * 60}ms`,
+      }}
+    >
+      {/* soft glow that follows hover */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: hover ? 1 : 0, transition: 'opacity .25s',
+        background: `radial-gradient(420px circle at 30% 0%, color-mix(in srgb, ${color} 14%, transparent), transparent 70%)`,
+      }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>{label}</div>
+        {onClick && (
+          <div style={{
+            fontSize: '13px', color, transition: 'transform .2s, opacity .2s',
+            opacity: hover ? 1 : 0.35, transform: hover ? 'translateX(2px)' : 'none',
+          }}>→</div>
+        )}
+      </div>
+      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '24px', fontWeight: 500, marginTop: '5px', marginBottom: '3px', color }}>{value}</div>
+      {delta && <div style={{ fontSize: '11px', color: 'var(--text2)' }}>{hover && hint ? hint : delta}</div>}
+    </div>
+  )
+}
+
+
+function TiltPanel({ title, accent = 'var(--text2)', onClick, children, index = 0 }) {
+  const ref = useRef(null)
+  const [transform, setTransform] = useState('')
+  const [hover, setHover] = useState(false)
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    setTransform(`perspective(900px) rotateX(${(-y * 2.5).toFixed(2)}deg) rotateY(${(x * 3.5).toFixed(2)}deg) translateY(-3px)`)
+  }
+  const onLeave = () => { setTransform(''); setHover(false) }
+
+  return (
+    <div
+      ref={ref}
+      className="dash-card"
+      onMouseMove={onMove}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={onLeave}
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px',
+        cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden',
+        transform, animationDelay: `${index * 60}ms`,
+      }}
+    >
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: hover ? 1 : 0, transition: 'opacity .25s',
+        background: `radial-gradient(560px circle at 25% 0%, color-mix(in srgb, ${accent} 10%, transparent), transparent 70%)`,
+      }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>{title}</div>
+        {onClick && (
+          <div style={{
+            fontSize: '13px', color: accent, transition: 'transform .2s, opacity .2s',
+            opacity: hover ? 1 : 0.35, transform: hover ? 'translateX(2px)' : 'none',
+          }}>→</div>
+        )}
+      </div>
+      {children}
+    </div>
+  )
 }
 
 export default function Dashboard() {
@@ -126,19 +224,17 @@ export default function Dashboard() {
 
       {/* Stat Cards - Clickable Revenue and COGS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '18px' }} className="stat-grid">
-        {/* Revenue Card - Clickable */}
+        {/* Revenue Card - dropdown breakdown */}
         <div style={{ position: 'relative' }}>
-          <div 
+          <DashCard
+            label="Revenue ▾"
+            value={`£${revenue.toFixed(2)}`}
+            delta={`${filtered.length} invoices`}
+            hint="Click for breakdown"
+            color="var(--accent)"
+            index={0}
             onClick={() => { setShowRevenueDropdown(!showRevenueDropdown); setShowCOGSDropdown(false) }}
-            style={{ cursor: 'pointer' }}
-          >
-            <StatCard 
-              label="Revenue ▾" 
-              value={`£${revenue.toFixed(2)}`} 
-              delta={`${filtered.length} invoices`} 
-              color="var(--accent)" 
-            />
-          </div>
+          />
           {showRevenueDropdown && (
             <InvoiceDropdown 
               title="Revenue Breakdown"
@@ -152,18 +248,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* COGS Card - Clickable */}
+        {/* COGS Card - dropdown breakdown */}
         <div style={{ position: 'relative' }}>
-          <div 
+          <DashCard
+            label="Cost of Sales ▾"
+            value={`£${cogs.toFixed(2)}`}
+            delta={`${tyresSold} tyres sold`}
+            hint="Click for breakdown"
+            index={1}
             onClick={() => { setShowCOGSDropdown(!showCOGSDropdown); setShowRevenueDropdown(false) }}
-            style={{ cursor: 'pointer' }}
-          >
-            <StatCard 
-              label="Cost of Sales ▾" 
-              value={`£${cogs.toFixed(2)}`} 
-              delta={`${tyresSold} tyres sold`} 
-            />
-          </div>
+          />
           {showCOGSDropdown && (
             <InvoiceDropdown 
               title="Cost Breakdown"
@@ -177,34 +271,31 @@ export default function Dashboard() {
           )}
         </div>
 
-        <StatCard label="Gross Profit" value={`£${profit.toFixed(2)}`} delta={`${margin}% margin`} color="var(--green)" />
-        <StatCard label="Stock Value" value={`£${stockVal.toFixed(2)}`} delta={`${activeBatches} active batches`} color="var(--blue)" />
+        <DashCard label="Gross Profit" value={`£${profit.toFixed(2)}`} delta={`${margin}% margin`} hint="View invoices →" color="var(--green)" index={2} onClick={() => navigate('/invoices')} />
+        <DashCard label="Stock Value" value={`£${stockVal.toFixed(2)}`} delta={`${activeBatches} active batches`} hint="View inventory →" color="var(--blue)" index={3} onClick={() => navigate('/inventory')} />
       </div>
 
       {/* Gold content */}
       {isGold ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
-            <Card>
-              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: '12px', fontFamily: 'DM Mono, monospace' }}>Monthly P&L</div>
+            <TiltPanel title="Monthly P&L" accent="var(--accent)" index={4} onClick={() => navigate('/invoices')}>
               <PLChart invoices={invoices} />
-            </Card>
-            <Card>
-              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: '12px', fontFamily: 'DM Mono, monospace' }}>Top Selling Tyres</div>
+            </TiltPanel>
+            <TiltPanel title="Top Selling Tyres" accent="var(--teal)" index={5} onClick={() => navigate('/inventory')}>
               <TopTyres invoices={filtered} skus={skus} />
-            </Card>
+            </TiltPanel>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
-            <Card>
-              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', marginBottom: '12px', fontFamily: 'DM Mono, monospace' }}>Stock Alerts</div>
+            <TiltPanel title="Stock Alerts" accent="var(--red)" index={6} onClick={() => navigate('/inventory', { state: { tab: 'low' } })}>
               <StockAlerts lowStock={lowStock} getTotalStock={getTotalStock} />
-            </Card>
+            </TiltPanel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignContent: 'start' }}>
-              <StatCard label="Used Tyre Revenue" value={`£${usedRev.toFixed(2)}`} delta="Part-ex resales" color="var(--teal)" />
-              <StatCard label="Active Batches" value={activeBatches} delta="FIFO tracking" />
-              <StatCard label="Used in Stock" value={usedTyres.filter(u => !u.sold).length} delta="Available" color="var(--teal)" />
-              <StatCard label="Total SKUs" value={skus.length} delta="Tyre types" />
+              <DashCard label="Used Tyre Revenue" value={`£${usedRev.toFixed(2)}`} delta="Part-ex resales" hint="View used stock →" color="var(--teal)" index={7} onClick={() => navigate('/inventory', { state: { tab: 'used' } })} />
+              <DashCard label="Active Batches" value={activeBatches} delta="FIFO tracking" hint="View purchases →" index={8} onClick={() => navigate('/purchases')} />
+              <DashCard label="Used in Stock" value={usedTyres.filter(u => !u.sold).length} delta="Available" hint="View used stock →" color="var(--teal)" index={9} onClick={() => navigate('/inventory', { state: { tab: 'used' } })} />
+              <DashCard label="Total SKUs" value={skus.length} delta="Tyre types" hint="View inventory →" index={10} onClick={() => navigate('/inventory')} />
             </div>
           </div>
         </>
