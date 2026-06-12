@@ -669,6 +669,18 @@
       card.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
     });
   });
+
+  // Make whole platform card clickable (goes to same page as its Visit button)
+  document.querySelectorAll('.platform-card').forEach(function(card){
+    var btn = card.querySelector('.pc-btn');
+    if (!btn) return;
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', function(e){
+      if (e.target.closest('a')) return;            // button itself already navigates
+      if (window.getSelection().toString()) return; // don't hijack text selection
+      window.open(btn.href, btn.target || '_self');
+    });
+  });
 })();
 </script>
 </body>
