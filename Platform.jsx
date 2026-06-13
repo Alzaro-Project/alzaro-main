@@ -30,6 +30,7 @@ function Platform() {
   const [busy, setBusy] = useState(null) // user_id currently toggling
   const [planBusy, setPlanBusy] = useState(null) // user_id+product currently saving plan
   const [expanded, setExpanded] = useState(null) // user_id currently expanded
+  const [showAdmins, setShowAdmins] = useState(false)
 
   // call the admin-users edge function with the current session token
   const callFn = async (body) => {
@@ -169,6 +170,7 @@ function Platform() {
         </div>
         <div style={{ display:'flex', gap:'10px' }}>
           <button onClick={loadUsers} style={btnSec}>↻ Refresh</button>
+          <button onClick={()=>setShowAdmins(true)} style={{...btnSec, color:'var(--orange-light)', borderColor:'rgba(249,115,22,.3)'}}>+ Admins</button>
           <button onClick={signOut} style={btnSec}>Sign out</button>
         </div>
       </div>
@@ -285,6 +287,8 @@ function Platform() {
           </div>
         )}
       </div>
+
+      {showAdmins && <AdminModal callFn={callFn} onClose={()=>{ setShowAdmins(false); loadUsers() }} />}
     </div>
   )
 }
@@ -317,6 +321,80 @@ function Field({label,value,onChange,type,onEnter}) {
         onKeyDown={e=>{ if(e.key==='Enter' && onEnter) onEnter() }}
         style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 13px', color:'var(--text)', fontSize:'14px', fontFamily:'Manrope, sans-serif' }}
       />
+    </div>
+  )
+}
+
+function AdminModal({ callFn, onClose }) {
+  const [admins, setAdmins] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [msg, setMsg] = useState('')
+  const [working, setWorking] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await callFn({ action: 'list-admins' })
+    if (res && res.admins) setAdmins(res.admins)
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const add = async () => {
+    setMsg(''); setWorking(true)
+    const res = await callFn({ action: 'add-admin', email: email.trim(), password: pw })
+    setWorking(false)
+    if (res && res.error) { setMsg(res.error); return }
+    setMsg(res.created ? 'New admin login created and granted.' : 'Existing user granted admin.')
+    setEmail(''); setPw(''); await load()
+  }
+
+  const remove = async (e) => {
+    if (!confirm(`Remove admin access for ${e}? Their login stays, but they lose /platform access.`)) return
+    setWorking(true)
+    const res = await callFn({ action: 'remove-admin', email: e })
+    setWorking(false)
+    if (res && res.error) { setMsg(res.error); return }
+    await load()
+  }
+
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ ...card, width:'100%', maxWidth:'460px', maxHeight:'85vh', overflowY:'auto' }} className="fade-in">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px' }}>
+          <div style={{ fontSize:'18px', fontWeight:800 }}>Platform admins</div>
+          <button onClick={onClose} style={{ ...btnSec, padding:'6px 12px' }}>✕</button>
+        </div>
+
+        {/* current admins */}
+        {loading ? <div style={{color:'var(--text3)',fontSize:'13px'}}>Loading…</div> : (
+          <div style={{ display:'grid', gap:'8px', marginBottom:'22px' }}>
+            {admins.map(a => (
+              <div key={a.email} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', padding:'10px 12px' }}>
+                <span style={{ fontSize:'13.5px' }}>{a.email}</span>
+                <button onClick={()=>remove(a.email)} disabled={working}
+                  style={{ ...btnSec, padding:'5px 10px', color:'var(--red)', borderColor:'rgba(239,68,68,.3)' }}>Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* add new */}
+        <div style={{ borderTop:'1px solid var(--border)', paddingTop:'18px' }}>
+          <div style={{ fontWeight:700, fontSize:'14px', marginBottom:'12px' }}>Add an admin</div>
+          <Field label="Email" value={email} onChange={setEmail} type="email" />
+          <Field label="Password (only needed if they have no login yet)" value={pw} onChange={setPw} type="password" />
+          {msg && <div style={{ fontSize:'13px', color: msg.includes('granted')||msg.includes('created') ? 'var(--green)':'var(--red)', margin:'2px 0 12px' }}>{msg}</div>}
+          <button onClick={add} disabled={working || !email.trim()}
+            style={{ width:'100%', background:'linear-gradient(135deg, var(--orange), var(--amber))', color:'#fff', fontWeight:800, fontSize:'14px', padding:'11px', borderRadius:'10px', border:'none', cursor:'pointer', opacity:(working||!email.trim())?0.6:1 }}>
+            {working ? 'Working…' : 'Add admin'}
+          </button>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'10px', lineHeight:1.5 }}>
+            If the email already has an Alzaro login, just leave the password blank — we'll grant admin to their existing account. Otherwise set a password to create their login.
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
