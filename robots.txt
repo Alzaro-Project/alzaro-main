@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Keep app/auth internals out of search results
+Disallow: /platform
+Disallow: /confirmed
+Disallow: /*/login
+Disallow: /*/register
+Disallow: /*/dashboard
+Disallow: /*/reset-password
+Disallow: /*/forgot-password
+Disallow: /*/admin
+
+Sitemap: https://alzaro.co.uk/sitemap.xml
