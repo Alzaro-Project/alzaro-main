@@ -47,7 +47,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
         </div>
         {!isAdmin && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, fontFamily: 'DM Mono, monospace', background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: 'uppercase' }}>
-            {TIER_META[tier]?.icon} {tier}
+            <span>{tierStyle.icon}</span> {tier}
           </div>
         )}
       </div>
