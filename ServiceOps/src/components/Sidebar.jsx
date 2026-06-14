@@ -18,7 +18,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
   const location = useLocation()
   const { user, tier, isAdmin, logout, settings } = useStore()
 
-  const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.starter
+  const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.bronze
   const isDark = getTheme() === 'dark'
 
   const toggleTheme = () => { applyTheme(isDark ? 'light' : 'dark'); window.dispatchEvent(new Event('storage')) }
