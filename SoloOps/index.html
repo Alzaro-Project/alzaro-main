@@ -4,1464 +4,442 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alzaro SoloOps — Simple Business Tools for UK Sole Traders</title>
-  <link rel="canonical" href="https://alzaro.co.uk/soloops">
-  <link rel="icon" type="image/svg+xml" href="/soloops/favicon.svg">
-  <link rel="apple-touch-icon" href="/soloops/favicon.svg">
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Alzaro">
-  <meta property="og:title" content="Alzaro SoloOps — Simple Business Tools for UK Sole Traders">
-  <meta property="og:description" content="Invoicing, expense tracking, mileage logs & tax estimates for freelancers and sole traders. Built in the UK. Start your 14-day free trial.">
-  <meta property="og:url" content="https://alzaro.co.uk/soloops">
-  <meta property="og:image" content="https://alzaro.co.uk/favicon.svg">
-  <meta property="og:locale" content="en_GB">
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Alzaro SoloOps — Simple Business Tools for UK Sole Traders">
-  <meta name="twitter:description" content="Invoicing, expense tracking, mileage logs & tax estimates for freelancers and sole traders. Built in the UK. Start your 14-day free trial.">
-  <meta name="twitter:image" content="https://alzaro.co.uk/favicon.svg">
-  <meta name="robots" content="index, follow">
   <meta name="description" content="Invoicing, expense tracking, mileage logs & tax estimates for freelancers and sole traders. Built in the UK. Start your 14-day free trial.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    :root {
-      --bg: #0a0908;
-      --surface: #121110;
-      --surface2: #1a1816;
-      --surface3: #23201d;
-      --border: rgba(255,255,255,0.06);
-      --border-light: rgba(255,255,255,0.1);
-      --text: #faf9f7;
-      --text2: #a8a29e;
-      --text3: #68635d;
-      --orange: #f97316;
-      --orange-light: #fb923c;
-      --orange-dark: #c2410c;
-      --orange-glow: rgba(249,115,22,0.35);
-      --orange-subtle: rgba(249,115,22,0.08);
-      --amber: #f59e0b;
-      --yellow: #eab308;
-      --blue: #3b82f6;
-      --green: #22c55e;
-      --red: #ef4444;
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#100b07;
+      --bg2:#130e09;
+      --surface:#181109;
+      --surface2:#241810;
+      --line:rgba(255,255,255,0.06);
+      --line2:rgba(255,255,255,0.12);
+      --text:#fbf6f1;
+      --text2:#ab9d8f;
+      --text3:#6b5d4f;
+      --orange:#f97316;
+      --orange-light:#fb923c;
+      --orange-subtle:rgba(249,115,22,0.08);
+      --orange-glow:rgba(249,115,22,0.35);
+      --green:#22c55e;
+      --amber:#f59e0b;
+      --blue:#38bdf8;
+      --mono:'JetBrains Mono',monospace;
     }
-    
-    html { scroll-behavior: smooth; }
-    
-    body {
-      font-family: 'Manrope', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
+    html{scroll-behavior:smooth}
+    @media (prefers-reduced-motion:reduce){
+      html{scroll-behavior:auto}
+      *,*::before,*::after{animation-duration:0.001s!important;transition-duration:0.001s!important}
     }
-    
-    /* ===== SCROLL ANIMATIONS ===== */
-    .reveal {
-      opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 0.8s ease, transform 0.8s ease;
-    }
-    
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    
-    .reveal-left {
-      opacity: 0;
-      transform: translateX(-50px);
-      transition: opacity 0.8s ease, transform 0.8s ease;
-    }
-    
-    .reveal-left.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    
-    .reveal-right {
-      opacity: 0;
-      transform: translateX(50px);
-      transition: opacity 0.8s ease, transform 0.8s ease;
-    }
-    
-    .reveal-right.visible {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    
-    .reveal-scale {
-      opacity: 0;
-      transform: scale(0.9);
-      transition: opacity 0.8s ease, transform 0.8s ease;
-    }
-    
-    .reveal-scale.visible {
-      opacity: 1;
-      transform: scale(1);
-    }
-    
-    .stagger-1 { transition-delay: 0.1s; }
-    .stagger-2 { transition-delay: 0.2s; }
-    .stagger-3 { transition-delay: 0.3s; }
-    .stagger-4 { transition-delay: 0.4s; }
-    .stagger-5 { transition-delay: 0.5s; }
-    .stagger-6 { transition-delay: 0.6s; }
-    
-    a { color: inherit; text-decoration: none; }
-    
-    .container {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+    body{font-family:'Space Grotesk',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1180px;margin:0 auto;padding:0 28px}
+    .mono{font-family:var(--mono)}
+    .page{display:none}
+    .page.active{display:block}
 
-    /* ===== NAVBAR ===== */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      padding: 18px 0;
-      transition: all 0.3s ease;
-    }
-    
-    nav.scrolled {
-      background: rgba(10,9,8,0.92);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    nav .container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .logo {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-    }
-    
-    .logo span { color: var(--orange); }
-    
-    .nav-center {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 6px 8px;
-    }
-    
-    .nav-center a {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text2);
-      padding: 8px 18px;
-      border-radius: 100px;
-      transition: all 0.2s;
-    }
-    
-    .nav-center a:hover {
-      color: var(--text);
-      background: var(--surface2);
-    }
-    
-    .nav-center a.active {
-      color: var(--text);
-      background: var(--surface3);
-    }
-    
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 700;
-      padding: 12px 24px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .btn-ghost {
-      background: transparent;
-      color: var(--text2);
-    }
-    
-    .btn-ghost:hover {
-      color: var(--text);
-    }
-    
-    .btn-secondary {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border-light);
-    }
-    
-    .btn-secondary:hover {
-      background: var(--surface3);
-      border-color: rgba(255,255,255,0.15);
-      transform: translateY(-1px);
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, var(--orange) 0%, var(--amber) 100%);
-      color: #000;
-    }
-    
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px var(--orange-glow);
-    }
-    
-    .btn-large {
-      padding: 16px 32px;
-      font-size: 15px;
-      border-radius: 12px;
-    }
+    nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:16px 0;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
+    nav.scrolled{background:rgba(16,11,7,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom-color:var(--line)}
+    nav .container{display:flex;align-items:center;justify-content:space-between}
+    .logo{font-size:20px;font-weight:700;letter-spacing:-0.01em}
+    .logo span{color:var(--orange)}
+    .nav-center{display:flex;gap:26px}
+    .nav-center a{font-size:13.5px;font-weight:500;color:var(--text2);transition:color .2s}
+    .nav-center a:hover,.nav-center a.active{color:var(--text)}
+    .nav-right{display:flex;gap:10px;align-items:center}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-radius:8px;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
+    .btn-orange{background:linear-gradient(135deg,var(--orange),#ea580c);color:#1a0d02;font-size:13.5px;padding:10px 20px;box-shadow:0 4px 18px var(--orange-glow)}
+    .btn-orange:hover{transform:translateY(-1px);box-shadow:0 8px 26px var(--orange-glow)}
+    .btn-ghost{border:1px solid var(--line2);color:var(--text2);font-size:13.5px;padding:10px 20px}
+    .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.28)}
+    .btn-lg{font-size:15px;padding:15px 28px;border-radius:10px}
 
-    /* ===== HERO - SINGLE COLUMN CENTERED ===== */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 140px 0 80px;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    /* Warm gradient background */
-    .hero::before {
-      content: '';
-      position: absolute;
-      top: -20%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 140%;
-      height: 80%;
-      background: radial-gradient(ellipse at center, var(--orange-subtle) 0%, transparent 60%);
-      pointer-events: none;
-    }
-    
-    /* Floating shapes */
-    .hero-shape {
-      position: absolute;
-      border-radius: 50%;
-      opacity: 0.5;
-      pointer-events: none;
-    }
-    
-    .hero-shape-1 {
-      width: 300px;
-      height: 300px;
-      top: 15%;
-      left: 10%;
-      background: linear-gradient(135deg, var(--orange-subtle) 0%, transparent 70%);
-      animation: float1 18s ease-in-out infinite;
-    }
-    
-    .hero-shape-2 {
-      width: 200px;
-      height: 200px;
-      bottom: 20%;
-      right: 15%;
-      background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, transparent 70%);
-      animation: float2 15s ease-in-out infinite;
-    }
-    
-    .hero-shape-3 {
-      width: 150px;
-      height: 150px;
-      top: 40%;
-      right: 10%;
-      background: linear-gradient(135deg, rgba(234,179,8,0.06) 0%, transparent 70%);
-      animation: float1 20s ease-in-out infinite reverse;
-    }
-    
-    @keyframes float1 {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      50% { transform: translate(30px, 20px) rotate(5deg); }
-    }
-    
-    @keyframes float2 {
-      0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(-20px, -30px); }
-    }
-    
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      max-width: 720px;
-    }
-    
-    .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 20px;
-      background: var(--surface);
-      border: 1px solid var(--border-light);
-      border-radius: 100px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text2);
-      margin-bottom: 32px;
-      animation: fadeUp 0.6s ease both;
-    }
-    
-    .hero-eyebrow span {
-      color: var(--orange);
-    }
-    
-    .hero h1 {
-      font-size: clamp(48px, 7vw, 80px);
-      font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -3px;
-      margin-bottom: 24px;
-      animation: fadeUp 0.6s ease 0.1s both;
-    }
-    
-    .hero h1 .highlight {
-      background: linear-gradient(135deg, var(--orange) 0%, var(--yellow) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    
-    .hero-tagline {
-      display: flex;
-      justify-content: center;
-      gap: 32px;
-      margin-bottom: 24px;
-      animation: fadeUp 0.6s ease 0.15s both;
-    }
-    
-    .tagline-item {
-      font-family: 'Fira Code', monospace;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--orange-light);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-    
-    .hero-desc {
-      font-size: 18px;
-      color: var(--text2);
-      line-height: 1.8;
-      max-width: 560px;
-      margin: 0 auto 40px;
-      animation: fadeUp 0.6s ease 0.2s both;
-    }
-    
-    .hero-actions {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 60px;
-      animation: fadeUp 0.6s ease 0.3s both;
-    }
-    
-    /* Hero mini dashboard */
-    .hero-dashboard {
-      max-width: 500px;
-      margin: 0 auto;
-      animation: fadeUp 0.8s ease 0.4s both;
-    }
-    
-    .dash-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-    }
-    
-    .dash-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 20px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .dash-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text2);
-    }
-    
-    .dash-dots {
-      display: flex;
-      gap: 6px;
-    }
-    
-    .dash-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-    
-    .dash-dot:nth-child(1) { background: #ff5f57; }
-    .dash-dot:nth-child(2) { background: #ffbd2e; }
-    .dash-dot:nth-child(3) { background: #28ca41; }
-    
-    .dash-body {
-      padding: 20px;
-    }
-    
-    .dash-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    
-    .dash-stat {
-      background: var(--surface2);
-      border-radius: 10px;
-      padding: 14px;
-      text-align: center;
-    }
-    
-    .dash-stat-value {
-      font-family: 'Fira Code', monospace;
-      font-size: 20px;
-      font-weight: 600;
-    }
-    
-    .dash-stat-value.orange { color: var(--orange-light); }
-    .dash-stat-value.green { color: var(--green); }
-    .dash-stat-value.blue { color: var(--blue); }
-    
-    .dash-stat-label {
-      font-size: 11px;
-      color: var(--text3);
-      margin-top: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .dash-progress {
-      background: var(--surface2);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-    
-    .dash-progress-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    
-    .dash-progress-label {
-      font-size: 12px;
-      color: var(--text2);
-    }
-    
-    .dash-progress-value {
-      font-family: 'Fira Code', monospace;
-      font-size: 12px;
-      color: var(--orange-light);
-    }
-    
-    .dash-progress-bar {
-      height: 6px;
-      background: var(--surface3);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    
-    .dash-progress-fill {
-      height: 100%;
-      width: 68%;
-      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 100%);
-      border-radius: 3px;
-    }
-    
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    .hero{padding:150px 0 80px;position:relative;overflow:hidden}
+    .hero-glow{position:absolute;inset:0;pointer-events:none;background:
+      radial-gradient(ellipse 800px 500px at 75% 20%,rgba(249,115,22,0.10) 0%,transparent 65%),
+      radial-gradient(ellipse 600px 400px at 10% 90%,rgba(249,115,22,0.05) 0%,transparent 60%)}
+    .webgl-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.45}
+    .hero .container{display:grid;grid-template-columns:1.02fr 0.98fr;gap:54px;align-items:center;position:relative;z-index:1}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--orange-light);background:var(--orange-subtle);border:1px solid rgba(249,115,22,0.25);border-radius:4px;padding:6px 13px;margin-bottom:26px}
+    .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);animation:blink 2.4s ease infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+    h1{font-size:clamp(38px,5.2vw,64px);font-weight:700;line-height:1.06;letter-spacing:-0.03em;margin-bottom:22px}
+    h1 .orange{color:var(--orange)}
+    .hero-sub{font-size:16.5px;color:var(--text2);max-width:480px;line-height:1.75;margin-bottom:34px}
+    .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
+    .hero-note{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.05em}
+    .hero-note b{color:var(--text2)}
 
-    /* ===== BENEFITS BAR ===== */
-    .benefits-bar {
-      padding: 24px 0;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .benefits-grid {
-      display: flex;
-      justify-content: center;
-      gap: 48px;
-    }
-    
-    .benefit-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text2);
-    }
-    
-    .benefit-icon {
-      font-size: 18px;
-    }
+    /* SIGNATURE cube */
+    .flow-scene{perspective:1500px;position:relative}
+    .flow-scene .sc-chip{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;border-radius:7px;padding:9px 13px;border:1px solid var(--line2);background:var(--surface2);box-shadow:0 14px 36px rgba(0,0,0,0.5);display:flex;align-items:center;gap:8px;color:var(--text2);z-index:5}
+    .flow-scene .sc-chip .dot{width:7px;height:7px;border-radius:50%}
+    .chip-1{top:-16px;right:6%}
+    .chip-1 .dot{background:var(--orange);box-shadow:0 0 8px var(--orange)}
+    .chip-2{bottom:-14px;left:5%}
+    .chip-2 .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+    .cube{position:relative;width:100%;height:380px;transform-style:preserve-3d;transition:transform 1.1s cubic-bezier(.6,.05,.2,1);transform:translateZ(-190px) rotateY(0deg)}
+    .face{position:absolute;inset:0;border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(249,115,22,0.05);overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+    .face-front{transform:rotateY(0deg) translateZ(190px)}
+    .face-right{transform:rotateY(120deg) translateZ(190px)}
+    .face-back{transform:rotateY(240deg) translateZ(190px)}
+    .fc-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);background:rgba(0,0,0,0.22)}
+    .fc-title{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
+    .fc-title b{color:var(--text);font-weight:600}
+    .fc-badge{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;border-radius:4px;padding:4px 9px;color:var(--green);border:1px solid rgba(34,197,94,0.35);background:rgba(34,197,94,0.08)}
+    .fc-badge.amber{color:var(--amber);border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.08)}
+    .fc-body{padding:20px}
+    .fc-cust{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .fc-cust .name{font-size:14.5px;font-weight:600}
+    .fc-cust .meta{font-family:var(--mono);font-size:10.5px;color:var(--text2);background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:3px 9px}
+    .fc-lines{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+    .fc-line{display:flex;justify-content:space-between;padding:10px 14px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
+    .fc-line:last-child{border-bottom:none}
+    .fc-line .amt{font-family:var(--mono);color:var(--text)}
+    .fc-total{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:9px;background:var(--orange-subtle);border:1px solid rgba(249,115,22,0.25)}
+    .fc-total .label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--orange-light)}
+    .fc-total .val{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)}
+    .exp-list{display:flex;flex-direction:column;gap:9px}
+    .exp-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:11px 14px;background:rgba(255,255,255,0.015)}
+    .exp-row .ico{width:26px;height:26px;border-radius:7px;background:var(--orange-subtle);border:1px solid rgba(249,115,22,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+    .exp-row .lbl{font-size:13px;color:var(--text)}
+    .exp-row .cat{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto;margin-right:10px}
+    .exp-row .amt{font-family:var(--mono);font-size:12.5px;color:var(--text);font-weight:600}
+    .tax-big{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+    .tax-label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3)}
+    .tax-amount{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--text);letter-spacing:-0.02em}
+    .tax-amount .sub{color:var(--text3);font-size:20px}
+    .tax-rows{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+    .tax-row{display:flex;justify-content:space-between;padding:10px 14px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
+    .tax-row:last-child{border-bottom:none}
+    .tax-row b{font-family:var(--mono);color:var(--text);font-weight:600}
 
-    /* ===== FEATURES - 2x2 GRID WITH ICONS ===== */
-    .features {
-      padding: 120px 0;
-    }
-    
-    .section-header {
-      text-align: center;
-      max-width: 580px;
-      margin: 0 auto 72px;
-    }
-    
-    .section-tag {
-      display: inline-block;
-      font-family: 'Fira Code', monospace;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--orange);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 16px;
-    }
-    
-    .section-title {
-      font-size: clamp(32px, 4vw, 44px);
-      font-weight: 800;
-      letter-spacing: -1.5px;
-      margin-bottom: 16px;
-    }
-    
-    .section-desc {
-      font-size: 17px;
-      color: var(--text2);
-      line-height: 1.7;
-    }
-    
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 24px;
-    }
-    
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 36px;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 100%);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    
-    .feature-card:hover {
-      border-color: rgba(249,115,22,0.3);
-      transform: translateY(-4px);
-    }
-    
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-    
-    .feature-icon-wrap {
-      width: 56px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--orange-subtle);
-      border-radius: 14px;
-      font-size: 26px;
-      margin-bottom: 24px;
-    }
-    
-    .feature-icon-wrap.blue { background: rgba(59,130,246,0.1); }
-    .feature-icon-wrap.green { background: rgba(34,197,94,0.1); }
-    .feature-icon-wrap.amber { background: rgba(245,158,11,0.1); }
-    
-    .feature-title {
-      font-size: 22px;
-      font-weight: 800;
-      margin-bottom: 12px;
-      letter-spacing: -0.5px;
-    }
-    
-    .feature-desc {
-      font-size: 15px;
-      color: var(--text2);
-      line-height: 1.7;
-      margin-bottom: 20px;
-    }
-    
-    .feature-list {
-      list-style: none;
-    }
-    
-    .feature-list li {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: var(--text2);
-      margin-bottom: 8px;
-    }
-    
-    .feature-list li::before {
-      content: '→';
-      color: var(--orange);
-      font-weight: 700;
-    }
-    
-    .feature-tag {
-      display: inline-block;
-      margin-top: 12px;
-      font-family: 'Fira Code', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: rgba(245,158,11,0.12);
-      color: var(--amber);
-    }
+    .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);padding:26px 0}
+    .strip .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+    .st{text-align:center}
+    .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:var(--orange-light)}
+    .st span{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
 
-    /* ===== WHY SOLO SECTION ===== */
-    .why-section {
-      padding: 100px 0;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .why-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 32px;
-      margin-top: 60px;
-    }
-    
-    .why-card {
-      text-align: center;
-      padding: 24px 16px;
-    }
-    
-    .why-number {
-      font-family: 'Fira Code', monospace;
-      font-size: 48px;
-      font-weight: 700;
-      color: var(--orange);
-      margin-bottom: 8px;
-    }
-    
-    .why-label {
-      font-size: 14px;
-      color: var(--text2);
-      line-height: 1.5;
-    }
+    section{padding:90px 0}
+    .sec-head{max-width:620px;margin-bottom:52px}
+    .kicker{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--orange-light);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .kicker::before{content:'';width:22px;height:1px;background:var(--orange)}
+    h2{font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-0.025em;line-height:1.12;margin-bottom:14px}
+    .sec-sub{font-size:15.5px;color:var(--text2);line-height:1.75}
 
-    /* ===== PRICING ===== */
-    .pricing {
-      padding: 120px 0;
-    }
-    
-    .pricing-cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      max-width: 1000px;
-      margin: 60px auto 0;
-    }
-    
-    .pricing-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 36px 28px;
-      position: relative;
-      transition: all 0.3s ease;
-    }
-    
-    .pricing-card:hover {
-      transform: translateY(-4px);
-    }
-    
-    .pricing-card.featured {
-      border-color: var(--orange);
-      box-shadow: 0 0 60px var(--orange-subtle);
-    }
-    
-    .pricing-card.featured::before {
-      content: 'Most Popular';
-      position: absolute;
-      top: -13px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, var(--orange) 0%, var(--amber) 100%);
-      color: #000;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 6px 18px;
-      border-radius: 100px;
-    }
-    
-    .pricing-tier {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    
-    .pricing-amount {
-      font-family: 'Fira Code', monospace;
-      font-size: 44px;
-      font-weight: 700;
-    }
-    
-    .pricing-period {
-      font-size: 14px;
-      color: var(--text3);
-      margin-bottom: 20px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .pricing-features {
-      list-style: none;
-      margin-bottom: 28px;
-    }
-    
-    .pricing-features li {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: var(--text2);
-      margin-bottom: 12px;
-    }
-    
-    .pricing-features li::before {
-      content: '✓';
-      color: var(--green);
-      font-weight: 700;
-    }
-    
-    .pricing-features li.disabled {
-      color: var(--text3);
-      opacity: 0.5;
-    }
-    
-    .pricing-features li.disabled::before {
-      content: '—';
-      color: var(--text3);
-    }
-    
-    .pricing-card .btn {
-      width: 100%;
-    }
+    .bigfeat{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+    .bf{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:28px;position:relative;transition:border-color .25s,transform .2s;overflow:hidden}
+    .bf::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--orange),transparent 70%);opacity:0;transition:opacity .25s}
+    .bf:hover{border-color:rgba(249,115,22,0.35);transform:translateY(-3px)}
+    .bf:hover::before{opacity:1}
+    .bf-num{font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;color:var(--text3);margin-bottom:18px}
+    .bf-icon{width:44px;height:44px;border-radius:10px;border:1px solid rgba(249,115,22,0.3);background:var(--orange-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+    .bf-icon svg{width:21px;height:21px;stroke:var(--orange-light);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .bf h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em}
+    .bf p{font-size:14px;color:var(--text2);line-height:1.8}
 
-    /* ===== HOW IT WORKS ===== */
-    .how-section {
-      padding: 120px 0;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .steps-row {
-      display: flex;
-      justify-content: space-between;
-      position: relative;
-      margin-top: 60px;
-    }
-    
-    .steps-row::before {
-      content: '';
-      position: absolute;
-      top: 28px;
-      left: 15%;
-      right: 15%;
-      height: 2px;
-      background: linear-gradient(90deg, var(--orange) 0%, var(--amber) 50%, var(--yellow) 100%);
-      opacity: 0.3;
-    }
-    
-    .step {
-      flex: 1;
-      text-align: center;
-      position: relative;
-      padding: 0 16px;
-    }
-    
-    .step-icon {
-      width: 56px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-      background: var(--bg);
-      border: 2px solid var(--orange);
-      border-radius: 50%;
-      font-size: 24px;
-      position: relative;
-      z-index: 1;
-    }
-    
-    .step-title {
-      font-size: 17px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    
-    .step-desc {
-      font-size: 14px;
-      color: var(--text2);
-      line-height: 1.6;
-      max-width: 180px;
-      margin: 0 auto;
-    }
+    .tl{position:relative;max-width:760px;margin:0 auto;padding-left:32px}
+    .tl::before{content:'';position:absolute;left:7px;top:6px;bottom:6px;width:1px;background:linear-gradient(180deg,var(--orange),var(--line) 90%)}
+    .tl-item{position:relative;padding:0 0 34px 24px}
+    .tl-item:last-child{padding-bottom:0}
+    .tl-item::before{content:'';position:absolute;left:-29px;top:5px;width:13px;height:13px;border-radius:50%;background:var(--bg2);border:2px solid var(--orange)}
+    .tl-step{font-family:var(--mono);font-size:11.5px;letter-spacing:0.1em;color:var(--orange-light);margin-bottom:5px}
+    .tl-item h3{font-size:16.5px;font-weight:600;margin-bottom:7px}
+    .tl-item p{font-size:14px;color:var(--text2);line-height:1.75;max-width:560px}
 
-    /* ===== CTA ===== */
-    .cta-section {
-      padding: 140px 0;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .cta-section::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 700px;
-      height: 700px;
-      background: radial-gradient(circle, var(--orange-subtle) 0%, transparent 60%);
-      pointer-events: none;
-    }
-    
-    .cta-content {
-      position: relative;
-      z-index: 1;
-    }
-    
-    .cta-title {
-      font-size: clamp(32px, 5vw, 52px);
-      font-weight: 800;
-      letter-spacing: -2px;
-      margin-bottom: 16px;
-    }
-    
-    .cta-desc {
-      font-size: 18px;
-      color: var(--text2);
-      margin-bottom: 36px;
-    }
-    
-    .cta-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-    }
+    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+    .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
+    .plan:hover{transform:translateY(-3px)}
+    .plan.popular{border-color:rgba(249,115,22,0.45);background:linear-gradient(180deg,rgba(249,115,22,0.06),var(--surface) 40%)}
+    .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--orange);color:#1a0d02;border-radius:5px;padding:4px 12px}
+    .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
+    .tier-dot{width:9px;height:9px;border-radius:50%}
+    .bronze .tier-dot{background:#cd7f32}
+    .silver .tier-dot{background:#c0c0c0}
+    .gold .tier-dot{background:var(--amber)}
+    .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+    .plan-price b{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-0.02em}
+    .plan-price span{font-size:13px;color:var(--text3)}
+    .plan-desc{font-size:13px;color:var(--text2);margin-bottom:22px;min-height:20px}
+    .plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px;flex:1}
+    .plan li{font-size:13.5px;color:var(--text2);display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+    .plan li::before{content:'✓';color:var(--orange-light);font-weight:700;flex-shrink:0}
+    .plan li.off{color:var(--text3);opacity:0.6}
+    .plan li.off::before{content:'—';color:var(--text3)}
+    .plan .btn{width:100%}
+    .pricing-note{text-align:center;margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.04em}
 
-    /* ===== LEGAL PAGES ===== */
-    .page {
-      display: none;
-    }
-    
-    .page.active {
-      display: block;
-    }
-    
-    .legal-page {
-      padding: 140px 0 100px;
-      min-height: 100vh;
-    }
-    
-    .legal-container {
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
-    
-    .legal-header {
-      margin-bottom: 48px;
-      padding-bottom: 32px;
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .legal-header h1 {
-      font-size: clamp(32px, 5vw, 44px);
-      font-weight: 800;
-      letter-spacing: -1.5px;
-      margin-bottom: 12px;
-    }
-    
-    .legal-meta {
-      font-family: 'Fira Code', monospace;
-      font-size: 13px;
-      color: var(--text3);
-    }
-    
-    .legal-content {
-      color: var(--text2);
-      line-height: 1.8;
-    }
-    
-    .legal-content h2 {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text);
-      margin-top: 44px;
-      margin-bottom: 16px;
-    }
-    
-    .legal-content h3 {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text);
-      margin-top: 28px;
-      margin-bottom: 12px;
-    }
-    
-    .legal-content p {
-      margin-bottom: 16px;
-    }
-    
-    .legal-content ul {
-      margin-bottom: 16px;
-      padding-left: 24px;
-    }
-    
-    .legal-content li {
-      margin-bottom: 10px;
-    }
-    
-    .legal-content strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-    
-    .legal-content a {
-      color: var(--orange-light);
-      transition: color 0.2s;
-    }
-    
-    .legal-content a:hover {
-      color: var(--orange);
-      text-decoration: underline;
-    }
-    
-    .legal-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      margin: 24px 0;
-    }
-    
-    .legal-box p {
-      margin-bottom: 0;
-    }
-    
-    .legal-box.warning {
-      border-color: rgba(249,115,22,0.3);
-      background: var(--orange-subtle);
-    }
-    
-    .back-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text2);
-      margin-bottom: 32px;
-      transition: color 0.2s;
-    }
-    
-    .back-link:hover {
-      color: var(--orange-light);
-    }
+    .cta{text-align:center;padding:110px 0;position:relative;overflow:hidden}
+    .cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 380px at 50% 50%,rgba(249,115,22,0.10),transparent 70%);pointer-events:none}
+    .cta .container{position:relative}
+    .cta h2{margin-bottom:16px}
+    .cta p{font-size:15.5px;color:var(--text2);max-width:460px;margin:0 auto 32px}
+    .cta .hero-btns{justify-content:center;margin-bottom:18px}
 
-    /* ===== FOOTER ===== */
-    footer {
-      padding: 48px 0;
-      border-top: 1px solid var(--border);
-    }
-    
-    .footer-content {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .footer-links {
-      display: flex;
-      gap: 32px;
-    }
-    
-    .footer-links a {
-      font-size: 14px;
-      color: var(--text3);
-      transition: color 0.2s;
-    }
-    
-    .footer-links a:hover { color: var(--text); }
-    
-    .footer-copy {
-      font-size: 13px;
-      color: var(--text3);
-    }
+    footer{border-top:1px solid var(--line);padding:42px 0 34px;background:var(--bg2)}
+    .foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+    .foot-links{display:flex;gap:22px;flex-wrap:wrap}
+    .foot-links a{font-size:13px;color:var(--text2);transition:color .2s}
+    .foot-links a:hover{color:var(--text)}
+    .foot-copy{font-family:var(--mono);font-size:10.5px;color:var(--text3);letter-spacing:0.05em;width:100%;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 
-    /* ===== RESPONSIVE ===== */
-    @media (max-width: 1024px) {
-      .features-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .why-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      
-      .pricing-cards {
-        grid-template-columns: 1fr;
-        max-width: 400px;
-      }
-      
-      .steps-row {
-        flex-direction: column;
-        gap: 40px;
-      }
-      
-      .steps-row::before { display: none; }
+    .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+    .reveal.in{opacity:1;transform:none}
+    a:focus-visible,button:focus-visible{outline:2px solid var(--orange-light);outline-offset:3px;border-radius:6px}
+
+    .legal-page{padding:140px 0 90px;min-height:100vh}
+    .legal-container{max-width:760px;margin:0 auto;padding:0 28px}
+    .back-link{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text2);margin-bottom:34px;transition:color .2s}
+    .back-link:hover{color:var(--orange-light)}
+    .legal-header h1{font-size:clamp(30px,4vw,44px);margin-bottom:8px}
+    .legal-meta{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.06em;margin-bottom:38px}
+    .legal-box{border:1px solid rgba(249,115,22,0.3);background:var(--orange-subtle);border-radius:10px;padding:18px 20px;margin-bottom:34px;font-size:14px;color:var(--text2);line-height:1.7}
+    .legal-content h2{font-size:21px;margin:36px 0 12px;letter-spacing:-0.015em}
+    .legal-content h3{font-size:15.5px;font-weight:600;margin:22px 0 8px;color:var(--text)}
+    .legal-content p{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:12px}
+    .legal-content ul{margin:0 0 14px 20px}
+    .legal-content li{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:5px}
+    .legal-content a{color:var(--orange-light);text-decoration:underline;text-underline-offset:3px}
+    .legal-content strong{color:var(--text)}
+
+    @media (max-width:960px){
+      .hero .container{grid-template-columns:1fr;gap:48px}
+      .bigfeat{grid-template-columns:1fr}
+      .plans{grid-template-columns:1fr}
+      .strip .container{grid-template-columns:repeat(2,1fr);gap:24px}
     }
-    
-    @media (max-width: 768px) {
-      .nav-center { display: none; }
-      
-      .hero { padding: 120px 0 60px; }
-      
-      .hero-tagline {
-        flex-direction: column;
-        gap: 8px;
-      }
-      
-      .hero-actions {
-        flex-direction: column;
-        align-items: center;
-      }
-      
-      .hero-actions .btn {
-        width: 100%;
-        max-width: 300px;
-      }
-      
-      .benefits-grid {
-        flex-direction: column;
-        gap: 16px;
-      }
-      
-      .why-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-      }
-      
-      .footer-content {
-        flex-direction: column;
-        gap: 24px;
-        text-align: center;
-      }
-      
-      .cta-buttons {
-        flex-direction: column;
-        align-items: center;
-      }
+    @media (max-width:640px){
+      .nav-center{display:none}
+      .hero{padding-top:118px}
+      .container{padding:0 20px}
+      .flow-scene .sc-chip{display:none}
     }
   </style>
 </head>
 <body>
 
-  <!-- NAVIGATION -->
-  <nav id="nav">
-    <div class="container">
-      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>SoloOps</span></a>
-      <div class="nav-center">
-        <a href="#features" class="active">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#how">How it works</a>
-      </div>
-      <div class="nav-right">
-        <a href="/soloops/login" class="btn btn-ghost">Login</a>
-        <a href="/soloops/register" class="btn btn-primary">Start Free Trial</a>
-      </div>
+<nav id="nav">
+  <div class="container">
+    <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>SoloOps</span></a>
+    <div class="nav-center">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
     </div>
-  </nav>
+    <div class="nav-right">
+      <a href="/soloops/login" class="btn btn-ghost">Log in</a>
+      <a href="/soloops/register" class="btn btn-orange">Start free trial</a>
+    </div>
+  </div>
+</nav>
 
-  <!-- HOME PAGE -->
-  <div id="page-home" class="page active">
+<!-- ================= HOME ================= -->
+<div id="page-home" class="page active">
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-shape hero-shape-1"></div>
-    <div class="hero-shape hero-shape-2"></div>
-    <div class="hero-shape hero-shape-3"></div>
-    
-    <div class="container">
-      <div class="hero-content">
-        <div class="hero-eyebrow">
-          🇬🇧 <span>Built for UK Sole Traders</span>
-        </div>
-        
-        <h1>
-          Your business,<br>
-          <span class="highlight">simplified</span>
-        </h1>
-        
-        <div class="hero-tagline">
-          <span class="tagline-item">Track</span>
-          <span class="tagline-item">Earn</span>
-          <span class="tagline-item">Grow</span>
-        </div>
-        
-        <p class="hero-desc">
-          Invoicing, expenses, mileage tracking, and tax estimates — everything a sole trader needs to stay organised and stress-free at tax time.
-        </p>
-        
-        <div class="hero-actions">
-          <a href="/soloops/register" class="btn btn-primary btn-large">
-            Start 14-Day Free Trial →
-          </a>
-          <a href="#features" class="btn btn-secondary btn-large">
-            See Features
-          </a>
-        </div>
-        
-        <div class="hero-dashboard">
-          <div class="dash-card">
-            <div class="dash-header">
-              <span class="dash-title">This Tax Year</span>
-              <div class="dash-dots">
-                <span class="dash-dot"></span>
-                <span class="dash-dot"></span>
-                <span class="dash-dot"></span>
-              </div>
+<section class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="container">
+    <div>
+      <div class="eyebrow">Built for UK sole traders · Live</div>
+      <h1>Your business,<br><span class="orange">simplified.</span></h1>
+      <p class="hero-sub">Invoicing, expenses, mileage tracking and tax estimates — everything a sole trader needs to stay organised and stress-free at tax time.</p>
+      <div class="hero-btns">
+        <a href="/soloops/register" class="btn btn-orange btn-lg">Start your 14-day free trial →</a>
+        <a href="#features" class="btn btn-ghost btn-lg">See features</a>
+      </div>
+      <p class="hero-note"><b>No card required</b> // full features // cancel any time</p>
+    </div>
+
+    <!-- signature: invoice -> expenses -> tax cube -->
+    <div class="flow-scene">
+      <div class="sc-chip chip-1"><span class="dot"></span>No surprises at tax time</div>
+      <div class="cube" id="cube" aria-label="SoloOps live panel">
+
+        <!-- FACE 1: Invoice -->
+        <div class="face face-front">
+          <div class="fc-head"><span class="fc-title">INVOICE <b>· #INV-061</b></span><span class="fc-badge">PAID</span></div>
+          <div class="fc-body">
+            <div class="fc-cust"><span class="name">Meadow Design Studio</span><span class="meta">Net 14</span></div>
+            <div class="fc-lines">
+              <div class="fc-line"><span>Brand identity — phase 1</span><span class="amt">£1,400</span></div>
+              <div class="fc-line"><span>Logo revisions</span><span class="amt">£250</span></div>
+              <div class="fc-line"><span>Paid online · 12 Jun</span><span class="amt">£1,650</span></div>
             </div>
-            <div class="dash-body">
-              <div class="dash-stats">
-                <div class="dash-stat">
-                  <div class="dash-stat-value orange">£24,850</div>
-                  <div class="dash-stat-label">Income</div>
-                </div>
-                <div class="dash-stat">
-                  <div class="dash-stat-value green">£8,420</div>
-                  <div class="dash-stat-label">Expenses</div>
-                </div>
-                <div class="dash-stat">
-                  <div class="dash-stat-value blue">£3,286</div>
-                  <div class="dash-stat-label">Tax Est.</div>
-                </div>
-              </div>
-              <div class="dash-progress">
-                <div class="dash-progress-header">
-                  <span class="dash-progress-label">Tax year progress</span>
-                  <span class="dash-progress-value">68%</span>
-                </div>
-                <div class="dash-progress-bar">
-                  <div class="dash-progress-fill"></div>
-                </div>
-              </div>
+            <div class="fc-total"><span class="label">Invoice total</span><span class="val">£1,650.00</span></div>
+          </div>
+        </div>
+
+        <!-- FACE 2: Expenses -->
+        <div class="face face-right">
+          <div class="fc-head"><span class="fc-title">EXPENSES <b>· THIS MONTH</b></span><span class="fc-badge amber">£642</span></div>
+          <div class="fc-body">
+            <div class="exp-list">
+              <div class="exp-row"><span class="ico">⛽</span><span class="lbl">Fuel — 214 mi</span><span class="cat">Mileage</span><span class="amt">£96.30</span></div>
+              <div class="exp-row"><span class="ico">🧾</span><span class="lbl">Adobe subscription</span><span class="cat">Software</span><span class="amt">£51.98</span></div>
+              <div class="exp-row"><span class="ico">🔧</span><span class="lbl">Tools &amp; materials</span><span class="cat">Equipment</span><span class="amt">£184.00</span></div>
+              <div class="exp-row"><span class="ico">📱</span><span class="lbl">Phone &amp; broadband</span><span class="cat">Utilities</span><span class="amt">£42.00</span></div>
             </div>
           </div>
         </div>
+
+        <!-- FACE 3: Tax estimate -->
+        <div class="face face-back">
+          <div class="fc-head"><span class="fc-title">TAX <b>· ESTIMATE</b></span><span class="fc-badge">ON TRACK</span></div>
+          <div class="fc-body">
+            <div class="tax-big">
+              <span class="tax-label">Set aside for tax</span>
+              <span class="tax-amount">£4,286<span class="sub">.00</span></span>
+            </div>
+            <div class="tax-rows">
+              <div class="tax-row"><span>Income to date</span><b>£24,850</b></div>
+              <div class="tax-row"><span>Allowable expenses</span><b>£8,420</b></div>
+              <div class="tax-row"><span>Estimated tax + NI</span><b>£4,286</b></div>
+            </div>
+            <div class="fc-total"><span class="label">Updated live</span><span class="val">Save monthly</span></div>
+          </div>
+        </div>
+
+      </div>
+      <div class="sc-chip chip-2"><span class="dot"></span>Tax set aside automatically</div>
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="container">
+    <div class="st"><b>Minutes</b><span>To send an invoice</span></div>
+    <div class="st"><b>Live</b><span>Real-time tax estimate</span></div>
+    <div class="st"><b>14 days</b><span>Free trial, full access</span></div>
+    <div class="st"><b>HMRC</b><span>Ready exports</span></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">What's inside</div>
+      <h2>Track. Earn. Grow.</h2>
+      <p class="sec-sub">Everything a one-person business needs to stay organised — and nothing it doesn't.</p>
+    </div>
+    <div class="bigfeat">
+      <div class="bf reveal">
+        <div class="bf-num">01</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13h6M9 17h6"/></svg></div>
+        <h3>Simple Invoicing</h3>
+        <p>Create professional invoices in seconds. Send via email, track payment status, and get automatic reminders for overdue invoices.</p>
+      </div>
+      <div class="bf reveal">
+        <div class="bf-num">02</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="13" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg></div>
+        <h3>Expense Tracking</h3>
+        <p>Snap receipts with your phone, categorise expenses, and watch your deductibles add up. Tax time becomes a breeze.</p>
+      </div>
+      <div class="bf reveal">
+        <div class="bf-num">03</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg></div>
+        <h3>Mileage Tracking</h3>
+        <p>Log business journeys manually or let GPS do it automatically. Calculate your mileage allowance at current HMRC rates.</p>
+      </div>
+      <div class="bf reveal">
+        <div class="bf-num">04</div>
+        <div class="bf-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Tax Estimates</h3>
+        <p>See your estimated tax bill in real-time. No nasty surprises in January. Set aside the right amount each month.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- BENEFITS BAR -->
-  <section class="benefits-bar">
-    <div class="container">
-      <div class="benefits-grid">
-        <div class="benefit-item">
-          <span class="benefit-icon">⚡</span>
-          No accountant needed
-        </div>
-        <div class="benefit-item">
-          <span class="benefit-icon">📱</span>
-          Works on any device
-        </div>
-        <div class="benefit-item">
-          <span class="benefit-icon">🔒</span>
-          Bank-level security
-        </div>
-        <div class="benefit-item">
-          <span class="benefit-icon">🇬🇧</span>
-          HMRC ready
-        </div>
+<section id="how" style="background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">How it works</div>
+      <h2>Up and running in minutes.</h2>
+      <p class="sec-sub">No credit card needed. No accountant required.</p>
+    </div>
+    <div class="tl">
+      <div class="tl-item reveal"><div class="tl-step">STEP 01</div><h3>Sign up</h3><p>Create your account in 2 minutes. No credit card needed.</p></div>
+      <div class="tl-item reveal"><div class="tl-step">STEP 02</div><h3>Add your details</h3><p>Business name, logo and bank details for invoices.</p></div>
+      <div class="tl-item reveal"><div class="tl-step">STEP 03</div><h3>Send invoices</h3><p>Create and send your first invoice in under 5 minutes.</p></div>
+      <div class="tl-item reveal"><div class="tl-step">STEP 04</div><h3>Track &amp; grow</h3><p>Log expenses, track income, and watch your business grow.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="kicker">Pricing</div>
+      <h2>Honest pricing for one-person businesses.</h2>
+      <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time.</p>
+    </div>
+    <div class="plans">
+      <div class="plan bronze reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
+        <div class="plan-price"><b>£40</b><span>/month</span></div>
+        <p class="plan-desc"></p>
+        <ul>
+          <li>Unlimited invoices</li>
+          <li>Customer database</li>
+          <li>Basic income tracking</li>
+          <li>Email support</li>
+          <li class="off">Expense tracking</li>
+          <li class="off">Mileage logs</li>
+        </ul>
+        <a href="/soloops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
+      <div class="plan silver popular reveal">
+        <div class="plan-flag">Most popular</div>
+        <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
+        <div class="plan-price"><b>£55</b><span>/month</span></div>
+        <p class="plan-desc"></p>
+        <ul>
+          <li>Everything in Bronze</li>
+          <li>Expense tracking</li>
+          <li>Receipt scanning</li>
+          <li>Mileage logging</li>
+          <li>Basic reports</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="/soloops/register" class="btn btn-orange">Start free trial</a>
+      </div>
+      <div class="plan gold reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
+        <div class="plan-price"><b>£70</b><span>/month</span></div>
+        <p class="plan-desc"></p>
+        <ul>
+          <li>Everything in Silver</li>
+          <li>Real-time tax estimates</li>
+          <li>Tax year reports</li>
+          <li>HMRC-ready exports</li>
+          <li>Accountant access</li>
+          <li>Phone support</li>
+        </ul>
+        <a href="/soloops/register" class="btn btn-ghost">Start free trial</a>
       </div>
     </div>
-  </section>
+    <p class="pricing-note">ALL PRICES IN GBP // 14-DAY FREE TRIAL ON EVERY PLAN // CANCEL ANY TIME</p>
+  </div>
+</section>
 
-  <!-- FEATURES -->
-  <section class="features" id="features">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">Features</div>
-        <h2 class="section-title">Everything you need, nothing you don't</h2>
-        <p class="section-desc">
-          Built specifically for sole traders. Simple tools that save you hours every month.
-        </p>
-      </div>
-      
-      <div class="features-grid">
-        <div class="feature-card reveal stagger-1">
-          <div class="feature-icon-wrap">🧾</div>
-          <h3 class="feature-title">Simple Invoicing</h3>
-          <p class="feature-desc">
-            Create professional invoices in seconds. Send via email, track payment status, and get automatic reminders for overdue invoices.
-          </p>
-          <ul class="feature-list">
-            <li>Customise with your logo</li>
-            <li>Automatic invoice numbering</li>
-            <li>Payment tracking</li>
-            <li>Send reminders in one click</li>
-          </ul>
-        </div>
-        
-        <div class="feature-card reveal stagger-2">
-          <div class="feature-icon-wrap blue">📊</div>
-          <h3 class="feature-title">Expense Tracking</h3>
-          <p class="feature-desc">
-            Snap receipts with your phone, categorise expenses, and watch your deductibles add up. Tax time becomes a breeze.
-          </p>
-          <ul class="feature-list">
-            <li>Photo receipt capture</li>
-            <li>Auto-categorisation</li>
-            <li>HMRC categories built-in</li>
-            <li>Export for tax return</li>
-          </ul>
-          <span class="feature-tag">Silver+</span>
-        </div>
-        
-        <div class="feature-card reveal stagger-3">
-          <div class="feature-icon-wrap green">🚗</div>
-          <h3 class="feature-title">Mileage Tracking</h3>
-          <p class="feature-desc">
-            Log business journeys manually or let GPS do it automatically. Calculate your mileage allowance at current HMRC rates.
-          </p>
-          <ul class="feature-list">
-            <li>GPS auto-tracking</li>
-            <li>Current HMRC rates</li>
-            <li>Journey notes & clients</li>
-            <li>Annual mileage reports</li>
-          </ul>
-          <span class="feature-tag">Silver+</span>
-        </div>
-        
-        <div class="feature-card reveal stagger-4">
-          <div class="feature-icon-wrap amber">💰</div>
-          <h3 class="feature-title">Tax Estimates</h3>
-          <p class="feature-desc">
-            See your estimated tax bill in real-time. No nasty surprises in January. Set aside the right amount each month.
-          </p>
-          <ul class="feature-list">
-            <li>Real-time tax calculator</li>
-            <li>Income Tax + NI estimates</li>
-            <li>Payment on Account reminders</li>
-            <li>Tax year summary export</li>
-          </ul>
-          <span class="feature-tag">Gold</span>
-        </div>
-      </div>
+<section class="cta">
+  <div class="container">
+    <div class="kicker reveal" style="justify-content:center">Ready when you are</div>
+    <h2 class="reveal">Stay organised. Stay sane.<br>Especially in January.</h2>
+    <p class="reveal">Send your first invoice, log your first expense, and see your tax estimate update live.</p>
+    <div class="hero-btns reveal">
+      <a href="/soloops/register" class="btn btn-orange btn-lg">Start your 14-day free trial →</a>
+      <a href="mailto:hello@alzaro.co.uk" class="btn btn-ghost btn-lg">Talk to us</a>
     </div>
-  </section>
+    <p class="hero-note reveal">No card required // set up in minutes // UK support</p>
+  </div>
+</section>
 
-  <!-- WHY SOLOOPS -->
-  <section class="why-section">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">Why SoloOps</div>
-        <h2 class="section-title">Built by sole traders, for sole traders</h2>
-        <p class="section-desc">
-          We know the pain of spreadsheets, shoebox receipts, and tax deadline panic. SoloOps fixes all of it.
-        </p>
-      </div>
-      
-      <div class="why-grid">
-        <div class="why-card reveal stagger-1">
-          <div class="why-number">5</div>
-          <div class="why-label">Minutes to send<br>your first invoice</div>
-        </div>
-        <div class="why-card reveal stagger-2">
-          <div class="why-number">10+</div>
-          <div class="why-label">Hours saved<br>per month</div>
-        </div>
-        <div class="why-card reveal stagger-3">
-          <div class="why-number">£0</div>
-          <div class="why-label">Accountant fees<br>for basic taxes</div>
-        </div>
-        <div class="why-card reveal stagger-4">
-          <div class="why-number">0</div>
-          <div class="why-label">Tax deadline<br>panic attacks</div>
-        </div>
-      </div>
-    </div>
-  </section>
+</div><!-- /page-home -->
 
-  <!-- PRICING -->
-  <section class="pricing" id="pricing">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">Pricing</div>
-        <h2 class="section-title">Simple pricing for simple businesses</h2>
-        <p class="section-desc">
-          14-day free trial on all plans. No credit card required.
-        </p>
-      </div>
-      
-      <div class="pricing-cards">
-        <div class="pricing-card reveal stagger-1">
-          <div class="pricing-tier">🥉 Bronze</div>
-          <div class="pricing-amount">£40</div>
-          <div class="pricing-period">per month</div>
-          <ul class="pricing-features">
-            <li>Unlimited invoices</li>
-            <li>Customer database</li>
-            <li>Basic income tracking</li>
-            <li>Email support</li>
-            <li class="disabled">Expense tracking</li>
-            <li class="disabled">Mileage logs</li>
-          </ul>
-          <a href="/soloops/register" class="btn btn-secondary">Start Free Trial</a>
-        </div>
-        
-        <div class="pricing-card featured reveal stagger-2">
-          <div class="pricing-tier">🥈 Silver</div>
-          <div class="pricing-amount">£55</div>
-          <div class="pricing-period">per month</div>
-          <ul class="pricing-features">
-            <li>Everything in Bronze</li>
-            <li>Expense tracking</li>
-            <li>Receipt scanning</li>
-            <li>Mileage logging</li>
-            <li>Basic reports</li>
-            <li>Priority support</li>
-          </ul>
-          <a href="/soloops/register" class="btn btn-primary">Start Free Trial</a>
-        </div>
-        
-        <div class="pricing-card reveal stagger-3">
-          <div class="pricing-tier">🥇 Gold</div>
-          <div class="pricing-amount">£70</div>
-          <div class="pricing-period">per month</div>
-          <ul class="pricing-features">
-            <li>Everything in Silver</li>
-            <li>Real-time tax estimates</li>
-            <li>Tax year reports</li>
-            <li>HMRC-ready exports</li>
-            <li>Accountant access</li>
-            <li>Phone support</li>
-          </ul>
-          <a href="/soloops/register" class="btn btn-secondary">Start Free Trial</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="how-section" id="how">
-    <div class="container">
-      <div class="section-header reveal">
-        <div class="section-tag">How It Works</div>
-        <h2 class="section-title">Get started in minutes</h2>
-        <p class="section-desc">
-          No training needed. No complex setup. Just sign up and go.
-        </p>
-      </div>
-      
-      <div class="steps-row">
-        <div class="step reveal stagger-1">
-          <div class="step-icon">📝</div>
-          <h3 class="step-title">Sign Up</h3>
-          <p class="step-desc">Create your account in 2 minutes. No credit card needed.</p>
-        </div>
-        <div class="step reveal stagger-2">
-          <div class="step-icon">⚙️</div>
-          <h3 class="step-title">Add Your Details</h3>
-          <p class="step-desc">Business name, logo, and bank details for invoices.</p>
-        </div>
-        <div class="step reveal stagger-3">
-          <div class="step-icon">🧾</div>
-          <h3 class="step-title">Send Invoices</h3>
-          <p class="step-desc">Create and send your first invoice in under 5 minutes.</p>
-        </div>
-        <div class="step reveal stagger-4">
-          <div class="step-icon">📈</div>
-          <h3 class="step-title">Track & Grow</h3>
-          <p class="step-desc">Log expenses, track income, and watch your business grow.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="container">
-      <div class="cta-content reveal-scale">
-        <h2 class="cta-title">Ready to simplify your business?</h2>
-        <p class="cta-desc">Join thousands of UK sole traders already using SoloOps.</p>
-        <div class="cta-buttons">
-          <a href="/soloops/register" class="btn btn-primary btn-large">Start Your Free Trial →</a>
-          <a href="mailto:hello@alzaro.co.uk" class="btn btn-secondary btn-large">Talk to Us</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  </div><!-- End HOME PAGE -->
-
-  <!-- PRIVACY PAGE -->
   <div id="page-privacy" class="page">
     <section class="legal-page">
       <div class="legal-container">
@@ -1622,98 +600,182 @@
     </section>
   </div>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="container">
-      <div class="footer-content">
-        <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro <span>SoloOps</span></a>
-        <div class="footer-links">
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="mailto:hello@alzaro.co.uk">Contact</a>
-          <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
-          <a href="#" onclick="showPage('terms'); return false;">Terms</a>
-        </div>
-        <div class="footer-copy">© 2026 Alzaro SoloOps. Built in the UK 🇬🇧</div>
+<footer>
+  <div class="container">
+    <div class="foot">
+      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>SoloOps</span></a>
+      <div class="foot-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
+        <a href="#" onclick="showPage('terms'); return false;">Terms</a>
+        <a href="mailto:hello@alzaro.co.uk">Contact</a>
+      </div>
+      <div class="foot-copy">
+        <span>© 2026 Alzaro Group. All rights reserved.</span>
+        <span>PART OF THE ALZARO PLATFORM FAMILY // MILTON KEYNES, UK</span>
       </div>
     </div>
-  </footer>
+  </div>
+</footer>
 
-  <script>
-    // Page navigation
-    function showPage(pageName) {
-      document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-      });
-      
-      const targetPage = document.getElementById('page-' + pageName);
-      if (targetPage) {
-        targetPage.classList.add('active');
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  function showPage(pageName) {
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+    const targetPage = document.getElementById('page-' + pageName);
+    if (targetPage) targetPage.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (pageName === 'home') { history.pushState(null, '', window.location.pathname); }
+    else { history.pushState(null, '', '#' + pageName); }
+    const navCenter = document.querySelector('.nav-center');
+    if (navCenter) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
+  }
+
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (href.startsWith('#') && href.length > 1 && !href.includes('page')) {
+        e.preventDefault();
+        const homePage = document.getElementById('page-home');
+        const go = () => { const target = document.querySelector(href); if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+        if (!homePage.classList.contains('active')) { showPage('home'); setTimeout(go, 100); } else { go(); }
       }
-      
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      if (pageName === 'home') {
-        history.pushState(null, '', window.location.pathname);
-      } else {
-        history.pushState(null, '', '#' + pageName);
-      }
-      
-      const navLinks = document.querySelector('.nav-center');
-      if (navLinks) {
-        navLinks.style.display = (pageName === 'home') ? 'flex' : 'none';
-      }
+    });
+  });
+
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-center a');
+  window.addEventListener('scroll', () => {
+    const homePage = document.getElementById('page-home');
+    if (!homePage.classList.contains('active')) return;
+    let current = '';
+    sections.forEach(section => { if (window.scrollY >= section.offsetTop - 110) current = section.getAttribute('id'); });
+    navLinks.forEach(link => { link.classList.toggle('active', link.getAttribute('href') === '#' + current); });
+  }, {passive:true});
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold: 0.12});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.slice(1);
+    if (hash === 'privacy' || hash === 'terms') showPage(hash);
+  });
+  window.addEventListener('popstate', () => {
+    const hash = window.location.hash.slice(1);
+    if (hash === 'privacy' || hash === 'terms') showPage(hash);
+    else showPage('home');
+  });
+
+  // ===== 3D motion gates =====
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const finePointer = matchMedia('(pointer: fine)').matches;
+
+  // Auto-rotating cube (Invoice -> Expenses -> Tax)
+  (function(){
+    const cube = document.getElementById('cube');
+    const scene = document.querySelector('.flow-scene');
+    if (!cube) return;
+    if (reduceMotion) return;
+    const faces = [0, -120, -240];
+    let i = 0, paused = false;
+    if (scene){
+      scene.addEventListener('mouseenter', () => { paused = true; });
+      scene.addEventListener('mouseleave', () => { paused = false; });
     }
-    
-    // Smooth scroll
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
-        const href = this.getAttribute('href');
-        if (href.length > 1 && !this.getAttribute('onclick')) {
-          e.preventDefault();
-          const homePage = document.getElementById('page-home');
-          if (!homePage.classList.contains('active')) {
-            showPage('home');
-            setTimeout(() => {
-              const target = document.querySelector(href);
-              if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-          } else {
-            const target = document.querySelector(href);
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
+    setInterval(() => {
+      if (paused) return;
+      i = (i + 1) % faces.length;
+      cube.style.transform = `translateZ(-190px) rotateY(${faces[i]}deg)`;
+    }, 3200);
+  })();
+
+  // WebGL hero: rising growth bars + trend line
+  (function(){
+    if (reduceMotion || typeof THREE === 'undefined') return;
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); }
+    catch (e) { return; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.domElement.className = 'webgl-canvas';
+    hero.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.set(0, 0.5, 10);
+
+    const wire = (geo, color, opacity) =>
+      new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    const ORANGE = 0xf97316, ORANGEL = 0xfb923c, GREY = 0xab9d8f;
+
+    const chart = new THREE.Group();
+    // rising bars
+    const heights = [1.0, 1.5, 1.3, 2.1, 2.6, 3.2];
+    const bars = [];
+    heights.forEach((h, i) => {
+      const bar = wire(new THREE.BoxGeometry(0.5, h, 0.5), i === heights.length-1 ? ORANGEL : ORANGE, 0.7);
+      bar.position.set((i - 2.5) * 0.85, h/2 - 1.4, 0);
+      bar.userData = { base: h };
+      chart.add(bar); bars.push(bar);
+    });
+    // trend line points climbing
+    const linePts = [];
+    heights.forEach((h, i) => linePts.push(new THREE.Vector3((i - 2.5) * 0.85, h - 1.4 + 0.2, 0)));
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+    const trend = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.85 }));
+    chart.add(trend);
+
+    chart.rotation.x = 0.12;
+    scene.add(chart);
+
+    const pGeo = new THREE.BufferGeometry();
+    const N = 200, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * 16;
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xab9d8f, size: 0.03, transparent: true, opacity: 0.4 })));
+
+    let mx = 0, my = 0;
+    if (finePointer) addEventListener('mousemove', e => {
+      mx = (e.clientX / innerWidth - 0.5); my = (e.clientY / innerHeight - 0.5);
+    }, { passive: true });
+
+    const resize = () => {
+      const w = hero.clientWidth, h = hero.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+      chart.position.x = w > 960 ? 2.2 : 0;
+      renderer.domElement.style.opacity = w > 960 ? 0.5 : 0.22;
+    };
+    addEventListener('resize', resize, { passive: true }); resize();
+
+    let running = true;
+    document.addEventListener('visibilitychange', () => { running = !document.hidden; });
+    const clock = new THREE.Clock();
+    (function animate(){
+      requestAnimationFrame(animate);
+      if (!running) return;
+      const t = clock.getElapsedTime();
+      chart.rotation.y = Math.sin(t * 0.28) * 0.4;
+      bars.forEach((b, i) => {
+        const s = 1 + Math.sin(t * 0.9 + i * 0.5) * 0.06;
+        b.scale.y = s;
+        b.position.y = (b.userData.base * s) / 2 - 1.4;
       });
-    });
-    
-    // Navbar scroll
-    const nav = document.getElementById('nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 50);
-    });
-    
-    // Scroll reveal
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add('visible');
-      });
-    }, { threshold: 0.15 });
-    
-    document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale').forEach(el => {
-      revealObserver.observe(el);
-    });
-    
-    // Handle hash
-    window.addEventListener('load', () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'privacy' || hash === 'terms') showPage(hash);
-    });
-    
-    window.addEventListener('popstate', () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'privacy' || hash === 'terms') showPage(hash);
-      else showPage('home');
-    });
-  </script>
+      camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
+      camera.position.y += (0.5 - my * 0.5 - camera.position.y) * 0.04;
+      camera.lookAt(chart.position.x * 0.6, 0, 0);
+      renderer.render(scene, camera);
+    })();
+  })();
+</script>
 </body>
 </html>
