@@ -18,7 +18,6 @@ const TIER_CLASSES = {
   gold: { bg: 'rgba(79,70,229,0.1)', color: '#4f46e5', border: 'rgba(79,70,229,0.25)', icon: '👑' },
   admin: { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)', icon: '🛡️' },
 }
-}
 
 function getTheme() {
   return localStorage.getItem('alzaro-theme') || 'light'
