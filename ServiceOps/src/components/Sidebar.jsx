@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
-import { PRODUCT, TIER_META } from '../config/product'
+import { PRODUCT } from '../config/product'
 import { NAV } from '../config/nav'
 
 const TIER_CLASSES = {
@@ -17,6 +18,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, tier, isAdmin, logout, settings } = useStore()
+  const [search, setSearch] = useState('')
 
   const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.bronze
   const isDark = getTheme() === 'dark'
@@ -29,6 +31,11 @@ export default function Sidebar({ onNavigate, isMobile }) {
     navigate(item.path)
     if (onNavigate) onNavigate()
   }
+
+  // Filter nav items by the search box (case-insensitive label match)
+  const visibleNav = NAV.filter(item =>
+    item.label.toLowerCase().includes(search.trim().toLowerCase())
+  )
 
   return (
     <div style={{ width: '230px', background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 56px)' : '100vh' }}>
@@ -52,6 +59,28 @@ export default function Sidebar({ onNavigate, isMobile }) {
         )}
       </div>
 
+      {/* Search */}
+      {!isAdmin && (
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', opacity: 0.6 }}>🔍</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search..."
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '8px 10px 8px 30px',
+                fontSize: '13px', fontFamily: 'inherit',
+                color: 'var(--text)', background: 'var(--surface2)',
+                border: '1px solid var(--border)', borderRadius: '8px',
+                outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
         {isAdmin ? (
           <>
@@ -59,7 +88,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
             <NavItem icon="👑" label="Licence Manager" active={location.pathname === '/admin'} onClick={() => { navigate('/admin'); onNavigate?.() }} />
           </>
         ) : (
-          NAV.map(item => {
+          visibleNav.map(item => {
             const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
             return <NavItem key={item.path} icon={item.icon} label={item.label} locked={locked} active={location.pathname === item.path} onClick={() => handleNav(item)} />
           })
