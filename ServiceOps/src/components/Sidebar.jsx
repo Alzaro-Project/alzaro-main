@@ -4,10 +4,10 @@ import { PRODUCT, TIER_META } from '../config/product'
 import { NAV } from '../config/nav'
 
 const TIER_CLASSES = {
-  starter:  { bg: 'rgba(100,116,139,0.12)', color: '#64748b', border: 'rgba(100,116,139,0.25)' },
-  pro:      { bg: 'rgba(16,185,129,0.1)',   color: '#10b981', border: 'rgba(16,185,129,0.25)' },
-  business: { bg: 'rgba(13,148,136,0.12)',  color: '#0d9488', border: 'rgba(13,148,136,0.25)' },
-  admin:    { bg: 'rgba(124,58,237,0.1)',   color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },
+  bronze: { bg: 'rgba(180,100,30,0.12)', color: '#b36b1a', border: 'rgba(180,100,30,0.25)', icon: '🥉' },
+  silver: { bg: 'rgba(100,100,120,0.1)', color: '#6b7080', border: 'rgba(100,100,120,0.25)', icon: '🥈' },
+  gold:   { bg: 'rgba(245,200,66,0.12)', color: '#f5c842', border: 'rgba(245,200,66,0.3)',  icon: '👑' },
+  admin:  { bg: 'rgba(124,58,237,0.1)',  color: '#7c3aed', border: 'rgba(124,58,237,0.25)', icon: '🛡️' },
 }
 
 const getTheme = () => localStorage.getItem('alzaro-theme') || 'light'
