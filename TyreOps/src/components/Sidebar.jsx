@@ -92,9 +92,9 @@ export default function Sidebar({ onNavigate, isMobile }) {
           border: `1px solid ${tierStyle.border}`,
           textTransform: 'uppercase',
         }}>
+          <span>{tierStyle.icon}</span>
           {tier}
-        </div>
-      </div>
+        </div>      </div>
 
       {/* Nav */}
       <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
