@@ -13,10 +13,11 @@ const NAV = [
 ]
 
 const TIER_CLASSES = {
-  bronze: { bg: 'rgba(180,100,30,0.12)', color: '#b36b1a', border: 'rgba(180,100,30,0.25)' },
-  silver: { bg: 'rgba(100,100,120,0.1)', color: '#6b7080', border: 'rgba(100,100,120,0.25)' },
-  gold: { bg: 'rgba(79,70,229,0.1)', color: '#4f46e5', border: 'rgba(79,70,229,0.25)' },
-  admin: { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },
+  bronze: { bg: 'rgba(180,100,30,0.12)', color: '#b36b1a', border: 'rgba(180,100,30,0.25)', icon: '🥉' },
+  silver: { bg: 'rgba(100,100,120,0.1)', color: '#6b7080', border: 'rgba(100,100,120,0.25)', icon: '🥈' },
+  gold: { bg: 'rgba(79,70,229,0.1)', color: '#4f46e5', border: 'rgba(79,70,229,0.25)', icon: '👑' },
+  admin: { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)', icon: '🛡️' },
+}
 }
 
 function getTheme() {
