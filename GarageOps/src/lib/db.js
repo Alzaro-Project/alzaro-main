@@ -421,12 +421,13 @@ export async function deleteVehicle(id) {
 // ============================================================
 export async function getServices(garageId) {
   const { data, error } = await supabase
-    .from('services').select('*').eq('garage_id', garageId).order('category').order('name')
+    .from('services').select('*').eq('garage_id', garageId).order('sort_order').order('name')
   if (error) throw error
   return (data || []).map(s => ({
     ...s,
-    labourHours: s.labour_hours,
+    defaultDurationMin: s.default_duration_min,
     defaultPrice: s.default_price,
+    defaultDescription: s.default_description,
   }))
 }
 
