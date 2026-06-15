@@ -95,8 +95,8 @@ export function Settings() {
     try {
       const { supabase } = await import('../lib/supabase')
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase.from('garages')
-        .update({ name: name.trim(), phone: phone.trim(), address: addr.trim() })
+      const { error } = await supabase.from('product_members')
+        .update({ company_name: name.trim(), phone: phone.trim(), address: addr.trim() })
         .eq('id', tenantId)
       if (error) throw error
       if (user) await hydrateUser(user)
