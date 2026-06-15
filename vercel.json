@@ -201,6 +201,10 @@
       "destination": "/ServiceOps/dist/index.html"
     },
     {
+      "source": "/serviceops/dist/:path*",
+      "destination": "/ServiceOps/dist/:path*"
+    },
+    {
       "source": "/serviceops/:file((?!login|register|reset-password|dashboard|jobs|quotes|invoices|customers|schedule|settings|admin).+\\..+)",
       "destination": "/ServiceOps/dist/:file"
     },
