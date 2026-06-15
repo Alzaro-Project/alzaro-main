@@ -133,9 +133,27 @@ function App() {
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
-      {/* SIDEBAR */}
+     {/* SIDEBAR */}
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
-        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 22px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 6px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        {(() => {
+          const TIER_META = {
+            bronze: { icon:'🥉', color:'#b36b1a', bg:'rgba(180,100,30,0.12)', border:'rgba(180,100,30,0.25)' },
+            silver: { icon:'🥈', color:'#9ca3af', bg:'rgba(100,100,120,0.12)', border:'rgba(100,100,120,0.25)' },
+            gold:   { icon:'👑', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.25)' },
+          }
+          const bizName = session.user.user_metadata?.business_name || session.user.email.split('@')[0]
+          const tier = (session.user.user_metadata?.tier || 'gold').toLowerCase()
+          const tm = TIER_META[tier] || TIER_META.gold
+          return (
+            <div style={{ padding:'0 12px 16px', flexShrink:0 }}>
+              <div style={{ fontSize:'13px', fontWeight:600, marginBottom:'6px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{bizName}</div>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
+                <span>{tm.icon}</span>{tier}
+              </span>
+            </div>
+          )
+        })()}
         <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
           {NAV.map(([k,label]) => (
             <div key={k} data-nav onClick={()=>setView(k)} style={{
