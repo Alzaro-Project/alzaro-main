@@ -61,12 +61,13 @@ function App() {
     const uid = sess?.session?.user?.id
     if (uid) {
       const { data: access } = await window.sb
-        .from('soloops_access').select('user_id').eq('user_id', uid).maybeSingle()
+        .from('soloops_access').select('user_id, business_name').eq('user_id', uid).maybeSingle()
       if (!access) {
         await window.sb.auth.signOut()
         window.location.href = '/soloops/login'
         return
       }
+      setBizName(access.business_name || '')
     }
     const [inv, exp, mil, cli] = await Promise.all([
       window.sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false }),
