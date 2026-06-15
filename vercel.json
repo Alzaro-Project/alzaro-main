@@ -1,5 +1,5 @@
 {
- "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
+  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
     {
@@ -20,6 +20,16 @@
     {
       "source": "/GarageOps/:path((?!dist).*)",
       "destination": "/garageops/:path",
+      "permanent": true
+    },
+    {
+      "source": "/ServiceOps",
+      "destination": "/serviceops",
+      "permanent": true
+    },
+    {
+      "source": "/ServiceOps/:path((?!dist).*)",
+      "destination": "/serviceops/:path",
       "permanent": true
     }
   ],
@@ -151,14 +161,6 @@
     {
       "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|reports|settings|admin).+\\..+)",
       "destination": "/GarageOps/dist/:file"
-    },
-    {
-      "source": "/ServiceOps",
-      "destination": "/serviceops"
-    },
-    {
-      "source": "/ServiceOps/:path((?!dist).*)",
-      "destination": "/serviceops/:path"
     },
     {
       "source": "/serviceops",
