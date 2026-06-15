@@ -153,24 +153,56 @@
       "destination": "/GarageOps/dist/:file"
     },
     {
+      "source": "/serviceops",
+      "destination": "/ServiceOps/landing.html"
+    },
+    {
       "source": "/serviceops/login",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/register",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/serviceops/:file((?!login|register).+\\..+)",
-      "destination": "/ServiceOps/:file"
+      "source": "/serviceops/reset-password",
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/serviceops",
-      "destination": "/ServiceOps/index.html"
+      "source": "/serviceops/dashboard",
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/ServiceOps",
-      "destination": "/ServiceOps/index.html"
+      "source": "/serviceops/jobs",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/quotes",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/invoices",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/customers",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/schedule",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/settings",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/admin",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/:file((?!login|register|reset-password|dashboard|jobs|quotes|invoices|customers|schedule|settings|admin).+\\..+)",
+      "destination": "/ServiceOps/dist/:file"
     },
     {
       "source": "/soloops/login",
