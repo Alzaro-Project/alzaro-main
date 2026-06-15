@@ -153,6 +153,14 @@
       "destination": "/GarageOps/dist/:file"
     },
     {
+      "source": "/ServiceOps",
+      "destination": "/serviceops"
+    },
+    {
+      "source": "/ServiceOps/:path((?!dist).*)",
+      "destination": "/serviceops/:path"
+    },
+    {
       "source": "/serviceops",
       "destination": "/ServiceOps/landing.html"
     },
