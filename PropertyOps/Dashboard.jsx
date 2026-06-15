@@ -1703,6 +1703,15 @@ const PAGES = {
   reports: ReportsPage, settings: SettingsPage,
 };
 
+// Tier → crown badge. PropOps tier isn't stored yet, so this maps whatever
+// tier string we find (settings/membership) to a badge; defaults to Enterprise.
+const TIER_BADGE = {
+  starter: { label: "STARTER", icon: "🥉" },
+  professional: { label: "PROFESSIONAL", icon: "🥈" },
+  enterprise: { label: "ENTERPRISE", icon: "👑" },
+};
+const tierBadge = (tier) => TIER_BADGE[(tier || "enterprise").toLowerCase()] || TIER_BADGE.enterprise;
+
 function Dashboard({ user, signOut }) {
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
@@ -1714,6 +1723,42 @@ function Dashboard({ user, signOut }) {
   const [allData, setAllData] = useState(null);
   const [query, setQuery] = useState("");
   const [showNotif, setShowNotif] = useState(false);
+
+  // ---- business identity for the sidebar (real DB data, not email) ----
+  // Priority: prop_settings.company_name → product_members.company_name →
+  // user_metadata.company_name → email prefix (last resort). Tier read from
+  // settings/membership if a column exists, else defaults to Enterprise.
+  const [biz, setBiz] = useState({ name: "", tier: "enterprise", loaded: false });
+
+  useEffect(() => {
+    if (!DB_READY) {
+      setBiz({ name: DEMO.user.name, tier: DEMO.user.tier.toLowerCase(), loaded: true });
+      return;
+    }
+    let cancelled = false;
+    const loadBiz = async () => {
+      let name = "", tier = "";
+      // 1) prop_settings (most likely to be user-corrected)
+      try {
+        const { data: s } = await db.from("prop_settings").select("company_name,tier,plan").eq("user_id", user.id).maybeSingle();
+        if (s) { name = s.company_name || name; tier = s.tier || s.plan || tier; }
+      } catch (e) {}
+      // 2) product_members (set at signup / join)
+      if (!name || !tier) {
+        try {
+          const { data: m } = await db.from("product_members").select("company_name,tier,plan").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
+          if (m) { name = name || m.company_name || ""; tier = tier || m.tier || m.plan || ""; }
+        } catch (e) {}
+      }
+      // 3) auth metadata (always set at signup)
+      if (!name) name = user.user_metadata?.company_name || "";
+      // 4) last resort — email prefix
+      if (!name) name = (user.email || "").split("@")[0];
+      if (!cancelled) setBiz({ name, tier: tier || "enterprise", loaded: true });
+    };
+    loadBiz();
+    return () => { cancelled = true; };
+  }, [user]);
 
   useEffect(() => {
     document.body.classList.toggle("light", light);
@@ -1769,6 +1814,10 @@ function Dashboard({ user, signOut }) {
 
   const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
 
+  // resolved sidebar identity
+  const badge = tierBadge(biz.tier);
+  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : DEMO.user.name)) : "…";
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 80 }} />}
@@ -1776,10 +1825,37 @@ function Dashboard({ user, signOut }) {
         ...(isMobile
           ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 90, transform: navOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: navOpen ? "0 0 40px rgba(0,0,0,.5)" : "none" }
           : { width: 210, position: "sticky", top: 0, height: "100vh" }) }}>
+        {/* logo */}
         <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
-        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Property Operations Pro</div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 18px" }}>{DEMO.user.tier}</span>
+        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 18 }}>Property Operations Pro</div>
+        {/* business name (real DB data, not email) */}
+        <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
+        {/* tier badge with crown icon */}
+        <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 16px" }}>
+          <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
+        </span>
+        {/* working search bar */}
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
+            <i className="ti ti-search" style={{ fontSize: 14, color: "var(--txt-3)" }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12, fontFamily: "Inter" }} />
+            {query && <i className="ti ti-x" onClick={() => setQuery("")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} />}
+          </div>
+          {q && (
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 10, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 95, maxHeight: 320, overflow: "auto" }}>
+              {results.length === 0 ? (
+                <div style={{ padding: "14px", fontSize: 12, color: "var(--txt-3)" }}>No matches for "{query}".</div>
+              ) : results.slice(0, 12).map((r, i) => (
+                <div key={i} onClick={() => { goTo(r.page); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 13px", cursor: "pointer", borderBottom: i < Math.min(results.length, 12) - 1 ? "0.5px solid var(--line)" : "none" }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel-2)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                  <i className={`ti ${r.icon}`} style={{ fontSize: 15, color: "var(--brand)" }} />
+                  <div style={{ minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</div><div style={{ fontSize: 10, color: "var(--txt-3)" }}>{r.sub}</div></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* nav */}
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((n) => {
             const on = n.id === active;
