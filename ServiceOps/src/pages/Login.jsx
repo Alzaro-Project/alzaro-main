@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { joinProduct } from '../lib/db'
 import { useStore } from '../store/useStore'
 import { PRODUCT } from '../config/product'
 
@@ -13,9 +14,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [joinFor, setJoinFor] = useState(null) // email of a valid user who isn't a member yet
   const { login } = useStore()
   const navigate = useNavigate()
-
   const inp = {
     background: 'var(--surface2)', border: '1px solid var(--border)',
     borderRadius: '8px', padding: '11px 14px', color: 'var(--text)',
@@ -37,17 +38,36 @@ export default function Login() {
 
       const res = await login(data.user)
 
-      // Valid credentials, but no account for THIS product.
+      // Valid credentials, but no account for THIS product yet.
+      // Keep them signed in and offer a trial (same as other Alzaro products).
       if (!res.ok) {
-        await supabase.auth.signOut()
         setLoading(false)
-        setError(`No ${PRODUCT.name} account found for this email. Please register for ${PRODUCT.name} first.`)
+        setJoinFor(email)
+        setBizName(data.user?.user_metadata?.tenant_name || data.user?.user_metadata?.company_name || '')
         return
       }
 
       navigate(res.isAdmin ? '/admin' : '/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
+    }
+    setLoading(false)
+  }
+
+  // They're signed in but not a member of THIS product — create a trial garage
+  // via join_product, then re-hydrate and go to the dashboard.
+  const doJoin = async () => {
+    if (!bizName.trim()) return setError('Please enter your business name')
+    setLoading(true); reset()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Session expired — please sign in again.')
+      await joinProduct(bizName.trim())
+      const res = await login(user)
+      if (!res.ok) throw new Error('Trial created, but sign-in failed. Please try logging in again.')
+      navigate(res.isAdmin ? '/admin' : '/dashboard')
+    } catch (err) {
+      setError(err.message || 'Could not start your trial')
     }
     setLoading(false)
   }
@@ -121,6 +141,23 @@ export default function Login() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <input style={inp} type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && doForgot()} />
               <button onClick={doForgot} disabled={loading} style={{ ...primaryBtn, opacity: loading ? .7 : 1 }}>{loading ? 'Sending…' : 'Send Reset Link'}</button>
+            </div>
+          </>
+        ) : joinFor ? (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <div style={{ fontSize: '30px', marginBottom: '8px' }}>👋</div>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>You're already with Alzaro</div>
+              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--text)' }}>{joinFor}</strong> is registered to another Alzaro product. Start a separate <strong style={{ color: 'var(--accent)' }}>{PRODUCT.trialDays}-day {PRODUCT.name} trial</strong> on this same login? Your other products stay completely separate.
+              </div>
+            </div>
+            <Alerts />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input style={inp} placeholder={`${PRODUCT.tenantLabel} *`} value={bizName} onChange={e => setBizName(e.target.value)} onKeyDown={e => e.key === 'Enter' && doJoin()} autoFocus />
+              <button onClick={doJoin} disabled={loading} style={{ ...primaryBtn, opacity: loading ? .7 : 1 }}>{loading ? 'Setting up…' : `Start ${PRODUCT.name} Trial →`}</button>
+              <button onClick={async () => { await supabase.auth.signOut(); setJoinFor(null); reset() }} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px' }}>Not now — sign me out</button>
+              <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>Separate trial · No credit card required</div>
             </div>
           </>
         ) : (
