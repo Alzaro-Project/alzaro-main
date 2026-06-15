@@ -25,19 +25,19 @@ export const useStore = create((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession()
     if (session?.user) {
       const res = await get().hydrateUser(session.user)
-      // Valid session but no account for THIS product → sign out silently.
+      // Valid session but no account for THIS product. Keep the session
+      // alive (so the user can start a trial) but leave user null so the
+      // router won't show the dashboard.
       if (!res.ok) {
-        await supabase.auth.signOut()
         set({ user: null, isAdmin: false, tenantId: null, status: null, settings: {} })
       }
     }
     set({ ready: true })
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
+     if (session?.user) {
         const res = await get().hydrateUser(session.user)
         if (!res.ok) {
-          await supabase.auth.signOut()
           set({ user: null, isAdmin: false, tenantId: null, status: null, settings: {} })
         }
       } else {
