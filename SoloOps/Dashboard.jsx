@@ -36,7 +36,6 @@ function App() {
   const [clients, setClients] = useState([])
   const [bizName, setBizName] = useState('')
   const [search, setSearch] = useState('')
-  const [bizName, setBizName] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // 'expense' | 'invoice' | null
   const [toast, setToast] = useState('')
@@ -69,7 +68,6 @@ function App() {
         window.location.href = '/soloops/login'
         return
       }
-      setBizName(access.business_name || '')      }
       setBizName(access.business_name || '')
     }
     const [inv, exp, mil, cli] = await Promise.all([
@@ -138,27 +136,63 @@ function App() {
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
-     {/* SIDEBAR */}
+      {/* SIDEBAR */}
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
-        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 6px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
+
         {(() => {
           const TIER_META = {
             bronze: { icon:'🥉', color:'#b36b1a', bg:'rgba(180,100,30,0.12)', border:'rgba(180,100,30,0.25)' },
             silver: { icon:'🥈', color:'#9ca3af', bg:'rgba(100,100,120,0.12)', border:'rgba(100,100,120,0.25)' },
             gold:   { icon:'👑', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.25)' },
           }
-          const bizName = session.user.user_metadata?.business_name || session.user.email.split('@')[0]
+          const name = bizName || session.user.user_metadata?.business_name || session.user.email.split('@')[0]
           const tier = (session.user.user_metadata?.tier || 'gold').toLowerCase()
           const tm = TIER_META[tier] || TIER_META.gold
           return (
-            <div style={{ padding:'0 12px 16px', flexShrink:0 }}>
-              <div style={{ fontSize:'13px', fontWeight:600, marginBottom:'6px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{bizName}</div>
+            <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
+              <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
               <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
                 <span>{tm.icon}</span>{tier}
               </span>
             </div>
           )
         })()}
+
+        {/* search */}
+        <div style={{ position:'relative', padding:'0 4px 12px', flexShrink:0 }}>
+          <input
+            value={search}
+            onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍  Search…"
+            style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', padding:'10px 12px', color:'var(--text)', fontSize:'13px', outline:'none' }}
+          />
+          {search.trim().length >= 2 && (() => {
+            const q = search.trim().toLowerCase()
+            const hits = []
+            clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'clients' }) })
+            invoices.forEach(i => { if ((`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q)) hits.push({ type:'Invoice', label:`${i.number||'—'} · ${i.client_name||''}`, view:'income' }) })
+            expenses.forEach(e => { if ((`${e.merchant||''} ${e.category||''}`).toLowerCase().includes(q)) hits.push({ type:'Expense', label:`${e.merchant} · ${gbp(e.amount)}`, view:'expenses' }) })
+            const top = hits.slice(0, 8)
+            return (
+              <div style={{ position:'absolute', left:'4px', right:'4px', top:'46px', zIndex:50, background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'12px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', overflow:'hidden', maxHeight:'340px', overflowY:'auto' }}>
+                {top.length === 0
+                  ? <div style={{ padding:'14px', fontSize:'12.5px', color:'var(--text3)' }}>No matches for “{search}”.</div>
+                  : top.map((h, idx) => (
+                    <div key={idx} onClick={()=>{ setView(h.view); setSearch('') }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'10px 12px', cursor:'pointer', borderBottom:'1px solid var(--border)', fontSize:'13px' }}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{h.label}</span>
+                      <span style={{ flexShrink:0, fontSize:'10px', color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h.type}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            )
+          })()}
+        </div>
+
         <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
           {NAV.map(([k,label]) => (
             <div key={k} data-nav onClick={()=>setView(k)} style={{
