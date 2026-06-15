@@ -27,7 +27,17 @@ export async function checkIsAdmin(email) {
   }
   return !!data
 }
-
+/** Create a trial garage for THIS product on the signed-in user's
+    account, via the shared join_product DB function. Idempotent:
+    if a garage for this product already exists, its id is returned. */
+export async function joinProduct(garageName) {
+  const { data, error } = await supabase.rpc('join_product', {
+    p_product: PRODUCT.id,
+    p_garage_name: garageName || '',
+  })
+  if (error) throw error
+  return data
+}
 /** Fetch the tenant row for a given auth user id, scoped to product. */
 export async function getTenantByUserId(userId) {
   const { data, error } = await supabase
