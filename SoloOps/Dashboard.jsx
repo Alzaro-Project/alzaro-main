@@ -34,6 +34,7 @@ function App() {
   const [expenses, setExpenses] = useState([])
   const [mileage, setMileage] = useState([])
   const [clients, setClients] = useState([])
+  const [bizName, setBizName] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // 'expense' | 'invoice' | null
   const [toast, setToast] = useState('')
