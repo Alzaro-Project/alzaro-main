@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build",
+ "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
     {
