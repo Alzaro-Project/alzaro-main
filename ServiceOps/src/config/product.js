@@ -35,9 +35,9 @@ export const PRODUCT = {
 
   // Pricing tiers (label + monthly £). Order matters: low → high.
   tiers: [
-    { id: 'starter',  label: 'Starter',  price: 29, icon: '🔧' },
-    { id: 'pro',      label: 'Pro',      price: 49, icon: '⚡' },
-    { id: 'business', label: 'Business', price: 89, icon: '🏆' },
+    { id: 'bronze', label: 'Bronze', price: 60, icon: '🥉' },
+    { id: 'silver', label: 'Silver', price: 75, icon: '🥈' },
+    { id: 'gold',   label: 'Gold',   price: 90, icon: '👑' },
   ],
 
   trialDays: 14,
