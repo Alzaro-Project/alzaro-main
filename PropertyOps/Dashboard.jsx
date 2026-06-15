@@ -264,7 +264,7 @@ function DashboardPage({ range, go, user }) {
         <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{totalProps} propert{totalProps === 1 ? "y" : "ies"} · {attention} item{attention === 1 ? "" : "s"} need attention · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Compliance Score" value={hasCerts ? <>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></> : "—"} sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
+        <Metric label="Compliance Score" value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Rent Arrears" value={gbp(arrears)} sub={`${arrearsCount} overdue`} color={arrears ? "var(--red)" : "var(--green)"} />
         <Metric label="Occupancy" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} color="var(--blue)" />
         <Metric label="Monthly Income" value={gbp(income)} sub="From let properties" color="var(--brand)" />
