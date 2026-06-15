@@ -69,6 +69,7 @@ function App() {
         window.location.href = '/soloops/login'
         return
       }
+      setBizName(access.business_name || '')      }
       setBizName(access.business_name || '')
     }
     const [inv, exp, mil, cli] = await Promise.all([
