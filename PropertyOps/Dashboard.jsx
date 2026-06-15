@@ -1740,13 +1740,14 @@ function Dashboard({ user, signOut }) {
       let name = "", tier = "";
       // 1) prop_settings (most likely to be user-corrected)
       try {
-        const { data: s } = await db.from("prop_settings").select("company_name,tier,plan").eq("user_id", user.id).maybeSingle();
+        const { data: s } = await db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle();
         if (s) { name = s.company_name || name; tier = s.tier || s.plan || tier; }
       } catch (e) {}
-      // 2) product_members (set at signup / join)
+      // 2) product_members (set at signup / join) — select * so a missing
+      // tier/plan column can't throw and swallow the company_name.
       if (!name || !tier) {
         try {
-          const { data: m } = await db.from("product_members").select("company_name,tier,plan").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
+          const { data: m } = await db.from("product_members").select("*").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
           if (m) { name = name || m.company_name || ""; tier = tier || m.tier || m.plan || ""; }
         } catch (e) {}
       }
