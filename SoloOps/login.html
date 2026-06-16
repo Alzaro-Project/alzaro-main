@@ -1,337 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alzaro SoloOps — Business Operations for Sole Traders</title>
-  <meta name="description" content="The modern operating system for self-employed businesses. Track income, expenses, mileage and tax." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    :root{
-      --bg:#0a0908; --surface:#121110; --surface2:#1a1816; --surface3:#23201d;
-      --border:rgba(255,255,255,.06); --border-light:rgba(255,255,255,.1);
-      --text:#faf9f7; --text2:#a8a29e; --text3:#68635d;
-      --orange:#f97316; --orange-light:#fb923c; --amber:#f59e0b;
-      --orange-subtle:rgba(249,115,22,.08);
-      --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
-      --radius:16px; --radius-sm:8px;
-    }
-    *{box-sizing:border-box; margin:0; padding:0;}
-    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased;}
-    .mono{font-family:'Fira Code',monospace;}
-    ::-webkit-scrollbar{width:8px;height:8px;}
-    ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
-    a{color:inherit;text-decoration:none;}
-    .fade-in{animation:fade .5s ease both;}
-    @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Alzaro SoloOps — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#0a0908;--surface:#121110;--surface2:#1a1816;--surface3:#23201d;--border:rgba(255,255,255,.06);--text:#faf9f7;--text2:#a8a29e;--text3:#68635d;--orange:#f97316;--amber:#f59e0b;--red:#ef4444;--green:#22c55e;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;}
+.wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:420px;max-width:100%;}
+.brand{font-size:32px;font-weight:800;text-align:center;margin-bottom:6px;letter-spacing:-.5px;}
+.brand span{color:var(--orange);}
+.sub{text-align:center;color:var(--text2);font-size:13px;margin-bottom:24px;}
+.tabs{display:flex;gap:6px;background:var(--surface2);border-radius:8px;padding:4px;margin-bottom:20px;}
+.tab{flex:1;padding:8px;text-align:center;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);}
+.tab.active{background:var(--surface3);color:var(--text);}
+input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-size:14px;outline:none;width:100%;margin-bottom:12px;font-family:inherit;}
+button.go{background:linear-gradient(135deg,var(--orange),var(--amber));color:#000;font-weight:700;font-size:14px;padding:13px;border-radius:8px;border:none;cursor:pointer;width:100%;}
+button.go:disabled{opacity:.6;}
+.link{background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:8px;width:100%;margin-top:4px;}
+.msg{border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;}
+.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);}
+.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green);}
+.foot{font-size:11px;color:var(--text3);}
+.hidden{display:none;}
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="supabase.js"></script>
-  <script type="text/plain" id="login-src">
-// ============================================================
-//  Alzaro SoloOps — Login / Register
-//  Loaded by app.html via <\script type="text/babel">.
-//  Uses CDN globals (React, ReactDOM) + window.sb from supabase.js
-//  — no import statements (browser Babel can't resolve modules).
-// ============================================================
-const { useState } = React
-
-// Emails listed here go to the admin dashboard instead of the normal one.
-const ADMIN_EMAILS = ['mohammmed250052@gmail.com']
-
-function Login() {
-  const [tab, setTab] = useState(window.__START_TAB === 'register' ? 'register' : 'login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [businessName, setBusinessName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [joinMode, setJoinMode] = useState(false)     // existing Alzaro login, no SoloOps access yet
-  const [pendingUser, setPendingUser] = useState(null) // the signed-in user awaiting a SoloOps trial
-
-  const goTo = (path) => { window.location.href = path }
-
-  const inp = {
-    background: 'var(--surface2)', border: '1px solid var(--border)',
-    borderRadius: '8px', padding: '11px 14px', color: 'var(--text)',
-    fontSize: '14px', outline: 'none', width: '100%'
-  }
-  const grad = 'linear-gradient(135deg, var(--orange), var(--amber))'
-
-  const doLogin = async () => {
-    if (!email || !password) return setError('Please enter email and password')
-    setLoading(true); setError(''); setSuccess('')
-    try {
-      const { data, error: err } = await window.sb.auth.signInWithPassword({ email, password })
-      if (err) throw err
-
-      const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase())
-      if (isAdmin) { goTo('/soloops/admin'); return }
-
-      // Multi-vertical: an account may exist (via any Alzaro product) but
-      // must have SIGNED UP for SoloOps. We check the soloops_access table.
-      // (Legacy accounts with metadata product='soloops' are backfilled there.)
-      const { data: access } = await window.sb
-        .from('soloops_access').select('user_id').eq('user_id', data.user.id).maybeSingle()
-
-      if (!access) {
-        // New signups have metadata product='soloops' but no access row yet
-        // (it can't be made before email confirmation). Create it now.
-        if (data.user.user_metadata?.product === 'soloops') {
-          await window.sb.from('soloops_access').insert({ email: data.user.email,
-            user_id: data.user.id,
-            business_name: data.user.user_metadata?.business_name || null
-          })
-          goTo('/soloops/dashboard')
-          return
-        }
-        // Existing Alzaro account from another product — offer a SoloOps
-        // trial inline (stay signed in; the join screen adds the access row).
-        setPendingUser(data.user)
-        setJoinMode(true)
-        setLoading(false)
-        return
-      }
-      goTo('/soloops/dashboard')
-    } catch (err) {
-      const msg = err.message || 'Login failed'
-      if (/invalid login credentials/i.test(msg)) {
-        setError('Email or password is incorrect. New here? Use the Register tab to create an account.')
-      } else {
-        setError(msg)
-      }
-    }
-    setLoading(false)
-  }
-
-  // Existing Alzaro user starting their SoloOps trial (inline)
-  const doJoin = async () => {
-    if (!businessName.trim()) return setError('Please enter your business name')
-    if (!pendingUser) return setError('Something went wrong — please sign in again')
-    setLoading(true); setError('')
-    try {
-      const { error: insErr } = await window.sb.from('soloops_access').insert({
-        user_id: pendingUser.id,
-        email: pendingUser.email,
-        business_name: businessName.trim(),
-      })
-      if (insErr) throw insErr
-      goTo('/soloops/dashboard')
-    } catch (err) {
-      setError(err.message || 'Could not set up your SoloOps account')
-      setLoading(false)
-    }
-  }
-
-  const cancelJoin = async () => {
-    try { await window.sb.auth.signOut() } catch (e) { /* ignore */ }
-    setJoinMode(false)
-    setPendingUser(null)
-    setBusinessName('')
-    setError('')
-    setLoading(false)
-  }
-
-  const doRegister = async () => {
-    if (!businessName || !email || !password) return setError('Please fill all fields')
-    if (password.length < 6) return setError('Password must be at least 6 characters')
-    setLoading(true); setError(''); setSuccess('')
-    try {
-      const siteUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:5173'
-        : `${window.location.protocol}//${window.location.host}`
-
-      // First, try to sign in — this tells us if the email already exists
-      // on Alzaro (from any vertical) with this password.
-      const { data: signInData, error: signInErr } =
-        await window.sb.auth.signInWithPassword({ email, password })
-
-      if (!signInErr && signInData?.user) {
-        // Email already exists on Alzaro. Add SoloOps access to this account.
-        const uid = signInData.user.id
-        const { data: existing } = await window.sb
-          .from('soloops_access').select('user_id').eq('user_id', uid).maybeSingle()
-        if (existing) {
-          await window.sb.auth.signOut()
-          setSuccess('You already have SoloOps on this account \u2014 just log in.')
-          setTab('login'); setBusinessName(''); setPassword('')
-          setLoading(false); return
-        }
-        const { error: insErr } = await window.sb
-          .from('soloops_access').insert({ user_id: uid, email: email.trim().toLowerCase(), business_name: businessName.trim() })
-        if (insErr) throw insErr
-        // signed in + access granted → straight to dashboard
-        goTo('/soloops/dashboard')
-        return
-      }
-
-      // Otherwise it's a brand-new account → normal signup (with confirm email).
-      const { error: err } = await window.sb.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${siteUrl}/soloops/login`,
-          data: { business_name: businessName.trim(), product: 'soloops' }
-        }
-      })
-      if (err) throw err
-      setSuccess('Check your email to confirm your account, then log in.')
-      setTab('login'); setBusinessName(''); setPassword('')
-    } catch (err) {
-      setError(err.message || 'Registration failed')
-    }
-    setLoading(false)
-  }
-
-  const doForgotPassword = async () => {
-    if (!email) return setError('Please enter your email address')
-    setLoading(true); setError(''); setSuccess('')
-    try {
-      const siteUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:5173'
-        : `${window.location.protocol}//${window.location.host}`
-      const { error: err } = await window.sb.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/soloops/reset-password`,
-      })
-      if (err) throw err
-      setSuccess('Password reset link sent! Check your email inbox (and spam folder).')
-    } catch (err) {
-      setError(err.message || 'Failed to send reset email')
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', padding: '20px' }} className="fade-in">
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px', padding: '40px', width: '420px', maxWidth: '100%' }}>
-        <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: '32px', fontWeight: 800, textAlign: 'center', marginBottom: '6px', letterSpacing: '-0.5px' }}>
-          Alzaro <span style={{ color: 'var(--orange)' }}>SoloOps</span>
-        </div>
-        <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: '13px', marginBottom: '24px' }}>Business Operations for Sole Traders</div>
-
-        {joinMode ? (
-          <>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '36px', marginBottom: '8px' }}>👋</div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>
-                You're already with Alzaro
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5 }}>
-                <strong style={{ color: 'var(--text)' }}>{pendingUser?.email}</strong> is registered to another
-                Alzaro product. Start a separate <strong style={{ color: 'var(--orange-light)' }}>14-day
-                SoloOps trial</strong> on this same login? Your other products and their data stay
-                completely separate.
-              </div>
-            </div>
-            {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>{error}</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input style={inp} placeholder="Business name for SoloOps *" value={businessName} onChange={e => setBusinessName(e.target.value)} onKeyDown={e => e.key === 'Enter' && doJoin()} autoFocus />
-              <button onClick={doJoin} disabled={loading} style={{ background: grad, color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}>
-                {loading ? 'Setting up...' : 'Start SoloOps Trial →'}
-              </button>
-              <button onClick={cancelJoin} disabled={loading} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px', textAlign: 'center' }}>
-                Not now — sign me out
-              </button>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>Separate trial · Separate subscription · No card required</div>
-            </div>
-          </>
-        ) : showForgotPassword ? (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <button onClick={() => { setShowForgotPassword(false); setError(''); setSuccess('') }}
-                style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ← Back to login
-              </button>
-            </div>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '20px', marginBottom: '8px' }}>🔑</div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>Reset Password</div>
-              <div style={{ fontSize: '13px', color: 'var(--text2)' }}>Enter your email and we'll send you a reset link</div>
-            </div>
-            {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>{error}</div>}
-            {success && <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--green)', marginBottom: '14px' }}>✓ {success}</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input style={inp} type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && doForgotPassword()} />
-              <button onClick={doForgotPassword} disabled={loading} style={{ background: grad, color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}>
-                {loading ? 'Sending...' : 'Send Reset Link'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', gap: '6px', background: 'var(--surface2)', borderRadius: '8px', padding: '4px', marginBottom: '20px' }}>
-              {['login', 'register'].map(t => (
-                <div key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }} style={{
-                  flex: 1, padding: '8px', textAlign: 'center', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  background: tab === t ? 'var(--surface3)' : 'transparent', color: tab === t ? 'var(--text)' : 'var(--text2)',
-                }}>{t === 'login' ? 'Login' : 'Register Business'}</div>
-              ))}
-            </div>
-            {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--red)', marginBottom: '14px' }}>{error}</div>}
-            {success && <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--green)', marginBottom: '14px' }}>✓ {success}</div>}
-            {tab === 'login' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <input style={inp} type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} />
-                <input style={inp} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} />
-                <button onClick={doLogin} disabled={loading} style={{ background: grad, color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}>
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </button>
-                <button onClick={() => { setShowForgotPassword(true); setError(''); setSuccess('') }}
-                  style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: '12px', cursor: 'pointer', padding: '8px', textAlign: 'center' }}>
-                  Forgot password?
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ background: 'var(--orange-subtle)', border: '1px solid rgba(249,115,22,.2)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--orange-light)', textAlign: 'center' }}>
-                  🎉 Start your <strong>14-day free trial</strong> with full access to all features
-                  <div style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px' }}>
-                    Already use another Alzaro product? Just <strong>sign in</strong> — we'll set up SoloOps on your existing login.
-                  </div>
-                </div>
-                <input style={inp} placeholder="Business name *" value={businessName} onChange={e => setBusinessName(e.target.value)} />
-                <input style={inp} type="email" placeholder="Email address *" value={email} onChange={e => setEmail(e.target.value)} />
-                <input style={inp} type="password" placeholder="Password (min 6 characters) *" value={password} onChange={e => setPassword(e.target.value)} />
-                <button onClick={doRegister} disabled={loading} style={{ background: grad, color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px', borderRadius: '8px', border: 'none', cursor: 'pointer', opacity: loading ? .7 : 1 }}>
-                  {loading ? 'Creating account...' : 'Start Free Trial'}
-                </button>
-                <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center' }}>No credit card required · Cancel anytime</div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Alzaro SoloOps · Business Management SaaS · v1.0</div>
+<div class="wrap">
+  <div class="card">
+    <div class="brand">Alzaro <span>SoloOps</span></div>
+    <div class="sub">Business Operations for Sole Traders</div>
+    <div class="tabs">
+      <div class="tab active" id="tabLogin">Login</div>
+      <div class="tab" id="tabReg">Register Business</div>
     </div>
-  )
-}
+    <div id="msg"></div>
+    <div id="loginForm">
+      <input type="email" id="lEmail" placeholder="Email address" />
+      <input type="password" id="lPass" placeholder="Password" />
+      <button class="go" id="btnLogin">Sign In</button>
+      <button class="link" id="btnForgot">Forgot password?</button>
+    </div>
+    <div id="regForm" class="hidden">
+      <input type="text" id="rBiz" placeholder="Business name *" />
+      <input type="email" id="rEmail" placeholder="Email address *" />
+      <input type="password" id="rPass" placeholder="Password (min 6 characters) *" />
+      <button class="go" id="btnReg">Start Free Trial</button>
+      <div class="foot" style="text-align:center;margin-top:8px;">No credit card required · Cancel anytime</div>
+    </div>
+  </div>
+  <div class="foot">Alzaro SoloOps · Business Management SaaS · v1.0</div>
+</div>
 
-// Mount into #root (matches PropertyOps' self-rendering pattern)
-ReactDOM.createRoot(document.getElementById('root')).render(<Login />)
-
-</script>
+<script src="supabase.js"></script>
 <script>
-  (function(){
-    var src = document.getElementById("login-src").textContent;
-    try {
-      var out = Babel.transform(src, { presets: ["react"] }).code;
-      (0, eval)(out);
-    } catch (e) {
-      document.getElementById("root").innerHTML =
-        '<div style="color:#fff;font-family:sans-serif;padding:40px">Login failed: '+e.message+'</div>';
-      console.error(e);
+(function(){
+  var ADMIN=['mohammmed250052@gmail.com'];
+  var $=function(id){return document.getElementById(id);};
+  var go=function(p){window.location.href=p;};
+  var setMsg=function(t,cls){ $('msg').innerHTML = t? '<div class="msg '+cls+'">'+t+'</div>' : ''; };
+
+  $('tabLogin').onclick=function(){ $('tabLogin').classList.add('active'); $('tabReg').classList.remove('active'); $('loginForm').classList.remove('hidden'); $('regForm').classList.add('hidden'); setMsg(''); };
+  $('tabReg').onclick=function(){ $('tabReg').classList.add('active'); $('tabLogin').classList.remove('active'); $('regForm').classList.remove('hidden'); $('loginForm').classList.add('hidden'); setMsg(''); };
+
+  $('btnLogin').onclick=async function(){
+    var email=$('lEmail').value.trim(), pass=$('lPass').value;
+    if(!email||!pass){ setMsg('Please enter email and password','err'); return; }
+    $('btnLogin').disabled=true; setMsg('');
+    try{
+      var r=await window.sb.auth.signInWithPassword({email:email,password:pass});
+      if(r.error) throw r.error;
+      if(ADMIN.indexOf(email.toLowerCase())>=0){ go('/soloops/admin'); return; }
+      var a=await window.sb.from('soloops_access').select('user_id').eq('user_id',r.data.user.id).maybeSingle();
+      if(!a.data){
+        if(r.data.user.user_metadata && r.data.user.user_metadata.product==='soloops'){
+          await window.sb.from('soloops_access').insert({email:r.data.user.email,user_id:r.data.user.id,business_name:(r.data.user.user_metadata.business_name||null)});
+          go('/soloops/dashboard'); return;
+        }
+        setMsg('This login has no SoloOps access yet. Use Register to start a trial.','err');
+        $('btnLogin').disabled=false; return;
+      }
+      go('/soloops/dashboard');
+    }catch(e){
+      var m=e.message||'Login failed';
+      if(/invalid login credentials/i.test(m)) m='Email or password is incorrect. New here? Use Register.';
+      setMsg(m,'err'); $('btnLogin').disabled=false;
     }
-  })();
+  };
+
+  $('btnForgot').onclick=async function(){
+    var email=$('lEmail').value.trim();
+    if(!email){ setMsg('Enter your email first','err'); return; }
+    var base=location.hostname==='localhost'?'http://localhost:5173':location.protocol+'//'+location.host;
+    try{ var r=await window.sb.auth.resetPasswordForEmail(email,{redirectTo:base+'/soloops/reset-password'}); if(r.error) throw r.error; setMsg('Reset link sent — check your email.','ok'); }
+    catch(e){ setMsg(e.message||'Failed to send reset email','err'); }
+  };
+
+  $('btnReg').onclick=async function(){
+    var biz=$('rBiz').value.trim(), email=$('rEmail').value.trim(), pass=$('rPass').value;
+    if(!biz||!email||!pass){ setMsg('Please fill all fields','err'); return; }
+    if(pass.length<6){ setMsg('Password must be at least 6 characters','err'); return; }
+    $('btnReg').disabled=true; setMsg('');
+    var base=location.hostname==='localhost'?'http://localhost:5173':location.protocol+'//'+location.host;
+    try{
+      var si=await window.sb.auth.signInWithPassword({email:email,password:pass});
+      if(!si.error && si.data && si.data.user){
+        var uid=si.data.user.id;
+        var ex=await window.sb.from('soloops_access').select('user_id').eq('user_id',uid).maybeSingle();
+        if(ex.data){ await window.sb.auth.signOut(); setMsg('You already have SoloOps — just log in.','ok'); $('tabLogin').onclick(); $('btnReg').disabled=false; return; }
+        var ins=await window.sb.from('soloops_access').insert({user_id:uid,email:email.toLowerCase(),business_name:biz});
+        if(ins.error) throw ins.error;
+        go('/soloops/dashboard'); return;
+      }
+      var su=await window.sb.auth.signUp({email:email,password:pass,options:{emailRedirectTo:base+'/soloops/login',data:{business_name:biz,product:'soloops'}}});
+      if(su.error) throw su.error;
+      setMsg('Check your email to confirm your account, then log in.','ok'); $('tabLogin').onclick();
+    }catch(e){ setMsg(e.message||'Registration failed','err'); $('btnReg').disabled=false; }
+  };
+})();
 </script>
 </body>
 </html>
