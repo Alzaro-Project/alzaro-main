@@ -239,7 +239,7 @@
       "destination": "/SoloOps/admin.html"
     },
     {
-      "source": "/soloops/:file((?!login|register|dashboard|reset-password|admin).+\\..+)",
+      "source": "/soloops/:file(.+\\..+)",
       "destination": "/SoloOps/:file"
     },
     {
