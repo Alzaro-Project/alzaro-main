@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.25.6/babel.min.js"></script>
   <style>
     :root{
       --bg:#0b0b0e; --panel:#141418; --panel-2:#16161b; --line:rgba(255,255,255,.07);
@@ -50,6 +50,6 @@
 <body>
   <div id="root"></div>
   <script src="supabase.js"></script>
-  <script type="text/babel" src="Dashboard.v2.jsx"></script>
+  <script type="text/babel" data-presets="react" src="Dashboard.v2.jsx"></script>
 </body>
 </html>
