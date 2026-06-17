@@ -153,8 +153,8 @@ function Pill({ text, tone }) {
 
 function Table({ cols, children }) {
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflowX: "auto" }}>
+      <table style={{ width: "100%", minWidth: cols.length > 4 ? 640 : 0, borderCollapse: "collapse", fontSize: 12.5 }}>
         <thead>
           <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
             {cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--txt-3)", fontWeight: 600 }}>{c}</th>)}
@@ -197,6 +197,17 @@ function useConfirm() {
     </div>
   ) : null;
   return [node, ask];
+}
+
+/* Shared: is the viewport phone-sized? */
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== "undefined" && window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setM(window.innerWidth <= 768);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
+  return m;
 }
 
 /* Shared: load the customer list once, for dropdowns across pages */
@@ -1604,7 +1615,7 @@ function SettingsPage() {
 /*  AUTH SCREEN  (login + sign up)                                    */
 /* ================================================================== */
 function AuthScreen() {
-  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register");
+  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register" || window.location.pathname.endsWith("/register"));
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -1643,7 +1654,23 @@ function AuthScreen() {
     if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
-    const { error } = await db.auth.signUp({ email, password: pw, options: { data: { company_name: company.trim(), product: "serviceops" } } });
+    const { data, error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=serviceops`, data: { company_name: company.trim(), product: "serviceops" } } });
+    // an existing Alzaro account (from another Ops product) shows up as an error
+    // or as a signUp result with no identities — handle both
+    const alreadyExists = (error && /already/i.test(error.message)) ||
+      (!error && data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+    if (alreadyExists) {
+      // sign them in with their existing Alzaro password and activate ServiceOps on it
+      const { data: si, error: siErr } = await db.auth.signInWithPassword({ email, password: pw });
+      if (siErr) {
+        setBusy(false);
+        return setMsg("An Alzaro account with this email already exists (from another Alzaro product). Enter that account's password here to activate ServiceOps on it — the password you entered didn't match.");
+      }
+      await db.from("svc_licences").insert([{ user_id: si.user.id }]); // duplicate-safe: errors ignored below
+      setBusy(false);
+      window.location.href = "/serviceops/login"; // fresh load → straight into the app
+      return;
+    }
     setBusy(false);
     if (error) return setMsg(error.message);
     setOk("Check your email to confirm your account, then log in.");
@@ -1663,7 +1690,7 @@ function AuthScreen() {
   };
 
   const authInp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "Inter", outline: "none" };
-  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(139,127,232,.3)" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
   const Banner = ({ text, good }) => (
     <div style={{ background: good ? "var(--green-soft)" : "var(--red-soft)", border: "1px solid " + (good ? "var(--green)" : "var(--red)"), borderRadius: 8, padding: "11px 14px", fontSize: 13, color: good ? "var(--green)" : "var(--red)", marginBottom: 14, lineHeight: 1.4 }}>{good ? "✓ " : ""}{text}</div>
   );
@@ -1711,7 +1738,7 @@ function AuthScreen() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ background: "var(--brand-soft)", border: "1px solid rgba(139,127,232,.25)", borderRadius: 8, padding: "11px 14px", fontSize: 12, color: "var(--brand)", textAlign: "center", fontWeight: 500 }}>
+                <div style={{ background: "var(--brand-soft)", border: "1px solid rgba(34,197,94,.25)", borderRadius: 8, padding: "11px 14px", fontSize: 12, color: "var(--brand)", textAlign: "center", fontWeight: 500 }}>
                   🔧 Start your <strong>14-day free trial</strong> — full access, no card required
                 </div>
                 <input style={authInp} placeholder="Business name *" value={company} onChange={(e) => setCompany(e.target.value)} />
@@ -1730,16 +1757,146 @@ function AuthScreen() {
 }
 
 /* ================================================================== */
+/*  ADMIN  (only visible to accounts in svc_admins)                   */
+/* ================================================================== */
+function AdminPage() {
+  const TIERS = ["Sole Trader", "Team", "Firm"];
+  const FEES = { "Sole Trader": 29, "Team": 69, "Firm": 129 };
+  const STATUSES = ["Trial", "Active", "Suspended"];
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+
+  const load = () => {
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    db.rpc("svc_admin_overview").then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
+      setData(typeof data === "string" ? JSON.parse(data) : data);
+    });
+  };
+  useEffect(load, []);
+
+  const users = (data && data.users) || [];
+  const now = new Date();
+  const daysUntil = (d) => d ? Math.ceil((new Date(d + "T00:00:00") - now) / 86400000) : null;
+  const fee = (u) => u.status === "Active" ? (FEES[u.tier] || 0) : 0;
+  const mrr = users.reduce((s, u) => s + fee(u), 0);
+  const onTrial = users.filter((u) => u.status === "Trial").length;
+  const active = users.filter((u) => u.status === "Active").length;
+  const suspended = users.filter((u) => u.status === "Suspended").length;
+  const expiringSoon = users.filter((u) => u.status === "Trial" && daysUntil(u.trial_ends) !== null && daysUntil(u.trial_ends) <= 7).length;
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  const setLicence = async (u, patch) => {
+    const next = { tier: u.tier, status: u.status, trial_ends: u.trial_ends, ...patch };
+    const { error } = await db.rpc("svc_admin_set_licence", { target: u.id, new_tier: next.tier, new_status: next.status, new_trial_ends: next.trial_ends });
+    if (error) { setErr(error.message); return; }
+    load();
+  };
+
+  const statCard = (label, value, sub, color) => (
+    <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
+      <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: color || "var(--txt)" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+  const statusBox = (label, value, color, bg) => (
+    <div style={{ flex: 1, background: bg, border: "0.5px solid var(--line)", borderRadius: 10, padding: "18px 16px", textAlign: "center" }}>
+      <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+  const selStyle = { ...inp, padding: "6px 8px", fontSize: 12, width: "auto" };
+
+  return (
+    <div className="fade-in">
+      <PageHead title="Admin — Licence Manager" sub={data ? `${users.length} registered user${users.length === 1 ? "" : "s"} on ServiceOps` : "Loading platform data…"}
+        right={<span onClick={load}><Btn icon="ti-refresh" label="Refresh" /></span>} />
+      {err && <div style={errBanner}>{err.includes("Not authorised") ? "Your account isn't an admin." : err}</div>}
+      {data && (
+        <>
+          <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+            {statCard("Total users", users.length, `${onTrial} on trial`, "var(--brand)")}
+            {statCard("Monthly revenue", gbp(mrr), "MRR from active", "var(--green)")}
+            {statCard("Active subscriptions", active, `${suspended} suspended`, "var(--blue)")}
+            {statCard("Trials expiring soon", expiringSoon, "within 7 days", expiringSoon > 0 ? "var(--red)" : "var(--txt)")}
+          </div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
+            <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Tier breakdown</div>
+              {TIERS.map((t) => {
+                const n = users.filter((u) => u.tier === t).length;
+                const rev = users.filter((u) => u.tier === t && u.status === "Active").length * FEES[t];
+                const pct = users.length ? (n / users.length) * 100 : 0;
+                return (
+                  <div key={t} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
+                      <span style={{ fontWeight: 600 }}>{t}</span>
+                      <span style={{ color: "var(--txt-2)" }}>{n} · {gbp(rev)}/mo</span>
+                    </div>
+                    <div style={{ height: 5, background: "var(--panel-2)", borderRadius: 3 }}><div style={{ width: pct + "%", height: "100%", background: "var(--brand)", borderRadius: 3 }} /></div>
+                  </div>
+                );
+              })}
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 10, fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>Total MRR</span><span style={{ fontWeight: 700, color: "var(--green)" }}>{gbp(mrr)}/mo</span>
+              </div>
+            </div>
+            <div style={{ flex: 1.4, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Status overview</div>
+              <div style={{ display: "flex", gap: 12 }}>
+                {statusBox("Active", active, "var(--green)", "var(--green-soft)")}
+                {statusBox("Trial", onTrial, "var(--amber)", "var(--amber-soft)")}
+                {statusBox("Suspended", suspended, "var(--red)", "var(--red-soft)")}
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 10 }}>All users — newest first</div>
+          <Table cols={["User", "Joined", "Tier", "Status", "Trial ends", "Fee/mo", "Usage"]}>
+            {users.map((u) => {
+              const left = daysUntil(u.trial_ends);
+              return (
+                <tr key={u.id}>
+                  <Td><span style={{ fontWeight: 500 }}>{u.email}</span></Td>
+                  <Td color="var(--txt-2)">{fmtDate(u.created_at)}</Td>
+                  <Td><select style={selStyle} value={u.tier} onChange={(e) => setLicence(u, { tier: e.target.value })}>{TIERS.map((t) => <option key={t}>{t}</option>)}</select></Td>
+                  <Td><select style={selStyle} value={u.status} onChange={(e) => setLicence(u, { status: e.target.value })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></Td>
+                  <Td>{u.status === "Trial" ? <span>{fmtDate(u.trial_ends)}{left !== null && <div style={{ fontSize: 10.5, color: left <= 3 ? "var(--red)" : left <= 7 ? "var(--amber)" : "var(--txt-3)" }}>{left < 0 ? "expired" : left + " days left"}</div>}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
+                  <Td>{u.status === "Active" ? <span style={{ fontWeight: 600, color: "var(--green)" }}>{gbp(FEES[u.tier] || 0)}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
+                  <Td color="var(--txt-2)"><span style={{ fontSize: 11.5 }}>{u.customers} customers · {u.jobs} jobs · {u.invoices} inv</span></Td>
+                </tr>
+              );
+            })}
+          </Table>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  APP SHELL                                                         */
 /* ================================================================== */
 const PAGES = {
   customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
-  reports: ReportsPage, settings: SettingsPage,
+  reports: ReportsPage, settings: SettingsPage, admin: AdminPage,
 };
 
 function Dashboard({ user, signOut }) {
   const [active, setActive] = useState("dashboard");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // is this account an admin? (svc_admins row visible only to its owner)
+  useEffect(() => {
+    if (!DB_READY || !user) return;
+    db.from("svc_admins").select("user_id").eq("user_id", user.id)
+      .then(({ data }) => setIsAdmin((data || []).length > 0));
+  }, [user]);
+
+  const navItems = isAdmin ? [...NAV, { id: "admin", label: "Admin", icon: "ti-shield-lock" }] : NAV;
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
@@ -1786,7 +1943,7 @@ function Dashboard({ user, signOut }) {
   const totalHits = hits.customers.length + hits.jobs.length + hits.invoices.length + hits.quotes.length + hits.properties.length;
 
   // navigate: always clear search + close notifications so the overlay never lingers
-  const goTo = (page) => { setSearch(""); setShowNotif(false); setActive(page); };
+  const goTo = (page) => { setSearch(""); setShowNotif(false); setMenuOpen(false); setActive(page); };
   // open a specific customer's detail from search
   const [openCustomerId, setOpenCustomerId] = useState(null);
   const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); };
@@ -1798,24 +1955,27 @@ function Dashboard({ user, signOut }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
-        <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
-        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 20 }}>Field Service Pro</div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 18px" }}>{DEMO.user.tier}</span>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map((n) => {
+      {isMobile && menuOpen && <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 120 }} />}
+      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", ...(isMobile
+        ? { position: "fixed", top: 0, left: 0, height: "100dvh", zIndex: 130, transform: menuOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: menuOpen ? "12px 0 40px rgba(0,0,0,.45)" : "none" }
+        : { position: "sticky", top: 0, height: "100vh", overflow: "hidden" }) }}>
+        <div className="brand" style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 14, flexShrink: 0 }}>Field Service Pro</div>
+        <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
+        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#0f4429", background: "#a7e8c4", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0 }}>
+          {navItems.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent", flexShrink: 0 }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ fontSize: 13 }}>{n.label}</span>
               </div>
             );
           })}
         </nav>
-        <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : DEMO.user.email}</div>
+        <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 12, marginTop: 10, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
             <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
@@ -1825,11 +1985,12 @@ function Dashboard({ user, signOut }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: "18px 22px", maxWidth: 1180 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, position: "relative" }}>
+      <main style={{ flex: 1, minWidth: 0, padding: isMobile ? "14px 12px" : "18px 22px", maxWidth: 1180 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: 16, position: "relative" }}>
+          {isMobile && <i className="ti ti-menu-2" onClick={() => setMenuOpen(true)} style={{ fontSize: 23, color: "var(--txt)", cursor: "pointer", flexShrink: 0 }} title="Menu" />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
             <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customers, jobs, invoices, quotes, properties…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={isMobile ? "Search…" : "Search customers, jobs, invoices, quotes, properties…"} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
             {search && <i className="ti ti-x" onClick={() => setSearch("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
           </div>
           <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
@@ -1876,7 +2037,7 @@ function Dashboard({ user, signOut }) {
           <>
             {active === "dashboard" && (
               <div style={{ marginBottom: 18 }}>
-                <div style={{ display: "flex", gap: 5, fontSize: 12 }}>
+                <div style={{ display: "flex", gap: 5, fontSize: 12, flexWrap: "wrap" }}>
                   {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
                 </div>
                 {range === "Custom" && (
@@ -1913,8 +2074,32 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
 /* ================================================================== */
 /*  ROOT — decides: login screen or dashboard                         */
 /* ================================================================== */
+/* Shown to Alzaro accounts from other products that don't have ServiceOps yet */
+function ActivateScreen({ user, signOut }) {
+  const [busy, setBusy] = useState(false);
+  const goRegister = async () => {
+    setBusy(true);
+    await db.auth.signOut();
+    window.location.href = "/serviceops/register";
+  };
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 430, maxWidth: "100%", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
+        <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+        <div style={{ width: 54, height: 54, borderRadius: 14, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", margin: "18px auto 16px" }}><i className="ti ti-rocket" style={{ fontSize: 26 }} /></div>
+        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>This account isn't registered for ServiceOps</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but ServiceOps needs its own registration.</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Register now to start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> — no card needed.</div>
+        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
+        <div onClick={signOut} style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 16, cursor: "pointer" }}>Not you? <span style={{ color: "var(--brand)" }}>Sign out</span></div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [session, setSession] = useState(undefined);
+  const [member, setMember] = useState(undefined); // undefined = checking, true/false = known
 
   useEffect(() => {
     if (!DB_READY) { setSession(null); return; }
@@ -1923,12 +2108,32 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // membership gate: does this account have a ServiceOps licence?
+  useEffect(() => {
+    if (!session || !DB_READY) { setMember(undefined); return; }
+    db.from("svc_licences").select("user_id").eq("user_id", session.user.id).then(async ({ data }) => {
+      if ((data || []).length > 0) { setMember(true); return; }
+      // registered via the ServiceOps register page? auto-activate silently
+      const meta = session.user.user_metadata || {};
+      if (meta.product === "serviceops") {
+        await db.from("svc_licences").insert([{ user_id: session.user.id }]);
+        setMember(true);
+      } else {
+        setMember(false);
+      }
+    });
+  }, [session]);
+
   const signOut = () => db.auth.signOut();
 
   if (session === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!session) return <AuthScreen />;
+  if (member === undefined) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+  }
+  if (!member) return <ActivateScreen user={session.user} signOut={signOut} />;
   return <Dashboard user={session.user} signOut={signOut} />;
 }
 
