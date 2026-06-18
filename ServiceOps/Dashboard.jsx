@@ -1943,7 +1943,12 @@ const PAGES = {
 };
 
 function Dashboard({ user, signOut }) {
-  const [active, setActive] = useState("dashboard");
+  const pageFromUrl = () => {
+    const seg = (window.location.pathname.split("/serviceops/")[1] || "").replace(/\/$/, "");
+    const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings", "admin"];
+    return known.includes(seg) ? seg : "dashboard";
+  };
+  const [active, setActive] = useState(pageFromUrl);
   const [isAdmin, setIsAdmin] = useState(false);
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1954,6 +1959,17 @@ function Dashboard({ user, signOut }) {
     db.from("svc_admins").select("user_id").eq("user_id", user.id)
       .then(({ data }) => setIsAdmin((data || []).length > 0));
   }, [user]);
+
+  // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
+  useEffect(() => {
+    const onPop = () => setActive(pageFromUrl());
+    window.addEventListener("popstate", onPop);
+    const seg = (window.location.pathname.split("/serviceops/")[1] || "").replace(/\/$/, "");
+    if (seg === "login" || seg === "register" || seg === "" ) {
+      try { window.history.replaceState({ page: "dashboard" }, "", "/serviceops/dashboard"); } catch (e) {}
+    }
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const navItems = isAdmin ? [...NAV, { id: "admin", label: "Admin", icon: "ti-shield-lock" }] : NAV;
   const [range, setRange] = useState("This Month");
@@ -2002,10 +2018,10 @@ function Dashboard({ user, signOut }) {
   const totalHits = hits.customers.length + hits.jobs.length + hits.invoices.length + hits.quotes.length + hits.properties.length;
 
   // navigate: always clear search + close notifications so the overlay never lingers
-  const goTo = (page) => { setSearch(""); setShowNotif(false); setMenuOpen(false); setActive(page); };
+  const goTo = (page) => { setSearch(""); setShowNotif(false); setMenuOpen(false); setActive(page); try { window.history.pushState({ page }, "", `/serviceops/${page}`); } catch (e) {} };
   // open a specific customer's detail from search
   const [openCustomerId, setOpenCustomerId] = useState(null);
-  const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); };
+  const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); try { window.history.pushState({ page: "customers" }, "", "/serviceops/customers"); } catch (e) {} };
 
   let body;
   if (active === "dashboard") body = <DashboardPage range={range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range} go={goTo} user={user} />;
