@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin, getGarageForProduct, joinProduct } from '../lib/db'
+import { getGarageForProduct, joinProduct } from '../lib/db'
 
 // GarageOps brand palette — matches landing page
 const BRAND = {
@@ -73,23 +73,17 @@ export default function Login() {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) throw err
 
-      const isAdmin = await checkIsAdmin(email)
-      if (isAdmin) {
-        login(email, true)
-        navigate('/admin')
-      } else {
-        // MULTI-PRODUCT — look for this login's GarageOps garage specifically.
-        // If they're an Alzaro user from another product (e.g. TyreOps),
-        // offer to start a separate GarageOps trial on the same login.
-        const garage = await getGarageForProduct(email, 'garageops')
-        if (!garage) {
-          setJoinMode(true)
-          setLoading(false)
-          return
-        }
-        login(email, false)
-        navigate('/dashboard')
+      // MULTI-PRODUCT — look for this login's GarageOps garage specifically.
+      // If they're an Alzaro user from another product (e.g. TyreOps),
+      // offer to start a separate GarageOps trial on the same login.
+      const garage = await getGarageForProduct(email, 'garageops')
+      if (!garage) {
+        setJoinMode(true)
+        setLoading(false)
+        return
       }
+      login(email)
+      navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -102,7 +96,7 @@ export default function Login() {
     setLoading(true); setError('')
     try {
       await joinProduct('garageops', joinName.trim())
-      login(email, false)
+      login(email)
       navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Could not set up your GarageOps account')
