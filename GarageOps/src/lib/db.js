@@ -77,7 +77,7 @@ export async function updateGarageStatus(garageId, status) {
 }
 
 export async function deleteGarage(garageId) {
-  // Child rows cascade via FK (garage_id -> product_members.id ON DELETE CASCADE)
+  // Child rows cascade via FK (account_id -> product_members.id ON DELETE CASCADE)
   const { error } = await supabase.from('product_members').delete().eq('id', garageId)
   if (error) throw error
 }
@@ -151,14 +151,14 @@ export async function updateGarage(garageId, updates) {
 // SKUS  (TyreOps)
 // ============================================================
 export async function getSKUs(garageId) {
-  const { data, error } = await supabase.from('skus').select('*').eq('garage_id', garageId).order('brand')
+  const { data, error } = await supabase.from('skus').select('*').eq('account_id', garageId).order('brand')
   if (error) throw error
   return data || []
 }
 
 export async function insertSKU(garageId, sku) {
   const { data, error } = await supabase.from('skus').insert({
-    garage_id: garageId, brand: sku.brand, model: sku.model,
+    account_id: garageId, brand: sku.brand, model: sku.model,
     w: sku.w, p: sku.p, r: sku.r, sell: sku.sell, alert: sku.alert, season: sku.season
   }).select().single()
   if (error) throw error
@@ -179,14 +179,14 @@ export async function deleteSKU(id) {
 // BATCHES  (TyreOps)
 // ============================================================
 export async function getBatches(garageId) {
-  const { data, error } = await supabase.from('batches').select('*').eq('garage_id', garageId).order('date')
+  const { data, error } = await supabase.from('batches').select('*').eq('account_id', garageId).order('date')
   if (error) throw error
   return data || []
 }
 
 export async function insertBatch(garageId, batch) {
   const { data, error } = await supabase.from('batches').insert({
-    garage_id: garageId, 
+    account_id: garageId, 
     sku_id: batch.skuId, 
     date: batch.date,
     qty: batch.qty, 
@@ -215,7 +215,7 @@ export async function updateBatch(id, updates) {
 // USED TYRES  (TyreOps)
 // ============================================================
 export async function getUsedTyres(garageId) {
-  const { data, error } = await supabase.from('used_tyres').select('*').eq('garage_id', garageId).order('date', { ascending: false })
+  const { data, error } = await supabase.from('used_tyres').select('*').eq('account_id', garageId).order('date', { ascending: false })
   if (error) throw error
   return (data || []).map(u => ({
     ...u, sourceCust: u.source_cust, lineType: 'used'
@@ -224,7 +224,7 @@ export async function getUsedTyres(garageId) {
 
 export async function insertUsedTyre(garageId, tyre) {
   const { data, error } = await supabase.from('used_tyres').insert({
-    garage_id: garageId, brand: tyre.brand, model: tyre.model,
+    account_id: garageId, brand: tyre.brand, model: tyre.model,
     w: tyre.w, p: tyre.p, r: tyre.r,
     cost: tyre.cost, sell: tyre.sell, source_cust: tyre.sourceCust,
     date: tyre.date, notes: tyre.notes, sold: false
@@ -249,7 +249,7 @@ export async function deleteUsedTyre(id) {
 // CUSTOMERS  (shared — TyreOps + GarageOps)
 // ============================================================
 export async function getCustomers(garageId) {
-  const { data, error } = await supabase.from('customers').select('*').eq('garage_id', garageId).order('name')
+  const { data, error } = await supabase.from('customers').select('*').eq('account_id', garageId).order('name')
   if (error) throw error
   return data || []
 }
@@ -257,7 +257,7 @@ export async function getCustomers(garageId) {
 export async function checkDuplicateCustomer(garageId, email, phone, excludeId = null) {
   if (!email && !phone) return null
   
-  let query = supabase.from('customers').select('*').eq('garage_id', garageId)
+  let query = supabase.from('customers').select('*').eq('account_id', garageId)
   
   const conditions = []
   if (email) conditions.push(`email.ilike.${email}`)
@@ -287,7 +287,7 @@ export async function insertCustomer(garageId, customer) {
   }
   
   const { data, error } = await supabase.from('customers').insert({
-    garage_id: garageId, name: customer.name, email: customer.email,
+    account_id: garageId, name: customer.name, email: customer.email,
     phone: customer.phone, reg: customer.reg, vehicle: customer.vehicle
   }).select().single()
   if (error) throw error
@@ -309,7 +309,7 @@ export async function deleteCustomer(id) {
 // ============================================================
 export async function getInvoices(garageId) {
   const { data: invs, error } = await supabase
-    .from('invoices').select('*').eq('garage_id', garageId).order('created_at', { ascending: false })
+    .from('invoices').select('*').eq('account_id', garageId).order('created_at', { ascending: false })
   if (error) throw error
   if (!invs?.length) return []
 
@@ -331,7 +331,7 @@ export async function getInvoices(garageId) {
 
 export async function insertInvoice(garageId, inv) {
   const { error: invErr } = await supabase.from('invoices').insert({
-    id: inv.id, garage_id: garageId, cust_id: inv.custId || null,
+    id: inv.id, account_id: garageId, cust_id: inv.custId || null,
     cust_name: inv.custName, cust_email: inv.custEmail, reg: inv.reg,
     date: inv.date, due: inv.due, status: inv.status,
     vat_scheme: inv.vatScheme, notes: inv.notes,
@@ -343,7 +343,7 @@ export async function insertInvoice(garageId, inv) {
   if (inv.lines?.length) {
     const { error: linesErr } = await supabase.from('invoice_lines').insert(
       inv.lines.map(l => ({
-        invoice_id: inv.id, garage_id: garageId,
+        invoice_id: inv.id, account_id: garageId,
         line_desc: l.desc, qty: l.qty, unit: l.unit, cost: l.cost || 0,
         sku_id: l.skuId || null, batch_id: l.batchId || null, used_id: l.usedId || null,
         line_type: l.lineType || 'service', margin_scheme: l.marginScheme || false
@@ -388,7 +388,7 @@ export async function deleteInvoice(id) {
 // ============================================================
 export async function getVehicles(garageId) {
   const { data, error } = await supabase
-    .from('vehicles').select('*').eq('garage_id', garageId).order('reg')
+    .from('vehicles').select('*').eq('account_id', garageId).order('reg')
   if (error) throw error
   return (data || []).map(mapVehicleFromDb)
 }
@@ -411,7 +411,7 @@ function mapVehicleFromDb(v) {
 
 export async function insertVehicle(garageId, vehicle) {
   const { data, error } = await supabase.from('vehicles').insert({
-    garage_id: garageId,
+    account_id: garageId,
     customer_id: vehicle.customerId || null,
     reg: vehicle.reg,
     make: vehicle.make || null,
@@ -468,7 +468,7 @@ export async function deleteVehicle(id) {
 // ============================================================
 export async function getServices(garageId) {
   const { data, error } = await supabase
-    .from('services').select('*').eq('garage_id', garageId).order('sort_order').order('name')
+    .from('services').select('*').eq('account_id', garageId).order('sort_order').order('name')
   if (error) throw error
   return (data || []).map(s => ({
     ...s,
@@ -480,7 +480,7 @@ export async function getServices(garageId) {
 
 export async function insertService(garageId, service) {
   const { data, error } = await supabase.from('services').insert({
-    garage_id: garageId,
+    account_id: garageId,
     name: service.name,
     category: service.category || null,
     description: service.description || null,
@@ -515,7 +515,7 @@ export async function deleteService(id) {
 // ============================================================
 export async function getParts(garageId) {
   const { data, error } = await supabase
-    .from('parts').select('*').eq('garage_id', garageId).order('name')
+    .from('parts').select('*').eq('account_id', garageId).order('name')
   if (error) throw error
   return (data || []).map(p => ({
     ...p,
@@ -527,7 +527,7 @@ export async function getParts(garageId) {
 
 export async function insertPart(garageId, part) {
   const { data, error } = await supabase.from('parts').insert({
-    garage_id: garageId,
+    account_id: garageId,
     part_number: part.partNumber || null,
     name: part.name,
     description: part.description || null,
@@ -571,7 +571,7 @@ export async function deletePart(id) {
 // ============================================================
 export async function getPartBatches(garageId) {
   const { data, error } = await supabase
-    .from('part_batches').select('*').eq('garage_id', garageId).order('date')
+    .from('part_batches').select('*').eq('account_id', garageId).order('date')
   if (error) throw error
   return (data || []).map(b => ({
     ...b,
@@ -582,7 +582,7 @@ export async function getPartBatches(garageId) {
 
 export async function insertPartBatch(garageId, batch) {
   const { data, error } = await supabase.from('part_batches').insert({
-    garage_id: garageId,
+    account_id: garageId,
     part_id: batch.partId,
     date: batch.date,
     qty: batch.qty,
@@ -615,7 +615,7 @@ export async function deletePartBatch(id) {
 // ============================================================
 export async function getLabourRates(garageId) {
   const { data, error } = await supabase
-    .from('labour_rates').select('*').eq('garage_id', garageId).order('name')
+    .from('labour_rates').select('*').eq('account_id', garageId).order('name')
   if (error) throw error
   return (data || []).map(r => ({
     ...r,
@@ -626,7 +626,7 @@ export async function getLabourRates(garageId) {
 
 export async function insertLabourRate(garageId, rate) {
   const { data, error } = await supabase.from('labour_rates').insert({
-    garage_id: garageId,
+    account_id: garageId,
     name: rate.name,
     hourly_rate: rate.hourlyRate,
     is_default: rate.isDefault || false,
@@ -657,7 +657,7 @@ export async function deleteLabourRate(id) {
 // ============================================================
 export async function getJobs(garageId) {
   const { data: jobs, error } = await supabase
-    .from('jobs').select('*').eq('garage_id', garageId).order('created_at', { ascending: false })
+    .from('jobs').select('*').eq('account_id', garageId).order('created_at', { ascending: false })
   if (error) throw error
   if (!jobs?.length) return []
 
@@ -696,7 +696,7 @@ export async function getJobs(garageId) {
 export async function insertJob(garageId, job) {
   const { error: jobErr } = await supabase.from('jobs').insert({
     id: job.id,
-    garage_id: garageId,
+    account_id: garageId,
     customer_id: job.customerId || null,
     vehicle_id: job.vehicleId || null,
     cust_name: job.custName || null,
@@ -720,7 +720,7 @@ export async function insertJob(garageId, job) {
     const { error: linesErr } = await supabase.from('job_lines').insert(
       job.lines.map((l, i) => ({
         job_id: job.id,
-        garage_id: garageId,
+        account_id: garageId,
         line_type: l.lineType,
         line_desc: l.desc,
         qty: l.qty || 1,
@@ -777,7 +777,7 @@ export async function replaceJobLines(jobId, garageId, lines) {
   const { error } = await supabase.from('job_lines').insert(
     lines.map((l, i) => ({
       job_id: jobId,
-      garage_id: garageId,
+      account_id: garageId,
       line_type: l.lineType,
       line_desc: l.desc,
       qty: l.qty || 1,
@@ -798,7 +798,7 @@ export async function replaceJobLines(jobId, garageId, lines) {
 // ============================================================
 export async function getMotReminders(garageId) {
   const { data, error } = await supabase
-    .from('mot_reminders').select('*').eq('garage_id', garageId).order('mot_due')
+    .from('mot_reminders').select('*').eq('account_id', garageId).order('mot_due')
   if (error) throw error
   return (data || []).map(r => ({
     ...r,
@@ -811,7 +811,7 @@ export async function getMotReminders(garageId) {
 
 export async function insertMotReminder(garageId, reminder) {
   const { data, error } = await supabase.from('mot_reminders').insert({
-    garage_id: garageId,
+    account_id: garageId,
     vehicle_id: reminder.vehicleId,
     mot_due: reminder.motDue,
     status: reminder.status || 'pending',
