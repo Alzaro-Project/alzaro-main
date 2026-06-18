@@ -30,7 +30,7 @@ export function useDayNotes() {
       const { data, error: e } = await supabase
         .from('day_notes')
         .select('note_date, body')
-        .eq('garage_id', garageId)
+        .eq('account_id', garageId)
       if (e) throw e
       const map = {}
       ;(data || []).forEach(r => { map[r.note_date] = r.body })
@@ -64,7 +64,7 @@ export function useDayNotes() {
         const { error: e } = await supabase
           .from('day_notes')
           .delete()
-          .eq('garage_id', garageId)
+          .eq('account_id', garageId)
           .eq('note_date', dateStr)
         if (e) throw e
         return
@@ -72,8 +72,8 @@ export function useDayNotes() {
       const { error: e } = await supabase
         .from('day_notes')
         .upsert(
-          { garage_id: garageId, note_date: dateStr, body: trimmed, updated_at: new Date().toISOString() },
-          { onConflict: 'garage_id,note_date' }
+          { account_id: garageId, note_date: dateStr, body: trimmed, updated_at: new Date().toISOString() },
+          { onConflict: 'account_id,note_date' }
         )
       if (e) throw e
     } catch (err) {
