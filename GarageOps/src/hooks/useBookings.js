@@ -25,7 +25,7 @@ export function useBookings() {
     setError(null)
     try {
       const [bRes, gRes] = await Promise.all([
-        supabase.from('bookings').select('*').eq('garage_id', garageId)
+        supabase.from('bookings').select('*').eq('account_id', garageId)
           .order('booking_date', { ascending: true })
           .order('start_time', { ascending: true }),
         supabase.from('product_settings')
@@ -53,7 +53,7 @@ export function useBookings() {
   const createBooking = useCallback(async (data) => {
     if (!garageId) throw new Error('No garage')
     const payload = {
-      garage_id: garageId,
+      account_id: garageId,
       customer_id: data.customer_id || null,
       vehicle_id: data.vehicle_id || null,
       customer_name: data.customer_name || null,
