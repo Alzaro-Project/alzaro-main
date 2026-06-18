@@ -31,7 +31,7 @@ const TIER_STYLE = {
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, tier, isAdmin, logout, settings, theme, toggleTheme } = useStore()
+  const { user, tier, logout, settings, theme, toggleTheme } = useStore()
 
   const isDark = theme !== 'light'
   const ts = TIER_STYLE[tier] || TIER_STYLE.bronze
@@ -84,41 +84,25 @@ export default function Sidebar({ onNavigate, isMobile }) {
       </div>
 
       {/* Search */}
-      {!isAdmin && (
-        <div style={{ padding: '10px 12px' }}>
-          <GlobalSearch showInSidebar placeholder="Search..." onResultClick={() => { if (onNavigate) onNavigate() }} />
-        </div>
-      )}
+      <div style={{ padding: '10px 12px' }}>
+        <GlobalSearch showInSidebar placeholder="Search..." onResultClick={() => { if (onNavigate) onNavigate() }} />
+      </div>
 
       {/* Nav */}
       <div style={{ flex: 1, padding: '6px 0', overflowY: 'auto' }}>
-        {isAdmin ? (
-          <>
-            <div style={{ fontSize: '9px', fontWeight: 500, letterSpacing: '1px', color: 'var(--text3)', padding: '12px 16px 6px', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-              Platform
-            </div>
+        {NAV.map(item => {
+          const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
+          return (
             <NavItem
-              icon="ti-crown"
-              label="Licence manager"
-              active={location.pathname === '/admin'}
-              onClick={() => { navigate('/admin'); if (onNavigate) onNavigate() }}
+              key={item.path}
+              icon={item.icon}
+              label={item.label}
+              locked={locked}
+              active={location.pathname === item.path}
+              onClick={() => handleNav(item)}
             />
-          </>
-        ) : (
-          NAV.map(item => {
-            const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
-            return (
-              <NavItem
-                key={item.path}
-                icon={item.icon}
-                label={item.label}
-                locked={locked}
-                active={location.pathname === item.path}
-                onClick={() => handleNav(item)}
-              />
-            )
-          })
-        )}
+          )
+        })}
       </div>
 
       {/* Footer */}
