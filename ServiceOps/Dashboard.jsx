@@ -172,7 +172,7 @@ function Table({ cols, children }) {
 }
 const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)" }}>{children}</td>;
 
-const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%", colorScheme: "inherit" };
+const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%" };
 const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 const formCard = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 };
 const demoBanner = { fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 };
@@ -237,6 +237,7 @@ function QuickAddCustomer({ user, onAdded, onClose }) {
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   const save = async () => {
     if (!f.name.trim()) { setErr("Name required."); return; }
+    if (!f.contact.trim() && !f.email.trim()) { setErr("Add a phone or email for this customer."); return; }
     setBusy(true);
     const { data, error } = await db.from("svc_customers").insert([{ ...f, name: f.name.trim(), user_id: user.id }]).select().single();
     if (!error && data && f.site.trim()) {
@@ -503,6 +504,7 @@ function CustomersPage({ user, openCustomerId, clearOpen, go }) {
 
   const save = async () => {
     if (!form.name.trim()) { setErr("Customer name is required."); return; }
+    if (!form.contact.trim() && !form.email.trim()) { setErr("Please add a phone number or email so you can contact this customer."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
     // only the customer's own columns go to svc_customers
