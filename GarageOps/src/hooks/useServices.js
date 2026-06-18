@@ -26,7 +26,7 @@ export function useServices({ includeArchived = false } = {}) {
       const { data, error: err } = await supabase
         .from('services')
         .select('*')
-        .eq('garage_id', garageId)
+        .eq('account_id', garageId)
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
       if (err) throw err
@@ -44,7 +44,7 @@ export function useServices({ includeArchived = false } = {}) {
   const createService = useCallback(async (data) => {
     if (!garageId) throw new Error('No garage')
     const payload = {
-      garage_id: garageId,
+      account_id: garageId,
       name: data.name?.trim(),
       default_duration_min: parseInt(data.default_duration_min, 10) || 60,
       default_price: data.default_price === '' || data.default_price == null
