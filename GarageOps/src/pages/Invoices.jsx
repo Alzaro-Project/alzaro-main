@@ -633,7 +633,7 @@ export default function Invoices() {
   // Load the garage's default markup once
   useEffect(() => {
     if (!garageId) return
-    supabase.from('garages').select('default_markup_pct').eq('id', garageId).single()
+    supabase.from('product_settings').select('default_markup_pct').eq('account_id', garageId).maybeSingle()
       .then(({ data }) => { if (data) setMarkupPct(Number(data.default_markup_pct ?? 40)) })
   }, [garageId])
 
