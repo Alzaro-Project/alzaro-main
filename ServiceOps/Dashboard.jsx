@@ -1,61 +1,5 @@
 const { useState, useEffect } = React;
 
-/* ================================================================== */
-/*  DEMO DATA  — replace with Supabase queries in phase 2             */
-/* ================================================================== */
-const DEMO = {
-  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "PRO" },
-  metrics: { revenue: 18450, outstanding: 3960, jobsToday: 6, jobsWeek: 23, quotesOpen: 8, quoteValue: 12400, certsDue: 3, customers: 64 },
-  certificates: [
-    { type: "Gas Safety (CP12)", ref: "Landlord cert", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
-    { type: "EICR", ref: "Electrical report", addr: "9 Mill Lane Flat 2", days: 16, icon: "ti-bolt", tone: "amber" },
-    { type: "Boiler Service", ref: "Annual service", addr: "22 Bridge Rd", days: 33, icon: "ti-flame-off", tone: "blue" },
-    { type: "PAT Testing", ref: "Appliance test", addr: "5 King's Court", days: 48, icon: "ti-plug", tone: "blue" },
-  ],
-  activity: [
-    { text: "Invoice paid · INV-1042 · £540", time: "9 min ago", tone: "green" },
-    { text: "Job completed · Boiler swap, Flat 4", time: "1 hr ago", tone: "blue" },
-    { text: "Quote approved · QUO-218 · £1,850", time: "2 hrs ago", tone: "green" },
-    { text: "New emergency call-out · 31 Park View", time: "3 hrs ago", tone: "amber" },
-  ],
-  customers: [
-    { name: "Sarah Connor", area: "Manchester", contact: "07700 900123", type: "Landlord", site: "14 Oak Street", jobs: 5, spend: 4250, tone: "green" },
-    { name: "Mill Lane Lettings", area: "Leeds", contact: "07700 900456", type: "Agency", site: "9 Mill Lane", jobs: 12, spend: 9800, tone: "green" },
-    { name: "Aisha Khan", area: "Manchester", contact: "07700 900789", type: "Homeowner", site: "22 Bridge Road", jobs: 2, spend: 680, tone: "green" },
-    { name: "King's Court Mgmt", area: "Liverpool", contact: "07700 900222", type: "Commercial", site: "5 King's Court", jobs: 9, spend: 7400, tone: "green" },
-    { name: "David Lowe", area: "Sheffield", contact: "07700 900333", type: "Homeowner", site: "8 Vale Road", jobs: 1, spend: 320, tone: "amber" },
-  ],
-  quotes: [
-    { ref: "QUO-218", customer: "Mill Lane Lettings", desc: "Full bathroom refit", amount: 1850, status: "Approved", date: "2026-05-20" },
-    { ref: "QUO-219", customer: "Sarah Connor", desc: "Boiler replacement + flush", amount: 2400, status: "Sent", date: "2026-05-24" },
-    { ref: "QUO-220", customer: "Aisha Khan", desc: "Consumer unit upgrade", amount: 680, status: "Sent", date: "2026-05-26" },
-    { ref: "QUO-221", customer: "David Lowe", desc: "Outdoor tap install", amount: 145, status: "Draft", date: "2026-05-28" },
-    { ref: "QUO-222", customer: "King's Court Mgmt", desc: "Communal lighting LED swap", amount: 3200, status: "Rejected", date: "2026-05-12" },
-  ],
-  jobs: [
-    { title: "Boiler not firing", customer: "Mill Lane Lettings", site: "9 Mill Lane Flat 2", engineer: "Dave R.", priority: "High", status: "In Progress", value: 280 },
-    { title: "Leaking kitchen tap", customer: "Sarah Connor", site: "14 Oak Street", engineer: "Mike T.", priority: "Medium", status: "Scheduled", value: 90 },
-    { title: "Consumer unit upgrade", customer: "Aisha Khan", site: "22 Bridge Road", engineer: "Unassigned", priority: "Low", status: "New", value: 680 },
-    { title: "Annual gas service x6", customer: "King's Court Mgmt", site: "5 King's Court", engineer: "Dave R.", priority: "Medium", status: "Completed", value: 540 },
-    { title: "Emergency — no hot water", customer: "David Lowe", site: "8 Vale Road", engineer: "Mike T.", priority: "High", status: "Invoiced", value: 165 },
-    { title: "Radiator replacement", customer: "Sarah Connor", site: "14 Oak Street", engineer: "Dave R.", priority: "Medium", status: "Scheduled", value: 320 },
-  ],
-  invoices: [
-    { ref: "INV-1042", customer: "King's Court Mgmt", amount: 540, due: "2026-05-15", status: "Paid" },
-    { ref: "INV-1043", customer: "Aisha Khan", amount: 680, due: "2026-06-01", status: "Sent" },
-    { ref: "INV-1044", customer: "Sarah Connor", amount: 90, due: "2026-06-04", status: "Sent" },
-    { ref: "INV-1041", customer: "Mill Lane Lettings", amount: 1850, due: "2026-05-10", status: "Overdue" },
-    { ref: "INV-1040", customer: "David Lowe", amount: 165, due: "2026-05-08", status: "Overdue" },
-  ],
-  documents: [
-    { name: "CP12 — 9 Mill Lane.pdf", cat: "Certificates", size: "180 KB", date: "01 Feb 2026", icon: "ti-flame", tone: "red" },
-    { name: "EICR Report — 22 Bridge Rd.pdf", cat: "Certificates", size: "1.2 MB", date: "18 Jan 2026", icon: "ti-bolt", tone: "amber" },
-    { name: "Quote QUO-218 — Mill Lane.pdf", cat: "Quotes", size: "96 KB", date: "20 May 2026", icon: "ti-file-dollar", tone: "blue" },
-    { name: "Invoice INV-1042 — King's Court.pdf", cat: "Invoices", size: "120 KB", date: "15 May 2026", icon: "ti-receipt", tone: "green" },
-    { name: "Completion Cert — Boiler swap.pdf", cat: "Certificates", size: "85 KB", date: "22 May 2026", icon: "ti-circle-check", tone: "green" },
-    { name: "Site photos — Flat 2 damp.pdf", cat: "Job Photos", size: "2.4 MB", date: "19 May 2026", icon: "ti-photo", tone: "blue" },
-  ],
-};
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand" },
@@ -1839,7 +1783,7 @@ function Dashboard({ user, signOut }) {
   // metadata, then email prefix. Defaults tier to PRO if none stored.
   const [biz, setBiz] = useState({ name: "", tier: "", loaded: false });
   useEffect(() => {
-    if (!DB_READY || !user) { setBiz({ name: DEMO.user.name, tier: DEMO.user.tier, loaded: true }); return; }
+    if (!DB_READY || !user) { setBiz({ name: "Your Business", tier: "", loaded: true }); return; }
     let cancelled = false;
     db.from("product_members").select("*").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
       .then(({ data: m }) => {
@@ -1850,8 +1794,8 @@ function Dashboard({ user, signOut }) {
       });
     return () => { cancelled = true; };
   }, [user]);
-  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : DEMO.user.name)) : "…";
-  const tierLabel = (biz.tier || DEMO.user.tier || "PRO").toUpperCase();
+  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "Your Business")) : "…";
+  const tierLabel = (biz.tier || "PRO").toUpperCase();
 
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
@@ -1956,7 +1900,7 @@ function Dashboard({ user, signOut }) {
           })}
         </nav>
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : ""}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", marginBottom: 6, color: "var(--txt-2)", fontSize: 12 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14 }} />
             <span>{light ? "Dark Mode" : "Light Mode"}</span>
