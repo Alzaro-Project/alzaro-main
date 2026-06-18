@@ -31,7 +31,7 @@ function applyTheme(theme) {
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, tier, isAdmin, logout, settings } = useStore()
+  const { user, tier, logout, settings } = useStore()
 
   const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.bronze
 
@@ -49,11 +49,6 @@ export default function Sidebar({ onNavigate, isMobile }) {
     const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
     if (locked) { alert('Upgrade your plan to access this feature.'); return }
     navigate(item.path)
-    if (onNavigate) onNavigate()
-  }
-
-  const handleAdminNav = () => {
-    navigate('/admin')
     if (onNavigate) onNavigate()
   }
 
@@ -98,36 +93,27 @@ export default function Sidebar({ onNavigate, isMobile }) {
 
       {/* Nav */}
       <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-        {!isAdmin && (
-          <div style={{ padding: '0 12px 12px' }}>
-            <GlobalSearch
-              showInSidebar
-              placeholder="Search..."
-              onResultClick={() => { if (onNavigate) onNavigate() }}
-            />
-          </div>
-        )}
+        <div style={{ padding: '0 12px 12px' }}>
+          <GlobalSearch
+            showInSidebar
+            placeholder="Search..."
+            onResultClick={() => { if (onNavigate) onNavigate() }}
+          />
+        </div>
 
-        {isAdmin ? (
-          <>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text3)', padding: '10px 16px 5px', textTransform: 'uppercase' }}>Platform</div>
-            <NavItem icon="👑" label="Licence Manager" active={location.pathname === '/admin'} onClick={handleAdminNav} />
-          </>
-        ) : (
-          NAV.map(item => {
-            const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
-            return (
-              <NavItem
-                key={item.path}
-                icon={item.icon}
-                label={item.label}
-                locked={locked}
-                active={location.pathname === item.path}
-                onClick={() => handleNav(item)}
-              />
-            )
-          })
-        )}
+        {NAV.map(item => {
+          const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
+          return (
+            <NavItem
+              key={item.path}
+              icon={item.icon}
+              label={item.label}
+              locked={locked}
+              active={location.pathname === item.path}
+              onClick={() => handleNav(item)}
+            />
+          )
+        })}
       </div>
 
       {/* Footer */}
