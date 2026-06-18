@@ -11,7 +11,6 @@ import Settings from './pages/Settings'
 import Items from './pages/Items'
 import Purchases from './pages/Purchases'
 import Calendar from './pages/Calendar'
-import Admin from './pages/Admin'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import ForgotPassword from './pages/ForgotPassword'
@@ -123,7 +122,6 @@ function AppLayout() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
           </Routes>
         </div>
       </div>
