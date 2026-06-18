@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 
 export default function TrialGuard({ children }) {
   const user = useStore(s => s.user)
-  const isAdmin = useStore(s => s.isAdmin)
   const garageId = useStore(s => s.garageId)
   const [liveStatus, setLiveStatus] = useState(null)
   const [liveTrialEnds, setLiveTrialEnds] = useState(null)
@@ -12,7 +11,7 @@ export default function TrialGuard({ children }) {
 
   // Fetch fresh status from Supabase on mount and periodically
   useEffect(() => {
-    if (!garageId || isAdmin) {
+    if (!garageId) {
       setLoading(false)
       return
     }
@@ -40,11 +39,8 @@ export default function TrialGuard({ children }) {
     // Re-check status every 30 seconds in case admin changes it
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
-  }, [garageId, isAdmin])
+  }, [garageId])
 
-  // Admins bypass all checks
-  if (isAdmin) return children
-  
   // If no user, let the router handle redirect to login
   if (!user) return children
 
@@ -167,4 +163,4 @@ export default function TrialGuard({ children }) {
   }
   
   return children
-} 
+}
