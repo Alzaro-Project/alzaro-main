@@ -4,7 +4,7 @@ const { useState, useEffect } = React;
 /*  DEMO DATA  — replace with Supabase queries in phase 2             */
 /* ================================================================== */
 const DEMO = {
-  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "PRO" },
+  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "GOLD" },
   metrics: { revenue: 18450, outstanding: 3960, jobsToday: 6, jobsWeek: 23, quotesOpen: 8, quoteValue: 12400, certsDue: 3, customers: 64 },
   certificates: [
     { type: "Gas Safety (CP12)", ref: "Landlord cert", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
