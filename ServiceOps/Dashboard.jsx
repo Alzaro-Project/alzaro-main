@@ -2042,6 +2042,13 @@ function Dashboard({ user, signOut }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
           <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{DEMO.user.tier}</div>
         </div>
+        <div style={{ padding: "12px 12px 0", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
+            <i className="ti ti-search" style={{ fontSize: 14, color: "var(--txt-3)" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif" }} />
+            {search && <i className="ti ti-x" onClick={() => setSearch("")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} />}
+          </div>
+        </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0, padding: "10px 0" }}>
           {navItems.map((n) => {
             const on = n.id === active;
