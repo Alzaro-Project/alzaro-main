@@ -44,17 +44,6 @@ async function fetchSettings(userId) {
 // ============================================================
 // ADMIN FUNCTIONS
 // ============================================================
-export async function checkIsAdmin(email) {
-  const { data, error } = await supabase
-    .from('platform_admins')
-    .select('email')
-    .eq('email', email)
-    .eq('product', 'all')
-    .maybeSingle()
-  if (error || !data) return false
-  return true
-}
-
 export async function getAllGarages() {
   // Admin panel list — all tyreops members, newest first
   const { data, error } = await supabase
