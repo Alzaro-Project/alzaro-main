@@ -59,7 +59,6 @@ button.go:disabled{opacity:.6;}
 <script src="supabase.js"></script>
 <script>
 (function(){
-  var ADMIN=['mohammmed250052@gmail.com'];
   var $=function(id){return document.getElementById(id);};
   var go=function(p){window.location.href=p;};
   var setMsg=function(t,cls){ $('msg').innerHTML = t? '<div class="msg '+cls+'">'+t+'</div>' : ''; };
@@ -74,7 +73,6 @@ button.go:disabled{opacity:.6;}
     try{
       var r=await window.sb.auth.signInWithPassword({email:email,password:pass});
       if(r.error) throw r.error;
-      if(ADMIN.indexOf(email.toLowerCase())>=0){ go('/soloops/admin'); return; }
       var a=await window.sb.from('soloops_access').select('user_id').eq('user_id',r.data.user.id).maybeSingle();
       if(!a.data){
         if(r.data.user.user_metadata && r.data.user.user_metadata.product==='soloops'){
