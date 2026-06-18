@@ -637,15 +637,17 @@ function CustomerDetail({ customer, onClose, go }) {
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
-      <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
-        <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 17, fontWeight: 600 }}>{customer.name}</div>
-          <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 3 }}>{[customer.type, customer.area, customer.site].filter(Boolean).join(" · ")}</div>
-          <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 6, display: "flex", gap: 16 }}>
-            {customer.contact && <span><i className="ti ti-phone" style={{ fontSize: 13, marginRight: 4 }} />{customer.contact}</span>}
-            {customer.email && <span><i className="ti ti-mail" style={{ fontSize: 13, marginRight: 4 }} />{customer.email}</span>}
+        <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="font-head" style={{ fontSize: 18, fontWeight: 700 }}>{customer.name}</div>
+            <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 3 }}>{[customer.type, customer.area, customer.site].filter(Boolean).join(" · ")}</div>
+            <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 6, display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {customer.contact && <span><i className="ti ti-phone" style={{ fontSize: 13, marginRight: 4 }} />{customer.contact}</span>}
+              {customer.email && <span><i className="ti ti-mail" style={{ fontSize: 13, marginRight: 4 }} />{customer.email}</span>}
+            </div>
           </div>
+          <button onClick={onClose} title="Close (Esc)" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, border: "0.5px solid var(--line)", background: "var(--panel-2)", color: "var(--txt-2)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ti ti-x" /></button>
         </div>
         <div style={{ padding: 20, overflow: "auto", flex: 1 }}>
           {!data ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div> : (
@@ -1746,8 +1748,8 @@ function AuthScreen() {
     else setOk("Password reset link sent! Check your inbox (and spam folder).");
   };
 
-  const authInp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "Inter", outline: "none" };
-  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
+  const authInp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
   const Banner = ({ text, good }) => (
     <div style={{ background: good ? "var(--green-soft)" : "var(--red-soft)", border: "1px solid " + (good ? "var(--green)" : "var(--red)"), borderRadius: 8, padding: "11px 14px", fontSize: 13, color: good ? "var(--green)" : "var(--red)", marginBottom: 14, lineHeight: 1.4 }}>{good ? "✓ " : ""}{text}</div>
   );
@@ -1762,7 +1764,7 @@ function AuthScreen() {
 
         {forgot ? (
           <>
-            <button onClick={() => { setForgot(false); reset(); }} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 18, fontFamily: "Inter" }}>← Back to login</button>
+            <button onClick={() => { setForgot(false); reset(); }} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 18, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>← Back to login</button>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
               <i className="ti ti-key" style={{ fontSize: 34, color: "var(--brand)" }} />
               <div style={{ fontSize: 18, fontWeight: 700, marginTop: 8 }}>Reset password</div>
@@ -1791,7 +1793,7 @@ function AuthScreen() {
                 <input style={authInp} type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doLogin()} />
                 <input style={authInp} type="password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doLogin()} />
                 <button onClick={doLogin} disabled={busy} style={primaryBtn}>{busy ? "Signing in…" : "Sign in →"}</button>
-                <button onClick={() => { setForgot(true); reset(); }} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "Inter" }}>Forgot password?</button>
+                <button onClick={() => { setForgot(true); reset(); }} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Forgot password?</button>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -2027,13 +2029,12 @@ function Dashboard({ user, signOut }) {
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0, padding: "10px 0" }}>
           {navItems.map((n) => {
             const on = n.id === active;
-            const tint = n.tint || "brand";
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 14px", margin: "2px 8px", borderRadius: 9, cursor: "pointer", background: on ? "var(--brand-soft)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0 }}>
-                <span style={{ width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: on ? "var(--brand)" : `var(--${tint}-soft)` }}>
-                  <i className={`ti ${n.icon}`} style={{ fontSize: 15, color: on ? "#fff" : `var(--${tint})` }} />
-                </span>
-                <span style={{ fontSize: 13, flex: 1 }}>{n.label}</span>
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", background: on ? "var(--surface3)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0, transition: "background .12s" }}
+                onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--surface2)"; }}
+                onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                <i className={`ti ${n.icon}`} style={{ fontSize: 18, width: 20, textAlign: "center", flexShrink: 0, color: on ? "var(--brand)" : "var(--txt-2)" }} />
+                <span style={{ fontSize: 13.5, flex: 1 }}>{n.label}</span>
               </div>
             );
           })}
@@ -2054,7 +2055,7 @@ function Dashboard({ user, signOut }) {
           {isMobile && <i className="ti ti-menu-2" onClick={() => setMenuOpen(true)} style={{ fontSize: 23, color: "var(--txt)", cursor: "pointer", flexShrink: 0 }} title="Menu" />}
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
             <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={isMobile ? "Search…" : "Search customers, jobs, invoices, quotes, properties…"} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={isMobile ? "Search…" : "Search customers, jobs, invoices, quotes, properties…"} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif" }} />
             {search && <i className="ti ti-x" onClick={() => setSearch("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
           </div>
           <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
@@ -2154,7 +2155,7 @@ function ActivateScreen({ user, signOut }) {
         <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>This account isn't registered for ServiceOps</div>
         <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but ServiceOps needs its own registration.</div>
         <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Register now to start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> — no card needed.</div>
-        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
+        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
         <div onClick={signOut} style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 16, cursor: "pointer" }}>Not you? <span style={{ color: "var(--brand)" }}>Sign out</span></div>
       </div>
     </div>
