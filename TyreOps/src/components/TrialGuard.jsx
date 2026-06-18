@@ -20,7 +20,7 @@ export default function TrialGuard({ children }) {
     const fetchStatus = async () => {
       try {
         const { data, error } = await supabase
-          .from('garages')
+          .from('product_members')
           .select('status, trial_ends')
           .eq('id', garageId)
           .single()
