@@ -1816,140 +1816,21 @@ function AuthScreen() {
 }
 
 /* ================================================================== */
-/*  ADMIN  (only visible to accounts in svc_admins)                   */
-/* ================================================================== */
-function AdminPage() {
-  const TIERS = ["Sole Trader", "Team", "Firm"];
-  const FEES = { "Sole Trader": 29, "Team": 69, "Firm": 129 };
-  const STATUSES = ["Trial", "Active", "Suspended"];
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState("");
-
-  const load = () => {
-    if (!DB_READY) { setErr("Database not connected."); return; }
-    db.rpc("svc_admin_overview").then(({ data, error }) => {
-      if (error) { setErr(error.message); return; }
-      setData(typeof data === "string" ? JSON.parse(data) : data);
-    });
-  };
-  useEffect(load, []);
-
-  const users = (data && data.users) || [];
-  const now = new Date();
-  const daysUntil = (d) => d ? Math.ceil((new Date(d + "T00:00:00") - now) / 86400000) : null;
-  const fee = (u) => u.status === "Active" ? (FEES[u.tier] || 0) : 0;
-  const mrr = users.reduce((s, u) => s + fee(u), 0);
-  const onTrial = users.filter((u) => u.status === "Trial").length;
-  const active = users.filter((u) => u.status === "Active").length;
-  const suspended = users.filter((u) => u.status === "Suspended").length;
-  const expiringSoon = users.filter((u) => u.status === "Trial" && daysUntil(u.trial_ends) !== null && daysUntil(u.trial_ends) <= 7).length;
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-
-  const setLicence = async (u, patch) => {
-    const next = { tier: u.tier, status: u.status, trial_ends: u.trial_ends, ...patch };
-    const { error } = await db.rpc("svc_admin_set_licence", { target: u.id, new_tier: next.tier, new_status: next.status, new_trial_ends: next.trial_ends });
-    if (error) { setErr(error.message); return; }
-    load();
-  };
-
-  const statCard = (label, value, sub, color) => (
-    <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
-      <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: color || "var(--txt)" }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 3 }}>{sub}</div>}
-    </div>
-  );
-  const statusBox = (label, value, color, bg) => (
-    <div style={{ flex: 1, background: bg, border: "0.5px solid var(--line)", borderRadius: 10, padding: "18px 16px", textAlign: "center" }}>
-      <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 2 }}>{label}</div>
-    </div>
-  );
-  const selStyle = { ...inp, padding: "6px 8px", fontSize: 12, width: "auto" };
-
-  return (
-    <div className="fade-in">
-      <PageHead title="Admin — Licence Manager" sub={data ? `${users.length} registered user${users.length === 1 ? "" : "s"} on ServiceOps` : "Loading platform data…"}
-        right={<span onClick={load}><Btn icon="ti-refresh" label="Refresh" /></span>} />
-      {err && <div style={errBanner}>{err.includes("Not authorised") ? "Your account isn't an admin." : err}</div>}
-      {data && (
-        <>
-          <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-            {statCard("Total users", users.length, `${onTrial} on trial`, "var(--brand)")}
-            {statCard("Monthly revenue", gbp(mrr), "MRR from active", "var(--green)")}
-            {statCard("Active subscriptions", active, `${suspended} suspended`, "var(--blue)")}
-            {statCard("Trials expiring soon", expiringSoon, "within 7 days", expiringSoon > 0 ? "var(--red)" : "var(--txt)")}
-          </div>
-          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
-            <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
-              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Tier breakdown</div>
-              {TIERS.map((t) => {
-                const n = users.filter((u) => u.tier === t).length;
-                const rev = users.filter((u) => u.tier === t && u.status === "Active").length * FEES[t];
-                const pct = users.length ? (n / users.length) * 100 : 0;
-                return (
-                  <div key={t} style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
-                      <span style={{ fontWeight: 600 }}>{t}</span>
-                      <span style={{ color: "var(--txt-2)" }}>{n} · {gbp(rev)}/mo</span>
-                    </div>
-                    <div style={{ height: 5, background: "var(--panel-2)", borderRadius: 3 }}><div style={{ width: pct + "%", height: "100%", background: "var(--brand)", borderRadius: 3 }} /></div>
-                  </div>
-                );
-              })}
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 10, fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>Total MRR</span><span style={{ fontWeight: 700, color: "var(--green)" }}>{gbp(mrr)}/mo</span>
-              </div>
-            </div>
-            <div style={{ flex: 1.4, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
-              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Status overview</div>
-              <div style={{ display: "flex", gap: 12 }}>
-                {statusBox("Active", active, "var(--green)", "var(--green-soft)")}
-                {statusBox("Trial", onTrial, "var(--amber)", "var(--amber-soft)")}
-                {statusBox("Suspended", suspended, "var(--red)", "var(--red-soft)")}
-              </div>
-            </div>
-          </div>
-          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 10 }}>All users — newest first</div>
-          <Table cols={["User", "Joined", "Tier", "Status", "Trial ends", "Fee/mo", "Usage"]}>
-            {users.map((u) => {
-              const left = daysUntil(u.trial_ends);
-              return (
-                <tr key={u.id}>
-                  <Td><span style={{ fontWeight: 500 }}>{u.email}</span></Td>
-                  <Td color="var(--txt-2)">{fmtDate(u.created_at)}</Td>
-                  <Td><select style={selStyle} value={u.tier} onChange={(e) => setLicence(u, { tier: e.target.value })}>{TIERS.map((t) => <option key={t}>{t}</option>)}</select></Td>
-                  <Td><select style={selStyle} value={u.status} onChange={(e) => setLicence(u, { status: e.target.value })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></Td>
-                  <Td>{u.status === "Trial" ? <span>{fmtDate(u.trial_ends)}{left !== null && <div style={{ fontSize: 10.5, color: left <= 3 ? "var(--red)" : left <= 7 ? "var(--amber)" : "var(--txt-3)" }}>{left < 0 ? "expired" : left + " days left"}</div>}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
-                  <Td>{u.status === "Active" ? <span style={{ fontWeight: 600, color: "var(--green)" }}>{gbp(FEES[u.tier] || 0)}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
-                  <Td color="var(--txt-2)"><span style={{ fontSize: 11.5 }}>{u.customers} customers · {u.jobs} jobs · {u.invoices} inv</span></Td>
-                </tr>
-              );
-            })}
-          </Table>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ================================================================== */
 /*  APP SHELL                                                         */
 /* ================================================================== */
 const PAGES = {
   customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
-  reports: ReportsPage, settings: SettingsPage, admin: AdminPage,
+  reports: ReportsPage, settings: SettingsPage,
 };
 
 function Dashboard({ user, signOut }) {
   const pageFromUrl = () => {
     const seg = (window.location.pathname.split("/serviceops/")[1] || "").replace(/\/$/, "");
-    const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings", "admin"];
+    const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings"];
     return known.includes(seg) ? seg : "dashboard";
   };
   const [active, setActive] = useState(pageFromUrl);
-  const [isAdmin, setIsAdmin] = useState(false);
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -1972,13 +1853,6 @@ function Dashboard({ user, signOut }) {
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : DEMO.user.name)) : "…";
   const tierLabel = (biz.tier || DEMO.user.tier || "PRO").toUpperCase();
 
-  // is this account an admin? (svc_admins row visible only to its owner)
-  useEffect(() => {
-    if (!DB_READY || !user) return;
-    db.from("svc_admins").select("user_id").eq("user_id", user.id)
-      .then(({ data }) => setIsAdmin((data || []).length > 0));
-  }, [user]);
-
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
     const onPop = () => setActive(pageFromUrl());
@@ -1990,7 +1864,7 @@ function Dashboard({ user, signOut }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const navItems = isAdmin ? [...NAV, { id: "admin", label: "Admin", icon: "ti-shield-lock" }] : NAV;
+  const navItems = NAV;
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
