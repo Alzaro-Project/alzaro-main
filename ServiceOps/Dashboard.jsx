@@ -58,17 +58,17 @@ const DEMO = {
 };
 
 const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
-  { id: "customers", label: "Customers", icon: "ti-users" },
-  { id: "properties", label: "Properties", icon: "ti-home" },
-  { id: "quotes", label: "Quotes", icon: "ti-file-dollar" },
-  { id: "jobs", label: "Jobs", icon: "ti-briefcase" },
-  { id: "diary", label: "Diary", icon: "ti-calendar" },
-  { id: "invoicing", label: "Invoicing", icon: "ti-receipt" },
-  { id: "certificates", label: "Certificates", icon: "ti-shield-check" },
-  { id: "documents", label: "Documents", icon: "ti-folder" },
-  { id: "reports", label: "Reports", icon: "ti-chart-bar" },
-  { id: "settings", label: "Settings", icon: "ti-settings" },
+  { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand" },
+  { id: "customers", label: "Customers", icon: "ti-users", tint: "blue" },
+  { id: "properties", label: "Properties", icon: "ti-home", tint: "teal" },
+  { id: "quotes", label: "Quotes", icon: "ti-file-dollar", tint: "amber" },
+  { id: "jobs", label: "Jobs", icon: "ti-briefcase", tint: "purple" },
+  { id: "diary", label: "Diary", icon: "ti-calendar", tint: "blue" },
+  { id: "invoicing", label: "Invoicing", icon: "ti-receipt", tint: "brand" },
+  { id: "certificates", label: "Certificates", icon: "ti-shield-check", tint: "red" },
+  { id: "documents", label: "Documents", icon: "ti-folder", tint: "amber" },
+  { id: "reports", label: "Reports", icon: "ti-chart-bar", tint: "teal" },
+  { id: "settings", label: "Settings", icon: "ti-settings", tint: "blue" },
 ];
 
 const REPORTS = [
@@ -329,14 +329,15 @@ function DashboardPage({ range, go, user }) {
   const [d, setD] = useState(null); // { customers, quotes, jobs, invoices }
 
   useEffect(() => {
-    if (!DB_READY) { setD({ customers: [], quotes: [], jobs: [], invoices: [] }); return; }
+    if (!DB_READY) { setD({ customers: [], quotes: [], jobs: [], invoices: [], certs: [] }); return; }
     Promise.all([
       db.from("svc_customers").select("*"),
       db.from("svc_quotes").select("*"),
       db.from("svc_jobs").select("*"),
       db.from("svc_invoices").select("*"),
-    ]).then(([c, q, j, i]) => setD({
-      customers: c.data || [], quotes: q.data || [], jobs: j.data || [], invoices: i.data || [],
+      db.from("svc_certificates").select("*"),
+    ]).then(([c, q, j, i, ce]) => setD({
+      customers: c.data || [], quotes: q.data || [], jobs: j.data || [], invoices: i.data || [], certs: ce.data || [],
     }));
   }, []);
 
@@ -356,6 +357,23 @@ function DashboardPage({ range, go, user }) {
   const quoteValue = openQuotes.reduce((s, q) => s + (+q.amount || 0), 0);
   const awaitingInvoice = d.jobs.filter((j) => j.status === "Completed").length;
 
+  // 6-month revenue: collected (paid) vs outstanding (sent+overdue) per month
+  const months = [];
+  for (let k = 5; k >= 0; k--) { const dt = new Date(); dt.setMonth(dt.getMonth() - k); months.push({ key: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`, label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
+  const series = months.map((m) => {
+    let coll = 0, out = 0;
+    d.invoices.forEach((v) => {
+      const k = (v.created_at || v.due_date || "").slice(0, 7);
+      if (k !== m.key) return;
+      if (v.status === "Paid") coll += +v.amount || 0;
+      else if (v.status === "Sent" || v.status === "Overdue") out += +v.amount || 0;
+    });
+    return { ...m, coll, out };
+  });
+  const maxVal = Math.max(1, ...series.map((s) => Math.max(s.coll, s.out)));
+  // certs expiring within 90 days, soonest first
+  const expiring = (d.certs || []).map((c) => ({ ...c, days: c.expiry_date ? Math.ceil((new Date(c.expiry_date + "T00:00:00") - new Date()) / 86400000) : 9999 })).filter((c) => c.days <= 90).sort((a, b) => a.days - b.days).slice(0, 5);
+
   // recent activity — newest records across tables
   const acts = [];
   d.invoices.forEach((v) => acts.push({ when: v.created_at, text: `Invoice ${v.status === "Paid" ? "paid" : "raised"} · ${v.ref || "—"} · ${gbp(+v.amount || 0)}`, tone: v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue" }));
@@ -374,14 +392,46 @@ function DashboardPage({ range, go, user }) {
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 19, fontWeight: 600 }}>{greet}, {name}</h2>
-        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} invoice{overdueCount === 1 ? "" : "s"} overdue · {range}</div>
+        <h2 className="font-head" style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.5px" }}>Dashboard</h2>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" />
         <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" />
         <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" />
         <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Panel title="Revenue — last 6 months">
+          <svg viewBox="0 0 380 140" style={{ width: "100%", height: 120 }}>
+            <line x1="0" y1="108" x2="380" y2="108" stroke="var(--line)" strokeWidth="1" />
+            {series.map((s, i) => {
+              const x = 24 + i * 60; const ch = Math.round((s.coll / maxVal) * 80); const oh = Math.round((s.out / maxVal) * 80);
+              return (
+                <g key={s.key}>
+                  <rect x={x} y={108 - ch} width="16" height={ch} rx="2" fill="var(--brand)" />
+                  <rect x={x + 18} y={108 - oh} width="16" height={oh} rx="2" fill="var(--amber)" />
+                  <text x={x + 17} y="124" fontSize="9" fill="var(--txt-3)" textAnchor="middle">{s.label}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 6 }}>
+            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--brand)" }} />Collected</span>
+            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--amber)" }} />Outstanding</span>
+          </div>
+        </Panel>
+        <Panel title="Certificates expiring" action="View all" onAction={() => go("certificates")}>
+          {expiring.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>No certificates due in the next 90 days.</div> : expiring.map((c, i) => {
+            const tone = c.days <= 7 ? "red" : c.days <= 30 ? "amber" : "blue";
+            return (
+              <div key={c.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < expiring.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+                <span style={{ fontSize: 11.5 }}>{c.cert_type}{c.site ? ` · ${c.site}` : ""}</span>
+                <Pill text={c.days < 0 ? "expired" : `${c.days}d`} tone={tone} />
+              </div>
+            );
+          })}
+        </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
         <Panel title="Jobs by Stage" action="View all" onAction={() => go("jobs")}>
@@ -1956,32 +2006,39 @@ function Dashboard({ user, signOut }) {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {isMobile && menuOpen && <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 120 }} />}
-      <aside style={{ width: 210, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", ...(isMobile
+      <aside style={{ width: 236, background: "var(--panel)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", ...(isMobile
         ? { position: "fixed", top: 0, left: 0, height: "100dvh", zIndex: 130, transform: menuOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: menuOpen ? "12px 0 40px rgba(0,0,0,.45)" : "none" }
         : { position: "sticky", top: 0, height: "100vh", overflow: "hidden" }) }}>
-        <div className="brand" style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
-        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 14, flexShrink: 0 }}>Field Service Pro</div>
-        <div style={{ fontSize: 15, fontWeight: 600, flexShrink: 0 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-        <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: "#0f4429", background: "#a7e8c4", padding: "2px 10px", borderRadius: 6, margin: "6px 0 14px", flexShrink: 0 }}>{DEMO.user.tier}</span>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <div style={{ padding: "18px 16px 14px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+          <div className="font-head" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+          <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
+        </div>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
+          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{DEMO.user.tier}</div>
+        </div>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0, padding: "10px 0" }}>
           {navItems.map((n) => {
             const on = n.id === active;
+            const tint = n.tint || "brand";
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent", flexShrink: 0 }}>
-                <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
-                <span style={{ fontSize: 13 }}>{n.label}</span>
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 14px", margin: "2px 8px", borderRadius: 9, cursor: "pointer", background: on ? "var(--brand-soft)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: on ? "var(--brand)" : `var(--${tint}-soft)` }}>
+                  <i className={`ti ${n.icon}`} style={{ fontSize: 15, color: on ? "#fff" : `var(--${tint})` }} />
+                </span>
+                <span style={{ fontSize: 13, flex: 1 }}>{n.label}</span>
               </div>
             );
           })}
         </nav>
-        <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 12, marginTop: 10, flexShrink: 0 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
-          <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
-            <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
-            <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
+          <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", marginBottom: 6, color: "var(--txt-2)", fontSize: 12 }}>
+            <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14 }} />
+            <span>{light ? "Dark Mode" : "Light Mode"}</span>
           </div>
-          <div onClick={signOut} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)" }}>
-            <i className="ti ti-logout" style={{ fontSize: 15 }} /><span style={{ fontSize: 12 }}>Sign Out</span></div>
+          <div onClick={signOut} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: "var(--txt-2)", fontSize: 12 }}>
+            <i className="ti ti-logout" style={{ fontSize: 14 }} /><span>Sign Out</span></div>
         </div>
       </aside>
 
