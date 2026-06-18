@@ -83,7 +83,7 @@ export async function updateGarageStatus(garageId, status) {
 }
 
 export async function deleteGarage(garageId) {
-  // Child rows cascade via FK (garage_id -> product_members.id ON DELETE CASCADE)
+  // Child rows cascade via FK (account_id -> product_members.id ON DELETE CASCADE)
   const { error } = await supabase.from('product_members').delete().eq('id', garageId)
   if (error) throw error
 }
@@ -154,7 +154,7 @@ export async function updateGarage(garageId, updates) {
     if (mErr) throw mErr
     const { error } = await supabase
       .from('product_settings')
-      .upsert({ user_id: member.user_id, product: PRODUCT, ...settingsPatch }, { onConflict: 'user_id,product' })
+      .upsert({ user_id: member.user_id, product: PRODUCT, account_id: garageId, ...settingsPatch }, { onConflict: 'user_id,product' })
     if (error) throw error
   }
 }
@@ -163,14 +163,14 @@ export async function updateGarage(garageId, updates) {
 // SKUS  (TyreOps)
 // ============================================================
 export async function getSKUs(garageId) {
-  const { data, error } = await supabase.from('skus').select('*').eq('garage_id', garageId).order('brand')
+  const { data, error } = await supabase.from('skus').select('*').eq('account_id', garageId).order('brand')
   if (error) throw error
   return data || []
 }
 
 export async function insertSKU(garageId, sku) {
   const { data, error } = await supabase.from('skus').insert({
-    garage_id: garageId, brand: sku.brand, model: sku.model,
+    account_id: garageId, brand: sku.brand, model: sku.model,
     w: sku.w, p: sku.p, r: sku.r, sell: sku.sell, alert: sku.alert, season: sku.season
   }).select().single()
   if (error) throw error
@@ -191,14 +191,14 @@ export async function deleteSKU(id) {
 // BATCHES  (TyreOps)
 // ============================================================
 export async function getBatches(garageId) {
-  const { data, error } = await supabase.from('batches').select('*').eq('garage_id', garageId).order('date')
+  const { data, error } = await supabase.from('batches').select('*').eq('account_id', garageId).order('date')
   if (error) throw error
   return data || []
 }
 
 export async function insertBatch(garageId, batch) {
   const { data, error } = await supabase.from('batches').insert({
-    garage_id: garageId,
+    account_id: garageId,
     sku_id: batch.skuId,
     date: batch.date,
     qty: batch.qty,
@@ -248,7 +248,7 @@ export async function deletePurchaseInvoice(publicUrl) {
 // USED TYRES  (TyreOps)
 // ============================================================
 export async function getUsedTyres(garageId) {
-  const { data, error } = await supabase.from('used_tyres').select('*').eq('garage_id', garageId).order('date', { ascending: false })
+  const { data, error } = await supabase.from('used_tyres').select('*').eq('account_id', garageId).order('date', { ascending: false })
   if (error) throw error
   return (data || []).map(u => ({
     ...u, sourceCust: u.source_cust, lineType: 'used'
@@ -257,7 +257,7 @@ export async function getUsedTyres(garageId) {
 
 export async function insertUsedTyre(garageId, tyre) {
   const { data, error } = await supabase.from('used_tyres').insert({
-    garage_id: garageId, brand: tyre.brand, model: tyre.model,
+    account_id: garageId, brand: tyre.brand, model: tyre.model,
     w: tyre.w, p: tyre.p, r: tyre.r,
     cost: tyre.cost, sell: tyre.sell, source_cust: tyre.sourceCust,
     date: tyre.date, notes: tyre.notes, sold: false
@@ -282,7 +282,7 @@ export async function deleteUsedTyre(id) {
 // CUSTOMERS  (shared — TyreOps + GarageOps)
 // ============================================================
 export async function getCustomers(garageId) {
-  const { data, error } = await supabase.from('customers').select('*').eq('garage_id', garageId).order('name')
+  const { data, error } = await supabase.from('customers').select('*').eq('account_id', garageId).order('name')
   if (error) throw error
   return data || []
 }
@@ -290,7 +290,7 @@ export async function getCustomers(garageId) {
 export async function checkDuplicateCustomer(garageId, email, phone, excludeId = null) {
   if (!email && !phone) return null
 
-  let query = supabase.from('customers').select('*').eq('garage_id', garageId)
+  let query = supabase.from('customers').select('*').eq('account_id', garageId)
 
   const conditions = []
   if (email) conditions.push(`email.ilike.${email}`)
@@ -320,7 +320,7 @@ export async function insertCustomer(garageId, customer) {
   }
 
   const { data, error } = await supabase.from('customers').insert({
-    garage_id: garageId, name: customer.name, email: customer.email,
+    account_id: garageId, name: customer.name, email: customer.email,
     phone: customer.phone, reg: customer.reg, vehicle: customer.vehicle,
     vehicles: customer.vehicles || []
   }).select().single()
@@ -350,7 +350,7 @@ export async function deleteCustomer(id) {
 // ============================================================
 export async function getInvoices(garageId) {
   const { data: invs, error } = await supabase
-    .from('invoices').select('*').eq('garage_id', garageId).order('created_at', { ascending: false })
+    .from('invoices').select('*').eq('account_id', garageId).order('created_at', { ascending: false })
   if (error) throw error
   if (!invs?.length) return []
 
@@ -372,7 +372,7 @@ export async function getInvoices(garageId) {
 
 export async function insertInvoice(garageId, inv) {
   const { error: invErr } = await supabase.from('invoices').insert({
-    id: inv.id, garage_id: garageId, cust_id: inv.custId || null,
+    id: inv.id, account_id: garageId, cust_id: inv.custId || null,
     cust_name: inv.custName, cust_email: inv.custEmail, reg: inv.reg,
     date: inv.date, due: inv.due, status: inv.status,
     vat_scheme: inv.vatScheme, notes: inv.notes,
@@ -384,7 +384,7 @@ export async function insertInvoice(garageId, inv) {
   if (inv.lines?.length) {
     const { error: linesErr } = await supabase.from('invoice_lines').insert(
       inv.lines.map(l => ({
-        invoice_id: inv.id, garage_id: garageId,
+        invoice_id: inv.id, account_id: garageId,
         line_desc: l.desc, qty: l.qty, unit: l.unit, cost: l.cost || 0,
         sku_id: l.skuId || null, batch_id: l.batchId || null, used_id: l.usedId || null,
         line_type: l.lineType || 'service', margin_scheme: l.marginScheme || false
@@ -403,21 +403,21 @@ export async function updateInvoice(garageId, id, updates) {
   if (Object.keys(dbUpdates).length === 0) return
 
   const { error } = await supabase.from('invoices').update(dbUpdates)
-    .eq('garage_id', garageId).eq('id', id)
+    .eq('account_id', garageId).eq('id', id)
   if (error) throw error
 }
 
 export async function updateInvoiceStatus(garageId, id, status) {
   const { error } = await supabase.from('invoices').update({ status })
-    .eq('garage_id', garageId).eq('id', id)
+    .eq('account_id', garageId).eq('id', id)
   if (error) throw error
 }
 
 export async function deleteInvoice(garageId, id) {
   await supabase.from('invoice_lines').delete()
-    .eq('garage_id', garageId).eq('invoice_id', id)
+    .eq('account_id', garageId).eq('invoice_id', id)
   const { error } = await supabase.from('invoices').delete()
-    .eq('garage_id', garageId).eq('id', id)
+    .eq('account_id', garageId).eq('id', id)
   if (error) throw error
 }
 
