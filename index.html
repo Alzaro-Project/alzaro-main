@@ -42,7 +42,43 @@
       --indigo2:#818cf8;
       --violet:#a78bfa;
       --pink:#f472b6;
+      --nav-scrolled:rgba(5,6,12,0.78);
+      --footer-bg:rgba(5,6,12,0.6);
+      --shadow-strong:rgba(0,0,0,0.5);
+      --shadow-soft:rgba(0,0,0,0.4);
+      --inset-hi:rgba(255,255,255,0.05);
+      --card-grad-a:rgba(255,255,255,0.045);
+      --card-grad-b:rgba(255,255,255,0.01);
+      --stack-grad-a:rgba(32,36,58,0.92);
+      --stack-grad-b:rgba(15,18,32,0.88);
     }
+    [data-theme="light"]{
+      --bg:#f4f5fb;
+      --bg2:#eceef7;
+      --surface:rgba(255,255,255,0.72);
+      --surface-solid:#ffffff;
+      --glass:rgba(10,12,28,0.025);
+      --border:rgba(10,15,45,0.10);
+      --border2:rgba(10,15,45,0.16);
+      --text:#1a1d2e;
+      --text2:#565d7e;
+      --text3:#9097b4;
+      --nav-scrolled:rgba(244,245,251,0.82);
+      --footer-bg:rgba(244,245,251,0.7);
+      --shadow-strong:rgba(60,66,110,0.18);
+      --shadow-soft:rgba(60,66,110,0.12);
+      --inset-hi:rgba(255,255,255,0.6);
+      --card-grad-a:rgba(255,255,255,0.7);
+      --card-grad-b:rgba(255,255,255,0.25);
+      --stack-grad-a:rgba(255,255,255,0.95);
+      --stack-grad-b:rgba(244,245,251,0.92);
+    }
+    .theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--glass);border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:color .2s,border-color .2s,background .2s;}
+    .theme-toggle:hover{color:var(--text);border-color:rgba(129,140,248,0.4);}
+    .theme-toggle svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+    .theme-toggle .icon-sun{display:none;}
+    [data-theme="light"] .theme-toggle .icon-sun{display:block;}
+    [data-theme="light"] .theme-toggle .icon-moon{display:none;}
     html{scroll-behavior:smooth}
     body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
     a{color:inherit;text-decoration:none}
@@ -59,7 +95,7 @@
 
     /* ====== NAV ====== */
     nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:18px 0;transition:padding .35s ease,background .35s ease,border-color .35s ease;border-bottom:1px solid transparent;}
-    nav.scrolled{padding:12px 0;background:rgba(5,6,12,0.78);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border-bottom-color:var(--border);}
+    nav.scrolled{padding:12px 0;background:var(--nav-scrolled);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border-bottom-color:var(--border);}
     nav .container{display:flex;align-items:center;justify-content:space-between;}
     .nav-logo{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;letter-spacing:0.02em;color:#fff;}
     .nav-logo span{color:var(--indigo2);}
@@ -102,7 +138,7 @@
     /* ====== HERO 3D STACK (signature) ====== */
     .stack-scene{perspective:1400px;height:530px;position:relative;animation:up .7s ease .3s both;}
     .stack{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(14deg) rotateY(-16deg);transition:transform .25s ease-out;will-change:transform;}
-    .stack-card{position:absolute;left:8%;right:8%;height:88px;border-radius:18px;border:1px solid var(--border2);background:linear-gradient(135deg,rgba(32,36,58,0.92),rgba(15,18,32,0.88));display:flex;align-items:center;gap:16px;padding:0 26px;transform-style:preserve-3d;box-shadow:0 30px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);transition:transform .35s ease,border-color .35s ease,box-shadow .35s ease;cursor:pointer;}
+    .stack-card{position:absolute;left:8%;right:8%;height:88px;border-radius:18px;border:1px solid var(--border2);background:linear-gradient(135deg,var(--stack-grad-a),var(--stack-grad-b));display:flex;align-items:center;gap:16px;padding:0 26px;transform-style:preserve-3d;box-shadow:0 30px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);transition:transform .35s ease,border-color .35s ease,box-shadow .35s ease;cursor:pointer;}
     .stack-card:hover{border-color:rgba(var(--brand-rgb),0.55);box-shadow:0 36px 80px rgba(var(--brand-rgb),0.22),inset 0 1px 0 rgba(255,255,255,0.14);}
     .stack-card::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--brand);box-shadow:0 0 14px rgba(var(--brand-rgb),0.8);}
     .stack-card:nth-child(1){top:0;transform:translateZ(200px);}
@@ -138,7 +174,7 @@
     .platform-card{
       border:1px solid var(--border);
       border-radius:24px;
-      background:linear-gradient(160deg,rgba(255,255,255,0.045) 0%,rgba(255,255,255,0.01) 55%);
+      background:linear-gradient(160deg,var(--card-grad-a) 0%,var(--card-grad-b) 55%);
       backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
       overflow:hidden;position:relative;
       transform-style:preserve-3d;
@@ -239,7 +275,7 @@
     .cta-btns{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
 
     /* ====== FOOTER ====== */
-    footer{padding:44px 0;border-top:1px solid var(--border);position:relative;z-index:1;background:rgba(5,6,12,0.6);}
+    footer{padding:44px 0;border-top:1px solid var(--border);position:relative;z-index:1;background:var(--footer-bg);}
     .foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;}
     .foot-links{display:flex;gap:26px;flex-wrap:wrap;}
     .foot-links a{font-size:13px;color:var(--text3);transition:color .2s;}
@@ -323,6 +359,11 @@
       .foot{flex-direction:column;text-align:center;}
     }
   </style>
+  <script>
+    (function(){
+      try{ var t = localStorage.getItem('alzaro-theme'); if(t==='light'){ document.documentElement.setAttribute('data-theme','light'); } }catch(e){}
+    })();
+  </script>
 </head>
 <body>
 
@@ -337,6 +378,10 @@
       <a href="#how" data-scroll>How It Works</a>
       <a href="#platforms" class="btn-cta" data-scroll>Explore Platforms →</a>
     </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
   </div>
 </nav>
 
@@ -618,6 +663,16 @@
   // Nav glass on scroll
   var nav = document.getElementById('nav');
   window.addEventListener('scroll', function(){ nav.classList.toggle('scrolled', window.scrollY > 40); }, {passive:true});
+
+  // Theme toggle
+  var themeToggle = document.getElementById('themeToggle');
+  if(themeToggle){
+    themeToggle.addEventListener('click', function(){
+      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      if(isLight){ document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('alzaro-theme','dark'); }catch(e){} }
+      else { document.documentElement.setAttribute('data-theme','light'); try{ localStorage.setItem('alzaro-theme','light'); }catch(e){} }
+    });
+  }
 
   // Smooth anchor scrolling that keeps the URL clean
   document.querySelectorAll('[data-scroll]').forEach(function(a){
