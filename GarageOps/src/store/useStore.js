@@ -79,7 +79,6 @@ const SEED_CUSTOMERS = []
 
 const SEED_INVOICES = []
 
-const SEED_LICENCES = []
 
 // ============================================================
 // STORE
@@ -92,7 +91,6 @@ export const useStore = create(
       // --------------------------------------------------------
       user: null,
       tier: 'gold',
-      isAdmin: false,
       garageId: null,
       garageStatus: null,
       trialEnds: null,
@@ -113,7 +111,6 @@ export const useStore = create(
       },
       customers: SEED_CUSTOMERS,
       invoices: SEED_INVOICES,
-      licences: SEED_LICENCES,
 
       // --------------------------------------------------------
       // TYREOPS DATA STATE
@@ -156,13 +153,8 @@ export const useStore = create(
       // --------------------------------------------------------
       // AUTH ACTIONS
       // --------------------------------------------------------
-      login: async (email, isAdmin = false) => {
-        if (isAdmin) {
-          set({ user: { name: 'GarageOps Admin', email }, isAdmin: true, tier: 'admin' })
-          return
-        }
-
-        set({ user: { name: email, email }, isAdmin: false })
+      login: async (email) => {
+        set({ user: { name: email, email } })
 
         try {
           const data = await db.loadAllGarageData(email)
@@ -275,7 +267,6 @@ export const useStore = create(
         set({
           user: null,
           tier: 'gold',
-          isAdmin: false,
           garageId: null,
           garageStatus: null,
           trialEnds: null,
@@ -690,12 +681,6 @@ export const useStore = create(
       },
 
       // --------------------------------------------------------
-      // LICENCES (Admin only — local state)
-      // --------------------------------------------------------
-      addLicence: (l) => set(s => ({ licences: [...s.licences, l] })),
-      updateLicence: (id, updates) => set(s => ({ licences: s.licences.map(l => l.id === id ? { ...l, ...updates } : l) })),
-      deleteLicence: (id) => set(s => ({ licences: s.licences.filter(l => l.id !== id) })),
-
       // --------------------------------------------------------
       // DASHBOARD
       // --------------------------------------------------------
@@ -1169,7 +1154,6 @@ export const useStore = create(
       partialize: (state) => ({
         user: state.user,
         tier: state.tier,
-        isAdmin: state.isAdmin,
         garageId: state.garageId,
         product: state.product,  // NEW: remember which product on reload
         theme: state.theme,      // NEW: remember light/dark across sessions
