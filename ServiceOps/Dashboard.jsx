@@ -1953,6 +1953,25 @@ function Dashboard({ user, signOut }) {
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // ---- business identity for the sidebar (real DB data, not email) ----
+  // Reads company_name + tier from product_members; falls back to auth
+  // metadata, then email prefix. Defaults tier to PRO if none stored.
+  const [biz, setBiz] = useState({ name: "", tier: "", loaded: false });
+  useEffect(() => {
+    if (!DB_READY || !user) { setBiz({ name: DEMO.user.name, tier: DEMO.user.tier, loaded: true }); return; }
+    let cancelled = false;
+    db.from("product_members").select("*").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
+      .then(({ data: m }) => {
+        if (cancelled) return;
+        let name = (m && m.company_name) || user.user_metadata?.company_name || (user.email || "").split("@")[0];
+        let tier = (m && (m.tier || m.plan)) || "";
+        setBiz({ name, tier, loaded: true });
+      });
+    return () => { cancelled = true; };
+  }, [user]);
+  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : DEMO.user.name)) : "…";
+  const tierLabel = (biz.tier || DEMO.user.tier || "PRO").toUpperCase();
+
   // is this account an admin? (svc_admins row visible only to its owner)
   useEffect(() => {
     if (!DB_READY || !user) return;
@@ -2039,8 +2058,8 @@ function Dashboard({ user, signOut }) {
           <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
         </div>
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
-          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{DEMO.user.tier}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
+          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
         </div>
         <div style={{ padding: "12px 12px 0", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
