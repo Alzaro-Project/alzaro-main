@@ -26,7 +26,7 @@ export function usePurchases() {
     setError(null)
     try {
       const [pRes, gRes] = await Promise.all([
-        supabase.from('purchases').select('*').eq('garage_id', garageId)
+        supabase.from('purchases').select('*').eq('account_id', garageId)
           .order('purchase_date', { ascending: false })
           .order('created_at', { ascending: false }),
         supabase.from('product_settings')
@@ -91,7 +91,7 @@ function buildPayload(garageId, data) {
   const net = toNum(data.net)
   const vat = toNum(data.vat)
   return {
-    garage_id: garageId,
+    account_id: garageId,
     supplier: (data.supplier || '').trim(),
     purchase_date: data.purchase_date,
     description: (data.description || '').trim(),
