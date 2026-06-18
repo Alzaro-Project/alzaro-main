@@ -4,7 +4,7 @@ const { useState, useEffect } = React;
 /*  DEMO DATA  — replace with Supabase queries in phase 2             */
 /* ================================================================== */
 const DEMO = {
-  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "GOLD" },
+  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "PRO" },
   metrics: { revenue: 18450, outstanding: 3960, jobsToday: 6, jobsWeek: 23, quotesOpen: 8, quoteValue: 12400, certsDue: 3, customers: 64 },
   certificates: [
     { type: "Gas Safety (CP12)", ref: "Landlord cert", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
@@ -107,7 +107,7 @@ function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
       <div>
-        <h2 className="font-head" style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.4px" }}>{title}</h2>
+        <h2 className="font-head" style={{ fontSize: 27, fontWeight: 700 }}>{title}</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{sub}</div>
       </div>
       {right}
@@ -172,7 +172,7 @@ function Table({ cols, children }) {
 }
 const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)" }}>{children}</td>;
 
-const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
+const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%", colorScheme: "inherit" };
 const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 const formCard = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 };
 const demoBanner = { fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 };
@@ -397,7 +397,7 @@ function DashboardPage({ range, go, user }) {
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 16 }}>
-        <h2 className="font-head" style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.5px" }}>Dashboard</h2>
+        <h2 className="font-head" style={{ fontSize: 30, fontWeight: 700 }}>Dashboard</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
