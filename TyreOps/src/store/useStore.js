@@ -63,7 +63,6 @@ export const useStore = create(
       // --------------------------------------------------------
       user: null,
       tier: 'gold',
-      isAdmin: false,
       garageId: null,
       garageStatus: null,
       trialEnds: null,
@@ -92,16 +91,10 @@ export const useStore = create(
       // --------------------------------------------------------
       // AUTH ACTIONS
       // --------------------------------------------------------
-      login: async (email, isAdmin = false) => {
-        if (isAdmin) {
-          set({ user: { name: 'GarageIQ Admin', email }, isAdmin: true, tier: 'admin' })
-          return
-        }
-
+      login: async (email) => {
         // Clear any stale data from previous sessions before loading fresh data
         set({
           user: { name: email, email },
-          isAdmin: false,
           customers: [],
           invoices: [],
           skus: [],
@@ -185,7 +178,6 @@ export const useStore = create(
         set({
           user: null,
           tier: 'gold',
-          isAdmin: false,
           garageId: null,
           garageStatus: null,
           trialEnds: null,
@@ -669,7 +661,6 @@ export const useStore = create(
       partialize: (state) => ({
         user: state.user,
         tier: state.tier,
-        isAdmin: state.isAdmin,
         garageId: state.garageId,
         settings: state.settings,
         dashPeriod: state.dashPeriod,
