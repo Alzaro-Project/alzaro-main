@@ -1,104 +1,151 @@
 import { supabase } from './supabase'
 
+const PRODUCT = 'garageops'
+
+// ============================================================
+// HELPERS — merge product_members + product_settings into one "garage" object
+// ============================================================
+function mergeGarage(member, settings) {
+  if (!member) return null
+  return {
+    id: member.id,
+    user_id: member.user_id,
+    email: member.email,
+    product: member.product,
+    name: member.company_name || (settings && settings.name) || '',
+    tier: member.tier,
+    status: member.status,
+    trial_ends: member.trial_ends,
+    created_at: member.created_at,
+    ...(settings || {}),
+    // re-assert membership fields so settings can't shadow them
+    id: member.id,
+    user_id: member.user_id,
+    email: member.email,
+    name: member.company_name || (settings && settings.name) || '',
+    tier: member.tier,
+    status: member.status,
+    trial_ends: member.trial_ends,
+  }
+}
+
+async function fetchSettings(userId) {
+  const { data } = await supabase
+    .from('product_settings').select('*')
+    .eq('user_id', userId).eq('product', PRODUCT).maybeSingle()
+  return data || null
+}
+
 // ============================================================
 // ADMIN FUNCTIONS
 // ============================================================
 export async function checkIsAdmin(email) {
   const { data, error } = await supabase
-    .from('garage_users')
-    .select('is_admin')
+    .from('platform_admins')
+    .select('email')
     .eq('email', email)
-    .eq('is_admin', true)
-    .single()
-  
+    .eq('product', 'all')
+    .maybeSingle()
   if (error || !data) return false
-  return data.is_admin === true
+  return true
 }
 
 export async function getAllGarages() {
   const { data, error } = await supabase
-    .from('garages')
+    .from('product_members')
     .select('*')
+    .eq('product', PRODUCT)
     .order('created_at', { ascending: false })
-  
   if (error) throw error
   return data || []
 }
 
 export async function updateGarageTier(garageId, tier) {
   const { error } = await supabase
-    .from('garages')
+    .from('product_members')
     .update({ tier })
     .eq('id', garageId)
-  
   if (error) throw error
 }
 
 export async function updateGarageStatus(garageId, status) {
   const { error } = await supabase
-    .from('garages')
+    .from('product_members')
     .update({ status })
     .eq('id', garageId)
-  
   if (error) throw error
 }
 
 export async function deleteGarage(garageId) {
-  // Delete garage_users first (foreign key)
-  await supabase.from('garage_users').delete().eq('garage_id', garageId)
-  // Then delete the garage
-  const { error } = await supabase.from('garages').delete().eq('id', garageId)
+  // Child rows cascade via FK (garage_id -> product_members.id ON DELETE CASCADE)
+  const { error } = await supabase.from('product_members').delete().eq('id', garageId)
   if (error) throw error
 }
 
 // ============================================================
-// GARAGE
+// GARAGE  (membership + settings, merged)
 // ============================================================
 export async function getGarageByEmail(email) {
-  const { data: gu } = await supabase
-    .from('garage_users').select('garage_id').eq('email', email).single()
-  if (!gu) return null
-  const { data: garage } = await supabase
-    .from('garages').select('*').eq('id', gu.garage_id).single()
-  return garage
+  const { data: member } = await supabase
+    .from('product_members').select('*')
+    .eq('email', email).eq('product', PRODUCT).maybeSingle()
+  if (!member) return null
+  const settings = await fetchSettings(member.user_id)
+  return mergeGarage(member, settings)
 }
 
 // ============================================================
-// MULTI-PRODUCT (Option B)
-// ------------------------------------------------------------
-// One email can hold one garage per product. These helpers find
-// the garage for a specific product, and create one when an
-// existing Alzaro user joins this product for the first time.
+// MULTI-PRODUCT
 // ============================================================
 export async function getGarageForProduct(email, product) {
-  const { data: links, error: linkErr } = await supabase
-    .from('garage_users').select('garage_id').eq('email', email)
-  if (linkErr) throw linkErr
-  if (!links || links.length === 0) return null
-
-  const ids = links.map(l => l.garage_id)
-  const { data: garages, error: gErr } = await supabase
-    .from('garages').select('*').in('id', ids).eq('product', product)
-  if (gErr) throw gErr
-  return (garages && garages[0]) || null
+  const prod = product || PRODUCT
+  const { data: member, error } = await supabase
+    .from('product_members').select('*')
+    .eq('email', email).eq('product', prod).maybeSingle()
+  if (error) throw error
+  if (!member) return null
+  const settings = await fetchSettings(member.user_id)
+  return mergeGarage(member, settings)
 }
 
-// Creates a new trial garage for this product on the signed-in user's
-// account (via the join_product database function). Idempotent: if a
-// garage for this product already exists, its id is returned instead.
 export async function joinProduct(product, garageName) {
   const { data, error } = await supabase.rpc('join_product', {
     p_product: product,
     p_garage_name: garageName || '',
   })
   if (error) throw error
-  return data // new (or existing) garage id
+  return data
 }
 
+// Update business/settings. Membership fields -> product_members,
+// everything else -> product_settings (upserted, keyed by user_id+product).
 export async function updateGarage(garageId, updates) {
-  const { error } = await supabase.from('garages').update(updates).eq('id', garageId)
-  if (error) throw error
+  const MEMBER_FIELDS = ['tier', 'status', 'trial_ends', 'company_name', 'name']
+  const memberPatch = {}
+  const settingsPatch = {}
+
+  for (const [k, v] of Object.entries(updates)) {
+    if (k === 'name') { memberPatch.company_name = v }
+    else if (MEMBER_FIELDS.includes(k)) { memberPatch[k] = v }
+    else { settingsPatch[k] = v }
+  }
+
+  if (Object.keys(memberPatch).length) {
+    const { error } = await supabase.from('product_members').update(memberPatch).eq('id', garageId)
+    if (error) throw error
+  }
+
+  if (Object.keys(settingsPatch).length) {
+    const { data: member, error: mErr } = await supabase
+      .from('product_members').select('user_id').eq('id', garageId).single()
+    if (mErr) throw mErr
+    const { error } = await supabase
+      .from('product_settings')
+      .upsert({ user_id: member.user_id, product: PRODUCT, account_id: garageId, ...settingsPatch }, { onConflict: 'user_id,product' })
+    if (error) throw error
+  }
 }
+
 
 // ============================================================
 // SKUS  (TyreOps)
