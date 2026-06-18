@@ -29,9 +29,9 @@ export function usePurchases() {
         supabase.from('purchases').select('*').eq('garage_id', garageId)
           .order('purchase_date', { ascending: false })
           .order('created_at', { ascending: false }),
-        supabase.from('garages')
+        supabase.from('product_settings')
           .select('default_markup_pct')
-          .eq('id', garageId).single(),
+          .eq('account_id', garageId).maybeSingle(),
       ])
       if (pRes.error) throw pRes.error
       if (gRes.error) throw gRes.error
