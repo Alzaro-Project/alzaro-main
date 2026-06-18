@@ -33,8 +33,8 @@ export default function WelcomeBanner() {
   useEffect(() => {
     if (!garageId) return
     Promise.all([
-      supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('garage_id', garageId),
-      supabase.from('purchases').select('id', { count: 'exact', head: true }).eq('garage_id', garageId),
+      supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('account_id', garageId),
+      supabase.from('purchases').select('id', { count: 'exact', head: true }).eq('account_id', garageId),
     ]).then(([b, p]) => {
       setCounts({ bookings: b.count || 0, purchases: p.count || 0 })
     }).catch(() => {
