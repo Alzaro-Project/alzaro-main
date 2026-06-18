@@ -641,7 +641,7 @@ export default function Invoices() {
   useEffect(() => {
     if (!showModal || !garageId) { setUnbilledPurchases([]); return }
     supabase.from('purchases').select('*')
-      .eq('garage_id', garageId).is('invoice_id', null)
+      .eq('account_id', garageId).is('invoice_id', null)
       .then(({ data, error }) => {
         if (error) { console.error('Load unbilled purchases:', error); return }
         setUnbilledPurchases(data || [])
