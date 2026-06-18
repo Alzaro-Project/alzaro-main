@@ -28,7 +28,7 @@ export function useCatalog(table) {
       const { data, error: err } = await supabase
         .from(table)
         .select('*')
-        .eq('garage_id', garageId)
+        .eq('account_id', garageId)
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
       if (err) throw err
@@ -44,7 +44,7 @@ export function useCatalog(table) {
 
   const create = useCallback(async (data) => {
     if (!garageId) throw new Error('No garage')
-    const payload = { ...cleanNumbers(data), garage_id: garageId }
+    const payload = { ...cleanNumbers(data), account_id: garageId }
     if (!payload.name?.trim()) throw new Error('Name is required')
     payload.name = payload.name.trim()
     const { data: inserted, error: err } = await supabase
@@ -76,7 +76,7 @@ export function useCatalog(table) {
   const setDefault = useCallback(async (id) => {
     if (!garageId) throw new Error('No garage')
     const { error: clearErr } = await supabase
-      .from(table).update({ is_default: false }).eq('garage_id', garageId)
+      .from(table).update({ is_default: false }).eq('account_id', garageId)
     if (clearErr) throw clearErr
     const { error: setErr } = await supabase
       .from(table).update({ is_default: true }).eq('id', id)
