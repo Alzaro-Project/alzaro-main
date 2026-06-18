@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
-import { checkIsAdmin, getGarageForProduct, joinProduct } from '../lib/db'
+import { getGarageForProduct, joinProduct } from '../lib/db'
 
 export default function Login() {
   const [tab, setTab] = useState('login')
@@ -42,39 +42,30 @@ export default function Login() {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) throw err
       
-      // Check if user is admin
-      const isAdmin = await checkIsAdmin(email)
-      
-      if (isAdmin) {
-        // Admin login
-        login(email, true)
-        navigate('/admin')
-      } else {
-        // MULTI-PRODUCT — look for this login's TyreOps garage specifically.
-        // If they're an Alzaro user from another product (e.g. GarageOps),
-        // offer to start a separate TyreOps trial on the same login.
-        const garage = await getGarageForProduct(email, 'tyreops')
-if (!garage) {
-  // Fresh TyreOps signup: garage name was captured at registration.
-  // Auto-create the garage instead of asking again.
-  const { data: { user } } = await supabase.auth.getUser()
-  const signupGarageName = user?.user_metadata?.garage_name
-  const signupProduct = user?.user_metadata?.product
-  if (signupGarageName && signupProduct === 'tyreops') {
-    await joinProduct('tyreops', signupGarageName)
-    login(email, false)
-    navigate('/dashboard')
-    return
-  }
-  // Existing Alzaro user from another product — offer the join screen.
-  setJoinMode(true)
-  setLoading(false)
-  return
-}
-        // Regular garage login
-        login(email, false)
-        navigate('/dashboard')
+      // MULTI-PRODUCT — look for this login's TyreOps garage specifically.
+      // If they're an Alzaro user from another product (e.g. GarageOps),
+      // offer to start a separate TyreOps trial on the same login.
+      const garage = await getGarageForProduct(email, 'tyreops')
+      if (!garage) {
+        // Fresh TyreOps signup: garage name was captured at registration.
+        // Auto-create the garage instead of asking again.
+        const { data: { user } } = await supabase.auth.getUser()
+        const signupGarageName = user?.user_metadata?.garage_name
+        const signupProduct = user?.user_metadata?.product
+        if (signupGarageName && signupProduct === 'tyreops') {
+          await joinProduct('tyreops', signupGarageName)
+          login(email)
+          navigate('/dashboard')
+          return
+        }
+        // Existing Alzaro user from another product — offer the join screen.
+        setJoinMode(true)
+        setLoading(false)
+        return
       }
+      // Regular garage login
+      login(email)
+      navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -87,7 +78,7 @@ if (!garage) {
     setLoading(true); setError('')
     try {
       await joinProduct('tyreops', joinName.trim())
-      login(email, false)
+      login(email)
       navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Could not set up your TyreOps account')
