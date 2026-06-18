@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 
 export default function TrialGuard({ children }) {
   const user = useStore(s => s.user)
-  const isAdmin = useStore(s => s.isAdmin)
   const garageId = useStore(s => s.garageId)
   const [liveStatus, setLiveStatus] = useState(null)
   const [liveTrialEnds, setLiveTrialEnds] = useState(null)
@@ -12,7 +11,7 @@ export default function TrialGuard({ children }) {
 
   // Fetch fresh status from Supabase on mount and periodically
   useEffect(() => {
-    if (!garageId || isAdmin) {
+    if (!garageId) {
       setLoading(false)
       return
     }
@@ -40,11 +39,8 @@ export default function TrialGuard({ children }) {
     // Re-check status every 30 seconds in case admin changes it
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
-  }, [garageId, isAdmin])
+  }, [garageId])
 
-  // Admins bypass all checks
-  if (isAdmin) return children
-  
   // If no user, let the router handle redirect to login
   if (!user) return children
 
@@ -73,7 +69,7 @@ export default function TrialGuard({ children }) {
             Your account has been suspended. Please contact support to resolve this issue.
           </div>
           <div style={{ color: 'var(--text3)', fontSize: '13px' }}>
-            Email: support@garageiq.co.uk
+            Email: support@alzaro.co.uk
           </div>
           <button
             onClick={() => {
@@ -114,11 +110,11 @@ export default function TrialGuard({ children }) {
               Trial Expired
             </div>
             <div style={{ color: 'var(--text2)', marginBottom: '24px', lineHeight: 1.6 }}>
-              Your 14-day free trial has ended. Subscribe to continue using GarageIQ and access all your data.
+              Your 14-day free trial has ended. Subscribe to continue using TyreOps and access all your data.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <a 
-                href="mailto:support@garageiq.co.uk?subject=GarageIQ Subscription"
+                href="mailto:support@alzaro.co.uk?subject=TyreOps Subscription"
                 style={{ 
                   background: 'var(--accent)', 
                   color: '#000', 
@@ -141,7 +137,7 @@ export default function TrialGuard({ children }) {
                 Questions? Contact us:
               </div>
               <div style={{ color: 'var(--text2)', fontSize: '13px' }}>
-                support@garageiq.co.uk
+                support@alzaro.co.uk
               </div>
             </div>
             <button
