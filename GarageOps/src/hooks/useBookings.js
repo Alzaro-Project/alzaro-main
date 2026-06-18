@@ -28,9 +28,9 @@ export function useBookings() {
         supabase.from('bookings').select('*').eq('garage_id', garageId)
           .order('booking_date', { ascending: true })
           .order('start_time', { ascending: true }),
-        supabase.from('garages')
+        supabase.from('product_settings')
           .select('booking_slot_minutes, booking_day_start, booking_day_end')
-          .eq('id', garageId).single(),
+          .eq('account_id', garageId).maybeSingle(),
       ])
       if (bRes.error) throw bRes.error
       if (gRes.error) throw gRes.error
