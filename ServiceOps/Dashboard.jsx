@@ -107,8 +107,8 @@ function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
       <div>
-        <h2 style={{ fontSize: 19, fontWeight: 600 }}>{title}</h2>
-        <div style={{ fontSize: 13, color: "var(--txt-2)" }}>{sub}</div>
+        <h2 className="font-head" style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.4px" }}>{title}</h2>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{sub}</div>
       </div>
       {right}
     </div>
@@ -124,12 +124,17 @@ function Btn({ icon, label, primary }) {
   );
 }
 
-function Metric({ label, value, sub, color, subColor }) {
+function Metric({ label, value, sub, color, subColor, onClick }) {
+  const [hover, setHover] = useState(false);
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
-      <div style={{ fontSize: 10, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 10 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 600, fontFamily: "Sora,sans-serif", color }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)", marginTop: 5 }}>{sub}</div>
+    <div onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px", cursor: onClick ? "pointer" : "default", transition: "border-color .15s", borderColor: hover && onClick ? color : "var(--line)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span className="mono" style={{ fontSize: 10, fontWeight: 500, letterSpacing: ".8px", color: "var(--txt-2)", textTransform: "uppercase" }}>{label}</span>
+        {onClick && <span style={{ fontSize: 13, color, opacity: hover ? 1 : 0.35, transform: hover ? "translateX(2px)" : "none", transition: "all .2s" }}>→</span>}
+      </div>
+      <div className="mono" style={{ fontSize: 25, fontWeight: 500, color }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)", marginTop: 4 }}>{sub}</div>
     </div>
   );
 }
@@ -396,13 +401,13 @@ function DashboardPage({ range, go, user }) {
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" />
-        <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" />
-        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" />
-        <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" />
+        <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
+        <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
+        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("jobs")} />
+        <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Revenue — last 6 months">
+        <Panel title="Revenue — last 6 months" action="View invoices →" onAction={() => go("invoicing")}>
           <svg viewBox="0 0 380 140" style={{ width: "100%", height: 120 }}>
             <line x1="0" y1="108" x2="380" y2="108" stroke="var(--line)" strokeWidth="1" />
             {series.map((s, i) => {
@@ -1591,7 +1596,7 @@ function ReportsPage() {
   return (
     <div className="fade-in" style={{ position: "relative" }}>
       <PageHead title="Reports" sub={`Showing: ${periodLabel}`}
-        right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
+        right={<div style={{ display: "flex", gap: 5, fontSize: 12 }}>{periods.map((p) => <span key={p} onClick={() => setPeriod(p)} style={{ cursor: "pointer", padding: "7px 14px", borderRadius: 7, fontWeight: p === period ? 600 : 500, color: p === period ? "var(--txt)" : "var(--txt-2)", background: p === period ? "var(--surface3)" : "transparent", border: "0.5px solid " + (p === period ? "var(--line)" : "transparent") }}>{p}</span>)}</div>} />
       {period === "Custom" && (
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 18, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 14 }}>
           <label style={fld}>From<input style={{ ...inp, width: 170 }} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -2095,7 +2100,7 @@ function Dashboard({ user, signOut }) {
             {active === "dashboard" && (
               <div style={{ marginBottom: 18 }}>
                 <div style={{ display: "flex", gap: 5, fontSize: 12, flexWrap: "wrap" }}>
-                  {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+                  {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: r === range ? 600 : 500, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--surface3)" : "transparent", border: r === range ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>{r}</span>)}
                 </div>
                 {range === "Custom" && (
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginTop: 10, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 12, width: "fit-content" }}>
