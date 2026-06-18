@@ -1725,7 +1725,7 @@ function AuthScreen() {
         setBusy(false);
         return setMsg("An Alzaro account with this email already exists (from another Alzaro product). Enter that account's password here to activate ServiceOps on it — the password you entered didn't match.");
       }
-      await db.from("svc_licences").insert([{ user_id: si.user.id }]); // duplicate-safe: errors ignored below
+      await db.from("product_members").insert([{ user_id: si.user.id, email: si.user.email, product: "serviceops", company_name: company.trim() }]); // duplicate-safe: errors ignored
       setBusy(false);
       window.location.href = "/serviceops/login"; // fresh load → straight into the app
       return;
@@ -2164,22 +2164,55 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
 /* ================================================================== */
 /* Shown to Alzaro accounts from other products that don't have ServiceOps yet */
 function ActivateScreen({ user, signOut }) {
+  const [company, setCompany] = useState(user?.user_metadata?.company_name || "");
   const [busy, setBusy] = useState(false);
-  const goRegister = async () => {
+  const [msg, setMsg] = useState("");
+
+  const doJoin = async () => {
+    setMsg("");
+    if (!company.trim()) return setMsg("Please enter your company name.");
     setBusy(true);
-    await db.auth.signOut();
-    window.location.href = "/serviceops/register";
+    const { error } = await db.from("product_members").insert([{
+      user_id: user.id,
+      email: user.email,
+      product: "serviceops",
+      company_name: company.trim(),
+    }]);
+    setBusy(false);
+    if (error) return setMsg(error.message || "Could not set up your ServiceOps account.");
+    window.location.href = "/serviceops/login"; // fresh load → straight into the app
   };
+
+  const inp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 430, maxWidth: "100%", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
-        <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 20 }}>
+      <div className="fade-in" style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 440, maxWidth: "100%", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
+        <div style={{ textAlign: "center", marginBottom: 6 }}>
+          <div className="brand" style={{ fontSize: 22, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
+        </div>
         <div style={{ width: 54, height: 54, borderRadius: 14, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", margin: "18px auto 16px" }}><i className="ti ti-rocket" style={{ fontSize: 26 }} /></div>
-        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>This account isn't registered for ServiceOps</div>
-        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but ServiceOps needs its own registration.</div>
-        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Register now to start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> — no card needed.</div>
-        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
-        <div onClick={signOut} style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 16, cursor: "pointer" }}>Not you? <span style={{ color: "var(--brand)" }}>Sign out</span></div>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>You're already with Alzaro</div>
+          <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--txt)" }}>{user.email}</strong> is registered to another
+            Alzaro product. Start a separate <strong style={{ color: "var(--brand)" }}>14-day
+            ServiceOps trial</strong> on this same login? Your other products and their data
+            stay completely separate.
+          </div>
+        </div>
+
+        {msg && (
+          <div style={{ background: "var(--red-soft)", border: "1px solid var(--red)", borderRadius: 8, padding: "11px 14px", fontSize: 13, color: "var(--red)", marginBottom: 14 }}>{msg}</div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input style={inp} placeholder="Business name for ServiceOps *" value={company} onChange={(e) => setCompany(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doJoin()} autoFocus />
+          <button onClick={doJoin} disabled={busy} style={primaryBtn}>{busy ? "Setting up…" : "Start ServiceOps Trial →"}</button>
+          <button onClick={signOut} disabled={busy} style={{ background: "none", border: "none", color: "var(--txt-3)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Not now — sign me out</button>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center" }}>Separate trial · Separate subscription · No card required</div>
+        </div>
       </div>
     </div>
   );
@@ -2196,16 +2229,18 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // membership gate: does this account have a ServiceOps licence?
+  // membership gate: does this account have a ServiceOps membership?
   useEffect(() => {
     if (!session || !DB_READY) { setMember(undefined); return; }
-    db.from("svc_licences").select("user_id").eq("user_id", session.user.id).then(async ({ data }) => {
-      if ((data || []).length > 0) { setMember(true); return; }
+    db.from("product_members").select("id").eq("user_id", session.user.id).eq("product", "serviceops").maybeSingle().then(async ({ data, error }) => {
+      if (error) { console.error("Membership check:", error); setMember(false); return; }
+      if (data) { setMember(true); return; }
       // registered via the ServiceOps register page? auto-activate silently
       const meta = session.user.user_metadata || {};
       if (meta.product === "serviceops") {
-        await db.from("svc_licences").insert([{ user_id: session.user.id }]);
-        setMember(true);
+        const { error: insErr } = await db.from("product_members").insert([{ user_id: session.user.id, email: session.user.email, product: "serviceops", company_name: meta.company_name || "My Company" }]);
+        setMember(!insErr);
+        if (insErr) console.error("Auto-join:", insErr);
       } else {
         setMember(false);
       }
