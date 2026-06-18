@@ -51,10 +51,11 @@
     /* dark-mode-safe form controls (fixes invisible date pickers) */
     html{color-scheme:dark;}
     body.light{color-scheme:light;}
-    input,select,textarea{color:var(--txt); background:var(--panel-2); font-family:inherit;}
-    input[type="date"],input[type="time"]{color-scheme:inherit;}
-    body:not(.light) input[type="date"]::-webkit-calendar-picker-indicator,
-    body:not(.light) input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.7);}
+    input,select,textarea{color:var(--txt); background:var(--panel-2); font-family:'Plus Jakarta Sans',sans-serif;}
+    body:not(.light) input[type="date"],
+    body:not(.light) input[type="time"]{color-scheme:dark;}
+    body.light input[type="date"],
+    body.light input[type="time"]{color-scheme:light;}
     select option{background:var(--panel); color:var(--txt);}
     @media (max-width: 768px){
       /* stack all multi-column form grids into one column */
