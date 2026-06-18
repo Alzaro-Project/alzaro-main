@@ -53,9 +53,9 @@
     body.light{color-scheme:light;}
     input,select,textarea{color:var(--txt); background:var(--panel-2); font-family:'Plus Jakarta Sans',sans-serif;}
     body:not(.light) input[type="date"],
-    body:not(.light) input[type="time"]{color-scheme:dark;}
+    body:not(.light) input[type="time"]{color-scheme:dark !important;}
     body.light input[type="date"],
-    body.light input[type="time"]{color-scheme:light;}
+    body.light input[type="time"]{color-scheme:light !important;}
     select option{background:var(--panel); color:var(--txt);}
     @media (max-width: 768px){
       /* stack all multi-column form grids into one column */
