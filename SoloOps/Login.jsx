@@ -6,8 +6,6 @@
 // ============================================================
 const { useState } = React
 
-// Emails listed here go to the admin dashboard instead of the normal one.
-const ADMIN_EMAILS = ['mohammmed250052@gmail.com']
 
 function Login() {
   const [tab, setTab] = useState(window.__START_TAB === 'register' ? 'register' : 'login')
@@ -36,9 +34,6 @@ function Login() {
     try {
       const { data, error: err } = await window.sb.auth.signInWithPassword({ email, password })
       if (err) throw err
-
-      const isAdmin = ADMIN_EMAILS.includes(email.trim().toLowerCase())
-      if (isAdmin) { goTo('/soloops/admin'); return }
 
       // Multi-vertical: an account may exist (via any Alzaro product) but
       // must have SIGNED UP for SoloOps. We check the soloops_access table.
