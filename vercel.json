@@ -333,11 +333,11 @@
     },
     {
       "source": "/propertyops",
-      "destination": "/PropertyOps/index.html"
+      "destination": "/PropertyOps/landing.html"
     },
     {
       "source": "/PropertyOps",
-      "destination": "/PropertyOps/index.html"
+      "destination": "/PropertyOps/landing.html"
     },
     {
       "source": "/stockops",
