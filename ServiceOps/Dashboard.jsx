@@ -44,9 +44,7 @@ const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year", "Cus
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
 const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
-/* ================================================================== */
-/*  SHARED COMPONENTS                                                 */
-/* ================================================================== */
+// SHARED COMPONENTS
 function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
@@ -272,12 +270,8 @@ function CustomerPropertyPicker({ user, customers, properties, reloadCustomers, 
   );
 }
 
-/* ================================================================== */
-/*  DASHBOARD                                                         */
-/* ================================================================== */
-/* ================================================================== */
-/*  WELCOME / ONBOARDING BANNER                                       */
-/* ================================================================== */
+// DASHBOARD
+// WELCOME / ONBOARDING BANNER
 function WelcomeBanner({ d, go, user }) {
   const SUCCESS = "#22c55e";
   const key = user ? `svc_welcome_dismissed_${user.id}` : "svc_welcome_dismissed";
@@ -295,8 +289,7 @@ function WelcomeBanner({ d, go, user }) {
     { id: "quote", label: "Create your first quote", done: (d.quotes || []).length > 0, page: "quotes" },
     { id: "invoice", label: "Raise your first invoice", done: (d.invoices || []).length > 0, page: "invoicing" },
   ];
-  // "Set up business details" counts as done once the user has done anything else,
-  // since ServiceOps has no single settings flag — keeps the checklist honest.
+  // "Settings" ticks once any other step is done (no single settings flag exists).
   steps[0].done = steps.slice(1).some((s) => s.done);
 
   const completed = steps.filter((s) => s.done).length;
@@ -474,9 +467,7 @@ function DashboardPage({ range, go, user }) {
   );
 }
 
-/* ================================================================== */
-/*  CUSTOMERS                                                         */
-/* ================================================================== */
+// CUSTOMERS
 function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
@@ -670,9 +661,7 @@ function CustomerDetail({ customer, onClose, go }) {
     </div>
   );
 }
-/* ================================================================== */
-/*  PROPERTIES                                                        */
-/* ================================================================== */
+// PROPERTIES
 function PropertiesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [confirmNode, ask] = useConfirm();
@@ -777,7 +766,6 @@ function PropertiesPage({ user }) {
   );
 }
 
-/* ================================================================== */
 function QuotesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -870,9 +858,7 @@ function QuotesPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  JOBS  (kanban)                                                    */
-/* ================================================================== */
+// JOBS  (kanban)
 
 /* Dialog: raise an invoice against a job (Deposit / Part / Final / Full) */
 function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
@@ -1086,9 +1072,7 @@ function JobsPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  DIARY  (week view)                                                */
-/* ================================================================== */
+// DIARY  (week view)
 function DiaryPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1190,9 +1174,7 @@ function DiaryPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  INVOICING                                                         */
-/* ================================================================== */
+// INVOICING
 function InvoicingPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1286,9 +1268,7 @@ function InvoicingPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  CERTIFICATES                                                      */
-/* ================================================================== */
+// CERTIFICATES
 function CertificatesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1390,9 +1370,7 @@ function CertificatesPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  DOCUMENTS                                                         */
-/* ================================================================== */
+// DOCUMENTS
 const DOC_BUCKET = "svc-documents";
 const fmtSize = (b) => b == null ? "—" : b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
 const iconFor = (cat, name) => {
@@ -1555,9 +1533,7 @@ function DocumentsPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  REPORTS  (+ click-to-preview)                                     */
-/* ================================================================== */
+// REPORTS  (+ click-to-preview)
 function ReportPreview({ report, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
@@ -1642,9 +1618,7 @@ function ReportsPage() {
   );
 }
 
-/* ================================================================== */
-/*  SETTINGS                                                          */
-/* ================================================================== */
+// SETTINGS
 function SettingsPage() {
   const sections = [
     { title: "Business", icon: "ti-building", rows: [["Trading name", "Alzaro Trade Services"], ["VAT number", "GB 123 4567 89"], ["Plan", "Pro"]] },
@@ -1674,9 +1648,7 @@ function SettingsPage() {
   );
 }
 
-/* ================================================================== */
-/*  AUTH SCREEN  (login + sign up)                                    */
-/* ================================================================== */
+// AUTH SCREEN  (login + sign up)
 function AuthScreen() {
   const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register" || window.location.pathname.endsWith("/register"));
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");
@@ -1819,9 +1791,7 @@ function AuthScreen() {
   );
 }
 
-/* ================================================================== */
-/*  APP SHELL                                                         */
-/* ================================================================== */
+// APP SHELL
 const PAGES = {
   customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
@@ -2056,9 +2026,7 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
   );
 }
 
-/* ================================================================== */
-/*  ROOT — decides: login screen or dashboard                         */
-/* ================================================================== */
+// ROOT — decides: login screen or dashboard
 /* Shown to Alzaro accounts from other products that don't have ServiceOps yet */
 function ActivateScreen({ user, signOut }) {
   const [company, setCompany] = useState(user?.user_metadata?.company_name || "");
