@@ -210,6 +210,67 @@ const propLabel = (props, id) => { const p = props.find((x) => String(x.id) === 
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
+/* ================================================================== */
+/*  WELCOME / ONBOARDING BANNER                                       */
+/* ================================================================== */
+function WelcomeBanner({ data, go, user }) {
+  const SUCCESS = "#22c55e";
+  const key = user ? `prop_welcome_dismissed_${user.id}` : "prop_welcome_dismissed";
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
+  });
+  const dismiss = () => {
+    try { localStorage.setItem(key, "1"); } catch (e) {}
+    setDismissed(true);
+  };
+
+  const steps = [
+    { id: "settings", label: "Set up your business details", done: false, page: "settings" },
+    { id: "property", label: "Add your first property", done: (data.props || []).length > 0, page: "properties" },
+    { id: "compliance", label: "Track a compliance certificate", done: (data.comp || []).length > 0, page: "compliance" },
+    { id: "tenant", label: "Add your first tenant", done: false, page: "tenants" },
+  ];
+  // Tenants aren't loaded on the dashboard; treat "add a tenant" as done once a
+  // let property exists (a let property implies a tenant). Settings counts as
+  // done once anything else is, since there's no single settings flag.
+  steps[3].done = (data.props || []).some((p) => p.status === "Let");
+  steps[0].done = steps.slice(1).some((s) => s.done);
+
+  const completed = steps.filter((s) => s.done).length;
+  const total = steps.length;
+  const allDone = completed === total;
+
+  if (dismissed || allDone) return null;
+
+  return (
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "20px 22px", marginBottom: 14, position: "relative" }}>
+      <button onClick={dismiss} title="Dismiss" style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", color: "var(--txt-3)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+
+      <div style={{ marginBottom: 14 }}>
+        <h3 className="font-head" style={{ color: "var(--brand)", fontSize: 19, fontWeight: 700, margin: "0 0 3px 0" }}>👋 Welcome to PropertyOps</h3>
+        <div style={{ color: "var(--txt-2)", fontSize: 13 }}>Let's get you set up — {completed} of {total} complete</div>
+      </div>
+
+      <div style={{ height: 6, background: "var(--line-2)", borderRadius: 3, overflow: "hidden", marginBottom: 16 }}>
+        <div style={{ height: "100%", width: `${(completed / total) * 100}%`, background: "var(--brand)", transition: "width .3s ease" }} />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {steps.map((step) => (
+          <div key={step.id} onClick={() => go(step.page)}
+            style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: `0.5px solid ${step.done ? SUCCESS : "var(--line)"}`, borderRadius: 9, padding: "11px 14px", cursor: "pointer", transition: "border-color .15s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--brand)")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = step.done ? SUCCESS : "var(--line)")}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: step.done ? SUCCESS : "transparent", border: step.done ? "none" : "2px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff", fontSize: 13, fontWeight: 700 }}>{step.done ? "✓" : ""}</div>
+            <span style={{ color: step.done ? "var(--txt-3)" : "var(--txt)", fontSize: 13.5, textDecoration: step.done ? "line-through" : "none", flex: 1 }}>{step.label}</span>
+            <span style={{ color: "var(--txt-3)", fontSize: 14 }}>→</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DashboardPage({ range, go, user }) {
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
@@ -259,6 +320,7 @@ function DashboardPage({ range, go, user }) {
 
   return (
     <div className="fade-in">
+      <WelcomeBanner data={data} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Compliance Score" value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Rent Arrears" value={gbp(arrears)} sub={`${arrearsCount} overdue`} color={arrears ? "var(--red)" : "var(--green)"} />
