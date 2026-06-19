@@ -106,11 +106,16 @@ export default function GlobalSearch({
     if (onResultClick) {
       onResultClick(result)
     } else {
-      // Default navigation
+      // Default navigation — carry the record id so the target page can
+      // open / highlight it instead of just showing the bare list.
       if (result.type === 'customer') {
-        navigate('/customers')
+        navigate(`/customers?focus=${encodeURIComponent(result.item.id)}`, {
+          state: { focusCustomerId: result.item.id },
+        })
       } else if (result.type === 'invoice') {
-        navigate('/invoices')
+        navigate(`/invoices?focus=${encodeURIComponent(result.item.id)}`, {
+          state: { focusInvoiceId: result.item.id },
+        })
       }
     }
     setShowResults(false)
