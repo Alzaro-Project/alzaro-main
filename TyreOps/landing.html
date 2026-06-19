@@ -183,13 +183,14 @@
     .mini p{font-size:13px;color:var(--text2);line-height:1.7}
 
     /* PRICING */
-    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:stretch}
     .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
     .plan:hover{transform:translateY(-3px)}
     .plan.popular{border-color:rgba(59,130,246,0.45);background:linear-gradient(180deg,rgba(59,130,246,0.06),var(--surface) 40%)}
     .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--blue);color:#fff;border-radius:5px;padding:4px 12px}
     .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
     .tier-dot{width:9px;height:9px;border-radius:50%}
+    .basic .tier-dot{background:#6b7280}
     .bronze .tier-dot{background:#cd7f32}
     .silver .tier-dot{background:#c0c0c0}
     .gold .tier-dot{background:var(--amber)}
@@ -440,6 +441,20 @@
       <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold features. No card required, cancel any time.</p>
     </div>
     <div class="plans">
+      <div class="plan basic reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Basic</div>
+        <div class="plan-price"><b>£40</b><span>/month</span></div>
+        <p class="plan-desc">For solo operators trying things out.</p>
+        <ul>
+          <li>10 invoices/month</li>
+          <li>Basic inventory</li>
+          <li>FIFO automatic pricing</li>
+          <li>1 user</li>
+          <li class="off">Used tyre tracking</li>
+          <li class="off">VAT margin scheme</li>
+        </ul>
+        <a href="/tyreops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
       <div class="plan bronze reveal">
         <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
         <div class="plan-price"><b>£60</b><span>/month</span></div>
@@ -663,6 +678,7 @@
           
           <h3>Pricing tiers</h3>
           <ul>
+            <li><strong>Basic:</strong> £40/month</li>
             <li><strong>Bronze:</strong> £60/month</li>
             <li><strong>Silver:</strong> £75/month</li>
             <li><strong>Gold:</strong> £90/month</li>
