@@ -33,6 +33,11 @@
       "permanent": true
     },
     {
+      "source": "/PropertyOps",
+      "destination": "/propertyops",
+      "permanent": true
+    },
+    {
       "source": "/PropertyOps/:path((?!dist).*)",
       "destination": "/propertyops/:path",
       "permanent": true
@@ -333,10 +338,6 @@
     },
     {
       "source": "/propertyops",
-      "destination": "/PropertyOps/landing.html"
-    },
-    {
-      "source": "/PropertyOps",
       "destination": "/PropertyOps/landing.html"
     },
     {
