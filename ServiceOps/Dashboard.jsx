@@ -275,6 +275,65 @@ function CustomerPropertyPicker({ user, customers, properties, reloadCustomers, 
 /* ================================================================== */
 /*  DASHBOARD                                                         */
 /* ================================================================== */
+/* ================================================================== */
+/*  WELCOME / ONBOARDING BANNER                                       */
+/* ================================================================== */
+function WelcomeBanner({ d, go, user }) {
+  const SUCCESS = "#22c55e";
+  const key = user ? `svc_welcome_dismissed_${user.id}` : "svc_welcome_dismissed";
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
+  });
+  const dismiss = () => {
+    try { localStorage.setItem(key, "1"); } catch (e) {}
+    setDismissed(true);
+  };
+
+  const steps = [
+    { id: "settings", label: "Set up your business details", done: false, page: "settings" },
+    { id: "customer", label: "Add your first customer", done: (d.customers || []).length > 0, page: "customers" },
+    { id: "quote", label: "Create your first quote", done: (d.quotes || []).length > 0, page: "quotes" },
+    { id: "invoice", label: "Raise your first invoice", done: (d.invoices || []).length > 0, page: "invoicing" },
+  ];
+  // "Set up business details" counts as done once the user has done anything else,
+  // since ServiceOps has no single settings flag — keeps the checklist honest.
+  steps[0].done = steps.slice(1).some((s) => s.done);
+
+  const completed = steps.filter((s) => s.done).length;
+  const total = steps.length;
+  const allDone = completed === total;
+
+  if (dismissed || allDone) return null;
+
+  return (
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "20px 22px", marginBottom: 14, position: "relative" }}>
+      <button onClick={dismiss} title="Dismiss" style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", color: "var(--txt-3)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+
+      <div style={{ marginBottom: 14 }}>
+        <h3 className="font-head" style={{ color: "var(--brand)", fontSize: 19, fontWeight: 700, margin: "0 0 3px 0" }}>👋 Welcome to ServiceOps</h3>
+        <div style={{ color: "var(--txt-2)", fontSize: 13 }}>Let's get you set up — {completed} of {total} complete</div>
+      </div>
+
+      <div style={{ height: 6, background: "var(--line-2)", borderRadius: 3, overflow: "hidden", marginBottom: 16 }}>
+        <div style={{ height: "100%", width: `${(completed / total) * 100}%`, background: "var(--brand)", transition: "width .3s ease" }} />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {steps.map((step) => (
+          <div key={step.id} onClick={() => go(step.page)}
+            style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: `0.5px solid ${step.done ? SUCCESS : "var(--line)"}`, borderRadius: 9, padding: "11px 14px", cursor: "pointer", transition: "border-color .15s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--brand)")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = step.done ? SUCCESS : "var(--line)")}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: step.done ? SUCCESS : "transparent", border: step.done ? "none" : "2px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff", fontSize: 13, fontWeight: 700 }}>{step.done ? "✓" : ""}</div>
+            <span style={{ color: step.done ? "var(--txt-3)" : "var(--txt)", fontSize: 13.5, textDecoration: step.done ? "line-through" : "none", flex: 1 }}>{step.label}</span>
+            <span style={{ color: "var(--txt-3)", fontSize: 14 }}>→</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DashboardPage({ range, go, user }) {
   const [d, setD] = useState(null); // { customers, quotes, jobs, invoices }
 
@@ -345,6 +404,7 @@ function DashboardPage({ range, go, user }) {
         <h2 className="font-head" style={{ fontSize: 30, fontWeight: 700 }}>Dashboard</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
+      <WelcomeBanner d={d} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
         <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
