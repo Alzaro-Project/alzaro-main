@@ -50,12 +50,25 @@ export function usePurchases() {
   const createPurchase = useCallback(async (data) => {
     if (!garageId) throw new Error('No garage')
     const payload = buildPayload(garageId, data)
+
     const { data: inserted, error: insErr } = await supabase
-      .from('purchases').insert(payload).select().single()
-    if (insErr) throw insErr
+      .from('purchases').insert(payload).select().maybeSingle()
+
+    if (insErr) {
+      console.error('createPurchase insert error:', insErr)
+      throw new Error(insErr.message || insErr.details || insErr.hint || 'Could not save purchase')
+    }
+
+    // If RLS allows the insert but blocks the select-back, `inserted` is null.
+    // The row still saved — refetch so it appears, rather than looking failed.
+    if (!inserted) {
+      await fetchAll()
+      return null
+    }
+
     setPurchases(prev => [inserted, ...prev].sort(byDateDesc))
     return inserted
-  }, [garageId])
+  }, [garageId, fetchAll])
 
   // ------- UPDATE -------
   const updatePurchase = useCallback(async (id, updates) => {
@@ -102,7 +115,7 @@ function buildPayload(garageId, data) {
     vat,
     gross: round2(net + vat),
     payment_status: data.payment_status || 'paid',
-    customer_id: data.customer_id || null,
+    customer_id: isUuid(data.customer_id) ? data.customer_id : null,
     customer_name: data.customer_name?.trim() || null,
     vehicle_reg: data.vehicle_reg?.trim().toUpperCase() || null,
     invoice_id: data.invoice_id || null,
@@ -113,6 +126,11 @@ function buildPayload(garageId, data) {
 function toNum(v) {
   const n = parseFloat(v)
   return Number.isFinite(n) ? round2(n) : 0
+}
+
+function isUuid(v) {
+  return typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
 }
 
 function round2(n) {
