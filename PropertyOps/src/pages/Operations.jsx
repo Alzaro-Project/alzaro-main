@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Btn, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td } from "../components/UI.jsx";
 import { REPORTS, buildReport, gbp, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
