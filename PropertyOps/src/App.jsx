@@ -133,7 +133,7 @@ function Dashboard({ user, signOut }) {
         <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
         <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 18 }}>Property Operations Pro</div>
         {/* business name (real DB data, not email) */}
-        <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
         {/* tier badge with crown icon */}
         <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 16px" }}>
           <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
