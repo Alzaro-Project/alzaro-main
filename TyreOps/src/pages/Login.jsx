@@ -9,7 +9,10 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [garageName, setGarageName] = useState('')
-  const [tier, setTier] = useState('gold')
+  const [tier, setTier] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('plan')
+    return ['basic', 'bronze', 'silver', 'gold'].includes(p) ? p : 'gold'
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -108,7 +111,8 @@ export default function Login() {
         options: {
           data: {
             garage_name: garageName.trim(),
-            product: 'tyreops'
+            product: 'tyreops',
+            plan: tier
           },
           emailRedirectTo: `${siteUrl}/confirmed?product=tyreops`
         }
