@@ -4,7 +4,6 @@ const CATEGORIES = ['Fuel','Travel','Software','Marketing','Equipment','Insuranc
 const CAT_COLORS = { Software:'#f97316', Fuel:'#f59e0b', Marketing:'#3b82f6', Equipment:'#22c55e', Travel:'#eab308', Insurance:'#a78bfa', Utilities:'#38bdf8', 'Professional Services':'#fb7185', 'Office Costs':'#94a3b8', Other:'#68635d' }
 const gbp = n => '£' + (Number(n)||0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
-// ---- styles ----
 const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }
 const inp = { background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'11px 14px', color:'var(--text)', fontSize:'14px', outline:'none', width:'100%' }
 const grad = 'linear-gradient(135deg, var(--orange), var(--amber))'
@@ -17,7 +16,6 @@ const NAV = [
   ['reports','Reports'], ['documents','Documents'], ['tax','Tax'], ['settings','Settings']
 ]
 
-// ---- Welcome / onboarding banner ----
 function WelcomeBanner({ invoices, expenses, clients, bizName, setView, setModal, uid }) {
   const SUCCESS = '#22c55e'
   const key = uid ? `solo_welcome_dismissed_${uid}` : 'solo_welcome_dismissed'
@@ -71,7 +69,7 @@ function WelcomeBanner({ invoices, expenses, clients, bizName, setView, setModal
 }
 
 function App() {
-  const [session, setSession] = useState(undefined) // undefined=loading, null=logged out
+  const [session, setSession] = useState(undefined)
   const [view, setView] = useState('dashboard')
   const [yearFilter, setYearFilter] = useState('all')
   const [rangeFrom, setRangeFrom] = useState('')
@@ -83,14 +81,13 @@ function App() {
   const [bizName, setBizName] = useState('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null) // 'expense' | 'invoice' | null
+  const [modal, setModal] = useState(null)
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState('dark')
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light')
   }, [theme])
 
-  // ---- auth gate ----
   useEffect(() => {
     window.sb.auth.getSession().then(({ data }) => {
       setSession(data.session || null)
@@ -99,11 +96,9 @@ function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  // ---- load live data once logged in ----
   const loadAll = async () => {
     setLoading(true)
-    // Access gate: this account must have signed up for SoloOps.
-    // (Stops someone reaching dashboard.html directly with a non-SoloOps account.)
+
     const { data: sess } = await window.sb.auth.getSession()
     const uid = sess?.session?.user?.id
     if (uid) {
@@ -133,12 +128,10 @@ function App() {
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
   const signOut = async () => { await window.sb.auth.signOut(); window.location.href = '/soloops/login' }
 
-  // ---- adjustable tax rates (user-set, stored on account) ----
   const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
   const [nicRate, setNicRate] = useState(session?.user?.user_metadata?.nic_rate ?? 9)
   const [allowance, setAllowance] = useState(session?.user?.user_metadata?.tax_allowance ?? 12570)
 
-  // ---- year filter ----
   const yOf = d => (d||'').slice(0,4)
   const availableYears = [...new Set([
     ...invoices.map(i=>yOf(i.issue_date)),
@@ -158,7 +151,6 @@ function App() {
   const fExpenses = expenses.filter(e=>inYear(e.spent_on))
   const fMileage  = mileage.filter(m=>inYear(m.journey_date))
 
-  // ---- derived totals (year-filtered) ----
   const revenue = fInvoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
   const totalExp = fExpenses.reduce((s,e)=>s+Number(e.amount||0),0)
   const profit = revenue - totalExp
@@ -166,7 +158,6 @@ function App() {
   const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
   const outstanding = fInvoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
 
-  // category breakdown
   const byCat = {}
   fExpenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
   const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
@@ -175,14 +166,14 @@ function App() {
     return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
 
   if (session === null) {
-    // not logged in → bounce to login
+
     window.location.href = '/soloops/login'
     return null
   }
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
-      {/* SIDEBAR */}
+
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
         <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
@@ -206,7 +197,6 @@ function App() {
           )
         })()}
 
-        {/* search */}
         <div style={{ position:'relative', padding:'0 4px 12px', flexShrink:0 }}>
           <input
             value={search}
@@ -256,9 +246,8 @@ function App() {
         <button onClick={signOut} style={{...btnSec, width:'100%', flexShrink:0}}>Sign out</button>
       </aside>
 
-      {/* MAIN */}
       <div style={{ minWidth:0 }}>
-        {/* topbar */}
+
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
           <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
@@ -284,7 +273,6 @@ function App() {
         <div style={{ padding:'28px' }} className="fade-in">
           {loading ? <div style={{color:'var(--text2)'}}>Loading your data…</div> : <>
 
-          {/* ===== DASHBOARD ===== */}
           {view==='dashboard' && <>
             <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={session.user.id} />
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
@@ -294,7 +282,6 @@ function App() {
               <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
             </div>
 
-            {/* monthly revenue vs expenses chart */}
             <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
@@ -318,7 +305,6 @@ function App() {
             </div>
           </>}
 
-          {/* ===== INCOME ===== */}
           {view==='income' && (
             <div style={card}>
               {fInvoices.length===0 ? <Empty msg="No income yet. Click “+ Income” to add one." />
@@ -334,12 +320,10 @@ function App() {
             </div>
           )}
 
-          {/* ===== CLIENTS ===== */}
           {view==='clients' && (
             <Clients uid={session.user.id} clients={clients} invoices={invoices} onChange={loadAll} flash={flash} />
           )}
 
-          {/* ===== EXPENSES ===== */}
           {view==='expenses' && (
             <div style={card}>
               {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
@@ -355,35 +339,29 @@ function App() {
             </div>
           )}
 
-          {/* ===== BANKING / CSV IMPORT ===== */}
           {view==='banking' && (
             <BankImport uid={session.user.id} existingExpenses={expenses} onImported={()=>{loadAll();flash('Transactions imported')}} />
           )}
 
-          {/* ===== RECURRING / SUBSCRIPTIONS ===== */}
           {view==='recurring' && (
             <Recurring expenses={expenses} />
           )}
 
-          {/* ===== RECEIPTS / MATCHING ===== */}
           {view==='receipts' && (
             <Receipts uid={session.user.id} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
           )}
 
-          {/* ===== REPORTS ===== */}
           {view==='reports' && (
             <Reports invoices={invoices} expenses={expenses} mileage={mileage} />
           )}
 
-          {/* ===== DOCUMENTS ===== */}
           {view==='documents' && (
             <Documents uid={session.user.id} invoices={invoices} expenses={expenses} />
           )}
 
-          {/* ===== MILEAGE ===== */}
           {view==='mileage' && (() => {
             const totalMiles = fMileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
-            // HMRC AMAP: 45p/mile first 10,000 miles, 25p after (cars/vans)
+
             const first = Math.min(totalMiles, 10000)
             const over = Math.max(0, totalMiles - 10000)
             const claim = first * 0.45 + over * 0.25
@@ -435,7 +413,6 @@ function App() {
             )
           })()}
 
-          {/* ===== TAX ===== */}
           {view==='tax' && (
             <>
             <div style={{ background:'var(--amber-soft, rgba(245,158,11,0.1))', border:'1px solid rgba(245,158,11,0.3)', borderRadius:'12px', padding:'14px 18px', marginBottom:'16px', fontSize:'13px', color:'var(--text2)', lineHeight:1.6 }}>
@@ -479,7 +456,6 @@ function App() {
             </>
           )}
 
-          {/* ===== SETTINGS ===== */}
           {view==='settings' && (
             <Settings session={session} signOut={signOut} flash={flash} />
           )}
@@ -488,20 +464,17 @@ function App() {
         </div>
       </div>
 
-      {/* MODALS */}
       {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={session.user.id} expenses={expenses} />}
       {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={session.user.id} invoices={invoices} clients={clients} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={session.user.id} mileage={mileage} />}
 
-      {/* TOAST */}
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
   )
 }
 
-// ---------- small components ----------
 function useCountUp(value, duration=900) {
-  // animate numbers in £x,xxx or plain-number strings up from 0
+
   const [display, setDisplay] = React.useState(value)
   React.useEffect(() => {
     const m = String(value).match(/-?[\d,]+(\.\d+)?/)
@@ -609,17 +582,15 @@ function Donut({ rows }) {
 }
 function Empty({msg}) { return <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text3)', fontSize:'14px' }}>{msg}</div> }
 
-// Date field that accepts BOTH typed input (DD/MM/YYYY or YYYY-MM-DD) and the calendar.
-// Stores value as YYYY-MM-DD (what the DB expects).
 function DateField({ value, onChange, style }) {
   const toText = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return d&&m&&y ? `${d}/${m}/${y}` : iso }
   const [text, setText] = React.useState(toText(value))
   React.useEffect(()=>{ setText(toText(value)) }, [value])
   const parse = (t) => {
     t = t.trim()
-    let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)      // DD/MM/YYYY
+    let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)
     if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`
-    m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)          // YYYY-MM-DD
+    m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)
     if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`
     return null
   }
@@ -649,14 +620,12 @@ function Status({s}) {
 function Line({label,v,bold}) { return <div style={{ display:'flex', justifyContent:'space-between', padding:'9px 0', fontSize:'14px' }}><span style={{color:'var(--text2)'}}>{label}</span><span className="mono" style={{fontWeight:bold?700:500}}>{v}</span></div> }
 function Check({ok,t}) { return <div style={{ display:'flex', alignItems:'center', gap:'12px', fontSize:'14px', padding:'8px 0' }}><span style={{ width:'22px', height:'22px', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', background: ok?'rgba(34,197,94,.12)':'var(--surface3)', color: ok?'var(--green)':'var(--text3)', fontWeight:700, fontSize:'13px' }}>{ok?'✓':'!'}</span>{t}</div> }
 
-// ---------- add-expense form (with smart category suggestion) ----------
 function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
   const [amount,setAmount]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
 
-  // smart suggestion: check learned rules as user types merchant
   const suggest = async (m) => {
     setMerchant(m)
     if (m.length < 3) return
@@ -671,7 +640,7 @@ function ExpenseForm({onClose,onSaved,uid,expenses}) {
       user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual'
     })
     if(error){ setErr(error.message); setBusy(false); return }
-    // learn the rule so future merchants auto-categorise
+
     await window.sb.from('soloops_rules').upsert({ user_id:uid, pattern:merchant.trim().split(' ')[0].toUpperCase(), category }, { onConflict:'user_id,pattern', ignoreDuplicates:true }).then(()=>{}).catch(()=>{})
     onSaved()
   }
@@ -688,7 +657,6 @@ function ExpenseForm({onClose,onSaved,uid,expenses}) {
   </Modal>
 }
 
-// ---------- add-invoice form ----------
 function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
   const [client,setClient]=useState(''); const [number,setNumber]=useState('')
   const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
@@ -755,7 +723,6 @@ function Modal({title,children,onClose}) {
 }
 function ErrBox({m}) { return <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)', marginBottom:'14px' }}>{m}</div> }
 
-// ---------- REPORTS ----------
 function Reports({ invoices, expenses, mileage }) {
   const [msg, setMsg] = React.useState('')
 
@@ -770,8 +737,8 @@ function Reports({ invoices, expenses, mileage }) {
     setMsg('Downloaded ' + filename); setTimeout(()=>setMsg(''), 2500)
   }
 
-  const ym = d => (d||'').slice(0,7)            // YYYY-MM
-  const yr = d => (d||'').slice(0,4)            // YYYY
+  const ym = d => (d||'').slice(0,7)
+  const yr = d => (d||'').slice(0,4)
   const quarter = d => { const m = parseInt((d||'0-0').slice(5,7)); return 'Q' + (Math.ceil(m/3)||0) }
   const sum = (arr,f) => arr.reduce((s,x)=>s+(Number(f(x))||0),0)
 
@@ -779,7 +746,6 @@ function Reports({ invoices, expenses, mileage }) {
   const totalRev = sum(paid, i=>i.total)
   const totalExp = sum(expenses, e=>e.amount)
 
-  // group helper
   const groupBy = (arr, keyFn, valFn) => {
     const g = {}
     arr.forEach(x => { const k = keyFn(x); g[k] = (g[k]||0) + (Number(valFn(x))||0) })
@@ -884,7 +850,6 @@ function Reports({ invoices, expenses, mileage }) {
   )
 }
 
-// ---------- DOCUMENTS ----------
 function Documents({ uid, invoices, expenses }) {
   const [q, setQ] = React.useState('')
   const [files, setFiles] = React.useState([])
@@ -892,7 +857,7 @@ function Documents({ uid, invoices, expenses }) {
   const [busy, setBusy] = React.useState(false)
   const [docType, setDocType] = React.useState('Statement')
   const [err, setErr] = React.useState('')
-  const [preview, setPreview] = React.useState(null) // {url, name, isImage, isPdf}
+  const [preview, setPreview] = React.useState(null)
 
   const load = () => {
     setLoading(true)
@@ -1006,7 +971,6 @@ function Documents({ uid, invoices, expenses }) {
   )
 }
 
-// ---------- RECEIPT MATCHING ----------
 function Receipts({ uid, expenses, onMatched }) {
   const [fileObj, setFileObj] = React.useState(null)
   const [fileName, setFileName] = React.useState('')
@@ -1050,20 +1014,20 @@ function Receipts({ uid, expenses, onMatched }) {
     setBusy(true); setErr('')
     try {
       let storagePath = null
-      // Upload the actual file to Storage (if one was chosen)
+
       if (fileObj) {
         const safe = fileObj.name.replace(/[^a-zA-Z0-9._-]/g, '_')
         storagePath = `${uid}/${crypto.randomUUID()}-${safe}`
         const { error: upErr } = await window.sb.storage
           .from('soloops-files').upload(storagePath, fileObj)
         if (upErr) throw upErr
-        // record it in the documents index
+
         await window.sb.from('soloops_documents').insert({
           user_id: uid, type: 'Receipt', name: fileObj.name,
           storage_path: storagePath, size_bytes: fileObj.size, expense_id: expenseId
         })
       }
-      // flag the expense as having a receipt
+
       const { error } = await window.sb.from('soloops_expenses')
         .update({ has_receipt: true, receipt_name: fileName || 'receipt' })
         .eq('id', expenseId)
@@ -1150,17 +1114,15 @@ function Receipts({ uid, expenses, onMatched }) {
   )
 }
 
-// ---------- RECURRING / SUBSCRIPTION DETECTION ----------
 function Recurring({ expenses }) {
-  // normalise a merchant name so "ADOBE UK" and "ADOBE *SUB" group together
+
   const norm = (m) => (m||'')
     .toUpperCase()
-    .replace(/[^A-Z0-9 ]/g, ' ')      // strip punctuation
+    .replace(/[^A-Z0-9 ]/g, ' ')
     .replace(/\b(LTD|LIMITED|UK|USA|COM|SUBSCRIPTION|SUB|PAYMENT|DD|BACS|CARD|LONDON)\b/g, '')
     .replace(/\s+/g, ' ').trim()
-    .split(' ').slice(0, 2).join(' ')  // first two significant words
+    .split(' ').slice(0, 2).join(' ')
 
-  // group expenses by normalised merchant
   const groups = {}
   expenses.forEach(e => {
     const key = norm(e.merchant)
@@ -1169,7 +1131,6 @@ function Recurring({ expenses }) {
     groups[key].items.push(e)
   })
 
-  // a group is "recurring" if it appears 2+ times
   const recurring = Object.values(groups)
     .filter(g => g.items.length >= 2)
     .map(g => {
@@ -1180,7 +1141,7 @@ function Recurring({ expenses }) {
         label: g.label,
         category: g.category,
         count: g.items.length,
-        monthly: avg,            // treat the typical charge as the monthly cost
+        monthly: avg,
         annual: avg * 12,
         lastSeen: dates[dates.length - 1] || '—',
         confidence: g.items.length >= 3 ? 'Confirmed' : 'Possible',
@@ -1236,9 +1197,8 @@ function Recurring({ expenses }) {
   )
 }
 
-// ---------- BANK CSV IMPORT ----------
 function BankImport({ uid, existingExpenses, onImported }) {
-  const [stage, setStage] = React.useState('upload') // upload | map | review | done
+  const [stage, setStage] = React.useState('upload')
   const [rows, setRows] = React.useState([])
   const [headers, setHeaders] = React.useState([])
   const [map, setMap] = React.useState({ date:'', desc:'', amount:'', debit:'', credit:'' })
@@ -1247,7 +1207,6 @@ function BankImport({ uid, existingExpenses, onImported }) {
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
 
-  // load the user's merchant rules so we can auto-categorise
   React.useEffect(() => {
     window.sb.from('soloops_rules').select('*').then(({ data }) => setRules(data || []))
   }, [])
@@ -1263,7 +1222,7 @@ function BankImport({ uid, existingExpenses, onImported }) {
         if (!res.data.length) { setErr('That file looks empty.'); return }
         const hs = res.meta.fields || Object.keys(res.data[0])
         setHeaders(hs); setRows(res.data)
-        // auto-detect columns
+
         setMap({
           date:   guess(['date'], hs),
           desc:   guess(['description','desc','reference','memo','details','narrative','payee'], hs),
@@ -1283,7 +1242,6 @@ function BankImport({ uid, existingExpenses, onImported }) {
     return hit ? hit.category : 'Other'
   }
 
-  // turn mapped rows into review items (debits = expenses)
   const buildReview = () => {
     if (!map.date || !map.desc || (!map.amount && !map.debit)) {
       setErr('Please choose at least Date, Description, and an Amount (or Debit) column.'); return
@@ -1297,10 +1255,10 @@ function BankImport({ uid, existingExpenses, onImported }) {
       if (map.debit && r[map.debit]) amt = Math.abs(parseFloat(String(r[map.debit]).replace(/[^0-9.\-]/g,''))) || 0
       else if (map.amount && r[map.amount]) {
         const v = parseFloat(String(r[map.amount]).replace(/[^0-9.\-]/g,'')) || 0
-        amt = v < 0 ? Math.abs(v) : 0   // negative = money out = expense
+        amt = v < 0 ? Math.abs(v) : 0
       }
-      if (amt <= 0 || !desc) return  // skip income/blank rows
-      // normalise date to YYYY-MM-DD where possible
+      if (amt <= 0 || !desc) return
+
       let d = (r[map.date]||'').trim()
       const dt = new Date(d)
       if (!isNaN(dt)) d = dt.toISOString().slice(0,10)
@@ -1327,7 +1285,7 @@ function BankImport({ uid, existingExpenses, onImported }) {
       }))
       const { error } = await window.sb.from('soloops_expenses').insert(payload)
       if (error) throw error
-      // learn rules from confirmed categorisations (first word of merchant)
+
       const ruleRows = chosen
         .filter(it => it.category && it.category !== 'Other')
         .map(it => ({ user_id: uid, pattern: (it.merchant.split(' ')[0]||'').toUpperCase(), category: it.category }))
@@ -1433,7 +1391,6 @@ function BankImport({ uid, existingExpenses, onImported }) {
   )
 }
 
-// ---------- SETTINGS ----------
 function Settings({ session, signOut, flash }) {
   const [name, setName] = React.useState(session.user.user_metadata?.business_name || '')
   const [address, setAddress] = React.useState(session.user.user_metadata?.company_address || '')
@@ -1514,7 +1471,6 @@ function Settings({ session, signOut, flash }) {
       {msg && <div style={{ gridColumn:'1/-1', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'10px', padding:'12px 16px', fontSize:'13.5px', color:'var(--green)' }}>✓ {msg}</div>}
       {err && <div style={{ gridColumn:'1/-1' }}><ErrBox m={err} /></div>}
 
-      {/* Profile */}
       <div data-card style={card}>
         <div style={sectionTitle}>Business profile</div>
         <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on your invoices.</div>
@@ -1543,7 +1499,6 @@ function Settings({ session, signOut, flash }) {
         <button style={{...btnPri, opacity:busy==='name'?.7:1}} disabled={busy==='name'} onClick={saveName}>{busy==='name'?'Saving…':'Save business details'}</button>
       </div>
 
-      {/* Account / email */}
       <div data-card style={card}>
         <div style={sectionTitle}>Login email</div>
         <div style={{ marginBottom:'12px' }}>
@@ -1554,7 +1509,6 @@ function Settings({ session, signOut, flash }) {
         <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'8px' }}>You'll get a confirmation link at the new address.</div>
       </div>
 
-      {/* Password */}
       <div data-card style={card}>
         <div style={sectionTitle}>Change password</div>
         <input style={{...inp, marginBottom:'10px'}} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="New password (min 6)" />
@@ -1562,7 +1516,6 @@ function Settings({ session, signOut, flash }) {
         <button style={{...btnPri, opacity:busy==='pw'?.7:1}} disabled={busy==='pw'} onClick={savePw}>{busy==='pw'?'Saving…':'Change password'}</button>
       </div>
 
-      {/* Billing */}
       <div data-card style={card}>
         <div style={sectionTitle}>Billing &amp; plan</div>
         <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>Gold</strong> · 14-day trial.</div>
@@ -1586,9 +1539,8 @@ function Settings({ session, signOut, flash }) {
   )
 }
 
-// ---------- CLIENTS ----------
 function Clients({ uid, clients, invoices, onChange, flash }) {
-  const [editing, setEditing] = React.useState(null) // client obj or 'new' or null
+  const [editing, setEditing] = React.useState(null)
   const [selected, setSelected] = React.useState(null)
   const blank = { name:'', email:'', phone:'', address:'', notes:'' }
   const [form, setForm] = React.useState(blank)
@@ -1675,7 +1627,6 @@ function Clients({ uid, clients, invoices, onChange, flash }) {
         </table>}
       </div>
 
-      {/* edit modal */}
       {editing!==null && (
         <Modal title={editing==='new'?'New client':'Edit client'} onClose={()=>setEditing(null)}>
           {err && <ErrBox m={err} />}
