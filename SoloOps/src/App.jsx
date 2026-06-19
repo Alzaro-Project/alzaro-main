@@ -1,0 +1,440 @@
+import React, { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
+import {
+  getSession, onAuthChange, signOut as dbSignOut, getAccess,
+  loadInvoices, loadExpenses, loadMileage, loadClients,
+  updateUser,
+} from './lib/db.js'
+import { NAV, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
+import { MonthlyChart, Donut } from './components/Charts.jsx'
+import WelcomeBanner from './components/WelcomeBanner.jsx'
+import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
+
+import Clients from './pages/Clients.jsx'
+import BankImport from './pages/BankImport.jsx'
+import Recurring from './pages/Recurring.jsx'
+import Receipts from './pages/Receipts.jsx'
+import Reports from './pages/Reports.jsx'
+import Documents from './pages/Documents.jsx'
+import Settings from './pages/Settings.jsx'
+import Login from './pages/Login.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
+
+const VALID_VIEWS = NAV.map(n => n[0])
+
+function Shell() {
+  const navigate = useNavigate()
+  const { view: routeView } = useParams()
+  const view = VALID_VIEWS.includes(routeView) ? routeView : 'dashboard'
+  const setView = (v) => navigate(`/${v}`)
+
+  const [session, setSession] = useState(undefined)
+  const [yearFilter, setYearFilter] = useState('all')
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo, setRangeTo] = useState('')
+  const [invoices, setInvoices] = useState([])
+  const [expenses, setExpenses] = useState([])
+  const [mileage, setMileage] = useState([])
+  const [clients, setClients] = useState([])
+  const [bizName, setBizName] = useState('')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(null)
+  const [toast, setToast] = useState('')
+  const [theme, setTheme] = useState('dark')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light')
+  }, [theme])
+
+  useEffect(() => {
+    getSession().then((s) => setSession(s || null))
+    const sub = onAuthChange((_e, s) => setSession(s))
+    return () => sub?.unsubscribe?.()
+  }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    const sess = await getSession()
+    const uid = sess?.user?.id
+    if (uid) {
+      const access = await getAccess(uid)
+      if (!access) {
+        await dbSignOut()
+        window.location.href = '/soloops/login'
+        return
+      }
+      setBizName(access.business_name || '')
+    }
+    const [inv, exp, mil, cli] = await Promise.all([
+      loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
+    ])
+    setInvoices(inv || [])
+    setExpenses(exp || [])
+    setMileage(mil || [])
+    setClients(cli || [])
+    setLoading(false)
+  }
+  useEffect(() => { if (session) loadAll() }, [session])
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
+  const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
+
+  const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
+  const [nicRate, setNicRate] = useState(session?.user?.user_metadata?.nic_rate ?? 9)
+  const [allowance, setAllowance] = useState(session?.user?.user_metadata?.tax_allowance ?? 12570)
+
+  const yOf = d => (d||'').slice(0,4)
+  const availableYears = [...new Set([
+    ...invoices.map(i=>yOf(i.issue_date)),
+    ...expenses.map(e=>yOf(e.spent_on)),
+    ...mileage.map(m=>yOf(m.journey_date)),
+  ].filter(Boolean))].sort().reverse()
+  const inYear = (d) => {
+    if (!d) return false
+    if (yearFilter === 'custom') {
+      if (rangeFrom && d < rangeFrom) return false
+      if (rangeTo && d > rangeTo) return false
+      return true
+    }
+    return yearFilter==='all' || yOf(d)===yearFilter
+  }
+  const fInvoices = invoices.filter(i=>inYear(i.issue_date))
+  const fExpenses = expenses.filter(e=>inYear(e.spent_on))
+  const fMileage  = mileage.filter(m=>inYear(m.journey_date))
+
+  const revenue = fInvoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
+  const totalExp = fExpenses.reduce((s,e)=>s+Number(e.amount||0),0)
+  const profit = revenue - totalExp
+  const taxable = Math.max(0, profit - Number(allowance||0))
+  const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
+  const outstanding = fInvoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
+
+  const byCat = {}
+  fExpenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
+  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
+
+  if (session === undefined)
+    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
+
+  if (session === null) {
+    window.location.href = '/soloops/login'
+    return null
+  }
+
+  const uid = session.user.id
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
+
+      <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
+        <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
+
+        {(() => {
+          const TIER_META = {
+            bronze: { icon:'🥉', color:'#b36b1a', bg:'rgba(180,100,30,0.12)', border:'rgba(180,100,30,0.25)' },
+            silver: { icon:'🥈', color:'#9ca3af', bg:'rgba(100,100,120,0.12)', border:'rgba(100,100,120,0.25)' },
+            gold:   { icon:'👑', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.25)' },
+          }
+          const name = bizName || session.user.user_metadata?.business_name || session.user.email.split('@')[0]
+          const tier = (session.user.user_metadata?.tier || 'gold').toLowerCase()
+          const tm = TIER_META[tier] || TIER_META.gold
+          return (
+            <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
+              <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
+                <span>{tm.icon}</span>{tier}
+              </span>
+            </div>
+          )
+        })()}
+
+        <div style={{ position:'relative', padding:'0 4px 12px', flexShrink:0 }}>
+          <input
+            value={search}
+            onChange={e=>setSearch(e.target.value)}
+            placeholder="🔍  Search…"
+            style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', padding:'10px 12px', color:'var(--text)', fontSize:'13px', outline:'none' }}
+          />
+          {search.trim().length >= 2 && (() => {
+            const q = search.trim().toLowerCase()
+            const hits = []
+            clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'clients' }) })
+            invoices.forEach(i => { if ((`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q)) hits.push({ type:'Invoice', label:`${i.number||'—'} · ${i.client_name||''}`, view:'income' }) })
+            expenses.forEach(e => { if ((`${e.merchant||''} ${e.category||''}`).toLowerCase().includes(q)) hits.push({ type:'Expense', label:`${e.merchant} · ${gbp(e.amount)}`, view:'expenses' }) })
+            const top = hits.slice(0, 8)
+            return (
+              <div style={{ position:'absolute', left:'4px', right:'4px', top:'46px', zIndex:50, background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'12px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', overflow:'hidden', maxHeight:'340px', overflowY:'auto' }}>
+                {top.length === 0
+                  ? <div style={{ padding:'14px', fontSize:'12.5px', color:'var(--text3)' }}>No matches for “{search}”.</div>
+                  : top.map((h, idx) => (
+                    <div key={idx} onClick={()=>{ setView(h.view); setSearch('') }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'10px 12px', cursor:'pointer', borderBottom:'1px solid var(--border)', fontSize:'13px' }}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{h.label}</span>
+                      <span style={{ flexShrink:0, fontSize:'10px', color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h.type}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            )
+          })()}
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
+          {NAV.map(([k,label]) => (
+            <div key={k} data-nav onClick={()=>setView(k)} style={{
+              padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
+              color: view===k ? 'var(--text)' : 'var(--text2)',
+              background: view===k ? 'var(--surface3)' : 'transparent',
+              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent'
+            }}>{label}</div>
+          ))}
+        </div>
+        <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
+        <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
+          {theme==='dark' ? '☀ Light mode' : '🌙 Dark mode'}
+        </button>
+        <button onClick={signOut} style={{...btnSec, width:'100%', flexShrink:0}}>Sign out</button>
+      </aside>
+
+      <div style={{ minWidth:0 }}>
+
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
+          <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
+          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+            {view!=='clients' && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+              <option value="all">All years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              <option value="custom">Custom range…</option>
+            </select>}
+            {view!=='clients' && yearFilter==='custom' && (
+              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+                <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
+                <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
+                <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)} title="To" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
+              </div>
+            )}
+            {['dashboard','income','expenses'].includes(view) && <>
+              <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
+              <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
+            </>}
+          </div>
+        </div>
+
+        <div style={{ padding:'28px' }} className="fade-in">
+          {loading ? <div style={{color:'var(--text2)'}}>Loading your data…</div> : <>
+
+          {view==='dashboard' && <>
+            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
+              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
+              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>
+              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
+              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
+            </div>
+
+            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
+              <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
+                <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
+                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
+                {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
+                  : <Donut rows={catRows} />}
+              </div>
+              <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+                  <div style={{fontWeight:700}}>Outstanding invoices</div>
+                  <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
+                </div>
+                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Awaiting payment</div>
+                {fInvoices.filter(i=>i.status!=='paid').length===0 ? <Empty msg="No outstanding invoices." />
+                  : fInvoices.filter(i=>i.status!=='paid').slice(0,6).map(i => (
+                  <Row key={i.id} left={i.client_name||'—'} mid={i.number||''} right={gbp(i.total)} status={i.status} />
+                ))}
+              </div>
+            </div>
+          </>}
+
+          {view==='income' && (
+            <div style={card}>
+              {fInvoices.length===0 ? <Empty msg="No income yet. Click “+ Income” to add one." />
+              : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead><Th cols={['Reference','Client','Issued','Total','Status']} /></thead>
+                <tbody>{fInvoices.map(i => (
+                  <tr key={i.id}>
+                    <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
+                    <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
+                    <Td right><Status s={i.status}/></Td>
+                  </tr>))}</tbody>
+              </table>}
+            </div>
+          )}
+
+          {view==='clients' && (
+            <Clients uid={uid} clients={clients} invoices={invoices} onChange={loadAll} flash={flash} />
+          )}
+
+          {view==='expenses' && (
+            <div style={card}>
+              {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
+              : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
+                <tbody>{fExpenses.map(e => (
+                  <tr key={e.id}>
+                    <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
+                    <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
+                    <Td mono right>{gbp(e.amount)}</Td>
+                  </tr>))}</tbody>
+              </table>}
+            </div>
+          )}
+
+          {view==='banking' && (
+            <BankImport uid={uid} existingExpenses={expenses} onImported={()=>{loadAll();flash('Transactions imported')}} />
+          )}
+
+          {view==='recurring' && (
+            <Recurring expenses={expenses} />
+          )}
+
+          {view==='receipts' && (
+            <Receipts uid={uid} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
+          )}
+
+          {view==='reports' && (
+            <Reports invoices={invoices} expenses={expenses} mileage={mileage} />
+          )}
+
+          {view==='documents' && (
+            <Documents uid={uid} invoices={invoices} expenses={expenses} />
+          )}
+
+          {view==='mileage' && (() => {
+            const totalMiles = fMileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
+            const first = Math.min(totalMiles, 10000)
+            const over = Math.max(0, totalMiles - 10000)
+            const claim = first * 0.45 + over * 0.25
+            const downloadReport = () => {
+              const rows = [['Date','From','To','Purpose','Miles']]
+              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
+              rows.push([])
+              rows.push(['Total miles', totalMiles])
+              rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
+              rows.push(['Over 10,000 miles @ 25p', (over*0.25).toFixed(2)])
+              rows.push(['Total claim (GBP)', claim.toFixed(2)])
+              const csv = rows.map(r => r.join(',')).join('\n')
+              const blob = new Blob([csv], { type:'text/csv' })
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(blob)
+              a.download = 'soloops-mileage-report.csv'
+              a.click()
+            }
+            return (
+            <>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+                <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
+                <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
+                <KPI label="Journeys" value={mileage.length} />
+              </div>
+              <div style={card}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+                  <div>
+                    <div style={{fontWeight:700}}>Mileage log</div>
+                    <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
+                  </div>
+                  <div style={{ display:'flex', gap:'10px' }}>
+                    {fMileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
+                    <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
+                  </div>
+                </div>
+                {fMileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
+                : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
+                  <tbody>{fMileage.map(m => (
+                    <tr key={m.id}>
+                      <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
+                      <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
+                      <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
+                    </tr>))}</tbody>
+                </table>}
+              </div>
+            </>
+            )
+          })()}
+
+          {view==='tax' && (
+            <>
+            <div style={{ background:'var(--amber-soft, rgba(245,158,11,0.1))', border:'1px solid rgba(245,158,11,0.3)', borderRadius:'12px', padding:'14px 18px', marginBottom:'16px', fontSize:'13px', color:'var(--text2)', lineHeight:1.6 }}>
+              <strong style={{color:'var(--amber)'}}>⚠ Estimate only — not tax advice.</strong> These figures are a rough guide based on simplified UK rates and your recorded income and expenses. They are not a substitute for professional advice or an official HMRC calculation. Always confirm your actual liability with an accountant or HMRC before filing.
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
+              <div style={card}>
+                <div style={{fontWeight:700, marginBottom:'4px'}}>Estimated tax</div>
+                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Using your own rates — adjust below</div>
+                <Line label="Taxable profit (after allowance)" v={gbp(taxable)} />
+                <Line label={`Income tax (est. @ ${taxRate}%)`} v={gbp(taxable*(Number(taxRate||0)/100))} />
+                <Line label={`National Insurance (est. @ ${nicRate}%)`} v={gbp(taxable*(Number(nicRate||0)/100))} />
+                <div style={{ borderTop:'1px solid var(--border)', marginTop:'10px', paddingTop:'12px' }}>
+                  <Line label="Total estimated" v={gbp(estTax)} bold />
+                </div>
+              </div>
+              <div style={card}>
+                <div style={{fontWeight:700, marginBottom:'16px'}}>Your tax rates</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'14px' }}>
+                  <div>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Income tax %</div>
+                    <input style={inp} type="number" value={taxRate} onChange={e=>setTaxRate(e.target.value)} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>NIC %</div>
+                    <input style={inp} type="number" value={nicRate} onChange={e=>setNicRate(e.target.value)} />
+                  </div>
+                  <div style={{ gridColumn:'1/-1' }}>
+                    <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Tax-free allowance (£)</div>
+                    <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
+                  </div>
+                </div>
+                <button style={btnSec} onClick={async()=>{ await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
+                <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
+                <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
+                <Check ok={invoices.length>0} t="Income recorded" />
+                <Check ok={expenses.length>0} t="Expenses recorded" />
+                <Check ok={mileage.length>0} t="Mileage logged" />
+              </div>
+            </div>
+            </>
+          )}
+
+          {view==='settings' && (
+            <Settings session={session} signOut={signOut} flash={flash} />
+          )}
+
+          </>}
+        </div>
+      </div>
+
+      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={uid} expenses={expenses} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={uid} invoices={invoices} clients={clients} />}
+      {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
+
+      {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/soloops">
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/:view" element={<Shell />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
