@@ -161,6 +161,15 @@ function AppLayout() {
 
 export default function App() {
   const user = useStore(s => s.user)
+  const reloadData = useStore(s => s.reloadData)
+
+  // On a page refresh, the user is restored from localStorage but the
+  // data lists are not — re-fetch them once on mount so the app isn't
+  // empty until the next sign-in.
+  useEffect(() => {
+    if (user?.email) reloadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <BrowserRouter basename="/garageops">
