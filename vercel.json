@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
+  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build && cd ../PropertyOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
     {
@@ -30,6 +30,11 @@
     {
       "source": "/ServiceOps/:path((?!dist).*)",
       "destination": "/serviceops/:path",
+      "permanent": true
+    },
+    {
+      "source": "/PropertyOps/:path((?!dist).*)",
+      "destination": "/propertyops/:path",
       "permanent": true
     }
   ],
@@ -272,15 +277,59 @@
     },
     {
       "source": "/propertyops/login",
-      "destination": "/PropertyOps/app.html"
+      "destination": "/PropertyOps/dist/index.html"
     },
     {
       "source": "/propertyops/register",
-      "destination": "/PropertyOps/app.html"
+      "destination": "/PropertyOps/dist/index.html"
     },
     {
-      "source": "/propertyops/:file((?!login|register).+\\..+)",
-      "destination": "/PropertyOps/:file"
+      "source": "/propertyops/forgot-password",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/reset-password",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/dashboard",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/properties",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/compliance",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/tenants",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/maintenance",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/finance",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/documents",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/reports",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/settings",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/:file((?!login|register|forgot-password|reset-password|dashboard|properties|compliance|tenants|maintenance|finance|documents|reports|settings).+\\..+)",
+      "destination": "/PropertyOps/dist/:file"
     },
     {
       "source": "/propertyops",
