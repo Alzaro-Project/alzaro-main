@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard } from '../components/UI'
 import { getAllGarages, updateGarageTier, updateGarageStatus, deleteGarage } from '../lib/db'
 
-const TIER_PRICE = { bronze: 60, silver: 75, gold: 90 }
+const TIER_PRICE = { basic: 40, bronze: 60, silver: 75, gold: 90 }
 
 export default function Admin() {
   const { isAdmin } = useStore()
@@ -68,7 +68,7 @@ export default function Admin() {
   const mrr = activeGarages.reduce((a, g) => a + (TIER_PRICE[g.tier] || 0), 0)
   const arr = mrr * 12
   
-  const tierCounts = { bronze: 0, silver: 0, gold: 0 }
+  const tierCounts = { basic: 0, bronze: 0, silver: 0, gold: 0 }
   garages.forEach(g => { if (tierCounts[g.tier] !== undefined) tierCounts[g.tier]++ })
 
   // Format date helper
@@ -137,14 +137,14 @@ export default function Admin() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '18px' }}>
         <Card>
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '14px' }}>Tier Breakdown</div>
-          {['bronze', 'silver', 'gold'].map(t => {
+          {['basic', 'bronze', 'silver', 'gold'].map(t => {
             const pct = garages.length ? Math.round(tierCounts[t] / garages.length * 100) : 0
-            const col = t === 'bronze' ? '#cd7f32' : t === 'silver' ? '#c0c0c0' : 'var(--accent)'
+            const col = t === 'basic' ? '#6b7280' : t === 'bronze' ? '#cd7f32' : t === 'silver' ? '#c0c0c0' : 'var(--accent)'
             const revenue = tierCounts[t] * TIER_PRICE[t]
             return (
               <div key={t} style={{ marginBottom: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
-                  <span style={{ fontWeight: 600 }}>{t === 'bronze' ? '🥉' : t === 'silver' ? '🥈' : '🥇'} {t.charAt(0).toUpperCase() + t.slice(1)}</span>
+                  <span style={{ fontWeight: 600 }}>{t === 'basic' ? '⚪' : t === 'bronze' ? '🥉' : t === 'silver' ? '🥈' : '🥇'} {t.charAt(0).toUpperCase() + t.slice(1)}</span>
                   <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{tierCounts[t]} · £{revenue}/mo</span>
                 </div>
                 <div style={{ height: '5px', background: 'var(--surface3)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -213,6 +213,7 @@ export default function Admin() {
                           value={g.tier || 'bronze'} 
                           onChange={e => handleTierChange(g.id, e.target.value)}
                         >
+                          <option value="basic">⚪ Basic</option>
                           <option value="bronze">🥉 Bronze</option>
                           <option value="silver">🥈 Silver</option>
                           <option value="gold">🥇 Gold</option>
