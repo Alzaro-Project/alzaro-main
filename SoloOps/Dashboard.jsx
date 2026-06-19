@@ -1,10 +1,3 @@
-// ============================================================
-//  Alzaro SoloOps — Dashboard
-//  Loaded by app.html via <script type="text/babel">.
-//  Uses CDN globals (React, ReactDOM) + window.sb from supabase.js.
-//  Reads LIVE data from soloops_* tables. Includes auth gate
-//  and add-forms for expenses & invoices.
-// ============================================================
 const { useState, useEffect } = React
 
 const CATEGORIES = ['Fuel','Travel','Software','Marketing','Equipment','Insurance','Utilities','Professional Services','Office Costs','Other']
