@@ -3,6 +3,7 @@
 
 /* ---- DARK (default) ---- */
 :root, :root[data-theme='dark'] {
+  color-scheme: dark;
   --bg: #0d0d10;
   --surface: #16161a;
   --surface2: #1e1e24;
@@ -26,6 +27,7 @@
 
 /* ---- LIGHT ---- */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #f7f6f9;
   --surface: #ffffff;
   --surface2: #f3f1f6;
@@ -56,3 +58,24 @@ body {
 }
 .font-head { font-family: 'Syne', sans-serif; }
 .font-mono { font-family: 'DM Mono', monospace; }
+
+/* Native date/time pickers follow the active theme so the calendar
+   icon stays visible in dark mode. */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+input[type='month'] {
+  color-scheme: inherit;
+}
+:root[data-theme='dark'] input[type='date'],
+:root[data-theme='dark'] input[type='time'],
+:root[data-theme='dark'] input[type='datetime-local'],
+:root[data-theme='dark'] input[type='month'] {
+  color-scheme: dark;
+}
+:root[data-theme='light'] input[type='date'],
+:root[data-theme='light'] input[type='time'],
+:root[data-theme='light'] input[type='datetime-local'],
+:root[data-theme='light'] input[type='month'] {
+  color-scheme: light;
+}
