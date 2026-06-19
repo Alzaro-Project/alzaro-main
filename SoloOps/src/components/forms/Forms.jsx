@@ -1,54 +1,133 @@
 import React, { useState } from 'react'
-import { grad } from './UI.jsx'
+import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
+import { insertExpense, insertInvoice, insertMileage, loadRules, upsertRule } from '../../lib/db.js'
 
-export default function WelcomeBanner({ invoices, expenses, clients, bizName, setView, setModal, uid }) {
-  const SUCCESS = '#22c55e'
-  const key = uid ? `solo_welcome_dismissed_${uid}` : 'solo_welcome_dismissed'
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem(key) === '1' } catch (e) { return false }
-  })
-  const dismiss = () => {
-    try { localStorage.setItem(key, '1') } catch (e) {}
-    setDismissed(true)
+export function ExpenseForm({onClose,onSaved,uid,expenses}) {
+  const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
+  const [amount,setAmount]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10))
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+  const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
+
+  const suggest = async (m) => {
+    setMerchant(m)
+    if (m.length < 3) return
+    const { data } = await loadRules()
+    const hit = (data||[]).find(r => m.toUpperCase().includes(r.pattern.toUpperCase()))
+    if (hit) setCategory(hit.category)
   }
+  const save = async () => {
+    if(!merchant||!amount) return setErr('Merchant and amount are required')
+    setBusy(true); setErr('')
+    const { error } = await insertExpense({
+      user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual'
+    })
+    if(error){ setErr(error.message); setBusy(false); return }
 
-  const steps = [
-    { id:'biz',     label:'Set up your business details', done: !!(bizName && bizName.trim()), action: () => setView('settings') },
-    { id:'client',  label:'Add your first client',        done: (clients  || []).length > 0,    action: () => setView('clients') },
-    { id:'expense', label:'Log your first expense',       done: (expenses || []).length > 0,    action: () => setModal('expense') },
-    { id:'invoice', label:'Create your first invoice',    done: (invoices || []).length > 0,    action: () => setModal('invoice') },
-  ]
+    await upsertRule({ user_id:uid, pattern:merchant.trim().split(' ')[0].toUpperCase(), category })
+      .then(()=>{}).catch(()=>{})
+    onSaved()
+  }
+  return <Modal title="Add expense" onClose={onClose}>
+    {err && <ErrBox m={err} />}
+    <input style={inp} list="past-merchants" placeholder="Supplier / merchant (e.g. Adobe UK)" value={merchant} onChange={e=>suggest(e.target.value)} />
+    <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
+    <select style={{...inp, marginTop:'12px'}} value={category} onChange={e=>setCategory(e.target.value)}>
+      {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+    </select>
+    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Amount (£)" value={amount} onChange={e=>setAmount(e.target.value)} />
+    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save expense'}</button>
+  </Modal>
+}
 
-  const completed = steps.filter(s => s.done).length
-  const total = steps.length
-  const allDone = completed === total
-  if (dismissed || allDone) return null
-
-  return (
-    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px', marginBottom:'16px', position:'relative' }}>
-      <button onClick={dismiss} title="Dismiss" style={{ position:'absolute', top:'14px', right:'16px', background:'transparent', border:'none', color:'var(--text3)', fontSize:'20px', cursor:'pointer', lineHeight:1 }}>×</button>
-
-      <div style={{ marginBottom:'14px' }}>
-        <h3 style={{ fontSize:'19px', fontWeight:800, margin:'0 0 3px 0', background:grad, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>👋 Welcome to SoloOps</h3>
-        <div style={{ color:'var(--text2)', fontSize:'13px' }}>Let's get you set up — {completed} of {total} complete</div>
+export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
+  const [client,setClient]=useState(''); const [number,setNumber]=useState('')
+  const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
+  const [date,setDate]=useState(new Date().toISOString().slice(0,10))
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+  const [picked,setPicked]=useState(null)
+  const pastClients = [...new Set((invoices||[]).map(i=>i.client_name).filter(Boolean))].sort()
+  const savedClients = clients||[]
+  const onPick = (id) => {
+    const c = savedClients.find(x=>x.id===id)
+    setPicked(c||null)
+    if (c) setClient(c.name)
+  }
+  const save = async () => {
+    if(!client||!total) return setErr('Client and total are required')
+    setBusy(true); setErr('')
+    const { error } = await insertInvoice({
+      user_id:uid, client_name:client.trim(), number:number.trim()||null, total:Number(total), status, issue_date:date
+    })
+    if(error){ setErr(error.message); setBusy(false); return }
+    onSaved()
+  }
+  return <Modal title="Add income" onClose={onClose}>
+    {err && <ErrBox m={err} />}
+    {savedClients.length>0 && (
+      <select style={{...inp, marginBottom:'12px'}} value={picked?.id||''} onChange={e=>onPick(e.target.value)}>
+        <option value="">— Pick a saved client (optional) —</option>
+        {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    )}
+    {picked && (
+      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
+        {picked.email && <div>✉ {picked.email}</div>}
+        {picked.phone && <div>☎ {picked.phone}</div>}
+        {picked.address && <div>📍 {picked.address}</div>}
+        {picked.notes && <div style={{color:'var(--text3)'}}>{picked.notes}</div>}
       </div>
+    )}
+    <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setPicked(null)}} />
+    <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
+    <input style={{...inp, marginTop:'12px'}} placeholder="Reference number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
+    <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
+      <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
+    </select>
+    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save income'}</button>
+  </Modal>
+}
 
-      <div style={{ height:'6px', background:'var(--surface2)', borderRadius:'3px', overflow:'hidden', marginBottom:'16px' }}>
-        <div style={{ height:'100%', width:`${(completed/total)*100}%`, background:grad, transition:'width .3s ease' }} />
-      </div>
+// NOTE: MileageForm was referenced in the old Dashboard.jsx (modal==='mileage')
+// but never defined there — clicking "+ Log journey" would have thrown
+// "MileageForm is not defined". Reconstructed here to match the soloops_mileage
+// shape (journey_date, start_loc, end_loc, purpose, miles, claim).
+// HMRC AMAP: 45p/mile up to 10,000 miles, 25p after. Confirm this matches any
+// earlier version you had.
+export function MileageForm({onClose,onSaved,uid,mileage}) {
+  const [date,setDate]=useState(new Date().toISOString().slice(0,10))
+  const [from,setFrom]=useState(''); const [to,setTo]=useState('')
+  const [purpose,setPurpose]=useState(''); const [miles,setMiles]=useState('')
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
 
-      <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-        {steps.map(step => (
-          <div key={step.id} onClick={step.action}
-            style={{ display:'flex', alignItems:'center', gap:'12px', background:'var(--surface2)', border:`1px solid ${step.done ? SUCCESS : 'var(--border)'}`, borderRadius:'10px', padding:'12px 15px', cursor:'pointer', transition:'border-color .15s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--amber)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = step.done ? SUCCESS : 'var(--border)'}>
-            <div style={{ width:'22px', height:'22px', borderRadius:'50%', background: step.done ? SUCCESS : 'transparent', border: step.done ? 'none' : '2px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:'#fff', fontSize:'13px', fontWeight:700 }}>{step.done ? '✓' : ''}</div>
-            <span style={{ color: step.done ? 'var(--text3)' : 'var(--text)', fontSize:'13.5px', textDecoration: step.done ? 'line-through' : 'none', flex:1 }}>{step.label}</span>
-            <span style={{ color:'var(--text3)', fontSize:'14px' }}>→</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  const priorMiles = (mileage||[]).reduce((s,m)=>s+(Number(m.miles)||0),0)
+
+  const save = async () => {
+    if(!from||!to||!miles) return setErr('From, to and miles are required')
+    const m = Number(miles)
+    if(!(m>0)) return setErr('Miles must be a positive number')
+    setBusy(true); setErr('')
+    // per-journey claim using cumulative-miles split across the 10k threshold
+    const remainingAt45 = Math.max(0, 10000 - priorMiles)
+    const at45 = Math.min(m, remainingAt45)
+    const at25 = m - at45
+    const claim = at45 * 0.45 + at25 * 0.25
+    const { error } = await insertMileage({
+      user_id:uid, journey_date:date, start_loc:from.trim(), end_loc:to.trim(),
+      purpose:purpose.trim(), miles:m, claim:Number(claim.toFixed(2))
+    })
+    if(error){ setErr(error.message); setBusy(false); return }
+    onSaved()
+  }
+  return <Modal title="Log journey" onClose={onClose}>
+    {err && <ErrBox m={err} />}
+    <DateField value={date} onChange={setDate} />
+    <input style={{...inp, marginTop:'12px'}} placeholder="From" value={from} onChange={e=>setFrom(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} placeholder="To" value={to} onChange={e=>setTo(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} placeholder="Purpose (e.g. client visit)" value={purpose} onChange={e=>setPurpose(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Miles" value={miles} onChange={e=>setMiles(e.target.value)} />
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save journey'}</button>
+  </Modal>
 }
