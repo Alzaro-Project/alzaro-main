@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
@@ -686,6 +687,19 @@ export default function Invoices() {
   const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isBronze = tier === 'bronze'
   const isGold = tier === 'gold'
+
+  // When global search sends us here with a focused invoice id, open it.
+  const location = useLocation()
+  useEffect(() => {
+    const id = location.state?.focusInvoiceId
+      || new URLSearchParams(location.search).get('focus')
+    if (!id) return
+    const target = invoices.find(i => i.id === id)
+    if (target) {
+      setViewInv(target)
+      setSearch(id)
+    }
+  }, [location.key, invoices])
 
   const filtered = invoices.filter(inv => {
     if (filter !== 'all' && inv.status !== filter) return false
