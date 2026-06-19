@@ -5,7 +5,10 @@ import { useStore } from '../store/useStore'
 import { getGarageForProduct, joinProduct } from '../lib/db'
 
 export default function Login() {
-  const [tab, setTab] = useState('login')
+  const [tab, setTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t === 'register' ? 'register' : 'login'
+  })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [garageName, setGarageName] = useState('')
