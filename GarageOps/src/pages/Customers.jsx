@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
@@ -17,6 +18,19 @@ export default function Customers() {
   
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const vf = (k, v) => setVehicleForm(p => ({ ...p, [k]: v }))
+
+  // When global search sends us here with a focused customer id,
+  // filter the list down to that customer so they're front and centre.
+  const location = useLocation()
+  useEffect(() => {
+    const id = location.state?.focusCustomerId
+      || new URLSearchParams(location.search).get('focus')
+    if (!id) return
+    const target = customers.find(c => c.id === id)
+    if (target) {
+      setSearch(target.name || '')
+    }
+  }, [location.key, customers])
 
   const inputStyle = { 
     background: 'var(--surface2)', 
