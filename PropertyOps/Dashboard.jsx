@@ -1,8 +1,6 @@
 const { useState, useEffect } = React;
 
-/* ================================================================== */
-/*  MOBILE HELPERS                                                    */
-/* ================================================================== */
+// MOBILE HELPERS
 const MOBILE_BP = 880; // below this width = phone/small-tablet layout
 function useIsMobile() {
   const [m, setM] = useState(typeof window !== "undefined" && window.innerWidth <= MOBILE_BP);
@@ -26,62 +24,6 @@ if (typeof document !== "undefined" && !document.getElementById("propops-mobile-
   document.head.appendChild(st);
 }
 
-/* ================================================================== */
-/*  DEMO DATA  — replace with Supabase queries in phase 2             */
-/* ================================================================== */
-const DEMO = {
-  user: { name: "James M.", email: "james@alzaro.co.uk", tier: "ENTERPRISE" },
-  metrics: { complianceScore: 94, arrears: 4250, occupancy: 95.2, income: 68400, openMaintenance: 7, renewalsDue: 5, properties: 42, let: 40 },
-  certificates: [
-    { type: "Gas Safety", ref: "CP12 certificate", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
-    { type: "EICR", ref: "Electrical report", addr: "9 Mill Lane Flat 2", days: 18, icon: "ti-bolt", tone: "amber" },
-    { type: "EPC", ref: "Energy rating C", addr: "22 Bridge Rd", days: 41, icon: "ti-leaf", tone: "blue" },
-    { type: "Smoke Alarm", ref: "Annual check", addr: "5 King's Court", days: 53, icon: "ti-bell-ringing", tone: "blue" },
-  ],
-  activity: [
-    { text: "EICR uploaded · 31 Park View", time: "12 min ago", tone: "green" },
-    { text: "Rent received · Flat 4, £1,150", time: "1 hr ago", tone: "blue" },
-    { text: "Boiler fault reported · Flat 2", time: "3 hrs ago", tone: "amber" },
-    { text: "Tenancy renewed · 8 Vale Rd", time: "Yesterday", tone: "green" },
-  ],
-  properties: [
-    { addr: "14 Oak Street", area: "Manchester", units: 1, type: "House", status: "Let", rent: 1250, score: 78, tone: "amber" },
-    { addr: "9 Mill Lane", area: "Leeds", units: 4, type: "HMO", status: "Let", rent: 3200, score: 88, tone: "green" },
-    { addr: "22 Bridge Road", area: "Manchester", units: 1, type: "Flat", status: "Let", rent: 950, score: 95, tone: "green" },
-    { addr: "5 King's Court", area: "Liverpool", units: 6, type: "Block", status: "Let", rent: 5400, score: 91, tone: "green" },
-    { addr: "31 Park View", area: "Leeds", units: 1, type: "Flat", status: "Vacant", rent: 0, score: 100, tone: "green" },
-    { addr: "8 Vale Road", area: "Sheffield", units: 1, type: "House", status: "Let", rent: 1100, score: 96, tone: "green" },
-  ],
-  tenants: [
-    { name: "Sarah Connor", prop: "14 Oak Street", end: "2026-09-14", rent: 1250, paid: true, rtr: "Verified" },
-    { name: "Tom Hardy", prop: "9 Mill Lane Flat 2", end: "2026-07-01", rent: 800, paid: false, rtr: "Verified" },
-    { name: "Aisha Khan", prop: "22 Bridge Road", end: "2027-01-30", rent: 950, paid: true, rtr: "Verified" },
-    { name: "David Lowe", prop: "5 King's Court Flat 1", end: "2026-06-20", rent: 900, paid: false, rtr: "Pending" },
-    { name: "Maria Silva", prop: "8 Vale Road", end: "2026-11-08", rent: 1100, paid: true, rtr: "Verified" },
-  ],
-  maintenance: [
-    { title: "Boiler not firing", prop: "9 Mill Lane Flat 2", status: "In Progress", priority: "High", contractor: "GasPro Ltd", days: 1 },
-    { title: "Leaking kitchen tap", prop: "14 Oak Street", status: "Assigned", priority: "Medium", contractor: "FlowFix", days: 2 },
-    { title: "Broken window latch", prop: "5 King's Court", status: "Reported", priority: "Low", contractor: "—", days: 0 },
-    { title: "Damp in bedroom", prop: "22 Bridge Road", status: "In Progress", priority: "High", contractor: "DryWall Co", days: 4 },
-    { title: "Annual boiler service", prop: "8 Vale Road", status: "Completed", priority: "Medium", contractor: "GasPro Ltd", days: 12 },
-  ],
-  payments: [
-    { tenant: "Sarah Connor", prop: "14 Oak Street", amount: 1250, due: "2026-05-01", status: "Paid" },
-    { tenant: "Aisha Khan", prop: "22 Bridge Road", amount: 950, due: "2026-05-01", status: "Paid" },
-    { tenant: "Maria Silva", prop: "8 Vale Road", amount: 1100, due: "2026-05-01", status: "Paid" },
-    { tenant: "Tom Hardy", prop: "9 Mill Lane Flat 2", amount: 800, due: "2026-05-01", status: "Overdue" },
-    { tenant: "David Lowe", prop: "5 King's Court Flat 1", amount: 900, due: "2026-05-01", status: "Overdue" },
-  ],
-  documents: [
-    { name: "Tenancy Agreement — 14 Oak St.pdf", cat: "Agreements", size: "240 KB", date: "12 Mar 2026", icon: "ti-file-text", tone: "blue" },
-    { name: "Gas Safety CP12 — 9 Mill Lane.pdf", cat: "Certificates", size: "180 KB", date: "01 Feb 2026", icon: "ti-flame", tone: "red" },
-    { name: "EICR Report — 22 Bridge Rd.pdf", cat: "Certificates", size: "1.2 MB", date: "18 Jan 2026", icon: "ti-bolt", tone: "amber" },
-    { name: "Right to Rent — S. Connor.pdf", cat: "Right to Rent", size: "95 KB", date: "10 Mar 2026", icon: "ti-id", tone: "green" },
-    { name: "Section 21 Notice — Flat 1.pdf", cat: "Notices", size: "60 KB", date: "05 May 2026", icon: "ti-mail", tone: "blue" },
-    { name: "Invoice — GasPro Ltd.pdf", cat: "Invoices", size: "120 KB", date: "20 May 2026", icon: "ti-receipt", tone: "green" },
-  ],
-};
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard" },
@@ -125,9 +67,7 @@ const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
 const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
-/* ================================================================== */
-/*  SHARED COMPONENTS                                                 */
-/* ================================================================== */
+// SHARED COMPONENTS
 function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
@@ -197,7 +137,7 @@ const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: co
 function usePropertyList() {
   const [props, setProps] = useState([]);
   useEffect(() => {
-    if (!DB_READY) { setProps(DEMO.properties.map((p, i) => ({ id: i + 1, address: p.addr }))); return; }
+    if (!DB_READY) { setProps([]); return; }
     db.from("prop_properties").select("id,address").order("created_at", { ascending: false })
       .then(({ data }) => setProps(data || []));
   }, []);
@@ -207,12 +147,8 @@ function usePropertyList() {
 // Resolve a property_id to its address label
 const propLabel = (props, id) => { const p = props.find((x) => String(x.id) === String(id)); return p ? p.address : null; };
 
-/* ================================================================== */
-/*  DASHBOARD                                                         */
-/* ================================================================== */
-/* ================================================================== */
-/*  WELCOME / ONBOARDING BANNER                                       */
-/* ================================================================== */
+// DASHBOARD
+// WELCOME / ONBOARDING BANNER
 function WelcomeBanner({ data, go, user }) {
   const SUCCESS = "#22c55e";
   const key = user ? `prop_welcome_dismissed_${user.id}` : "prop_welcome_dismissed";
@@ -230,9 +166,7 @@ function WelcomeBanner({ data, go, user }) {
     { id: "compliance", label: "Track a compliance certificate", done: (data.comp || []).length > 0, page: "compliance" },
     { id: "tenant", label: "Add your first tenant", done: false, page: "tenants" },
   ];
-  // Tenants aren't loaded on the dashboard; treat "add a tenant" as done once a
-  // let property exists (a let property implies a tenant). Settings counts as
-  // done once anything else is, since there's no single settings flag.
+  // "Add a tenant" ticks once a property is Let; "settings" ticks once any other step is done.
   steps[3].done = (data.props || []).some((p) => p.status === "Let");
   steps[0].done = steps.slice(1).some((s) => s.done);
 
@@ -276,7 +210,7 @@ function DashboardPage({ range, go, user }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    if (!DB_READY) { setData({ props: DEMO.properties, comp: [], pays: [], maint: [] }); return; }
+    if (!DB_READY) { setData({ props: [], comp: [], pays: [], maint: [] }); return; }
     Promise.all([
       db.from("prop_properties").select("*"),
       db.from("prop_compliance").select("*"),
@@ -371,9 +305,7 @@ function DashboardPage({ range, go, user }) {
   );
 }
 
-/* ================================================================== */
-/*  PROPERTIES                                                        */
-/* ================================================================== */
+// PROPERTIES
 function PropertiesPage({ user, go }) {
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
@@ -387,11 +319,11 @@ function PropertiesPage({ user, go }) {
   const [form, setForm] = useState(blank);
 
   React.useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.properties); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("prop_properties").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) { setErr(error.message); setRows(DEMO.properties); }
-        else setRows(data.length ? data : DEMO.properties);
+        if (error) { setErr(error.message); setRows([]); }
+        else setRows(data || []);
       });
     Promise.all([
       db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"),
@@ -530,9 +462,7 @@ function DetailRow({ main, sub, pill, tone }) {
   );
 }
 
-/* ================================================================== */
-/*  COMPLIANCE                                                        */
-/* ================================================================== */
+// COMPLIANCE
 function CompliancePage({ user, go }) {
   const TYPES = {
     "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing",
@@ -553,7 +483,7 @@ function CompliancePage({ user, go }) {
   useEffect(() => {
     if (!DB_READY) {
       const today = new Date();
-      setRows(DEMO.certificates.map((c) => ({ type: c.type, property: c.addr, reference: c.ref, expiry_date: new Date(today.getTime() + c.days * 864e5).toISOString().slice(0, 10) })));
+      setRows([]);
       return;
     }
     db.from("prop_compliance").select("*")
@@ -679,9 +609,7 @@ function CompliancePage({ user, go }) {
   );
 }
 
-/* ================================================================== */
-/*  TENANTS                                                           */
-/* ================================================================== */
+// TENANTS
 function TenantsPage({ user, go }) {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
@@ -695,7 +623,7 @@ function TenantsPage({ user, go }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.tenants.map((t) => ({ name: t.name, property: t.prop, tenancy_end: t.end, rent: t.rent, rent_status: t.paid ? "Up to date" : "Overdue", rtr_status: t.rtr }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("prop_tenants").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
     Promise.all([
@@ -833,9 +761,7 @@ function TenantsPage({ user, go }) {
   );
 }
 
-/* ================================================================== */
-/*  MAINTENANCE (kanban)                                              */
-/* ================================================================== */
+// MAINTENANCE (kanban)
 function MaintenancePage({ user, go }) {
   const isMobile = useIsMobile();
   const stages = ["Reported", "Assigned", "In Progress", "Completed"];
@@ -849,7 +775,7 @@ function MaintenancePage({ user, go }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.maintenance.map((m) => ({ title: m.title, property: m.prop, priority: m.priority, contractor: m.contractor, status: m.status }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("prop_maintenance").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
   }, []);
@@ -975,9 +901,7 @@ function MaintenancePage({ user, go }) {
   );
 }
 
-/* ================================================================== */
-/*  FINANCE                                                           */
-/* ================================================================== */
+// FINANCE
 function FinancePage({ user, go }) {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
@@ -991,7 +915,7 @@ function FinancePage({ user, go }) {
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.payments.map((p) => ({ tenant: p.tenant, property: p.prop, amount: p.amount, due_date: p.due, status: p.status }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("prop_payments").select("*").order("due_date", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
     Promise.all([
@@ -1125,9 +1049,7 @@ function FinancePage({ user, go }) {
   );
 }
 
-/* ================================================================== */
-/*  DOCUMENTS                                                         */
-/* ================================================================== */
+// DOCUMENTS
 function DocumentsPage({ user }) {
   const cats = ["All", "Agreements", "Certificates", "Right to Rent", "Notices", "Invoices", "Other"];
   const catIcon = { Agreements: "ti-file-text", Certificates: "ti-certificate", "Right to Rent": "ti-id", Notices: "ti-mail", Invoices: "ti-receipt", Other: "ti-file" };
@@ -1143,7 +1065,7 @@ function DocumentsPage({ user }) {
   const fileRef = React.useRef(null);
 
   useEffect(() => {
-    if (!DB_READY) { setRows(DEMO.documents.map((d) => ({ name: d.name, category: d.cat, size_kb: 0, file_path: null }))); return; }
+    if (!DB_READY) { setRows([]); return; }
     db.from("prop_documents").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
   }, []);
@@ -1275,9 +1197,7 @@ function DocumentsPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  REPORTS  (+ click-to-preview)                                     */
-/* ================================================================== */
+// REPORTS  (+ click-to-preview)
 function downloadCSV(filename, cols, rows) {
   const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const csv = [cols.map(esc).join(","), ...rows.map((r) => r.map(esc).join(","))].join("\n");
@@ -1459,9 +1379,7 @@ function ReportsPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  SETTINGS                                                          */
-/* ================================================================== */
+// SETTINGS
 function SettingsPage({ user }) {
   const isMobile = useIsMobile();
   const [org, setOrg] = useState({ company_name: "", vat_number: "" });
@@ -1620,9 +1538,7 @@ function SettingsPage({ user }) {
   );
 }
 
-/* ================================================================== */
-/*  AUTH SCREEN  (login + sign up)                                    */
-/* ================================================================== */
+// AUTH SCREEN  (login + sign up)
 function AuthScreen() {
   const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register");
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");   // "login" | "register"
@@ -1753,9 +1669,7 @@ function AuthScreen() {
   );
 }
 
-/* ================================================================== */
-/*  APP SHELL                                                         */
-/* ================================================================== */
+// APP SHELL
 const PAGES = {
   properties: PropertiesPage, compliance: CompliancePage, tenants: TenantsPage,
   maintenance: MaintenancePage, finance: FinancePage, documents: DocumentsPage,
@@ -1791,7 +1705,7 @@ function Dashboard({ user, signOut }) {
 
   useEffect(() => {
     if (!DB_READY) {
-      setBiz({ name: DEMO.user.name, tier: DEMO.user.tier.toLowerCase(), loaded: true });
+      setBiz({ name: "", tier: "", loaded: true });
       return;
     }
     let cancelled = false;
@@ -1876,7 +1790,7 @@ function Dashboard({ user, signOut }) {
 
   // resolved sidebar identity
   const badge = tierBadge(biz.tier);
-  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : DEMO.user.name)) : "…";
+  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "")) : "…";
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -1928,7 +1842,7 @@ function Dashboard({ user, signOut }) {
           })}
         </nav>
         <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : DEMO.user.email}</div>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : ""}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
             <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
@@ -2002,13 +1916,11 @@ function Dashboard({ user, signOut }) {
   );
 }
 
-/* ================================================================== */
 /*  MEMBERSHIP GATE — multi-product accounts                          */
 /*  One Alzaro login can hold several products. PropertyOps access    */
 /*  requires a row in product_members for this user. Users who        */
 /*  originally registered via PropertyOps are let in silently; users  */
 /*  from other Alzaro products get a "start your trial" offer.        */
-/* ================================================================== */
 function JoinScreen({ user, onJoined, signOut }) {
   const [company, setCompany] = useState(user?.user_metadata?.company_name || "");
   const [busy, setBusy] = useState(false);
@@ -2066,9 +1978,7 @@ function JoinScreen({ user, onJoined, signOut }) {
   );
 }
 
-/* ================================================================== */
-/*  ROOT — decides: login screen or dashboard                         */
-/* ================================================================== */
+// ROOT — decides: login screen or dashboard
 function App() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [member, setMember] = useState(undefined);   // undefined = checking, true/false
