@@ -139,6 +139,7 @@ export default function Settings() {
   }
 
   const TIERS = [
+    { key: 'basic', label: '⚪ Basic', price: '£40/mo', color: '#6b7280', features: ['10 invoices/month', 'Basic inventory', 'FIFO automatic', '1 user'] },
     { key: 'bronze', label: '🥉 Bronze', price: '£60/mo', color: '#cd7f32', features: ['50 invoices/month', 'Basic inventory', 'FIFO automatic', '1 user'] },
     { key: 'silver', label: '🥈 Silver', price: '£75/mo', color: '#c0c0c0', features: ['Unlimited invoices', 'Batch override', 'Supplier tracking', 'Used tyres', 'VAT reports', '2 users'] },
     { key: 'gold', label: '🥇 Gold', price: '£90/mo', color: 'var(--accent)', features: ['Everything in Silver', 'Full P&L dashboard', 'VAT Margin Scheme', 'Reports & export', 'Unlimited users'] },
