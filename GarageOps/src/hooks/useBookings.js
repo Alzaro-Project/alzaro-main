@@ -75,9 +75,22 @@ export function useBookings() {
 
   // ------- UPDATE -------
   const updateBooking = useCallback(async (id, updates) => {
-    const patch = { ...updates }
-    if (patch.start_time) patch.start_time = ensureSeconds(patch.start_time)
-    if (patch.duration_min != null) patch.duration_min = parseInt(patch.duration_min, 10) || 60
+    // Whitelist editable columns only — never forward id/account_id/
+    // created_at/updated_at from the original row, or Postgres rejects
+    // the update (this was why "Save changes" silently failed on edit).
+    const patch = {
+      customer_id: updates.customer_id || null,
+      vehicle_id: updates.vehicle_id || null,
+      customer_name: updates.customer_name || null,
+      vehicle_reg: updates.vehicle_reg || null,
+      booking_date: updates.booking_date,
+      start_time: ensureSeconds(updates.start_time),
+      duration_min: parseInt(updates.duration_min, 10) || 60,
+      job_type: updates.job_type || null,
+      description: updates.description || null,
+      notes: updates.notes || null,
+      status: updates.status || 'booked',
+    }
     const { data: updated, error: updErr } = await supabase
       .from('bookings').update(patch).eq('id', id).select().single()
     if (updErr) throw updErr
