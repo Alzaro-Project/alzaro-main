@@ -257,6 +257,26 @@ export const useStore = create(
         }
       },
 
+      // --------------------------------------------------------
+      // reloadData — re-fetch Supabase data after a page refresh.
+      // On reload, Zustand rehydrates `user`/`garageId` from
+      // localStorage (so the app looks logged in) but the actual
+      // lists (customers, invoices, etc.) are NOT persisted — they
+      // must be fetched again. login() already does the full,
+      // correct load, so we reuse it with the remembered email.
+      // --------------------------------------------------------
+      reloadData: async () => {
+        const u = get().user
+        if (!u?.email) return
+        if (get()._reloading) return
+        set({ _reloading: true })
+        try {
+          await get().login(u.email)
+        } finally {
+          set({ _reloading: false })
+        }
+      },
+
       logout: async () => {
         try {
           await supabase.auth.signOut()
