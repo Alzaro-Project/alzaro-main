@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db, DB_READY } from '../lib/db.js'
-import { gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
+import { REPORTS, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker } from '../components/UI.jsx'
 
 // ---- Dashboard ----
