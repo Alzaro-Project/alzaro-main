@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build && cd ../PropertyOps && npm install && npm run build",
+  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build && cd ../PropertyOps && npm install && npm run build && cd ../SoloOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
     {
@@ -40,6 +40,16 @@
     {
       "source": "/PropertyOps/:path((?!dist).*)",
       "destination": "/propertyops/:path",
+      "permanent": true
+    },
+    {
+      "source": "/SoloOps",
+      "destination": "/soloops",
+      "permanent": true
+    },
+    {
+      "source": "/SoloOps/:path((?!dist).*)",
+      "destination": "/soloops/:path",
       "permanent": true
     }
   ],
@@ -249,36 +259,72 @@
       "destination": "/ServiceOps/dist/:file"
     },
     {
+      "source": "/soloops",
+      "destination": "/SoloOps/landing.html"
+    },
+    {
       "source": "/soloops/login",
-      "destination": "/SoloOps/login.html"
+      "destination": "/SoloOps/dist/index.html"
     },
     {
       "source": "/soloops/register",
-      "destination": "/SoloOps/register.html"
-    },
-    {
-      "source": "/soloops/dashboard",
-      "destination": "/SoloOps/dashboard.html"
+      "destination": "/SoloOps/dist/index.html"
     },
     {
       "source": "/soloops/reset-password",
-      "destination": "/SoloOps/reset-password.html"
+      "destination": "/SoloOps/dist/index.html"
     },
     {
-      "source": "/soloops/admin",
-      "destination": "/SoloOps/admin.html"
+      "source": "/soloops/dashboard",
+      "destination": "/SoloOps/dist/index.html"
     },
     {
-      "source": "/soloops/:file(.+\\..+)",
-      "destination": "/SoloOps/:file"
+      "source": "/soloops/income",
+      "destination": "/SoloOps/dist/index.html"
     },
     {
-      "source": "/soloops",
-      "destination": "/SoloOps/index.html"
+      "source": "/soloops/clients",
+      "destination": "/SoloOps/dist/index.html"
     },
     {
-      "source": "/SoloOps",
-      "destination": "/SoloOps/index.html"
+      "source": "/soloops/expenses",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/banking",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/recurring",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/receipts",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/mileage",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/reports",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/documents",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/tax",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/settings",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/:file((?!login|register|reset-password|dashboard|income|clients|expenses|banking|recurring|receipts|mileage|reports|documents|tax|settings).+\\..+)",
+      "destination": "/SoloOps/dist/:file"
     },
     {
       "source": "/propertyops/login",
