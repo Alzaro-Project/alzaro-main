@@ -1156,7 +1156,7 @@ export default function Invoices() {
                       <div>
                         <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
                         <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.unit} onChange={e => updateLine(line.id, { unit: parseFloat(e.target.value) || 0 })} />
+                          value={line.unit === 0 ? '' : line.unit} onChange={e => updateLine(line.id, { unit: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })} />
                       </div>
                       <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                     </div>
@@ -1187,7 +1187,7 @@ export default function Invoices() {
                     <div>
                       <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
                       <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.unit} onChange={e => updateLine(line.id, { unit: parseFloat(e.target.value) || 0 })} />
+                        value={line.unit === 0 ? '' : line.unit} onChange={e => updateLine(line.id, { unit: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })} />
                     </div>
                     <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                   </div>
