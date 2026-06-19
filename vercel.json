@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build",
+  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build",
   "outputDirectory": ".",
   "redirects": [
     {
@@ -180,51 +180,63 @@
     },
     {
       "source": "/serviceops/login",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/register",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/reset-password",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/dashboard",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/jobs",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/quotes",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/invoices",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/customers",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/serviceops/schedule",
-      "destination": "/ServiceOps/app.html"
+      "source": "/serviceops/properties",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/quotes",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/jobs",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/diary",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/invoicing",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/certificates",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/documents",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/reports",
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
       "source": "/serviceops/settings",
-      "destination": "/ServiceOps/app.html"
+      "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/serviceops/admin",
-      "destination": "/ServiceOps/app.html"
-    },
-    {
-      "source": "/serviceops/:file((?!login|register|reset-password|dashboard|jobs|quotes|invoices|customers|schedule|settings|admin).+\\..+)",
-      "destination": "/ServiceOps/:file"
+      "source": "/serviceops/:file((?!login|register|reset-password|dashboard|customers|properties|quotes|jobs|diary|invoicing|certificates|documents|reports|settings).+\\..+)",
+      "destination": "/ServiceOps/dist/:file"
     },
     {
       "source": "/soloops/login",
