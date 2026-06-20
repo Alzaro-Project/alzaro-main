@@ -1,5 +1,61 @@
 const { useState, useEffect } = React;
 
+/* ================================================================== */
+/*  DEMO DATA  — replace with Supabase queries in phase 2             */
+/* ================================================================== */
+const DEMO = {
+  user: { name: "Dave R.", email: "dave@alzaro.co.uk", tier: "PRO" },
+  metrics: { revenue: 18450, outstanding: 3960, jobsToday: 6, jobsWeek: 23, quotesOpen: 8, quoteValue: 12400, certsDue: 3, customers: 64 },
+  certificates: [
+    { type: "Gas Safety (CP12)", ref: "Landlord cert", addr: "14 Oak St", days: 4, icon: "ti-flame", tone: "red" },
+    { type: "EICR", ref: "Electrical report", addr: "9 Mill Lane Flat 2", days: 16, icon: "ti-bolt", tone: "amber" },
+    { type: "Boiler Service", ref: "Annual service", addr: "22 Bridge Rd", days: 33, icon: "ti-flame-off", tone: "blue" },
+    { type: "PAT Testing", ref: "Appliance test", addr: "5 King's Court", days: 48, icon: "ti-plug", tone: "blue" },
+  ],
+  activity: [
+    { text: "Invoice paid · INV-1042 · £540", time: "9 min ago", tone: "green" },
+    { text: "Job completed · Boiler swap, Flat 4", time: "1 hr ago", tone: "blue" },
+    { text: "Quote approved · QUO-218 · £1,850", time: "2 hrs ago", tone: "green" },
+    { text: "New emergency call-out · 31 Park View", time: "3 hrs ago", tone: "amber" },
+  ],
+  customers: [
+    { name: "Sarah Connor", area: "Manchester", contact: "07700 900123", type: "Landlord", site: "14 Oak Street", jobs: 5, spend: 4250, tone: "green" },
+    { name: "Mill Lane Lettings", area: "Leeds", contact: "07700 900456", type: "Agency", site: "9 Mill Lane", jobs: 12, spend: 9800, tone: "green" },
+    { name: "Aisha Khan", area: "Manchester", contact: "07700 900789", type: "Homeowner", site: "22 Bridge Road", jobs: 2, spend: 680, tone: "green" },
+    { name: "King's Court Mgmt", area: "Liverpool", contact: "07700 900222", type: "Commercial", site: "5 King's Court", jobs: 9, spend: 7400, tone: "green" },
+    { name: "David Lowe", area: "Sheffield", contact: "07700 900333", type: "Homeowner", site: "8 Vale Road", jobs: 1, spend: 320, tone: "amber" },
+  ],
+  quotes: [
+    { ref: "QUO-218", customer: "Mill Lane Lettings", desc: "Full bathroom refit", amount: 1850, status: "Approved", date: "2026-05-20" },
+    { ref: "QUO-219", customer: "Sarah Connor", desc: "Boiler replacement + flush", amount: 2400, status: "Sent", date: "2026-05-24" },
+    { ref: "QUO-220", customer: "Aisha Khan", desc: "Consumer unit upgrade", amount: 680, status: "Sent", date: "2026-05-26" },
+    { ref: "QUO-221", customer: "David Lowe", desc: "Outdoor tap install", amount: 145, status: "Draft", date: "2026-05-28" },
+    { ref: "QUO-222", customer: "King's Court Mgmt", desc: "Communal lighting LED swap", amount: 3200, status: "Rejected", date: "2026-05-12" },
+  ],
+  jobs: [
+    { title: "Boiler not firing", customer: "Mill Lane Lettings", site: "9 Mill Lane Flat 2", engineer: "Dave R.", priority: "High", status: "In Progress", value: 280 },
+    { title: "Leaking kitchen tap", customer: "Sarah Connor", site: "14 Oak Street", engineer: "Mike T.", priority: "Medium", status: "Scheduled", value: 90 },
+    { title: "Consumer unit upgrade", customer: "Aisha Khan", site: "22 Bridge Road", engineer: "Unassigned", priority: "Low", status: "New", value: 680 },
+    { title: "Annual gas service x6", customer: "King's Court Mgmt", site: "5 King's Court", engineer: "Dave R.", priority: "Medium", status: "Completed", value: 540 },
+    { title: "Emergency — no hot water", customer: "David Lowe", site: "8 Vale Road", engineer: "Mike T.", priority: "High", status: "Invoiced", value: 165 },
+    { title: "Radiator replacement", customer: "Sarah Connor", site: "14 Oak Street", engineer: "Dave R.", priority: "Medium", status: "Scheduled", value: 320 },
+  ],
+  invoices: [
+    { ref: "INV-1042", customer: "King's Court Mgmt", amount: 540, due: "2026-05-15", status: "Paid" },
+    { ref: "INV-1043", customer: "Aisha Khan", amount: 680, due: "2026-06-01", status: "Sent" },
+    { ref: "INV-1044", customer: "Sarah Connor", amount: 90, due: "2026-06-04", status: "Sent" },
+    { ref: "INV-1041", customer: "Mill Lane Lettings", amount: 1850, due: "2026-05-10", status: "Overdue" },
+    { ref: "INV-1040", customer: "David Lowe", amount: 165, due: "2026-05-08", status: "Overdue" },
+  ],
+  documents: [
+    { name: "CP12 — 9 Mill Lane.pdf", cat: "Certificates", size: "180 KB", date: "01 Feb 2026", icon: "ti-flame", tone: "red" },
+    { name: "EICR Report — 22 Bridge Rd.pdf", cat: "Certificates", size: "1.2 MB", date: "18 Jan 2026", icon: "ti-bolt", tone: "amber" },
+    { name: "Quote QUO-218 — Mill Lane.pdf", cat: "Quotes", size: "96 KB", date: "20 May 2026", icon: "ti-file-dollar", tone: "blue" },
+    { name: "Invoice INV-1042 — King's Court.pdf", cat: "Invoices", size: "120 KB", date: "15 May 2026", icon: "ti-receipt", tone: "green" },
+    { name: "Completion Cert — Boiler swap.pdf", cat: "Certificates", size: "85 KB", date: "22 May 2026", icon: "ti-circle-check", tone: "green" },
+    { name: "Site photos — Flat 2 damp.pdf", cat: "Job Photos", size: "2.4 MB", date: "19 May 2026", icon: "ti-photo", tone: "blue" },
+  ],
+};
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand" },
@@ -44,7 +100,9 @@ const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year", "Cus
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
 const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
-// SHARED COMPONENTS
+/* ================================================================== */
+/*  SHARED COMPONENTS                                                 */
+/* ================================================================== */
 function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
@@ -260,7 +318,7 @@ function CustomerPropertyPicker({ user, customers, properties, reloadCustomers, 
           onSet({ property_id: e.target.value ? +e.target.value : "", site: p ? [p.address, p.postcode].filter(Boolean).join(", ") : form.site });
         }}>
           <option value="">{form.customer_id ? (custProps.length ? "— Select property —" : "No properties yet") : "Select customer first"}</option>
-          {custProps.map((p) => <option key={p.id} value={p.id}>{p.address}{p.postcode ? `, ${p.postcode}` : ""}</option>)}
+          {custProps.map((p) => <option key={p.id} value={p.id}>{p.prop_type ? `${p.prop_type} · ` : ""}{p.address}{p.postcode ? `, ${p.postcode}` : ""}</option>)}
           {form.customer_id && <option value="__add">+ Add new property…</option>}
         </select>
       </label>
@@ -270,63 +328,9 @@ function CustomerPropertyPicker({ user, customers, properties, reloadCustomers, 
   );
 }
 
-// DASHBOARD
-// WELCOME / ONBOARDING BANNER
-function WelcomeBanner({ d, go, user }) {
-  const SUCCESS = "#22c55e";
-  const key = user ? `svc_welcome_dismissed_${user.id}` : "svc_welcome_dismissed";
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
-  });
-  const dismiss = () => {
-    try { localStorage.setItem(key, "1"); } catch (e) {}
-    setDismissed(true);
-  };
-
-  const steps = [
-    { id: "settings", label: "Set up your business details", done: false, page: "settings" },
-    { id: "customer", label: "Add your first customer", done: (d.customers || []).length > 0, page: "customers" },
-    { id: "quote", label: "Create your first quote", done: (d.quotes || []).length > 0, page: "quotes" },
-    { id: "invoice", label: "Raise your first invoice", done: (d.invoices || []).length > 0, page: "invoicing" },
-  ];
-  // "Settings" ticks once any other step is done (no single settings flag exists).
-  steps[0].done = steps.slice(1).some((s) => s.done);
-
-  const completed = steps.filter((s) => s.done).length;
-  const total = steps.length;
-  const allDone = completed === total;
-
-  if (dismissed || allDone) return null;
-
-  return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "20px 22px", marginBottom: 14, position: "relative" }}>
-      <button onClick={dismiss} title="Dismiss" style={{ position: "absolute", top: 12, right: 14, background: "transparent", border: "none", color: "var(--txt-3)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
-
-      <div style={{ marginBottom: 14 }}>
-        <h3 className="font-head" style={{ color: "var(--brand)", fontSize: 19, fontWeight: 700, margin: "0 0 3px 0" }}>👋 Welcome to ServiceOps</h3>
-        <div style={{ color: "var(--txt-2)", fontSize: 13 }}>Let's get you set up — {completed} of {total} complete</div>
-      </div>
-
-      <div style={{ height: 6, background: "var(--line-2)", borderRadius: 3, overflow: "hidden", marginBottom: 16 }}>
-        <div style={{ height: "100%", width: `${(completed / total) * 100}%`, background: "var(--brand)", transition: "width .3s ease" }} />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {steps.map((step) => (
-          <div key={step.id} onClick={() => go(step.page)}
-            style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--panel)", border: `0.5px solid ${step.done ? SUCCESS : "var(--line)"}`, borderRadius: 9, padding: "11px 14px", cursor: "pointer", transition: "border-color .15s" }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--brand)")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = step.done ? SUCCESS : "var(--line)")}>
-            <div style={{ width: 22, height: 22, borderRadius: "50%", background: step.done ? SUCCESS : "transparent", border: step.done ? "none" : "2px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#fff", fontSize: 13, fontWeight: 700 }}>{step.done ? "✓" : ""}</div>
-            <span style={{ color: step.done ? "var(--txt-3)" : "var(--txt)", fontSize: 13.5, textDecoration: step.done ? "line-through" : "none", flex: 1 }}>{step.label}</span>
-            <span style={{ color: "var(--txt-3)", fontSize: 14 }}>→</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
+/* ================================================================== */
+/*  DASHBOARD                                                         */
+/* ================================================================== */
 function DashboardPage({ range, go, user }) {
   const [d, setD] = useState(null); // { customers, quotes, jobs, invoices }
 
@@ -397,7 +401,6 @@ function DashboardPage({ range, go, user }) {
         <h2 className="font-head" style={{ fontSize: 30, fontWeight: 700 }}>Dashboard</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
-      <WelcomeBanner d={d} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
         <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
@@ -467,7 +470,9 @@ function DashboardPage({ range, go, user }) {
   );
 }
 
-// CUSTOMERS
+/* ================================================================== */
+/*  CUSTOMERS                                                         */
+/* ================================================================== */
 function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);
@@ -661,7 +666,9 @@ function CustomerDetail({ customer, onClose, go }) {
     </div>
   );
 }
-// PROPERTIES
+/* ================================================================== */
+/*  PROPERTIES                                                        */
+/* ================================================================== */
 function PropertiesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [confirmNode, ask] = useConfirm();
@@ -766,6 +773,7 @@ function PropertiesPage({ user }) {
   );
 }
 
+/* ================================================================== */
 function QuotesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -858,7 +866,9 @@ function QuotesPage({ user }) {
   );
 }
 
-// JOBS  (kanban)
+/* ================================================================== */
+/*  JOBS  (kanban)                                                    */
+/* ================================================================== */
 
 /* Dialog: raise an invoice against a job (Deposit / Part / Final / Full) */
 function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
@@ -1072,7 +1082,9 @@ function JobsPage({ user }) {
   );
 }
 
-// DIARY  (week view)
+/* ================================================================== */
+/*  DIARY  (week view)                                                */
+/* ================================================================== */
 function DiaryPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1174,7 +1186,9 @@ function DiaryPage({ user }) {
   );
 }
 
-// INVOICING
+/* ================================================================== */
+/*  INVOICING                                                         */
+/* ================================================================== */
 function InvoicingPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1268,7 +1282,9 @@ function InvoicingPage({ user }) {
   );
 }
 
-// CERTIFICATES
+/* ================================================================== */
+/*  CERTIFICATES                                                      */
+/* ================================================================== */
 function CertificatesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -1370,7 +1386,9 @@ function CertificatesPage({ user }) {
   );
 }
 
-// DOCUMENTS
+/* ================================================================== */
+/*  DOCUMENTS                                                         */
+/* ================================================================== */
 const DOC_BUCKET = "svc-documents";
 const fmtSize = (b) => b == null ? "—" : b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
 const iconFor = (cat, name) => {
@@ -1533,7 +1551,9 @@ function DocumentsPage({ user }) {
   );
 }
 
-// REPORTS  (+ click-to-preview)
+/* ================================================================== */
+/*  REPORTS  (+ click-to-preview)                                     */
+/* ================================================================== */
 function ReportPreview({ report, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
@@ -1618,7 +1638,9 @@ function ReportsPage() {
   );
 }
 
-// SETTINGS
+/* ================================================================== */
+/*  SETTINGS                                                          */
+/* ================================================================== */
 function SettingsPage() {
   const sections = [
     { title: "Business", icon: "ti-building", rows: [["Trading name", "Alzaro Trade Services"], ["VAT number", "GB 123 4567 89"], ["Plan", "Pro"]] },
@@ -1648,7 +1670,9 @@ function SettingsPage() {
   );
 }
 
-// AUTH SCREEN  (login + sign up)
+/* ================================================================== */
+/*  AUTH SCREEN  (login + sign up)                                    */
+/* ================================================================== */
 function AuthScreen() {
   const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register" || window.location.pathname.endsWith("/register"));
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");
@@ -1701,7 +1725,7 @@ function AuthScreen() {
         setBusy(false);
         return setMsg("An Alzaro account with this email already exists (from another Alzaro product). Enter that account's password here to activate ServiceOps on it — the password you entered didn't match.");
       }
-      await db.from("product_members").insert([{ user_id: si.user.id, email: si.user.email, product: "serviceops", company_name: company.trim() }]); // duplicate-safe: errors ignored
+      await db.from("svc_licences").insert([{ user_id: si.user.id }]); // duplicate-safe: errors ignored below
       setBusy(false);
       window.location.href = "/serviceops/login"; // fresh load → straight into the app
       return;
@@ -1791,41 +1815,150 @@ function AuthScreen() {
   );
 }
 
-// APP SHELL
+/* ================================================================== */
+/*  ADMIN  (only visible to accounts in svc_admins)                   */
+/* ================================================================== */
+function AdminPage() {
+  const TIERS = ["Sole Trader", "Team", "Firm"];
+  const FEES = { "Sole Trader": 29, "Team": 69, "Firm": 129 };
+  const STATUSES = ["Trial", "Active", "Suspended"];
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+
+  const load = () => {
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    db.rpc("svc_admin_overview").then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
+      setData(typeof data === "string" ? JSON.parse(data) : data);
+    });
+  };
+  useEffect(load, []);
+
+  const users = (data && data.users) || [];
+  const now = new Date();
+  const daysUntil = (d) => d ? Math.ceil((new Date(d + "T00:00:00") - now) / 86400000) : null;
+  const fee = (u) => u.status === "Active" ? (FEES[u.tier] || 0) : 0;
+  const mrr = users.reduce((s, u) => s + fee(u), 0);
+  const onTrial = users.filter((u) => u.status === "Trial").length;
+  const active = users.filter((u) => u.status === "Active").length;
+  const suspended = users.filter((u) => u.status === "Suspended").length;
+  const expiringSoon = users.filter((u) => u.status === "Trial" && daysUntil(u.trial_ends) !== null && daysUntil(u.trial_ends) <= 7).length;
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  const setLicence = async (u, patch) => {
+    const next = { tier: u.tier, status: u.status, trial_ends: u.trial_ends, ...patch };
+    const { error } = await db.rpc("svc_admin_set_licence", { target: u.id, new_tier: next.tier, new_status: next.status, new_trial_ends: next.trial_ends });
+    if (error) { setErr(error.message); return; }
+    load();
+  };
+
+  const statCard = (label, value, sub, color) => (
+    <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
+      <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: color || "var(--txt)" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+  const statusBox = (label, value, color, bg) => (
+    <div style={{ flex: 1, background: bg, border: "0.5px solid var(--line)", borderRadius: 10, padding: "18px 16px", textAlign: "center" }}>
+      <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 12, color: "var(--txt-2)", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+  const selStyle = { ...inp, padding: "6px 8px", fontSize: 12, width: "auto" };
+
+  return (
+    <div className="fade-in">
+      <PageHead title="Admin — Licence Manager" sub={data ? `${users.length} registered user${users.length === 1 ? "" : "s"} on ServiceOps` : "Loading platform data…"}
+        right={<span onClick={load}><Btn icon="ti-refresh" label="Refresh" /></span>} />
+      {err && <div style={errBanner}>{err.includes("Not authorised") ? "Your account isn't an admin." : err}</div>}
+      {data && (
+        <>
+          <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+            {statCard("Total users", users.length, `${onTrial} on trial`, "var(--brand)")}
+            {statCard("Monthly revenue", gbp(mrr), "MRR from active", "var(--green)")}
+            {statCard("Active subscriptions", active, `${suspended} suspended`, "var(--blue)")}
+            {statCard("Trials expiring soon", expiringSoon, "within 7 days", expiringSoon > 0 ? "var(--red)" : "var(--txt)")}
+          </div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
+            <div style={{ flex: 1, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Tier breakdown</div>
+              {TIERS.map((t) => {
+                const n = users.filter((u) => u.tier === t).length;
+                const rev = users.filter((u) => u.tier === t && u.status === "Active").length * FEES[t];
+                const pct = users.length ? (n / users.length) * 100 : 0;
+                return (
+                  <div key={t} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
+                      <span style={{ fontWeight: 600 }}>{t}</span>
+                      <span style={{ color: "var(--txt-2)" }}>{n} · {gbp(rev)}/mo</span>
+                    </div>
+                    <div style={{ height: 5, background: "var(--panel-2)", borderRadius: 3 }}><div style={{ width: pct + "%", height: "100%", background: "var(--brand)", borderRadius: 3 }} /></div>
+                  </div>
+                );
+              })}
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 10, fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>Total MRR</span><span style={{ fontWeight: 700, color: "var(--green)" }}>{gbp(mrr)}/mo</span>
+              </div>
+            </div>
+            <div style={{ flex: 1.4, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 18 }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.2, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 12 }}>Status overview</div>
+              <div style={{ display: "flex", gap: 12 }}>
+                {statusBox("Active", active, "var(--green)", "var(--green-soft)")}
+                {statusBox("Trial", onTrial, "var(--amber)", "var(--amber-soft)")}
+                {statusBox("Suspended", suspended, "var(--red)", "var(--red-soft)")}
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 10 }}>All users — newest first</div>
+          <Table cols={["User", "Joined", "Tier", "Status", "Trial ends", "Fee/mo", "Usage"]}>
+            {users.map((u) => {
+              const left = daysUntil(u.trial_ends);
+              return (
+                <tr key={u.id}>
+                  <Td><span style={{ fontWeight: 500 }}>{u.email}</span></Td>
+                  <Td color="var(--txt-2)">{fmtDate(u.created_at)}</Td>
+                  <Td><select style={selStyle} value={u.tier} onChange={(e) => setLicence(u, { tier: e.target.value })}>{TIERS.map((t) => <option key={t}>{t}</option>)}</select></Td>
+                  <Td><select style={selStyle} value={u.status} onChange={(e) => setLicence(u, { status: e.target.value })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></Td>
+                  <Td>{u.status === "Trial" ? <span>{fmtDate(u.trial_ends)}{left !== null && <div style={{ fontSize: 10.5, color: left <= 3 ? "var(--red)" : left <= 7 ? "var(--amber)" : "var(--txt-3)" }}>{left < 0 ? "expired" : left + " days left"}</div>}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
+                  <Td>{u.status === "Active" ? <span style={{ fontWeight: 600, color: "var(--green)" }}>{gbp(FEES[u.tier] || 0)}</span> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
+                  <Td color="var(--txt-2)"><span style={{ fontSize: 11.5 }}>{u.customers} customers · {u.jobs} jobs · {u.invoices} inv</span></Td>
+                </tr>
+              );
+            })}
+          </Table>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  APP SHELL                                                         */
+/* ================================================================== */
 const PAGES = {
   customers: CustomersPage, properties: PropertiesPage, quotes: QuotesPage, jobs: JobsPage, diary: DiaryPage,
   invoicing: InvoicingPage, certificates: CertificatesPage, documents: DocumentsPage,
-  reports: ReportsPage, settings: SettingsPage,
+  reports: ReportsPage, settings: SettingsPage, admin: AdminPage,
 };
 
 function Dashboard({ user, signOut }) {
   const pageFromUrl = () => {
     const seg = (window.location.pathname.split("/serviceops/")[1] || "").replace(/\/$/, "");
-    const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings"];
+    const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings", "admin"];
     return known.includes(seg) ? seg : "dashboard";
   };
   const [active, setActive] = useState(pageFromUrl);
+  const [isAdmin, setIsAdmin] = useState(false);
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // ---- business identity for the sidebar (real DB data, not email) ----
-  // Reads company_name + tier from product_members; falls back to auth
-  // metadata, then email prefix. Defaults tier to PRO if none stored.
-  const [biz, setBiz] = useState({ name: "", tier: "", loaded: false });
+  // is this account an admin? (svc_admins row visible only to its owner)
   useEffect(() => {
-    if (!DB_READY || !user) { setBiz({ name: "Your Business", tier: "", loaded: true }); return; }
-    let cancelled = false;
-    db.from("product_members").select("*").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
-      .then(({ data: m }) => {
-        if (cancelled) return;
-        let name = (m && m.company_name) || user.user_metadata?.company_name || (user.email || "").split("@")[0];
-        let tier = (m && (m.tier || m.plan)) || "";
-        setBiz({ name, tier, loaded: true });
-      });
-    return () => { cancelled = true; };
+    if (!DB_READY || !user) return;
+    db.from("svc_admins").select("user_id").eq("user_id", user.id)
+      .then(({ data }) => setIsAdmin((data || []).length > 0));
   }, [user]);
-  const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "Your Business")) : "…";
-  const tierLabel = (biz.tier || "PRO").toUpperCase();
 
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
@@ -1838,7 +1971,7 @@ function Dashboard({ user, signOut }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const navItems = NAV;
+  const navItems = isAdmin ? [...NAV, { id: "admin", label: "Admin", icon: "ti-shield-lock" }] : NAV;
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
@@ -1906,8 +2039,8 @@ function Dashboard({ user, signOut }) {
           <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
         </div>
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
-          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{user ? user.email.split("@")[0] : DEMO.user.name}</div>
+          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{DEMO.user.tier}</div>
         </div>
         <div style={{ padding: "12px 12px 0", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
@@ -1930,7 +2063,7 @@ function Dashboard({ user, signOut }) {
           })}
         </nav>
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : ""}</div>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : DEMO.user.email}</div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", marginBottom: 6, color: "var(--txt-2)", fontSize: 12 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14 }} />
             <span>{light ? "Dark Mode" : "Light Mode"}</span>
@@ -2026,58 +2159,27 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
   );
 }
 
-// ROOT — decides: login screen or dashboard
+/* ================================================================== */
+/*  ROOT — decides: login screen or dashboard                         */
+/* ================================================================== */
 /* Shown to Alzaro accounts from other products that don't have ServiceOps yet */
 function ActivateScreen({ user, signOut }) {
-  const [company, setCompany] = useState(user?.user_metadata?.company_name || "");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  const doJoin = async () => {
-    setMsg("");
-    if (!company.trim()) return setMsg("Please enter your company name.");
+  const goRegister = async () => {
     setBusy(true);
-    const { error } = await db.from("product_members").insert([{
-      user_id: user.id,
-      email: user.email,
-      product: "serviceops",
-      company_name: company.trim(),
-    }]);
-    setBusy(false);
-    if (error) return setMsg(error.message || "Could not set up your ServiceOps account.");
-    window.location.href = "/serviceops/login"; // fresh load → straight into the app
+    await db.auth.signOut();
+    window.location.href = "/serviceops/register";
   };
-
-  const inp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none" };
-  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" };
-
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 20 }}>
-      <div className="fade-in" style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 440, maxWidth: "100%", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
-        <div style={{ textAlign: "center", marginBottom: 6 }}>
-          <div className="brand" style={{ fontSize: 22, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
-        </div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: "36px 32px", width: 430, maxWidth: "100%", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}>
+        <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
         <div style={{ width: 54, height: 54, borderRadius: 14, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", margin: "18px auto 16px" }}><i className="ti ti-rocket" style={{ fontSize: 26 }} /></div>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>You're already with Alzaro</div>
-          <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--txt)" }}>{user.email}</strong> is registered to another
-            Alzaro product. Start a separate <strong style={{ color: "var(--brand)" }}>14-day
-            ServiceOps trial</strong> on this same login? Your other products and their data
-            stay completely separate.
-          </div>
-        </div>
-
-        {msg && (
-          <div style={{ background: "var(--red-soft)", border: "1px solid var(--red)", borderRadius: 8, padding: "11px 14px", fontSize: 13, color: "var(--red)", marginBottom: 14 }}>{msg}</div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input style={inp} placeholder="Business name for ServiceOps *" value={company} onChange={(e) => setCompany(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doJoin()} autoFocus />
-          <button onClick={doJoin} disabled={busy} style={primaryBtn}>{busy ? "Setting up…" : "Start ServiceOps Trial →"}</button>
-          <button onClick={signOut} disabled={busy} style={{ background: "none", border: "none", color: "var(--txt-3)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Not now — sign me out</button>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center" }}>Separate trial · Separate subscription · No card required</div>
-        </div>
+        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>This account isn't registered for ServiceOps</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 6 }}>You're signed in as <strong style={{ color: "var(--txt)" }}>{user.email}</strong> with your Alzaro account, but ServiceOps needs its own registration.</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.6, marginBottom: 22 }}>Register now to start your <strong style={{ color: "var(--brand)" }}>14-day free trial</strong> — no card needed.</div>
+        <button onClick={goRegister} disabled={busy} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(34,197,94,.3)" }}>{busy ? "Taking you there…" : "Register for ServiceOps →"}</button>
+        <div onClick={signOut} style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 16, cursor: "pointer" }}>Not you? <span style={{ color: "var(--brand)" }}>Sign out</span></div>
       </div>
     </div>
   );
@@ -2094,18 +2196,16 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // membership gate: does this account have a ServiceOps membership?
+  // membership gate: does this account have a ServiceOps licence?
   useEffect(() => {
     if (!session || !DB_READY) { setMember(undefined); return; }
-    db.from("product_members").select("id").eq("user_id", session.user.id).eq("product", "serviceops").maybeSingle().then(async ({ data, error }) => {
-      if (error) { console.error("Membership check:", error); setMember(false); return; }
-      if (data) { setMember(true); return; }
+    db.from("svc_licences").select("user_id").eq("user_id", session.user.id).then(async ({ data }) => {
+      if ((data || []).length > 0) { setMember(true); return; }
       // registered via the ServiceOps register page? auto-activate silently
       const meta = session.user.user_metadata || {};
       if (meta.product === "serviceops") {
-        const { error: insErr } = await db.from("product_members").insert([{ user_id: session.user.id, email: session.user.email, product: "serviceops", company_name: meta.company_name || "My Company" }]);
-        setMember(!insErr);
-        if (insErr) console.error("Auto-join:", insErr);
+        await db.from("svc_licences").insert([{ user_id: session.user.id }]);
+        setMember(true);
       } else {
         setMember(false);
       }
