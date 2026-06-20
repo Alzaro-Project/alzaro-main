@@ -43,6 +43,12 @@ function Dashboard({ user, signOut }) {
   }, [user]);
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "Your Business")) : "…";
   const tierLabel = (biz.tier || "PRO").toUpperCase();
+  const TIER_COL = {
+    bronze:   { bg: "rgba(180,100,30,0.12)",  color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
+    silver:   { bg: "rgba(100,100,120,0.1)",  color: "#6b7080", border: "rgba(100,100,120,0.25)" },
+    gold:     { bg: "rgba(79,70,229,0.1)",    color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
+  };
+  const tierStyle = TIER_COL[(biz.tier || "").toLowerCase()] || TIER_COL.gold;
 
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
@@ -124,7 +130,7 @@ function Dashboard({ user, signOut }) {
         </div>
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
-          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)", textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
+          <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
         </div>
         <div style={{ padding: "12px 12px 0", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
@@ -137,11 +143,11 @@ function Dashboard({ user, signOut }) {
           {navItems.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", background: on ? "var(--surface3)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0, transition: "background .12s" }}
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", background: on ? "var(--surface3)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0, transition: "background .12s" }}
                 onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--surface2)"; }}
                 onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
-                <i className={`ti ${n.icon}`} style={{ fontSize: 18, width: 20, textAlign: "center", flexShrink: 0, color: on ? "var(--brand)" : "var(--txt-2)" }} />
-                <span style={{ fontSize: 13.5, flex: 1 }}>{n.label}</span>
+                <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", flexShrink: 0, color: on ? "var(--brand)" : "var(--txt-2)" }} />
+                <span style={{ fontSize: 13, flex: 1 }}>{n.label}</span>
               </div>
             );
           })}
