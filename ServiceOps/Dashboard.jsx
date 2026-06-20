@@ -756,11 +756,14 @@ function PropertiesPage({ user }) {
       ) : list.length === 0 ? (
         <div style={emptyCard}>No properties yet. Add a customer first, then add their property here (or use "+ Add new property" inside any customer dropdown).</div>
       ) : (
-        <Table cols={["Address", "Postcode", "Type", "Customer", ""]}>
+        <Table cols={["Address", "Type", "Customer", ""]}>
           {list.map((p) => (
             <tr key={p.id}>
-              <Td><span style={{ fontWeight: 500 }}>{p.address}</span>{p.notes ? <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{p.notes}</div> : null}</Td>
-              <Td color="var(--txt-2)">{p.postcode || "—"}</Td>
+              <Td>
+                <span style={{ fontWeight: 500 }}>{p.address}</span>
+                {p.postcode ? <div style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{p.postcode}</div> : null}
+                {p.notes ? <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{p.notes}</div> : null}
+              </Td>
               <Td><Pill text={p.prop_type || "—"} tone={p.prop_type === "Commercial" || p.prop_type === "HMO" ? "blue" : "green"} /></Td>
               <Td color="var(--txt-2)">{p.customer || "—"}</Td>
               <Td>{p.id && rowActions(DB_READY, () => openEdit(p), () => askDelete(p))}</Td>
