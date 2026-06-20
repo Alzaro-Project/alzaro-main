@@ -143,6 +143,124 @@ export function MaintenancePage({ user, go }) {
 }
 
 
+// Email preview modal — review the rent/invoice email, then send via Resend (/api/send-email)
+function PaymentEmailModal({ payment, tenant, propName, user, onClose, onSent }) {
+  const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [bizName, setBizName] = useState("Alzaro PropertyOps");
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null); // null | 'sending' | 'success' | 'error'
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    const build = async () => {
+      let biz = "Alzaro PropertyOps";
+      if (DB_READY) {
+        const { data: s } = await db.from("prop_settings").select("company_name").eq("user_id", user.id);
+        if (s && s.length && s[0].company_name) biz = s[0].company_name;
+      }
+      setBizName(biz);
+      const tName = tenant?.name || payment.tenant || "there";
+      const ref = payment.invoice_no || "your invoice";
+      const amount = gbp(payment.amount || 0);
+      const due = payment.due_date ? ` by ${payment.due_date}` : "";
+      const propLine = propName && propName !== "—" ? ` for ${propName}` : "";
+      setTo(tenant?.email || "");
+      setSubject(`Invoice ${payment.invoice_no || ""} from ${biz}`.trim());
+      setBody(
+`Hi ${tName},
+
+Please find your invoice ${ref}${propLine} for the amount of ${amount}.
+
+Payment is due${due}. If you have any questions, just reply to this email.
+
+Thank you,
+${biz}`
+      );
+      setLoading(false);
+    };
+    build();
+  }, []);
+
+  const send = async () => {
+    if (!to.trim()) { setStatus("error"); setMsg("Add a recipient email address first."); return; }
+    setStatus("sending"); setMsg("");
+    try {
+      const { data: sess } = await db.auth.getSession();
+      const token = sess?.session?.access_token;
+      if (!token) { setStatus("error"); setMsg("You need to be signed in to send."); return; }
+      const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">${body.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>`;
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName }),
+      });
+      let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
+      setStatus("success");
+      setTimeout(() => { onSent && onSent(); onClose(); }, 1400);
+    } catch (e) {
+      setStatus("error");
+      setMsg(e.message === "Failed to fetch" ? "Could not reach the email service — it may not be deployed yet." : e.message);
+    }
+  };
+
+  const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
+  const panel = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 22, width: 560, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" };
+  const labelTiny = { fontSize: 10, fontWeight: 700, color: "var(--txt-3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 };
+  const field = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 13, fontFamily: "Inter", outline: "none", width: "100%" };
+
+  return (
+    <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget && status !== "sending") onClose(); }}>
+      <div style={panel}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ti ti-mail" style={{ fontSize: 15 }} /></span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Email preview</span>
+          </div>
+          <span onClick={onClose} style={{ cursor: "pointer", color: "var(--txt-3)", fontSize: 16 }}><i className="ti ti-x" /></span>
+        </div>
+
+        {loading ? (
+          <div style={{ fontSize: 13, color: "var(--txt-3)", padding: "20px 0" }}>Preparing preview…</div>
+        ) : status === "success" ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--green-soft)", color: "var(--green)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}><i className="ti ti-check" style={{ fontSize: 22 }} /></span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--green)", marginBottom: 4 }}>Email sent</div>
+            <div style={{ fontSize: 12, color: "var(--txt-2)" }}>Sent to {to}</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelTiny}>To</div>
+              <input style={field} value={to} onChange={(e) => setTo(e.target.value)} placeholder="tenant@email.com" />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelTiny}>Subject</div>
+              <input style={field} value={subject} onChange={(e) => setSubject(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={labelTiny}>Message</div>
+              <textarea style={{ ...field, minHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
+            </div>
+
+            {status === "error" && msg && (
+              <div style={{ marginBottom: 14, background: "var(--red-soft)", border: "0.5px solid var(--red)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--red)" }}>✗ {msg}</div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span onClick={status === "sending" ? undefined : send}><Btn icon="ti-send" label={status === "sending" ? "Sending…" : "Send invoice"} primary /></span>
+              <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
+              <span style={{ fontSize: 10.5, color: "var(--txt-3)", marginLeft: "auto" }}>Sends via Alzaro (invoices@alzaro.co.uk)</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function FinancePage({ user, go }) {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
@@ -154,6 +272,7 @@ export function FinancePage({ user, go }) {
   const properties = usePropertyList();
   const blank = { tenant: "", property_id: "", amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
+  const [emailPayment, setEmailPayment] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -259,7 +378,7 @@ export function FinancePage({ user, go }) {
                   <Td>{gbp(p.amount || 0)}</Td>
                   <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
                   <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
-                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>{(p.status === "Pending" || p.status === "Overdue") && <i className="ti ti-circle-check" onClick={() => markReceived(p)} style={{ fontSize: 16, color: "var(--green)", cursor: "pointer" }} title="Mark received" />}<i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12, alignItems: "center" }} onClick={(e) => e.stopPropagation()}><i className="ti ti-send" onClick={() => setEmailPayment(p)} style={{ fontSize: 15, color: "var(--brand)", cursor: "pointer" }} title="Preview & send email" />{(p.status === "Pending" || p.status === "Overdue") && <i className="ti ti-circle-check" onClick={() => markReceived(p)} style={{ fontSize: 16, color: "var(--green)", cursor: "pointer" }} title="Mark received" />}<i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
                 </tr>
                 {isOpen && (
                   <tr>
@@ -285,6 +404,16 @@ export function FinancePage({ user, go }) {
             );
           })}
         </Table>
+      )}
+      {emailPayment && (
+        <PaymentEmailModal
+          payment={emailPayment}
+          tenant={related.tenants.find((t) => t.name === emailPayment.tenant)}
+          propName={propLabel(properties, emailPayment.property_id) || emailPayment.property || "—"}
+          user={user}
+          onClose={() => setEmailPayment(null)}
+          onSent={refresh}
+        />
       )}
     </div>
   );
