@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients,
-  updateUser,
+  updateUser, loadSettings,
 } from './lib/db.js'
 import { NAV, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
 import { MonthlyChart, Donut } from './components/Charts.jsx'
@@ -64,7 +64,15 @@ function Shell() {
         window.location.href = '/soloops/login'
         return
       }
-      setBizName(access.business_name || '')
+      // Source of truth for the business name is soloops_settings (what the
+      // Settings page writes). Fall back to soloops_access for users who
+      // haven't saved settings yet.
+      let nm = access.business_name || ''
+      try {
+        const st = await loadSettings(uid)
+        if (st && st.business_name) nm = st.business_name
+      } catch (_) {}
+      setBizName(nm)
     }
     const [inv, exp, mil, cli] = await Promise.all([
       loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
