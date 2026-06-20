@@ -90,6 +90,26 @@ export async function updateExpenseReceipt(id, receipt_name) {
 export async function insertClient(row) {
   return sb.from('soloops_clients').insert(row)
 }
+// Ensure a client exists by name (case-insensitive). Returns { created, client }.
+// kind: 'customer' (from income) or 'supplier' (from expense).
+// If an existing client of the opposite kind matches, it's promoted to 'both'.
+export async function ensureClient(uid, name, kind) {
+  const clean = (name||'').trim()
+  if (!clean) return { created:false, client:null }
+  const { data: existing } = await sb.from('soloops_clients')
+    .select('*').ilike('name', clean).limit(1)
+  const found = (existing||[])[0]
+  if (found) {
+    if (found.kind && found.kind !== kind && found.kind !== 'both') {
+      await sb.from('soloops_clients').update({ kind:'both' }).eq('id', found.id)
+      return { created:false, client:{ ...found, kind:'both' } }
+    }
+    return { created:false, client:found }
+  }
+  const { data: ins } = await sb.from('soloops_clients')
+    .insert({ user_id:uid, name:clean, kind }).select('*').limit(1)
+  return { created:true, client:(ins||[])[0]||null }
+}
 export async function updateClient(id, row) {
   return sb.from('soloops_clients').update(row).eq('id', id)
 }
