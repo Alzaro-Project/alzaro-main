@@ -40,8 +40,29 @@ export function ExpenseForm({onClose,onSaved,uid,expenses}) {
   </Modal>
 }
 
+// --- invoice-number helpers (INV-### format, 3-digit zero-padded, rolls past 999) ---
+const INV_RE = /^INV-(\d+)$/i
+function existingNumbers(invoices){
+  return new Set((invoices||[]).map(i=>(i.number||'').trim().toUpperCase()).filter(Boolean))
+}
+function nextInvoiceNumber(invoices){
+  let max = 0
+  ;(invoices||[]).forEach(i=>{
+    const m = INV_RE.exec((i.number||'').trim())
+    if(m){ const n = parseInt(m[1],10); if(n>max) max=n }
+  })
+  return 'INV-' + String(max+1).padStart(3,'0')
+}
+function nextFreeNumber(invoices){
+  const taken = existingNumbers(invoices)
+  let n = 1
+  let candidate = 'INV-' + String(n).padStart(3,'0')
+  while(taken.has(candidate.toUpperCase())){ n++; candidate = 'INV-' + String(n).padStart(3,'0') }
+  return candidate
+}
+
 export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
-  const [client,setClient]=useState(''); const [number,setNumber]=useState('')
+  const [client,setClient]=useState(''); const [number,setNumber]=useState(()=>nextInvoiceNumber(invoices))
   const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
   const [date,setDate]=useState(new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
@@ -55,11 +76,28 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
   }
   const save = async () => {
     if(!client||!total) return setErr('Client and total are required')
+    const num = number.trim()
+    // friendly duplicate check (UI layer) — suggest next free number
+    if(num && existingNumbers(invoices).has(num.toUpperCase())){
+      const free = nextFreeNumber(invoices)
+      setErr(`Invoice number "${num}" already exists. Next free number is ${free}.`)
+      setNumber(free)
+      return
+    }
     setBusy(true); setErr('')
     const { error } = await insertInvoice({
-      user_id:uid, client_name:client.trim(), number:number.trim()||null, total:Number(total), status, issue_date:date
+      user_id:uid, client_name:client.trim(), number:num||null, total:Number(total), status, issue_date:date
     })
-    if(error){ setErr(error.message); setBusy(false); return }
+    if(error){
+      // DB unique-violation (bulletproof layer) — race-safe fallback
+      if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
+        const free = nextFreeNumber(invoices)
+        setErr(`That invoice number was just taken. Next free number is ${free}.`)
+        setNumber(free)
+        setBusy(false); return
+      }
+      setErr(error.message); setBusy(false); return
+    }
     onSaved()
   }
   return <Modal title="Add income" onClose={onClose}>
@@ -80,7 +118,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
     )}
     <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setPicked(null)}} />
     <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
-    <input style={{...inp, marginTop:'12px'}} placeholder="Reference number (e.g. INV-0001)" value={number} onChange={e=>setNumber(e.target.value)} />
+    <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (auto, editable)" value={number} onChange={e=>{setNumber(e.target.value); setErr('')}} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
