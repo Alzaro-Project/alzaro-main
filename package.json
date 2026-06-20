@@ -2,6 +2,7 @@
   "name": "alzaro-api",
   "private": true,
   "dependencies": {
-    "nodemailer": "^6.9.16"
+    "nodemailer": "^6.9.16",
+    "pdf-lib": "^1.17.1"
   }
 }
