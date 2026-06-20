@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
-import { insertExpense, insertInvoice, updateInvoice, insertMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
+import { insertExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
@@ -63,19 +63,32 @@ function nextFreeNumber(invoices){
   return candidate
 }
 
-export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
-  const [client,setClient]=useState(edit?.client_name||''); const [number,setNumber]=useState(()=> edit ? (edit.number||'') : nextInvoiceNumber(invoices))
-  const [total,setTotal]=useState(edit?.total!=null?String(edit.total):''); const [status,setStatus]=useState(edit?.status||'sent')
+export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}) {
+  const [number,setNumber]=useState(()=> edit ? (edit.number||'') : nextInvoiceNumber(invoices))
+  const [status,setStatus]=useState(edit?.status||'sent')
   const [date,setDate]=useState(edit?.issue_date || new Date().toISOString().slice(0,10))
+  const [dueDate,setDueDate]=useState(edit?.due_date || '')
+  const [notes,setNotes]=useState(edit?.notes || '')
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
+
+  // VAT (only relevant if the business is VAT-registered)
+  const vatRegistered = !!settings?.vat_registered
+  const flatRate = Number(settings?.flat_rate)||0
+  const isFlat = settings?.vat_scheme==='flat_rate'
+  const [vatRate,setVatRate]=useState(()=> edit?.vat_rate!=null ? Number(edit.vat_rate) : (vatRegistered ? 20 : 0))
+
+  // Line items
+  const blankLine = ()=>({ description:'', qty:'1', unit_price:'' })
+  const [lines,setLines]=useState([blankLine()])
+  const [client,setClient]=useState(edit?.client_name||'')
+
+  // client picker
   const savedClients = clients||[]
-  // client picker: dropdown value is a client id, '__new__', or '' (none)
   const initialPick = edit?.client_name
     ? (savedClients.find(c=>(c.name||'').toLowerCase()===(edit.client_name||'').toLowerCase())?.id || '__new__')
     : ''
   const [pickId,setPickId]=useState(initialPick)
   const [picked,setPicked]=useState(savedClients.find(c=>c.id===initialPick)||null)
-  // inline new-client fields (shown when '__new__' chosen)
   const [newEmail,setNewEmail]=useState('')
   const [newPhone,setNewPhone]=useState('')
   const isNew = pickId==='__new__'
@@ -83,37 +96,78 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
     setPickId(val)
     if (val==='__new__') { setPicked(null); setClient(edit?.client_name||''); }
     else if (val==='') { setPicked(null); setClient('') }
-    else {
-      const c = savedClients.find(x=>x.id===val)
-      setPicked(c||null); setClient(c?.name||'')
-    }
+    else { const c = savedClients.find(x=>x.id===val); setPicked(c||null); setClient(c?.name||'') }
   }
+
+  // When editing, load existing line items
+  useEffect(()=>{
+    let alive=true
+    if (edit?.id) {
+      loadInvoiceLines(edit.id).then(rows=>{
+        if(!alive) return
+        if (rows && rows.length) setLines(rows.map(r=>({ description:r.description||'', qty:String(r.qty??'1'), unit_price:String(r.unit_price??'') })))
+      })
+    }
+    return ()=>{ alive=false }
+  }, [edit?.id])
+
+  const setLine = (i, key, val) => setLines(ls => ls.map((l,idx)=> idx===i ? {...l, [key]:val} : l))
+  const addLine = () => setLines(ls => [...ls, blankLine()])
+  const removeLine = (i) => setLines(ls => ls.length>1 ? ls.filter((_,idx)=>idx!==i) : ls)
+
+  const subtotal = lines.reduce((s,l)=> s + (Number(l.qty)||0)*(Number(l.unit_price)||0), 0)
+  const vat = vatRegistered ? (isFlat ? subtotal*flatRate/100 : subtotal*(Number(vatRate)||0)/100) : 0
+  const total = subtotal + vat
+  const fmt = n => '£' + (Number(n)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})
+
   const save = async () => {
-    if(!client||!total) return setErr('Client and total are required')
+    if(!client) return setErr('Please select or add a client')
+    const validLines = lines.filter(l=> l.description.trim() || Number(l.unit_price))
+    if(!validLines.length) return setErr('Add at least one line item')
     const num = number.trim()
-    // friendly duplicate check (UI layer) — exclude the row being edited
     const others = (invoices||[]).filter(i=> !edit || i.id!==edit.id)
     if(num && existingNumbers(others).has(num.toUpperCase())){
       const free = nextFreeNumber(others)
       setErr(`Invoice number "${num}" already exists. Next free number is ${free}.`)
-      setNumber(free)
-      return
+      setNumber(free); return
     }
     setBusy(true); setErr('')
-    const payload = { client_name:client.trim(), number:num||null, total:Number(total), status, issue_date:date }
-    const { error } = edit
-      ? await updateInvoice(edit.id, payload)
-      : await insertInvoice({ user_id:uid, ...payload })
-    if(error){
-      // DB unique-violation (bulletproof layer) — race-safe fallback
-      if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
-        const free = nextFreeNumber(others)
-        setErr(`That invoice number was just taken. Next free number is ${free}.`)
-        setNumber(free)
-        setBusy(false); return
-      }
-      setErr(error.message); setBusy(false); return
+    const payload = {
+      client_name:client.trim(), number:num||null, total:Number(total.toFixed(2)),
+      status, issue_date:date, due_date:dueDate||null,
+      vat_rate: vatRegistered ? (isFlat ? flatRate : Number(vatRate)||0) : 0,
+      notes: notes.trim()||null,
     }
+
+    let invId = edit?.id
+    if (edit) {
+      const { error } = await updateInvoice(edit.id, payload)
+      if(error){ setErr(error.message); setBusy(false); return }
+    } else {
+      const { data, error } = await insertInvoice({ user_id:uid, ...payload })
+      if(error){
+        if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
+          const free = nextFreeNumber(others)
+          setErr(`That invoice number was just taken. Next free number is ${free}.`)
+          setNumber(free); setBusy(false); return
+        }
+        setErr(error.message); setBusy(false); return
+      }
+      invId = data?.id
+    }
+
+    // replace-all line items
+    if (invId) {
+      try {
+        if (edit) await deleteInvoiceLines(invId)
+        const rows = validLines.map((l,idx)=>({
+          invoice_id:invId, user_id:uid, description:l.description.trim(),
+          qty:Number(l.qty)||0, unit_price:Number(l.unit_price)||0, position:idx
+        }))
+        await insertInvoiceLines(rows)
+      } catch(e){ /* lines best-effort; invoice already saved */ }
+    }
+
     let added=null
     try {
       const details = isNew ? { email:newEmail, phone:newPhone } : undefined
@@ -122,6 +176,9 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
     } catch(e){}
     onSaved(added ? { addedClient: added } : undefined)
   }
+
+  const lblSm = { fontSize:'11px', color:'var(--text3)', marginBottom:'4px' }
+
   return <Modal title={edit?"Edit income":"Add income"} onClose={onClose}>
     {err && <ErrBox m={err} />}
     <select style={inp} value={pickId} onChange={e=>onPick(e.target.value)}>
@@ -134,7 +191,6 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
         {picked.email && <div>✉ {picked.email}</div>}
         {picked.phone && <div>☎ {picked.phone}</div>}
         {picked.address && <div>📍 {picked.address}</div>}
-        {picked.notes && <div style={{color:'var(--text3)'}}>{picked.notes}</div>}
       </div>
     )}
     {isNew && (
@@ -145,12 +201,55 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
         <input style={{...inp, marginTop:'8px'}} placeholder="Phone (optional)" value={newPhone} onChange={e=>setNewPhone(e.target.value)} />
       </div>
     )}
+
     <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (auto, editable)" value={number} onChange={e=>{setNumber(e.target.value); setErr('')}} />
-    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
+
+    {/* Line items */}
+    <div style={{ marginTop:'16px', marginBottom:'4px', fontSize:'12px', fontWeight:700, color:'var(--text2)' }}>Line items</div>
+    {lines.map((l,i)=>(
+      <div key={i} style={{ display:'flex', gap:'6px', marginBottom:'6px', alignItems:'flex-start' }}>
+        <input style={{...inp, flex:1}} placeholder="Description" value={l.description} onChange={e=>setLine(i,'description',e.target.value)} />
+        <input style={{...inp, width:'52px', textAlign:'center'}} type="number" placeholder="Qty" value={l.qty} onChange={e=>setLine(i,'qty',e.target.value)} />
+        <input style={{...inp, width:'82px'}} type="number" placeholder="£ each" value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)} />
+        <button onClick={()=>removeLine(i)} title="Remove" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text3)', width:'34px', cursor:'pointer', fontSize:'16px', lineHeight:'38px' }}>×</button>
+      </div>
+    ))}
+    <button onClick={addLine} style={{ background:'transparent', border:'1px dashed var(--border-light)', borderRadius:'8px', color:'var(--text2)', padding:'8px', width:'100%', cursor:'pointer', fontSize:'13px', marginTop:'2px' }}>+ Add line</button>
+
+    {/* VAT (only if registered) */}
+    {vatRegistered && !isFlat && (
+      <div style={{ marginTop:'12px' }}>
+        <div style={lblSm}>VAT rate %</div>
+        <input style={inp} type="number" value={vatRate} onChange={e=>setVatRate(e.target.value)} placeholder="20" />
+      </div>
+    )}
+    {vatRegistered && isFlat && (
+      <div style={{ marginTop:'12px', fontSize:'12px', color:'var(--text3)' }}>Flat Rate VAT @ {flatRate}% applied.</div>
+    )}
+
+    {/* Totals summary */}
+    <div style={{ marginTop:'14px', padding:'12px 14px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', fontSize:'13px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+      {vatRegistered && <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)', marginTop:'4px' }}><span>VAT {isFlat?`(Flat ${flatRate}%)`:`(${Number(vatRate)||0}%)`}</span><span>{fmt(vat)}</span></div>}
+      <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'6px', paddingTop:'6px', borderTop:'1px solid var(--border)' }}><span>Total</span><span style={{ color:'var(--orange-light)' }}>{fmt(total)}</span></div>
+    </div>
+
+    <div style={{ display:'flex', gap:'10px', marginTop:'12px' }}>
+      <div style={{ flex:1 }}>
+        <div style={lblSm}>Issue date</div>
+        <DateField value={date} onChange={setDate} />
+      </div>
+      <div style={{ flex:1 }}>
+        <div style={lblSm}>Due date</div>
+        <DateField value={dueDate} onChange={setDueDate} />
+      </div>
+    </div>
+
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
     </select>
-    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
+    <textarea style={{...inp, marginTop:'12px', minHeight:'48px', resize:'vertical', fontFamily:'inherit'}} placeholder="Notes (optional, shown on invoice)" value={notes} onChange={e=>setNotes(e.target.value)} />
+
     <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update income':'Save income')}</button>
   </Modal>
 }
