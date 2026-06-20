@@ -107,6 +107,23 @@ function Shell() {
     if(error){ flash('Delete failed'); return }
     loadAll(); flash('Income deleted')
   }
+  const onDownloadPdf = async (inv) => {
+    try {
+      const sess = await getSession()
+      const res = await fetch('/api/invoice-pdf', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${sess?.access_token||''}` },
+        body: JSON.stringify({ invoice_id: inv.id }),
+      })
+      if(!res.ok){ const e=await res.json().catch(()=>({})); flash(e.error||'Could not generate PDF'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `${inv.number||'invoice'}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch(e){ flash('Could not generate PDF') }
+  }
   const onMarkPaid = async (inv) => {
     const { error } = await updateInvoice(inv.id, { status:'paid' })
     if(error){ flash('Update failed'); return }
@@ -332,6 +349,7 @@ function Shell() {
                       <Td><Status s={i.status}/></Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                          <button style={actBtn} onClick={()=>onDownloadPdf(i)}>PDF</button>
                           <button style={actBtn} onClick={()=>onEditInvoice(i)}>Edit</button>
                           {i.status!=='paid' && <button style={actBtn} onClick={()=>onMarkPaid(i)}>Mark paid</button>}
                           <button style={actBtnDanger} onClick={()=>onDeleteInvoice(i)}>Delete</button>
