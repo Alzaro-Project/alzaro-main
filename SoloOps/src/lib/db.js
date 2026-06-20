@@ -125,3 +125,13 @@ export async function signedUrl(path, expires) {
 export async function removeFiles(paths) {
   return sb.storage.from('soloops-files').remove(paths)
 }
+
+// ---------- settings (soloops_settings: one row per user) ----------
+export async function loadSettings(uid) {
+  const { data } = await sb
+    .from('soloops_settings').select('*').eq('user_id', uid).maybeSingle()
+  return data || null
+}
+export async function saveSettings(record) {
+  return sb.from('soloops_settings').upsert(record, { onConflict: 'user_id' })
+}
