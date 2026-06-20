@@ -483,7 +483,7 @@ function ReportPreview({ report, onClose }) {
           <div style={{ fontSize: 12.5, color: "var(--txt-2)", marginBottom: 16, lineHeight: 1.6 }}>{report.desc}</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)" }}>{c}</th>)}</tr></thead>
-            <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>)}</tbody>
+            <tbody>{report.rows.length ? report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>) : <tr><td colSpan={report.cols.length} style={{ padding: "28px 10px", textAlign: "center", color: "var(--txt-3)", fontSize: 12 }}>No data yet — this report will populate once you add live records.</td></tr>}</tbody>
           </table>
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
             <Btn icon="ti-file-type-pdf" label="Export PDF" primary />
@@ -498,13 +498,7 @@ function ReportPreview({ report, onClose }) {
 
 const SAMPLE = {
   cols: ["Customer", "Detail", "Value", "Status"],
-  rows: [
-    ["King's Court Mgmt", "INV-1042", "£540", "Paid"],
-    ["Aisha Khan", "INV-1043", "£680", "Sent"],
-    ["Sarah Connor", "INV-1044", "£90", "Sent"],
-    ["Mill Lane Lettings", "INV-1041", "£1,850", "Overdue"],
-    ["David Lowe", "INV-1040", "£165", "Overdue"],
-  ],
+  rows: [],
 };
 
 function ReportsPage() {
