@@ -37,6 +37,7 @@ function Shell() {
   const [mileage, setMileage] = useState([])
   const [clients, setClients] = useState([])
   const [bizName, setBizName] = useState('')
+  const [settings, setSettings] = useState(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
@@ -78,6 +79,7 @@ function Shell() {
       let nm = access.business_name || ''
       try {
         const st = await loadSettings(uid)
+        if (st) setSettings(st)
         if (st && st.business_name) nm = st.business_name
       } catch (_) {}
       setBizName(nm)
@@ -506,7 +508,7 @@ function Shell() {
       </div>
 
       {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={(r)=>{setModal(null);loadAll();flash(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added')}} uid={uid} expenses={expenses} />}
-      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
