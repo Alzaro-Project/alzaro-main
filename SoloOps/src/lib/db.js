@@ -93,21 +93,29 @@ export async function insertClient(row) {
 // Ensure a client exists by name (case-insensitive). Returns { created, client }.
 // kind: 'customer' (from income) or 'supplier' (from expense).
 // If an existing client of the opposite kind matches, it's promoted to 'both'.
-export async function ensureClient(uid, name, kind) {
+export async function ensureClient(uid, name, kind, details) {
   const clean = (name||'').trim()
   if (!clean) return { created:false, client:null }
   const { data: existing } = await sb.from('soloops_clients')
     .select('*').ilike('name', clean).limit(1)
   const found = (existing||[])[0]
   if (found) {
-    if (found.kind && found.kind !== kind && found.kind !== 'both') {
-      await sb.from('soloops_clients').update({ kind:'both' }).eq('id', found.id)
-      return { created:false, client:{ ...found, kind:'both' } }
+    const patch = {}
+    if (found.kind && found.kind !== kind && found.kind !== 'both') patch.kind = 'both'
+    // fill in contact details only if the existing record is missing them
+    if (details?.email && !found.email) patch.email = details.email.trim()
+    if (details?.phone && !found.phone) patch.phone = details.phone.trim()
+    if (Object.keys(patch).length) {
+      await sb.from('soloops_clients').update(patch).eq('id', found.id)
+      return { created:false, client:{ ...found, ...patch } }
     }
     return { created:false, client:found }
   }
+  const row = { user_id:uid, name:clean, kind }
+  if (details?.email) row.email = details.email.trim()
+  if (details?.phone) row.phone = details.phone.trim()
   const { data: ins } = await sb.from('soloops_clients')
-    .insert({ user_id:uid, name:clean, kind }).select('*').limit(1)
+    .insert(row).select('*').limit(1)
   return { created:true, client:(ins||[])[0]||null }
 }
 export async function updateClient(id, row) {
