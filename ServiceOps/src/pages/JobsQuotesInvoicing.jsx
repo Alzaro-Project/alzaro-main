@@ -520,7 +520,7 @@ ${biz}`
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={labelTiny}>Message</div>
-              <textarea style={{ ...field, minHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
+              <textarea style={{ ...field, minHeight: 130, maxHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
             </div>
 
             {status === "error" && msg && (
@@ -549,6 +549,7 @@ function InvoicingPage({ user }) {
   const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft" };
   const [form, setForm] = useState(blank);
   const [emailInvoice, setEmailInvoice] = useState(null);
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -573,15 +574,20 @@ function InvoicingPage({ user }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_invoices").delete().eq("id", id); refresh(); } };
+  const markPaid = async (v) => { if (v.id && DB_READY) { await db.from("svc_invoices").update({ status: "Paid" }).eq("id", v.id); refresh(); } };
   const [confirmNode, ask] = useConfirm();
   const askDelete = (v) => ask(<span>Delete invoice <strong>{v.ref || "(no ref)"}</strong> for <strong>{v.customer || "—"}</strong> ({gbp(+v.amount || 0)})? This can't be undone.</span>, () => remove(v.id));
+
+  // Stored amount is treated as the gross total; VAT (20%) is worked backward from it.
+  const vatBreakdown = (total) => { const t = +total || 0; const sub = t / 1.2; return { sub, vat: t - sub, total: t }; };
+  const money = (n) => "£" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const data = rows || [];
   const collected = data.filter((v) => v.status === "Paid").reduce((s, v) => s + (v.amount || 0), 0);
   const overdue = data.filter((v) => v.status === "Overdue").reduce((s, v) => s + (v.amount || 0), 0);
   const sent = data.filter((v) => v.status === "Sent").reduce((s, v) => s + (v.amount || 0), 0);
   const outstanding = sent + overdue;
-  const vat = Math.round(collected * 0.2);
+  const vat = Math.round(collected - collected / 1.2);
 
   return (
     <div className="fade-in">
@@ -593,7 +599,7 @@ function InvoicingPage({ user }) {
         <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--green)" />
         <Metric label="Outstanding" value={gbp(outstanding)} sub="Sent + overdue" color="var(--amber)" />
         <Metric label="Overdue" value={gbp(overdue)} sub={`${data.filter((v) => v.status === "Overdue").length} invoices`} color="var(--red)" />
-        <Metric label="VAT due (est.)" value={gbp(vat)} sub="20% on collected" color="var(--blue)" />
+        <Metric label="VAT due (est.)" value={gbp(vat)} sub="incl. in collected" color="var(--blue)" />
       </div>
       {adding && (
         <div style={formCard}>
@@ -608,35 +614,53 @@ function InvoicingPage({ user }) {
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update invoice" : "Save invoice"} primary /></span></div>
         </div>
       )}
+      {/* Filter tabs */}
+      <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
+        {["All", "Draft", "Sent", "Paid", "Overdue"].map((f) => (
+          <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
+        ))}
+      </div>
+
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Invoice ledger</div>
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading invoices…</div>
-      ) : data.length === 0 ? (
-        <div style={emptyCard}>No invoices yet. Click "New invoice" to raise your first one.</div>
-      ) : (
-        <Table cols={["Ref", "Type", "Customer", "Amount", "Due date", "Status", ""]}>
-          {data.map((v, i) => (
-            <tr key={v.id || i}>
-              <Td><span style={{ fontWeight: 500, fontFamily: "monospace" }}>{v.ref || "—"}</span></Td>
-              <Td>{v.inv_type ? <Pill text={v.inv_type} tone={v.inv_type === "Deposit" ? "amber" : v.inv_type === "Part" ? "blue" : "green"} /> : <span style={{ color: "var(--txt-3)" }}>—</span>}</Td>
-              <Td>{v.customer}</Td>
-              <Td>{gbp(v.amount || 0)}</Td>
-              <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
-              <Td><Pill text={v.status} tone={v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : v.status === "Sent" ? "blue" : "amber"} /></Td>
-              <Td>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-                  {v.id && DB_READY && (
-                    <span onClick={() => setEmailInvoice(v)} title="Preview & send email" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: "var(--brand)", background: "var(--brand-soft)" }}>
-                      <i className="ti ti-send" style={{ fontSize: 14 }} />
-                    </span>
-                  )}
-                  {v.id && rowActions(DB_READY, () => openEdit(v), () => askDelete(v))}
-                </div>
-              </Td>
-            </tr>
-          ))}
-        </Table>
-      )}
+      ) : (() => {
+        const shown = filter === "All" ? data : data.filter((v) => v.status === filter);
+        if (shown.length === 0) return <div style={emptyCard}>{filter === "All" ? 'No invoices yet. Click "New invoice" to raise your first one.' : `No ${filter.toLowerCase()} invoices.`}</div>;
+        const ActionBtn = ({ icon, title, onClick, tone }) => {
+          const bg = tone === "green" ? "var(--green-soft)" : tone === "red" ? "var(--red-soft)" : tone === "brand" ? "var(--brand-soft)" : "var(--panel)";
+          const col = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : tone === "brand" ? "var(--brand)" : "var(--txt-3)";
+          return <span onClick={onClick} title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: col, background: bg, border: "0.5px solid var(--line)" }}><i className={`ti ${icon}`} style={{ fontSize: 14 }} /></span>;
+        };
+        return (
+          <Table cols={["Ref", "Customer", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
+            {shown.map((v, i) => {
+              const b = vatBreakdown(v.amount);
+              return (
+                <tr key={v.id || i}>
+                  <Td><span style={{ fontWeight: 600, fontFamily: "monospace", color: "var(--brand)" }}>{v.ref || "—"}</span></Td>
+                  <Td><span style={{ fontWeight: 500 }}>{v.customer}</span></Td>
+                  <Td color="var(--txt-2)">{money(b.sub)}</Td>
+                  <Td color="var(--txt-2)">{money(b.vat)}</Td>
+                  <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
+                  <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
+                  <Td><Pill text={v.status} tone={v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : v.status === "Sent" ? "blue" : "amber"} /></Td>
+                  <Td>
+                    {v.id && DB_READY ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <ActionBtn icon="ti-send" title="Preview & send email" tone="brand" onClick={() => setEmailInvoice(v)} />
+                        <ActionBtn icon="ti-pencil" title="Edit" onClick={() => openEdit(v)} />
+                        {v.status !== "Paid" && <ActionBtn icon="ti-check" title="Mark paid" tone="green" onClick={() => markPaid(v)} />}
+                        <ActionBtn icon="ti-trash" title="Delete" tone="red" onClick={() => askDelete(v)} />
+                      </div>
+                    ) : null}
+                  </Td>
+                </tr>
+              );
+            })}
+          </Table>
+        );
+      })()}
       {confirmNode}
       {emailInvoice && (
         <InvoiceEmailModal invoice={emailInvoice} user={user} onClose={() => setEmailInvoice(null)} onSent={refresh} />
