@@ -21,7 +21,7 @@ const TABS = [
   { key: 'billing',  label: '💳 Billing' },
 ]
 
-export default function Settings({ session, signOut, flash }) {
+export default function Settings({ session, signOut, flash, onBizChange }) {
   const uid = session.user.id
 
   const [tab, setTab] = React.useState('business')
@@ -141,6 +141,7 @@ export default function Settings({ session, signOut, flash }) {
       if (tag === 'business') {
         await updateAccessName(uid, name.trim())
         await updateUser({ data: { business_name: name.trim() } })
+        onBizChange?.(name.trim())
       }
       note('Saved')
     } catch (e) {
