@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
-import { insertExpense, insertInvoice, insertMileage, loadRules, upsertRule } from '../../lib/db.js'
+import { insertExpense, insertInvoice, updateInvoice, insertMileage, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
@@ -61,10 +61,10 @@ function nextFreeNumber(invoices){
   return candidate
 }
 
-export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
-  const [client,setClient]=useState(''); const [number,setNumber]=useState(()=>nextInvoiceNumber(invoices))
-  const [total,setTotal]=useState(''); const [status,setStatus]=useState('sent')
-  const [date,setDate]=useState(new Date().toISOString().slice(0,10))
+export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
+  const [client,setClient]=useState(edit?.client_name||''); const [number,setNumber]=useState(()=> edit ? (edit.number||'') : nextInvoiceNumber(invoices))
+  const [total,setTotal]=useState(edit?.total!=null?String(edit.total):''); const [status,setStatus]=useState(edit?.status||'sent')
+  const [date,setDate]=useState(edit?.issue_date || new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const [picked,setPicked]=useState(null)
   const pastClients = [...new Set((invoices||[]).map(i=>i.client_name).filter(Boolean))].sort()
@@ -77,21 +77,23 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
   const save = async () => {
     if(!client||!total) return setErr('Client and total are required')
     const num = number.trim()
-    // friendly duplicate check (UI layer) — suggest next free number
-    if(num && existingNumbers(invoices).has(num.toUpperCase())){
-      const free = nextFreeNumber(invoices)
+    // friendly duplicate check (UI layer) — exclude the row being edited
+    const others = (invoices||[]).filter(i=> !edit || i.id!==edit.id)
+    if(num && existingNumbers(others).has(num.toUpperCase())){
+      const free = nextFreeNumber(others)
       setErr(`Invoice number "${num}" already exists. Next free number is ${free}.`)
       setNumber(free)
       return
     }
     setBusy(true); setErr('')
-    const { error } = await insertInvoice({
-      user_id:uid, client_name:client.trim(), number:num||null, total:Number(total), status, issue_date:date
-    })
+    const payload = { client_name:client.trim(), number:num||null, total:Number(total), status, issue_date:date }
+    const { error } = edit
+      ? await updateInvoice(edit.id, payload)
+      : await insertInvoice({ user_id:uid, ...payload })
     if(error){
       // DB unique-violation (bulletproof layer) — race-safe fallback
       if(error.code==='23505' || /duplicate key|unique/i.test(error.message||'')){
-        const free = nextFreeNumber(invoices)
+        const free = nextFreeNumber(others)
         setErr(`That invoice number was just taken. Next free number is ${free}.`)
         setNumber(free)
         setBusy(false); return
@@ -100,7 +102,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
     }
     onSaved()
   }
-  return <Modal title="Add income" onClose={onClose}>
+  return <Modal title={edit?"Edit income":"Add income"} onClose={onClose}>
     {err && <ErrBox m={err} />}
     {savedClients.length>0 && (
       <select style={{...inp, marginBottom:'12px'}} value={picked?.id||''} onChange={e=>onPick(e.target.value)}>
@@ -124,7 +126,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients}) {
       <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
     </select>
     <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save income'}</button>
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update income':'Save income')}</button>
   </Modal>
 }
 
