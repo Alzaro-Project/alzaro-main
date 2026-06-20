@@ -125,31 +125,34 @@ function Dashboard({ user, signOut }) {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 80 }} />}
-      <aside style={{ width: 240, background: "var(--panel)", borderRight: "0.5px solid var(--line)", padding: "18px 14px", display: "flex", flexDirection: "column", overflowY: "auto",
+      <aside style={{ width: 240, background: "var(--panel)", borderRight: "0.5px solid var(--line)", display: "flex", flexDirection: "column", overflowY: "auto",
         ...(isMobile
           ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 90, transform: navOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: navOpen ? "0 0 40px rgba(0,0,0,.5)" : "none" }
           : { width: 210, position: "sticky", top: 0, height: "100vh" }) }}>
         {/* logo */}
-        <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
-        <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 18 }}>Property Operations Pro</div>
-        {/* business name (real DB data, not email) */}
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
-        {/* tier badge with crown icon */}
-        {(() => {
-          const TIER_COL = {
-            starter:      { bg: "rgba(180,100,30,0.12)", color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
-            professional: { bg: "rgba(100,100,120,0.1)", color: "#6b7080", border: "rgba(100,100,120,0.25)" },
-            enterprise:   { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
-          };
-          const ts = TIER_COL[(biz.tier || "enterprise").toLowerCase()] || TIER_COL.enterprise;
-          return (
-            <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20, margin: "6px 0 16px" }}>
-              <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
-            </span>
-          );
-        })()}
+        <div style={{ padding: "18px 16px 14px", borderBottom: "0.5px solid var(--line)" }}>
+          <div className="brand" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Property Operations Pro</div>
+        </div>
+        {/* business name + tier badge */}
+        <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--line)" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
+          {(() => {
+            const TIER_COL = {
+              starter:      { bg: "rgba(180,100,30,0.12)", color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
+              professional: { bg: "rgba(100,100,120,0.1)", color: "#6b7080", border: "rgba(100,100,120,0.25)" },
+              enterprise:   { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
+            };
+            const ts = TIER_COL[(biz.tier || "enterprise").toLowerCase()] || TIER_COL.enterprise;
+            return (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20 }}>
+                <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
+              </span>
+            );
+          })()}
+        </div>
         {/* working search bar */}
-        <div style={{ position: "relative", marginBottom: 16 }}>
+        <div style={{ position: "relative", padding: "12px 12px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
             <i className="ti ti-search" style={{ fontSize: 14, color: "var(--txt-3)" }} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12, fontFamily: "Inter" }} />
@@ -170,12 +173,12 @@ function Dashboard({ user, signOut }) {
           )}
         </div>
         {/* nav */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 0", flex: 1 }}>
           {NAV.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)" }}
-                onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--panel-2)"; }}
+              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--brand-soft, rgba(79,70,229,0.1))" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)" }}
+                onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "rgba(127,127,127,0.08)"; }}
                 onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ flex: 1 }}>{n.label}</span>
@@ -183,14 +186,14 @@ function Dashboard({ user, signOut }) {
             );
           })}
         </nav>
-        <div style={{ marginTop: "auto", borderTop: "0.5px solid var(--line)", paddingTop: 14 }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9 }}>{user ? user.email : ""}</div>
-          <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7 }}>
-            <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 15, color: "var(--amber)" }} />
-            <span style={{ fontSize: 12, color: "var(--txt)" }}>{light ? "Dark Mode" : "Light Mode"}</span>
+        <div style={{ borderTop: "0.5px solid var(--line)", padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : ""}</div>
+          <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7, color: "var(--txt-2)", fontSize: 12 }}>
+            <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14, color: "var(--amber)" }} />
+            <span>{light ? "Dark Mode" : "Light Mode"}</span>
           </div>
-          <div onClick={signOut} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)" }}>
-            <i className="ti ti-logout" style={{ fontSize: 15 }} /><span style={{ fontSize: 12 }}>Sign Out</span></div>
+          <div onClick={signOut} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", color: "var(--txt-2)", fontSize: 12 }}>
+            <i className="ti ti-logout" style={{ fontSize: 14 }} /><span>Sign Out</span></div>
         </div>
       </aside>
 
