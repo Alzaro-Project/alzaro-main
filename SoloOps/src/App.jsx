@@ -49,7 +49,12 @@ function Shell() {
 
   useEffect(() => {
     getSession().then((s) => setSession(s || null))
-    const sub = onAuthChange((_e, s) => setSession(s))
+    const sub = onAuthChange((event, s) => {
+      // Ignore TOKEN_REFRESHED — it fires on tab-refocus and would otherwise
+      // hand us a new session object every time, forcing a full data reload.
+      if (event === 'TOKEN_REFRESHED') return
+      setSession(s)
+    })
     return () => sub?.unsubscribe?.()
   }, [])
 
@@ -83,7 +88,9 @@ function Shell() {
     setClients(cli || [])
     setLoading(false)
   }
-  useEffect(() => { if (session) loadAll() }, [session])
+  // Reload only when the logged-in USER changes (real login/logout),
+  // not on every new session object (e.g. token refresh on tab-refocus).
+  useEffect(() => { if (session?.user?.id) loadAll() }, [session?.user?.id])
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
