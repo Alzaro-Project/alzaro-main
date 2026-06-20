@@ -242,7 +242,7 @@ ${biz}`
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={labelTiny}>Message</div>
-              <textarea style={{ ...field, minHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
+              <textarea style={{ ...field, minHeight: 130, maxHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
             </div>
 
             {status === "error" && msg && (
@@ -273,6 +273,7 @@ export function FinancePage({ user, go }) {
   const blank = { tenant: "", property_id: "", amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -322,6 +323,15 @@ export function FinancePage({ user, go }) {
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 
+  // Stored amount is treated as the gross total; VAT (20%) is worked backward from it.
+  const vatBreakdown = (total) => { const t = +total || 0; const sub = t / 1.2; return { sub, vat: t - sub, total: t }; };
+  const money = (n) => "£" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const ActionBtn = ({ icon, title, onClick, tone }) => {
+    const bg = tone === "green" ? "var(--green-soft)" : tone === "red" ? "var(--red-soft)" : tone === "brand" ? "var(--brand-soft)" : "var(--panel-2)";
+    const col = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : tone === "brand" ? "var(--brand)" : "var(--txt-3)";
+    return <span onClick={(e) => { e.stopPropagation(); onClick(); }} title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: col, background: bg, border: "0.5px solid var(--line)" }}><i className={`ti ${icon}`} style={{ fontSize: 14 }} /></span>;
+  };
+
   return (
     <div className="fade-in">
       <PageHead title="Finance" sub={rows ? `${data.length} payment${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
@@ -353,14 +363,26 @@ export function FinancePage({ user, go }) {
         </div>
       )}
 
+      {/* Filter tabs */}
+      {rows && data.length > 0 && (
+        <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
+          {["All", "Pending", "Paid", "Overdue"].map((f) => (
+            <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
+          ))}
+        </div>
+      )}
+
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger</div>
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading payments…</div>
       ) : data.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
-      ) : (
-        <Table cols={["", "Tenant", "Property", "Amount", "Due date", "Status", ""]}>
-          {data.map((p, i) => {
+      ) : (() => {
+        const shown = filter === "All" ? data : data.filter((p) => p.status === filter);
+        if (shown.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No {filter.toLowerCase()} payments.</div>;
+        return (
+        <Table cols={["", "Tenant", "Property", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
+          {shown.map((p, i) => {
             const isOpen = expandedId === (p.id || i);
             const pid = p.property_id;
             const same = (x) => pid && String(x.property_id) === String(pid);
@@ -369,20 +391,30 @@ export function FinancePage({ user, go }) {
             const pC = related.comp.filter(same);
             const pM = related.maint.filter(same);
             const today = new Date(); today.setHours(0, 0, 0, 0);
+            const b = vatBreakdown(p.amount);
             return (
               <React.Fragment key={p.id || i}>
                 <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (p.id || i))}>
                   <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
                   <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
                   <Td color="var(--txt-2)">{propName}</Td>
-                  <Td>{gbp(p.amount || 0)}</Td>
+                  <Td color="var(--txt-2)">{money(b.sub)}</Td>
+                  <Td color="var(--txt-2)">{money(b.vat)}</Td>
+                  <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
                   <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
                   <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
-                  <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12, alignItems: "center" }} onClick={(e) => e.stopPropagation()}><i className="ti ti-send" onClick={() => setEmailPayment(p)} style={{ fontSize: 15, color: "var(--brand)", cursor: "pointer" }} title="Preview & send email" />{(p.status === "Pending" || p.status === "Overdue") && <i className="ti ti-circle-check" onClick={() => markReceived(p)} style={{ fontSize: 16, color: "var(--green)", cursor: "pointer" }} title="Mark received" />}<i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                  <Td>{p.id && DB_READY ? (
+                    <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                      <ActionBtn icon="ti-send" title="Preview & send email" tone="brand" onClick={() => setEmailPayment(p)} />
+                      <ActionBtn icon="ti-pencil" title="Edit" onClick={() => openEdit(p)} />
+                      {(p.status === "Pending" || p.status === "Overdue") && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
+                      <ActionBtn icon="ti-trash" title="Delete" tone="red" onClick={() => remove(p.id)} />
+                    </div>
+                  ) : null}</Td>
                 </tr>
                 {isOpen && (
                   <tr>
-                    <td colSpan={7} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                    <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px" }}>
                         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
                           <DetailBox title="Tenant(s)" icon="ti-users" empty={pT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
@@ -404,7 +436,8 @@ export function FinancePage({ user, go }) {
             );
           })}
         </Table>
-      )}
+        );
+      })()}
       {emailPayment && (
         <PaymentEmailModal
           payment={emailPayment}
