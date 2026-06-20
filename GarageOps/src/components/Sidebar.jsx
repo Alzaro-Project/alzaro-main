@@ -24,7 +24,7 @@ const NAV = [
 const TIER_STYLE = {
   bronze: { bg: 'rgba(180,100,30,0.18)', color: '#cd7f32', border: 'rgba(180,100,30,0.3)', icon: 'ti-award' },
   silver: { bg: 'rgba(160,160,160,0.15)', color: '#c0c0c0', border: 'rgba(160,160,160,0.3)', icon: 'ti-medal' },
-  gold:   { bg: 'rgba(245,200,66,0.12)',  color: '#f5c842', border: 'rgba(245,200,66,0.3)',  icon: 'ti-crown' },
+  gold:   { bg: 'rgba(79,70,229,0.1)',  color: '#4f46e5', border: 'rgba(79,70,229,0.25)',  icon: 'ti-crown' },
   admin:  { bg: 'rgba(167,139,250,0.1)',  color: '#a78bfa', border: 'rgba(167,139,250,0.3)', icon: 'ti-shield-lock' },
 }
 
@@ -72,19 +72,19 @@ export default function Sidebar({ onNavigate, isMobile }) {
           {settings?.name || user?.name || 'Your Garage'}
         </div>
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '4px',
+          display: 'inline-flex', alignItems: 'center', gap: '5px',
           padding: '3px 9px', borderRadius: '20px',
-          fontSize: '10px', fontWeight: 500, fontFamily: 'monospace',
+          fontSize: '11px', fontWeight: 700, fontFamily: 'monospace',
           background: ts.bg, color: ts.color, border: `1px solid ${ts.border}`,
-          textTransform: 'uppercase', letterSpacing: '0.5px',
+          textTransform: 'uppercase',
         }}>
-          <i className={`ti ${ts.icon}`} style={{ fontSize: '10px' }} aria-hidden="true" />
+          <i className={`ti ${ts.icon}`} style={{ fontSize: '11px' }} aria-hidden="true" />
           {tier}
         </span>
       </div>
 
       {/* Search */}
-      <div style={{ padding: '10px 12px' }}>
+      <div style={{ padding: '12px 12px' }}>
         <GlobalSearch showInSidebar placeholder="Search..." onResultClick={() => { if (onNavigate) onNavigate() }} />
       </div>
 
@@ -174,11 +174,11 @@ function NavItem({ icon, label, active, locked, onClick }) {
       display: 'flex',
       alignItems: 'center',
       gap: '10px',
-      padding: '10px 14px',
+      padding: '10px 16px',
       margin: '2px 8px',
       borderRadius: '8px',
       fontSize: '13px',
-      fontWeight: active ? 500 : 400,
+      fontWeight: active ? 600 : 500,
       cursor: 'pointer',
       transition: 'all .12s',
       color: active ? 'var(--text)' : 'var(--text2)',
@@ -186,7 +186,7 @@ function NavItem({ icon, label, active, locked, onClick }) {
     }}>
       <i className={`ti ${icon}`} style={{
         fontSize: '16px',
-        width: '18px',
+        width: '20px',
         textAlign: 'center',
         color: active ? 'var(--red)' : 'var(--text2)',
       }} aria-hidden="true" />
