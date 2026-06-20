@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
-import { insertExpense, insertInvoice, updateInvoice, insertMileage, loadRules, upsertRule } from '../../lib/db.js'
+import { insertExpense, insertInvoice, updateInvoice, insertMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
@@ -25,7 +25,9 @@ export function ExpenseForm({onClose,onSaved,uid,expenses}) {
 
     await upsertRule({ user_id:uid, pattern:merchant.trim().split(' ')[0].toUpperCase(), category })
       .then(()=>{}).catch(()=>{})
-    onSaved()
+    let added=null
+    try { const r = await ensureClient(uid, merchant.trim(), 'supplier'); if(r.created) added=r.client?.name } catch(e){}
+    onSaved(added ? { addedClient: added } : undefined)
   }
   return <Modal title="Add expense" onClose={onClose}>
     {err && <ErrBox m={err} />}
@@ -100,7 +102,9 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
       }
       setErr(error.message); setBusy(false); return
     }
-    onSaved()
+    let added=null
+    try { const r = await ensureClient(uid, client.trim(), 'customer'); if(r.created) added=r.client?.name } catch(e){}
+    onSaved(added ? { addedClient: added } : undefined)
   }
   return <Modal title={edit?"Edit income":"Add income"} onClose={onClose}>
     {err && <ErrBox m={err} />}
