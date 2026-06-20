@@ -544,6 +544,7 @@ export function ReportsPage({ user }) {
 
 export function SettingsPage({ user }) {
   const isMobile = useIsMobile();
+  const [tab, setTab] = useState("organisation");
   const [org, setOrg] = useState({ company_name: "", vat_number: "" });
   const [notif, setNotif] = useState({ notify_compliance: true, notify_rent: true, reminder_lead: "30 / 7 days before expiry" });
   const [loaded, setLoaded] = useState(false);
@@ -551,6 +552,14 @@ export function SettingsPage({ user }) {
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
   const currentPlan = "Enterprise"; // shown as current; real billing is future Stripe work
+
+  const TABS = [
+    { key: "organisation", label: "Organisation", icon: "ti-building" },
+    { key: "notifications", label: "Notifications", icon: "ti-bell" },
+    { key: "email", label: "Email", icon: "ti-mail" },
+    { key: "vat", label: "VAT", icon: "ti-receipt" },
+    { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
+  ];
 
   useEffect(() => {
     if (!DB_READY) { setLoaded(true); return; }
@@ -603,99 +612,135 @@ export function SettingsPage({ user }) {
     </div>
   );
 
+  const Toggle = ({ on, onClick }) => (
+    <span onClick={onClick} style={{ width: 38, height: 22, borderRadius: 11, background: on ? "var(--brand)" : "var(--line-2)", position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
+      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+    </span>
+  );
+
+  const ComingSoon = ({ icon, title, text }) => (
+    <div style={{ ...card, textAlign: "center", padding: "40px 24px" }}>
+      <span style={{ width: 44, height: 44, borderRadius: 11, background: "var(--brand-soft)", color: "var(--brand)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><i className={`ti ${icon}`} style={{ fontSize: 22 }} /></span>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 12.5, color: "var(--txt-3)", maxWidth: 360, margin: "0 auto", lineHeight: 1.5 }}>{text}</div>
+      <span style={{ display: "inline-block", marginTop: 14, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--brand)", background: "var(--brand-soft)", padding: "4px 12px", borderRadius: 20 }}>Coming soon</span>
+    </div>
+  );
+
   return (
     <div className="fade-in">
       <PageHead title="Settings" sub="Manage your organisation, team and subscription." />
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
-        {/* Organisation — editable */}
-        <div style={card}>
-          {head("ti-building", "Organisation")}
-          {!loaded ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>Loading…</div> : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <label style={fld}>Company name<input style={inp} placeholder="e.g. Alzaro Property Co." value={org.company_name} onChange={(e) => setOrg({ ...org, company_name: e.target.value })} /></label>
-              <label style={fld}>VAT number<input style={inp} placeholder="e.g. GB 123 4567 89" value={org.vat_number} onChange={(e) => setOrg({ ...org, vat_number: e.target.value })} /></label>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
-              {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
-                {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Team & roles */}
-        <div style={card}>
-          {head("ti-users", "Team & roles")}
-          {[["You", user ? user.email : "—", "Admin"], ["Invite teammates", "Coming soon", ""]].map((r, j) => (
-            <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j === 0 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
-              <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] && r[1] !== "Coming soon" ? ` · ${r[1]}` : ""}{r[1] === "Coming soon" ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Enterprise plan.</div>
-        </div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 12, padding: 5, marginBottom: 18, width: isMobile ? "100%" : "fit-content", overflowX: "auto" }}>
+        {TABS.map((t) => (
+          <div key={t.key} onClick={() => setTab(t.key)} style={{ display: "flex", alignItems: "center", gap: 7, padding: isMobile ? "9px 12px" : "9px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: tab === t.key ? "var(--brand)" : "transparent", color: tab === t.key ? "#fff" : "var(--txt-2)" }}>
+            <i className={`ti ${t.icon}`} style={{ fontSize: 14 }} />{t.label}
+          </div>
+        ))}
       </div>
 
-      {/* Notifications — editable */}
-      <div style={{ ...card, marginBottom: 18 }}>
-        {head("ti-bell", "Notifications")}
-        {(() => {
-          const Toggle = ({ on, onClick }) => (
-            <span onClick={onClick} style={{ width: 38, height: 22, borderRadius: 11, background: on ? "var(--brand)" : "var(--line-2)", position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
-              <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
-            </span>
-          );
-          return (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
-                <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Compliance reminders</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when certificates are due to expire</div></div>
-                <Toggle on={notif.notify_compliance} onClick={() => setNotif({ ...notif, notify_compliance: !notif.notify_compliance })} />
+      {/* ORGANISATION */}
+      {tab === "organisation" && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12 }}>
+          <div style={card}>
+            {head("ti-building", "Organisation")}
+            {!loaded ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>Loading…</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label style={fld}>Company name<input style={inp} placeholder="e.g. Alzaro Property Co." value={org.company_name} onChange={(e) => setOrg({ ...org, company_name: e.target.value })} /></label>
+                <label style={fld}>VAT number<input style={inp} placeholder="e.g. GB 123 4567 89" value={org.vat_number} onChange={(e) => setOrg({ ...org, vat_number: e.target.value })} /></label>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
+                {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+                  {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
-                <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Rent overdue alerts</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when a payment becomes overdue</div></div>
-                <Toggle on={notif.notify_rent} onClick={() => setNotif({ ...notif, notify_rent: !notif.notify_rent })} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
-                <div style={{ fontSize: 12.5, color: "var(--txt)" }}>Reminder lead time</div>
-                <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "7px 10px", color: "var(--txt)", fontSize: 12, fontFamily: "Inter", outline: "none" }}>
-                  {["60 / 30 / 7 days before expiry", "30 / 7 days before expiry", "14 / 1 days before expiry", "7 days before expiry"].map((x) => <option key={x}>{x}</option>)}
-                </select>
-              </div>
-              <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 6 }}>Changes save with the "Save changes" button above. Email delivery of these reminders is coming soon — alerts currently show in the app.</div>
-            </div>
-          );
-        })()}
-      </div>
+            )}
+          </div>
 
-      {/* Subscription */}
-      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
-        {tiers.map((t) => {
-          const isCurrent = t.name === currentPlan;
-          return (
-            <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
-              {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
-              <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
-              <div style={{ marginBottom: 14 }}><span style={{ fontSize: 26, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /{t.sub.replace("per ", "")}</span></div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
-                {t.features.map((f, k) => (
-                  <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, color: "var(--txt-2)" }}>
-                    <i className="ti ti-check" style={{ fontSize: 13, color: "var(--green)", marginTop: 1, flexShrink: 0 }} />{f}
+          <div style={card}>
+            {head("ti-users", "Team & roles")}
+            {[["You", user ? user.email : "—", "Admin"], ["Invite teammates", "Coming soon", ""]].map((r, j) => (
+              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j === 0 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
+                <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] && r[1] !== "Coming soon" ? ` · ${r[1]}` : ""}{r[1] === "Coming soon" ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Enterprise plan.</div>
+          </div>
+        </div>
+      )}
+
+      {/* NOTIFICATIONS */}
+      {tab === "notifications" && (
+        <div style={card}>
+          {head("ti-bell", "Notifications")}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Compliance reminders</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when certificates are due to expire</div></div>
+              <Toggle on={notif.notify_compliance} onClick={() => setNotif({ ...notif, notify_compliance: !notif.notify_compliance })} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Rent overdue alerts</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when a payment becomes overdue</div></div>
+              <Toggle on={notif.notify_rent} onClick={() => setNotif({ ...notif, notify_rent: !notif.notify_rent })} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
+              <div style={{ fontSize: 12.5, color: "var(--txt)" }}>Reminder lead time</div>
+              <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "7px 10px", color: "var(--txt)", fontSize: 12, fontFamily: "Inter", outline: "none" }}>
+                {["60 / 30 / 7 days before expiry", "30 / 7 days before expiry", "14 / 1 days before expiry", "7 days before expiry"].map((x) => <option key={x}>{x}</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+              <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+              {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+            </div>
+            <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>Email delivery of these reminders is coming soon — alerts currently show in the app.</div>
+          </div>
+        </div>
+      )}
+
+      {/* EMAIL */}
+      {tab === "email" && (
+        <ComingSoon icon="ti-mail" title="Email & SMTP" text="Connect your own email service to send compliance reminders, rent alerts and invoices straight from your domain. Custom SMTP setup is on the way." />
+      )}
+
+      {/* VAT */}
+      {tab === "vat" && (
+        <ComingSoon icon="ti-receipt" title="VAT settings" text="Set your VAT scheme and registration details so they flow through to your invoices and reports automatically. This is coming soon." />
+      )}
+
+      {/* SUBSCRIPTION */}
+      {tab === "subscription" && (
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+            {tiers.map((t) => {
+              const isCurrent = t.name === currentPlan;
+              return (
+                <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
+                  {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
+                  <div style={{ marginBottom: 14 }}><span style={{ fontSize: 26, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /{t.sub.replace("per ", "")}</span></div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
+                    {t.features.map((f, k) => (
+                      <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, color: "var(--txt-2)" }}>
+                        <i className="ti ti-check" style={{ fontSize: 13, color: "var(--green)", marginTop: 1, flexShrink: 0 }} />{f}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {isCurrent ? (
-                <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
-              ) : (
-                <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
+                  {isCurrent ? (
+                    <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
+                  ) : (
+                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
+        </div>
+      )}
     </div>
   );
 }
