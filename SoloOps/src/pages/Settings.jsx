@@ -18,6 +18,7 @@ const TABS = [
   { key: 'business', label: '🏢 Business' },
   { key: 'vat',      label: '📊 VAT' },
   { key: 'email',    label: '📧 Email' },
+  { key: 'payment',  label: '🏦 Payment' },
   { key: 'billing',  label: '💳 Billing' },
 ]
 
@@ -49,6 +50,12 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   const [smtpFromName, setSmtpFromName] = React.useState('')
   const [smtpFromEmail, setSmtpFromEmail] = React.useState('')
   const [emailFooter, setEmailFooter] = React.useState('')
+  // Payment / bank (printed on invoices)
+  const [bankName, setBankName] = React.useState('')
+  const [bankAccountName, setBankAccountName] = React.useState('')
+  const [bankSortCode, setBankSortCode] = React.useState('')
+  const [bankAccountNumber, setBankAccountNumber] = React.useState('')
+  const [paymentTerms, setPaymentTerms] = React.useState('')
   const [smtpTest, setSmtpTest] = React.useState(null) // null | 'testing' | 'ok' | 'error'
   const [smtpTestMsg, setSmtpTestMsg] = React.useState('')
 
@@ -91,6 +98,11 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         setSmtpFromName(s?.smtp_from_name || '')
         setSmtpFromEmail(s?.smtp_from_email || '')
         setEmailFooter(s?.email_footer || '')
+        setBankName(s?.bank_name || '')
+        setBankAccountName(s?.bank_account_name || '')
+        setBankSortCode(s?.bank_sort_code || '')
+        setBankAccountNumber(s?.bank_account_number || '')
+        setPaymentTerms(s?.payment_terms || '')
       } catch (e) {
         // first run, no row yet — defaults stand
       } finally {
@@ -131,6 +143,11 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       smtp_from_name: smtpFromName.trim(),
       smtp_from_email: smtpFromEmail.trim(),
       email_footer: emailFooter,
+      bank_name: bankName.trim(),
+      bank_account_name: bankAccountName.trim(),
+      bank_sort_code: bankSortCode.trim(),
+      bank_account_number: bankAccountNumber.trim(),
+      payment_terms: paymentTerms.trim(),
       updated_at: new Date().toISOString(),
       ...extra,
     }
@@ -370,6 +387,37 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
             <button style={{...btnSec, opacity:smtpTest==='testing'?.7:1}} disabled={smtpTest==='testing'} onClick={testSmtp}>{smtpTest==='testing'?'Testing…':'Test connection'}</button>
             <button style={{...btnPri, opacity:busy==='email'?.7:1}} disabled={busy==='email'} onClick={()=>persist({}, 'email')}>{busy==='email'?'Saving…':'Save email settings'}</button>
           </div>
+        </div>
+      )}
+
+      {/* PAYMENT TAB */}
+      {tab === 'payment' && (
+        <div data-card style={card}>
+          <div style={sectionTitle}>Payment details</div>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on invoices and in the “how to pay” section of invoice emails. Until online payments go live, customers pay by bank transfer using these details.</div>
+          <div style={field}>
+            <div style={lbl}>Account name</div>
+            <input style={inp} value={bankAccountName} onChange={e=>setBankAccountName(e.target.value)} placeholder="Name on the account" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Bank name</div>
+            <input style={inp} value={bankName} onChange={e=>setBankName(e.target.value)} placeholder="e.g. Barclays" />
+          </div>
+          <div style={{ display:'flex', gap:'10px' }}>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>Sort code</div>
+              <input style={inp} value={bankSortCode} onChange={e=>setBankSortCode(e.target.value)} placeholder="00-00-00" />
+            </div>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>Account number</div>
+              <input style={inp} value={bankAccountNumber} onChange={e=>setBankAccountNumber(e.target.value)} placeholder="12345678" />
+            </div>
+          </div>
+          <div style={field}>
+            <div style={lbl}>Payment terms (optional)</div>
+            <input style={inp} value={paymentTerms} onChange={e=>setPaymentTerms(e.target.value)} placeholder="e.g. Payment due within 14 days" />
+          </div>
+          <button style={{...btnPri, opacity:busy==='payment'?.7:1}} disabled={busy==='payment'} onClick={()=>persist({}, 'payment')}>{busy==='payment'?'Saving…':'Save payment details'}</button>
         </div>
       )}
 
