@@ -1,32 +1,151 @@
 import React from 'react'
 import { card, inp, btnPri, btnSec } from '../components/UI.jsx'
-import { updateUser, updateAccessName, uploadFile, signedUrl } from '../lib/db.js'
+import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings } from '../lib/db.js'
+
+// SMTP provider presets (inlined — SoloOps has no lib/email.js)
+const SMTP_PRESETS = {
+  custom:  { label: 'Custom / Other',        host: '',                       port: 587, secure: false },
+  outlook: { label: 'Outlook / Hotmail',     host: 'smtp-mail.outlook.com',  port: 587, secure: false },
+  gmail:   { label: 'Gmail / Google Workspace', host: 'smtp.gmail.com',      port: 587, secure: false },
+  office365: { label: 'Microsoft 365',       host: 'smtp.office365.com',     port: 587, secure: false },
+  zoho:    { label: 'Zoho Mail',             host: 'smtp.zoho.eu',           port: 587, secure: false },
+  ionos:   { label: 'IONOS',                 host: 'smtp.ionos.co.uk',       port: 587, secure: false },
+  resend:  { label: 'Resend',                host: 'smtp.resend.com',        port: 587, secure: false },
+  sendgrid:{ label: 'SendGrid',              host: 'smtp.sendgrid.net',      port: 587, secure: false },
+}
+
+const TABS = [
+  { key: 'business', label: '🏢 Business' },
+  { key: 'vat',      label: '📊 VAT' },
+  { key: 'email',    label: '📧 Email' },
+  { key: 'billing',  label: '💳 Billing' },
+]
 
 export default function Settings({ session, signOut, flash }) {
-  const [name, setName] = React.useState(session.user.user_metadata?.business_name || '')
-  const [address, setAddress] = React.useState(session.user.user_metadata?.company_address || '')
-  const [vatNo, setVatNo] = React.useState(session.user.user_metadata?.vat_number || '')
-  const [logoUrl, setLogoUrl] = React.useState(session.user.user_metadata?.logo_url || '')
-  const [email, setEmail] = React.useState(session.user.email || '')
+  const uid = session.user.id
+
+  const [tab, setTab] = React.useState('business')
+
+  // Business
+  const [name, setName] = React.useState('')
+  const [address, setAddress] = React.useState('')
+  const [phone, setPhone] = React.useState('')
+  const [bizEmail, setBizEmail] = React.useState('')
+  const [logoUrl, setLogoUrl] = React.useState('')
+
+  // VAT
+  const [vatRegistered, setVatRegistered] = React.useState(false)
+  const [vatNo, setVatNo] = React.useState('')
+  const [vatScheme, setVatScheme] = React.useState('standard')
+  const [flatRate, setFlatRate] = React.useState(16.5)
+
+  // Email / SMTP
+  const [smtpProvider, setSmtpProvider] = React.useState('custom')
+  const [smtpHost, setSmtpHost] = React.useState('')
+  const [smtpPort, setSmtpPort] = React.useState(587)
+  const [smtpSecure, setSmtpSecure] = React.useState(false)
+  const [smtpUser, setSmtpUser] = React.useState('')
+  const [smtpPass, setSmtpPass] = React.useState('')
+  const [smtpFromName, setSmtpFromName] = React.useState('')
+  const [smtpFromEmail, setSmtpFromEmail] = React.useState('')
+  const [emailFooter, setEmailFooter] = React.useState('')
+  const [smtpTest, setSmtpTest] = React.useState(null) // null | 'testing' | 'ok' | 'error'
+  const [smtpTestMsg, setSmtpTestMsg] = React.useState('')
+
+  // Login email / password
+  const [loginEmail, setLoginEmail] = React.useState(session.user.email || '')
   const [pw, setPw] = React.useState('')
   const [pw2, setPw2] = React.useState('')
+
   const [busy, setBusy] = React.useState('')
   const [msg, setMsg] = React.useState('')
   const [err, setErr] = React.useState('')
+  const [loaded, setLoaded] = React.useState(false)
 
   const note = (m) => { setMsg(m); setErr(''); setTimeout(()=>setMsg(''), 3500) }
   const fail = (m) => { setErr(m); setMsg('') }
 
-  const saveName = async () => {
-    setBusy('name'); setErr('')
+  // Load existing settings (falls back to user_metadata for first-run migration)
+  React.useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const s = await loadSettings(uid)
+        const md = session.user.user_metadata || {}
+        if (!alive) return
+        setName((s?.business_name ?? md.business_name) || '')
+        setAddress((s?.address ?? md.company_address) || '')
+        setPhone((s?.phone ?? md.phone) || '')
+        setBizEmail((s?.email ?? md.business_email) || '')
+        setLogoUrl((s?.logo_url ?? md.logo_url) || '')
+        setVatRegistered(s?.vat_registered ?? !!md.vat_number)
+        setVatNo((s?.vat_number ?? md.vat_number) || '')
+        setVatScheme(s?.vat_scheme || 'standard')
+        setFlatRate(s?.flat_rate ?? 16.5)
+        setSmtpProvider(s?.smtp_provider || 'custom')
+        setSmtpHost(s?.smtp_host || '')
+        setSmtpPort(s?.smtp_port || 587)
+        setSmtpSecure(s?.smtp_secure ?? false)
+        setSmtpUser(s?.smtp_user || '')
+        setSmtpPass(s?.smtp_pass || '')
+        setSmtpFromName(s?.smtp_from_name || '')
+        setSmtpFromEmail(s?.smtp_from_email || '')
+        setEmailFooter(s?.email_footer || '')
+      } catch (e) {
+        // first run, no row yet — defaults stand
+      } finally {
+        if (alive) setLoaded(true)
+      }
+    })()
+    return () => { alive = false }
+  }, [uid])
+
+  const applyProvider = (key) => {
+    setSmtpProvider(key)
+    const p = SMTP_PRESETS[key]
+    if (p && key !== 'custom') {
+      setSmtpHost(p.host); setSmtpPort(p.port); setSmtpSecure(p.secure)
+    }
+  }
+
+  // ---- saves ----
+  const persist = async (extra, tag) => {
+    setBusy(tag); setErr('')
+    const record = {
+      user_id: uid,
+      business_name: name.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      email: bizEmail.trim(),
+      logo_url: logoUrl,
+      vat_registered: vatRegistered,
+      vat_number: vatNo.trim(),
+      vat_scheme: vatScheme,
+      flat_rate: Number(flatRate) || 0,
+      smtp_provider: smtpProvider,
+      smtp_host: smtpHost.trim(),
+      smtp_port: Number(smtpPort) || 587,
+      smtp_secure: smtpSecure,
+      smtp_user: smtpUser.trim(),
+      smtp_pass: smtpPass,
+      smtp_from_name: smtpFromName.trim(),
+      smtp_from_email: smtpFromEmail.trim(),
+      email_footer: emailFooter,
+      updated_at: new Date().toISOString(),
+      ...extra,
+    }
     try {
-      const { error } = await updateUser({ data: {
-        business_name: name.trim(), company_address: address.trim(), vat_number: vatNo.trim()
-      } })
+      const { error } = await saveSettings(record)
       if (error) throw error
-      await updateAccessName(session.user.id, name.trim())
-      note('Business details saved')
-    } catch (e) { fail(e.message || 'Could not save details') }
+      // keep business_name mirrored to soloops_access + auth metadata (drives sidebar/welcome)
+      if (tag === 'business') {
+        await updateAccessName(uid, name.trim())
+        await updateUser({ data: { business_name: name.trim() } })
+      }
+      note('Saved')
+    } catch (e) {
+      fail((e.message || 'Could not save') + ' — if this mentions soloops_settings, re-run the settings SQL in Supabase.')
+    }
     setBusy('')
   }
 
@@ -35,22 +154,24 @@ export default function Settings({ session, signOut, flash }) {
     setBusy('logo'); setErr('')
     try {
       const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `${session.user.id}/logo-${safe}`
+      const path = `${uid}/logo-${safe}`
       const { error: upErr } = await uploadFile(path, f, { upsert:true })
       if (upErr) throw upErr
       const { data } = await signedUrl(path, 60*60*24*365)
       const url = data?.signedUrl || ''
+      setLogoUrl(url)
+      await saveSettings({ user_id: uid, logo_url: url, updated_at: new Date().toISOString() })
       await updateUser({ data: { logo_url: url } })
-      setLogoUrl(url); note('Logo uploaded')
+      note('Logo uploaded')
     } catch (e) { fail(e.message || 'Could not upload logo') }
     setBusy('')
   }
 
-  const saveEmail = async () => {
-    if (!email.trim()) return fail('Enter an email')
-    setBusy('email'); setErr('')
+  const saveLoginEmail = async () => {
+    if (!loginEmail.trim()) return fail('Enter an email')
+    setBusy('loginEmail'); setErr('')
     try {
-      const { error } = await updateUser({ email: email.trim() })
+      const { error } = await updateUser({ email: loginEmail.trim() })
       if (error) throw error
       note('Confirmation sent to your new email — click the link to confirm the change.')
     } catch (e) { fail(e.message || 'Could not update email') }
@@ -69,83 +190,228 @@ export default function Settings({ session, signOut, flash }) {
     setBusy('')
   }
 
+  const testSmtp = async () => {
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      setSmtpTest('error'); setSmtpTestMsg('Fill in the SMTP host, username and password first.')
+      return
+    }
+    setSmtpTest('testing'); setSmtpTestMsg('')
+    try {
+      const { data: { session: sess } } = await (await import('../lib/supabase.js')).sb.auth.getSession()
+      const res = await fetch('/api/test-smtp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess?.access_token || ''}` },
+        body: JSON.stringify({ host: smtpHost, port: smtpPort, secure: smtpSecure, user: smtpUser, pass: smtpPass, fromName: smtpFromName || name }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) { setSmtpTest('ok'); setSmtpTestMsg('Connected and sent a test email to ' + smtpUser) }
+      else { setSmtpTest('error'); setSmtpTestMsg(data.error || 'SMTP test failed') }
+    } catch (e) {
+      setSmtpTest('error'); setSmtpTestMsg('Could not reach /api/test-smtp — the function may not be deployed yet.')
+    }
+  }
+
   const tiers = [
     { name:'Bronze', price:'£40/mo', feats:'Dashboard, income & expenses, invoicing, mileage, CSV import' },
     { name:'Silver', price:'£55/mo', feats:'Everything in Bronze + recurring detection, receipt matching, tax estimates' },
     { name:'Gold',   price:'£70/mo', feats:'Everything in Silver + accountant export pack, priority support', current:true },
   ]
+
   const sectionTitle = { fontWeight:700, fontSize:'15px', marginBottom:'14px' }
   const lbl = { fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }
+  const field = { marginBottom:'12px' }
+
+  if (!loaded) {
+    return <div style={{ padding:'40px', textAlign:'center', color:'var(--text3)' }}>Loading settings…</div>
+  }
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', alignItems:'start' }}>
-      {msg && <div style={{ gridColumn:'1/-1', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'10px', padding:'12px 16px', fontSize:'13.5px', color:'var(--green)' }}>✓ {msg}</div>}
-      {err && <div style={{ gridColumn:'1/-1' }}><div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)' }}>{err}</div></div>}
-
-      <div data-card style={card}>
-        <div style={sectionTitle}>Business profile</div>
-        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on your invoices.</div>
-        <div style={{ marginBottom:'12px' }}>
-          <div style={lbl}>Business name</div>
-          <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your business name" />
-        </div>
-        <div style={{ marginBottom:'12px' }}>
-          <div style={lbl}>Company address</div>
-          <textarea style={{...inp, minHeight:'70px', resize:'vertical', fontFamily:'inherit'}} value={address} onChange={e=>setAddress(e.target.value)} placeholder="Street, city, postcode" />
-        </div>
-        <div style={{ marginBottom:'12px' }}>
-          <div style={lbl}>VAT number (optional)</div>
-          <input style={inp} value={vatNo} onChange={e=>setVatNo(e.target.value)} placeholder="GB123456789" />
-        </div>
-        <div style={{ marginBottom:'12px' }}>
-          <div style={lbl}>Logo</div>
-          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-            {logoUrl && <img src={logoUrl} alt="logo" style={{ height:'42px', width:'42px', objectFit:'contain', borderRadius:'8px', background:'var(--surface3)', padding:'4px' }} />}
-            <label style={{...btnSec, cursor:'pointer', opacity:busy==='logo'?.7:1}}>
-              {busy==='logo' ? 'Uploading…' : (logoUrl ? 'Replace logo' : 'Upload logo')}
-              <input type="file" accept="image/*" onChange={uploadLogo} disabled={busy==='logo'} style={{ display:'none' }} />
-            </label>
-          </div>
-        </div>
-        <button style={{...btnPri, opacity:busy==='name'?.7:1}} disabled={busy==='name'} onClick={saveName}>{busy==='name'?'Saving…':'Save business details'}</button>
-      </div>
-
-      <div data-card style={card}>
-        <div style={sectionTitle}>Login email</div>
-        <div style={{ marginBottom:'12px' }}>
-          <div style={lbl}>Email address</div>
-          <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} />
-        </div>
-        <button style={{...btnSec, opacity:busy==='email'?.7:1}} disabled={busy==='email'} onClick={saveEmail}>{busy==='email'?'Sending…':'Update email'}</button>
-        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'8px' }}>You'll get a confirmation link at the new address.</div>
-      </div>
-
-      <div data-card style={card}>
-        <div style={sectionTitle}>Change password</div>
-        <input style={{...inp, marginBottom:'10px'}} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="New password (min 6)" />
-        <input style={{...inp, marginBottom:'12px'}} type="password" value={pw2} onChange={e=>setPw2(e.target.value)} placeholder="Confirm new password" />
-        <button style={{...btnPri, opacity:busy==='pw'?.7:1}} disabled={busy==='pw'} onClick={savePw}>{busy==='pw'?'Saving…':'Change password'}</button>
-      </div>
-
-      <div data-card style={card}>
-        <div style={sectionTitle}>Billing &amp; plan</div>
-        <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>Gold</strong> · 14-day trial.</div>
-        {tiers.map(t => (
-          <div key={t.name} style={{ border:'1px solid '+(t.current?'var(--orange)':'var(--border)'), borderRadius:'12px', padding:'14px', marginBottom:'10px', background: t.current?'var(--orange-subtle)':'transparent' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div style={{ fontWeight:700 }}>{t.name} <span style={{ color:'var(--text3)', fontWeight:500, fontSize:'13px' }}>{t.price}</span></div>
-              {t.current ? <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', border:'1px solid var(--orange)', borderRadius:'20px', padding:'2px 10px' }}>CURRENT</span>
-                : <button style={{...btnSec, padding:'6px 12px'}} onClick={()=>flash('Plan changes are coming soon — billing isn\u2019t live yet.')}>Switch</button>}
-            </div>
-            <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{t.feats}</div>
-          </div>
+    <div>
+      {/* Tab bar */}
+      <div style={{ display:'flex', gap:'6px', marginBottom:'18px', flexWrap:'wrap' }}>
+        {TABS.map(t => (
+          <button key={t.key} onClick={()=>setTab(t.key)} style={{
+            padding:'9px 16px', borderRadius:'10px', fontSize:'13px', fontWeight:600, cursor:'pointer',
+            border:'1px solid '+(tab===t.key?'var(--orange)':'var(--border)'),
+            background: tab===t.key?'var(--orange-subtle)':'transparent',
+            color: tab===t.key?'var(--orange-light)':'var(--text2)',
+          }}>{t.label}</button>
         ))}
-        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'4px' }}>Online payments &amp; plan changes are coming soon.</div>
       </div>
 
-      <div style={{ gridColumn:'1/-1' }}>
-        <button onClick={signOut} style={btnSec}>Sign out</button>
-      </div>
+      {msg && <div style={{ marginBottom:'14px', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'10px', padding:'12px 16px', fontSize:'13.5px', color:'var(--green)' }}>✓ {msg}</div>}
+      {err && <div style={{ marginBottom:'14px', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)' }}>{err}</div>}
+
+      {/* BUSINESS TAB */}
+      {tab === 'business' && (
+        <div data-card style={card}>
+          <div style={sectionTitle}>Business profile</div>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on your invoices.</div>
+          <div style={field}>
+            <div style={lbl}>Business name</div>
+            <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your business name" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Company address</div>
+            <textarea style={{...inp, minHeight:'70px', resize:'vertical', fontFamily:'inherit'}} value={address} onChange={e=>setAddress(e.target.value)} placeholder="Street, city, postcode" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Phone</div>
+            <input style={inp} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07123 456789" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Contact email</div>
+            <input style={inp} value={bizEmail} onChange={e=>setBizEmail(e.target.value)} placeholder="hello@yourbusiness.co.uk" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Logo</div>
+            <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+              {logoUrl && <img src={logoUrl} alt="logo" style={{ height:'42px', width:'42px', objectFit:'contain', borderRadius:'8px', background:'var(--surface3)', padding:'4px' }} />}
+              <label style={{...btnSec, cursor:'pointer', opacity:busy==='logo'?.7:1}}>
+                {busy==='logo' ? 'Uploading…' : (logoUrl ? 'Replace logo' : 'Upload logo')}
+                <input type="file" accept="image/*" onChange={uploadLogo} disabled={busy==='logo'} style={{ display:'none' }} />
+              </label>
+            </div>
+          </div>
+          <button style={{...btnPri, opacity:busy==='business'?.7:1}} disabled={busy==='business'} onClick={()=>persist({}, 'business')}>{busy==='business'?'Saving…':'Save business details'}</button>
+        </div>
+      )}
+
+      {/* VAT TAB */}
+      {tab === 'vat' && (
+        <div data-card style={card}>
+          <div style={sectionTitle}>VAT</div>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Most sole traders aren’t VAT-registered until turnover passes £90k. Turn this on only if you are.</div>
+          <label style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px', cursor:'pointer' }}>
+            <input type="checkbox" checked={vatRegistered} onChange={e=>setVatRegistered(e.target.checked)} />
+            <span style={{ fontSize:'13.5px' }}>I’m VAT-registered</span>
+          </label>
+          {vatRegistered && (
+            <>
+              <div style={field}>
+                <div style={lbl}>VAT number</div>
+                <input style={inp} value={vatNo} onChange={e=>setVatNo(e.target.value)} placeholder="GB123456789" />
+              </div>
+              <div style={field}>
+                <div style={lbl}>VAT scheme</div>
+                <select style={inp} value={vatScheme} onChange={e=>setVatScheme(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="flat_rate">Flat Rate Scheme</option>
+                </select>
+              </div>
+              {vatScheme === 'flat_rate' && (
+                <div style={field}>
+                  <div style={lbl}>Flat rate %</div>
+                  <input style={inp} type="number" step="0.1" value={flatRate} onChange={e=>setFlatRate(e.target.value)} placeholder="16.5" />
+                </div>
+              )}
+            </>
+          )}
+          <button style={{...btnPri, opacity:busy==='vat'?.7:1}} disabled={busy==='vat'} onClick={()=>persist({}, 'vat')}>{busy==='vat'?'Saving…':'Save VAT settings'}</button>
+        </div>
+      )}
+
+      {/* EMAIL TAB */}
+      {tab === 'email' && (
+        <div data-card style={card}>
+          <div style={sectionTitle}>Email sending (SMTP)</div>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Connect your own email so invoices send from your address.</div>
+          <div style={field}>
+            <div style={lbl}>Provider</div>
+            <select style={inp} value={smtpProvider} onChange={e=>applyProvider(e.target.value)}>
+              {Object.entries(SMTP_PRESETS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+          <div style={field}>
+            <div style={lbl}>SMTP host</div>
+            <input style={inp} value={smtpHost} onChange={e=>setSmtpHost(e.target.value)} placeholder="smtp.yourprovider.com" />
+          </div>
+          <div style={{ display:'flex', gap:'10px' }}>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>Port</div>
+              <input style={inp} type="number" value={smtpPort} onChange={e=>setSmtpPort(e.target.value)} placeholder="587" />
+            </div>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>Security</div>
+              <select style={inp} value={smtpSecure?'ssl':'tls'} onChange={e=>setSmtpSecure(e.target.value==='ssl')}>
+                <option value="tls">STARTTLS (587)</option>
+                <option value="ssl">SSL (465)</option>
+              </select>
+            </div>
+          </div>
+          <div style={field}>
+            <div style={lbl}>Username</div>
+            <input style={inp} value={smtpUser} onChange={e=>setSmtpUser(e.target.value)} placeholder="you@yourbusiness.co.uk" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Password / app password</div>
+            <input style={inp} type="password" value={smtpPass} onChange={e=>setSmtpPass(e.target.value)} placeholder="••••••••" />
+            <div style={{ fontSize:'11px', color:'var(--text3)', marginTop:'5px' }}>Gmail and Outlook need an “app password”, not your normal login password.</div>
+          </div>
+          <div style={field}>
+            <div style={lbl}>From name</div>
+            <input style={inp} value={smtpFromName} onChange={e=>setSmtpFromName(e.target.value)} placeholder="Your business name" />
+          </div>
+          <div style={field}>
+            <div style={lbl}>Invoice footer (optional)</div>
+            <textarea style={{...inp, minHeight:'60px', resize:'vertical', fontFamily:'inherit'}} value={emailFooter} onChange={e=>setEmailFooter(e.target.value)} placeholder="Thanks for your business." />
+          </div>
+          {smtpTest && (
+            <div style={{ marginBottom:'12px', fontSize:'12.5px', padding:'10px 12px', borderRadius:'8px',
+              background: smtpTest==='ok'?'rgba(34,197,94,0.1)':smtpTest==='error'?'rgba(239,68,68,0.1)':'var(--surface3)',
+              color: smtpTest==='ok'?'var(--green)':smtpTest==='error'?'var(--red)':'var(--text2)',
+              border:'1px solid '+(smtpTest==='ok'?'rgba(34,197,94,.25)':smtpTest==='error'?'rgba(239,68,68,.25)':'var(--border)') }}>
+              {smtpTest==='testing'?'Testing connection…':smtpTestMsg}
+            </div>
+          )}
+          <div style={{ display:'flex', gap:'10px' }}>
+            <button style={{...btnSec, opacity:smtpTest==='testing'?.7:1}} disabled={smtpTest==='testing'} onClick={testSmtp}>{smtpTest==='testing'?'Testing…':'Test connection'}</button>
+            <button style={{...btnPri, opacity:busy==='email'?.7:1}} disabled={busy==='email'} onClick={()=>persist({}, 'email')}>{busy==='email'?'Saving…':'Save email settings'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* BILLING TAB */}
+      {tab === 'billing' && (
+        <>
+          <div data-card style={card}>
+            <div style={sectionTitle}>Billing &amp; plan</div>
+            <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>Gold</strong> · 14-day trial.</div>
+            {tiers.map(t => (
+              <div key={t.name} style={{ border:'1px solid '+(t.current?'var(--orange)':'var(--border)'), borderRadius:'12px', padding:'14px', marginBottom:'10px', background: t.current?'var(--orange-subtle)':'transparent' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ fontWeight:700 }}>{t.name} <span style={{ color:'var(--text3)', fontWeight:500, fontSize:'13px' }}>{t.price}</span></div>
+                  {t.current ? <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', border:'1px solid var(--orange)', borderRadius:'20px', padding:'2px 10px' }}>CURRENT</span>
+                    : <button style={{...btnSec, padding:'6px 12px'}} onClick={()=>flash('Plan changes are coming soon — billing isn\u2019t live yet.')}>Switch</button>}
+                </div>
+                <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{t.feats}</div>
+              </div>
+            ))}
+            <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'4px' }}>Online payments &amp; plan changes are coming soon.</div>
+          </div>
+
+          <div data-card style={{...card, marginTop:'16px'}}>
+            <div style={sectionTitle}>Login email</div>
+            <div style={field}>
+              <div style={lbl}>Email address</div>
+              <input style={inp} type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} />
+            </div>
+            <button style={{...btnSec, opacity:busy==='loginEmail'?.7:1}} disabled={busy==='loginEmail'} onClick={saveLoginEmail}>{busy==='loginEmail'?'Sending…':'Update email'}</button>
+            <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'8px' }}>You'll get a confirmation link at the new address.</div>
+          </div>
+
+          <div data-card style={{...card, marginTop:'16px'}}>
+            <div style={sectionTitle}>Change password</div>
+            <input style={{...inp, marginBottom:'10px'}} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="New password (min 6)" />
+            <input style={{...inp, marginBottom:'12px'}} type="password" value={pw2} onChange={e=>setPw2(e.target.value)} placeholder="Confirm new password" />
+            <button style={{...btnPri, opacity:busy==='pw'?.7:1}} disabled={busy==='pw'} onClick={savePw}>{busy==='pw'?'Saving…':'Change password'}</button>
+          </div>
+
+          <div style={{ marginTop:'16px' }}>
+            <button onClick={signOut} style={btnSec}>Sign out</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
