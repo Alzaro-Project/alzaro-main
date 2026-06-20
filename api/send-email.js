@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     }
     // --- End auth check ---
 
-    const { to, subject, html, text, fromName, replyTo } = req.body || {}
+    const { to, subject, html, text, fromName, replyTo, attachments } = req.body || {}
     if (!to || !subject || (!html && !text)) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, html/text' })
     }
@@ -61,6 +61,9 @@ export default async function handler(req, res) {
         html: html || undefined,
         text: text || undefined,
         reply_to: replyTo || undefined,
+        // Optional attachments: [{ filename, content }] where content is base64.
+        // Absent for all existing callers (TyreOps/GarageOps) — behaviour unchanged.
+        attachments: (Array.isArray(attachments) && attachments.length) ? attachments : undefined,
       }),
     })
     const data = await response.json()
