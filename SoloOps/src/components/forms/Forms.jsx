@@ -68,13 +68,25 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
   const [total,setTotal]=useState(edit?.total!=null?String(edit.total):''); const [status,setStatus]=useState(edit?.status||'sent')
   const [date,setDate]=useState(edit?.issue_date || new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
-  const [picked,setPicked]=useState(null)
-  const pastClients = [...new Set((invoices||[]).map(i=>i.client_name).filter(Boolean))].sort()
   const savedClients = clients||[]
-  const onPick = (id) => {
-    const c = savedClients.find(x=>x.id===id)
-    setPicked(c||null)
-    if (c) setClient(c.name)
+  // client picker: dropdown value is a client id, '__new__', or '' (none)
+  const initialPick = edit?.client_name
+    ? (savedClients.find(c=>(c.name||'').toLowerCase()===(edit.client_name||'').toLowerCase())?.id || '__new__')
+    : ''
+  const [pickId,setPickId]=useState(initialPick)
+  const [picked,setPicked]=useState(savedClients.find(c=>c.id===initialPick)||null)
+  // inline new-client fields (shown when '__new__' chosen)
+  const [newEmail,setNewEmail]=useState('')
+  const [newPhone,setNewPhone]=useState('')
+  const isNew = pickId==='__new__'
+  const onPick = (val) => {
+    setPickId(val)
+    if (val==='__new__') { setPicked(null); setClient(edit?.client_name||''); }
+    else if (val==='') { setPicked(null); setClient('') }
+    else {
+      const c = savedClients.find(x=>x.id===val)
+      setPicked(c||null); setClient(c?.name||'')
+    }
   }
   const save = async () => {
     if(!client||!total) return setErr('Client and total are required')
@@ -103,27 +115,36 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit}) {
       setErr(error.message); setBusy(false); return
     }
     let added=null
-    try { const r = await ensureClient(uid, client.trim(), 'customer'); if(r.created) added=r.client?.name } catch(e){}
+    try {
+      const details = isNew ? { email:newEmail, phone:newPhone } : undefined
+      const r = await ensureClient(uid, client.trim(), 'customer', details)
+      if(r.created) added=r.client?.name
+    } catch(e){}
     onSaved(added ? { addedClient: added } : undefined)
   }
   return <Modal title={edit?"Edit income":"Add income"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    {savedClients.length>0 && (
-      <select style={{...inp, marginBottom:'12px'}} value={picked?.id||''} onChange={e=>onPick(e.target.value)}>
-        <option value="">— Pick a saved client (optional) —</option>
-        {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
-    )}
+    <select style={inp} value={pickId} onChange={e=>onPick(e.target.value)}>
+      <option value="">— Select a client —</option>
+      {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      <option value="__new__">+ Add new client</option>
+    </select>
     {picked && (
-      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginBottom:'12px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
+      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginTop:'12px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
         {picked.email && <div>✉ {picked.email}</div>}
         {picked.phone && <div>☎ {picked.phone}</div>}
         {picked.address && <div>📍 {picked.address}</div>}
         {picked.notes && <div style={{color:'var(--text3)'}}>{picked.notes}</div>}
       </div>
     )}
-    <input style={inp} list="past-clients" placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setPicked(null)}} />
-    <datalist id="past-clients">{pastClients.map(c=><option key={c} value={c} />)}</datalist>
+    {isNew && (
+      <div style={{ marginTop:'12px', padding:'12px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px' }}>
+        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'8px' }}>New client — saved to Clients on save</div>
+        <input style={inp} placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setErr('')}} />
+        <input style={{...inp, marginTop:'8px'}} placeholder="Email (optional)" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
+        <input style={{...inp, marginTop:'8px'}} placeholder="Phone (optional)" value={newPhone} onChange={e=>setNewPhone(e.target.value)} />
+      </div>
+    )}
     <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (auto, editable)" value={number} onChange={e=>{setNumber(e.target.value); setErr('')}} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Total (£)" value={total} onChange={e=>setTotal(e.target.value)} />
     <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
