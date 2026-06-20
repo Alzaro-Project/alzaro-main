@@ -66,13 +66,28 @@ export async function insertMileage(row) {
 
 // ---------- invoices ----------
 export async function insertInvoice(row) {
-  return sb.from('soloops_invoices').insert(row)
+  // returns { data, error } with data = inserted row (so caller gets the id)
+  return sb.from('soloops_invoices').insert(row).select('*').limit(1).single()
 }
 export async function updateInvoice(id, row) {
   return sb.from('soloops_invoices').update(row).eq('id', id)
 }
 export async function deleteInvoice(id) {
   return sb.from('soloops_invoices').delete().eq('id', id)
+}
+
+// ---------- invoice line items ----------
+export async function loadInvoiceLines(invoice_id) {
+  const { data } = await sb.from('soloops_invoice_lines')
+    .select('*').eq('invoice_id', invoice_id).order('position', { ascending: true })
+  return data || []
+}
+export async function insertInvoiceLines(rows) {
+  if (!rows || !rows.length) return { error: null }
+  return sb.from('soloops_invoice_lines').insert(rows)
+}
+export async function deleteInvoiceLines(invoice_id) {
+  return sb.from('soloops_invoice_lines').delete().eq('invoice_id', invoice_id)
 }
 
 // ---------- expenses ----------
