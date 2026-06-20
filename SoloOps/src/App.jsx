@@ -345,7 +345,7 @@ function Shell() {
           })()}
 
           {view==='clients' && (
-            <Clients uid={uid} clients={clients} invoices={invoices} onChange={loadAll} flash={flash} />
+            <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={loadAll} flash={flash} />
           )}
 
           {view==='expenses' && (
@@ -487,8 +487,8 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={uid} expenses={expenses} />}
-      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={()=>{setModal(null);setEditInvoice(null);loadAll();flash(editInvoice?'Income updated':'Income added')}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={(r)=>{setModal(null);loadAll();flash(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added')}} uid={uid} expenses={expenses} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
