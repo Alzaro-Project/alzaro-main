@@ -412,6 +412,133 @@ function DiaryPage({ user }) {
 }
 
 // INVOICING
+// Email preview modal — review the invoice email, then send via Resend (/api/send-email)
+function InvoiceEmailModal({ invoice, user, onClose, onSent }) {
+  const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [bizName, setBizName] = useState("Alzaro ServiceOps");
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null); // null | 'sending' | 'success' | 'error'
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    const build = async () => {
+      // Pull the customer's email + the business name to compose a sensible default
+      let custEmail = "", custName = invoice.customer || "there", biz = "Alzaro ServiceOps";
+      if (DB_READY) {
+        if (invoice.customer_id) {
+          const { data: c } = await db.from("svc_customers").select("name,email").eq("id", invoice.customer_id);
+          if (c && c.length) { custEmail = c[0].email || ""; custName = c[0].name || custName; }
+        }
+        const { data: s } = await db.from("svc_settings").select("trading_name").eq("user_id", user.id);
+        if (s && s.length && s[0].trading_name) biz = s[0].trading_name;
+      }
+      setBizName(biz);
+      const ref = invoice.ref || "your invoice";
+      const amount = gbp(invoice.amount || 0);
+      const due = invoice.due_date ? ` by ${invoice.due_date}` : "";
+      setTo(custEmail);
+      setSubject(`Invoice ${invoice.ref || ""} from ${biz}`.trim());
+      setBody(
+`Hi ${custName},
+
+Please find your invoice ${ref} for the amount of ${amount}.
+
+Payment is due${due}. If you have any questions about this invoice, just reply to this email.
+
+Thank you for your business.
+
+Kind regards,
+${biz}`
+      );
+      setLoading(false);
+    };
+    build();
+  }, []);
+
+  const send = async () => {
+    if (!to.trim()) { setStatus("error"); setMsg("Add a recipient email address first."); return; }
+    setStatus("sending"); setMsg("");
+    try {
+      const { data: sess } = await db.auth.getSession();
+      const token = sess?.session?.access_token;
+      if (!token) { setStatus("error"); setMsg("You need to be signed in to send."); return; }
+      const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${body.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>`;
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName }),
+      });
+      let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
+      setStatus("success");
+      // Mark the invoice as Sent (only bump up from Draft)
+      if (DB_READY && invoice.id && invoice.status === "Draft") {
+        await db.from("svc_invoices").update({ status: "Sent" }).eq("id", invoice.id);
+      }
+      setTimeout(() => { onSent && onSent(); onClose(); }, 1400);
+    } catch (e) {
+      setStatus("error");
+      setMsg(e.message === "Failed to fetch" ? "Could not reach the email service — it may not be deployed yet." : e.message);
+    }
+  };
+
+  const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
+  const panel = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 22, width: 560, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" };
+  const labelTiny = { fontSize: 10, fontWeight: 700, color: "var(--txt-3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 };
+  const field = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 13, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%" };
+
+  return (
+    <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget && status !== "sending") onClose(); }}>
+      <div style={panel}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ti ti-mail" style={{ fontSize: 15 }} /></span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Email preview</span>
+          </div>
+          <span onClick={onClose} style={{ cursor: "pointer", color: "var(--txt-3)", fontSize: 16 }}><i className="ti ti-x" /></span>
+        </div>
+
+        {loading ? (
+          <div style={{ fontSize: 13, color: "var(--txt-3)", padding: "20px 0" }}>Preparing preview…</div>
+        ) : status === "success" ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--green-soft)", color: "var(--green)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}><i className="ti ti-check" style={{ fontSize: 22 }} /></span>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--green)", marginBottom: 4 }}>Email sent</div>
+            <div style={{ fontSize: 12, color: "var(--txt-2)" }}>Invoice {invoice.ref || ""} sent to {to}</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelTiny}>To</div>
+              <input style={field} value={to} onChange={(e) => setTo(e.target.value)} placeholder="customer@email.com" />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelTiny}>Subject</div>
+              <input style={field} value={subject} onChange={(e) => setSubject(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={labelTiny}>Message</div>
+              <textarea style={{ ...field, minHeight: 200, resize: "vertical", lineHeight: 1.5 }} value={body} onChange={(e) => setBody(e.target.value)} />
+            </div>
+
+            {status === "error" && msg && (
+              <div style={{ marginBottom: 14, background: "var(--red-soft)", border: "0.5px solid var(--red)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--red)" }}>✗ {msg}</div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span onClick={status === "sending" ? undefined : send}><Btn icon="ti-send" label={status === "sending" ? "Sending…" : "Send invoice"} primary /></span>
+              <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
+              <span style={{ fontSize: 10.5, color: "var(--txt-3)", marginLeft: "auto" }}>Sends via Alzaro (invoices@alzaro.co.uk)</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function InvoicingPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -421,6 +548,7 @@ function InvoicingPage({ user }) {
   const [editId, setEditId] = useState(null);
   const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft" };
   const [form, setForm] = useState(blank);
+  const [emailInvoice, setEmailInvoice] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -495,12 +623,24 @@ function InvoicingPage({ user }) {
               <Td>{gbp(v.amount || 0)}</Td>
               <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
               <Td><Pill text={v.status} tone={v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : v.status === "Sent" ? "blue" : "amber"} /></Td>
-              <Td>{v.id && rowActions(DB_READY, () => openEdit(v), () => askDelete(v))}</Td>
+              <Td>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                  {v.id && DB_READY && (
+                    <span onClick={() => setEmailInvoice(v)} title="Preview & send email" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: "var(--brand)", background: "var(--brand-soft)" }}>
+                      <i className="ti ti-send" style={{ fontSize: 14 }} />
+                    </span>
+                  )}
+                  {v.id && rowActions(DB_READY, () => openEdit(v), () => askDelete(v))}
+                </div>
+              </Td>
             </tr>
           ))}
         </Table>
       )}
       {confirmNode}
+      {emailInvoice && (
+        <InvoiceEmailModal invoice={emailInvoice} user={user} onClose={() => setEmailInvoice(null)} onSent={refresh} />
+      )}
     </div>
   );
 }
