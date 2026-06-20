@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
-  loadInvoices, loadExpenses, loadMileage, loadClients,
+  loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
   updateUser, loadSettings,
 } from './lib/db.js'
 import { NAV, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
@@ -40,6 +40,9 @@ function Shell() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
+  const [editInvoice, setEditInvoice] = useState(null)
+  const [incFilter, setIncFilter] = useState('all')
+  const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState('dark')
 
@@ -93,6 +96,22 @@ function Shell() {
   useEffect(() => { if (session?.user?.id) loadAll() }, [session?.user?.id])
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3000) }
+
+  const actBtn = { background:'var(--surface2)', color:'var(--text2)', border:'1px solid var(--border-light)', borderRadius:'7px', padding:'5px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }
+  const actBtnDanger = { ...actBtn, color:'#f87171', borderColor:'rgba(248,113,113,.3)' }
+
+  const onEditInvoice = (inv) => { setEditInvoice(inv); setModal('invoice') }
+  const onDeleteInvoice = async (inv) => {
+    if(!window.confirm(`Delete income ${inv.number||''} (${inv.client_name||''})? This cannot be undone.`)) return
+    const { error } = await deleteInvoice(inv.id)
+    if(error){ flash('Delete failed'); return }
+    loadAll(); flash('Income deleted')
+  }
+  const onMarkPaid = async (inv) => {
+    const { error } = await updateInvoice(inv.id, { status:'paid' })
+    if(error){ flash('Update failed'); return }
+    loadAll(); flash('Marked as paid')
+  }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
 
   const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
@@ -273,20 +292,57 @@ function Shell() {
             </div>
           </>}
 
-          {view==='income' && (
-            <div style={card}>
-              {fInvoices.length===0 ? <Empty msg="No income yet. Click “+ Income” to add one." />
-              : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Reference','Client','Issued','Total','Status']} /></thead>
-                <tbody>{fInvoices.map(i => (
-                  <tr key={i.id}>
-                    <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
-                    <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
-                    <Td right><Status s={i.status}/></Td>
-                  </tr>))}</tbody>
-              </table>}
+          {view==='income' && (() => {
+            const TABS = ['all','draft','sent','paid','overdue']
+            const q = incSearch.trim().toLowerCase()
+            const rows = fInvoices.filter(i =>
+              (incFilter==='all' || i.status===incFilter) &&
+              (!q || (`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q))
+            )
+            return (
+            <div>
+              <div style={{ marginBottom:'18px' }}>
+                <h1 style={{ fontSize:'26px', fontWeight:800, margin:0 }}>Income</h1>
+                <div style={{ color:'var(--text3)', fontSize:'14px', marginTop:'4px' }}>Create, send and track customer income</div>
+              </div>
+
+              <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'14px' }}>
+                {TABS.map(t => (
+                  <button key={t} onClick={()=>setIncFilter(t)} style={{
+                    background: incFilter===t ? 'var(--surface2)' : 'transparent',
+                    color: incFilter===t ? 'var(--text)' : 'var(--text3)',
+                    border:'1px solid '+(incFilter===t?'var(--border-light)':'transparent'),
+                    borderRadius:'10px', padding:'7px 16px', fontSize:'13px', fontWeight:700,
+                    textTransform:'capitalize', cursor:'pointer'
+                  }}>{t}</button>
+                ))}
+              </div>
+
+              <input style={{ ...inp, marginBottom:'16px' }} placeholder="Search clients, reference…" value={incSearch} onChange={e=>setIncSearch(e.target.value)} />
+
+              <div style={card}>
+                <div style={{ fontSize:'11px', fontWeight:800, letterSpacing:'.08em', color:'var(--text3)', marginBottom:'14px' }}>INCOME LIST</div>
+                {rows.length===0 ? <Empty msg={fInvoices.length===0 ? "No income yet. Click “+ Income” to add one." : "No income matches this filter."} />
+                : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <thead><Th cols={['Reference','Client','Issued','Total','Status','Actions']} /></thead>
+                  <tbody>{rows.map(i => (
+                    <tr key={i.id}>
+                      <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
+                      <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
+                      <Td><Status s={i.status}/></Td>
+                      <Td right>
+                        <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                          <button style={actBtn} onClick={()=>onEditInvoice(i)}>Edit</button>
+                          {i.status!=='paid' && <button style={actBtn} onClick={()=>onMarkPaid(i)}>Mark paid</button>}
+                          <button style={actBtnDanger} onClick={()=>onDeleteInvoice(i)}>Delete</button>
+                        </div>
+                      </Td>
+                    </tr>))}</tbody>
+                </table>}
+              </div>
             </div>
-          )}
+            )
+          })()}
 
           {view==='clients' && (
             <Clients uid={uid} clients={clients} invoices={invoices} onChange={loadAll} flash={flash} />
@@ -432,7 +488,7 @@ function Shell() {
       </div>
 
       {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Expense added')}} uid={uid} expenses={expenses} />}
-      {modal==='invoice' && <InvoiceForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Income added')}} uid={uid} invoices={invoices} clients={clients} />}
+      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={()=>{setModal(null);setEditInvoice(null);loadAll();flash(editInvoice?'Income updated':'Income added')}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} />}
       {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
