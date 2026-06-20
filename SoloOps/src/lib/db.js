@@ -68,6 +68,12 @@ export async function insertMileage(row) {
 export async function insertInvoice(row) {
   return sb.from('soloops_invoices').insert(row)
 }
+export async function updateInvoice(id, row) {
+  return sb.from('soloops_invoices').update(row).eq('id', id)
+}
+export async function deleteInvoice(id) {
+  return sb.from('soloops_invoices').delete().eq('id', id)
+}
 
 // ---------- expenses ----------
 export async function insertExpense(row) {
