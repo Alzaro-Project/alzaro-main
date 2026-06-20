@@ -134,8 +134,8 @@ function Shell() {
         {(() => {
           const TIER_META = {
             bronze: { icon:'🥉', color:'#b36b1a', bg:'rgba(180,100,30,0.12)', border:'rgba(180,100,30,0.25)' },
-            silver: { icon:'🥈', color:'#9ca3af', bg:'rgba(100,100,120,0.12)', border:'rgba(100,100,120,0.25)' },
-            gold:   { icon:'👑', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.25)' },
+            silver: { icon:'🥈', color:'#6b7080', bg:'rgba(100,100,120,0.1)', border:'rgba(100,100,120,0.25)' },
+            gold:   { icon:'👑', color:'#4f46e5', bg:'rgba(79,70,229,0.1)', border:'rgba(79,70,229,0.25)' },
           }
           const name = bizName || session.user.user_metadata?.business_name || session.user.email.split('@')[0]
           const tier = (session.user.user_metadata?.tier || 'gold').toLowerCase()
@@ -143,7 +143,7 @@ function Shell() {
           return (
             <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
               <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
-              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'11px', fontWeight:700, fontFamily:'DM Mono, monospace', textTransform:'uppercase', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
                 <span>{tm.icon}</span>{tier}
               </span>
             </div>
@@ -182,15 +182,26 @@ function Shell() {
           })()}
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
-          {NAV.map(([k,label]) => (
-            <div key={k} data-nav onClick={()=>setView(k)} style={{
-              padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
-              color: view===k ? 'var(--text)' : 'var(--text2)',
-              background: view===k ? 'var(--surface3)' : 'transparent',
-              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent'
-            }}>{label}</div>
-          ))}
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'2px', margin:'0 -4px', padding:'0 4px' }}>
+          {NAV.map(([k,label,icon]) => {
+            const active = view===k
+            return (
+              <div key={k} data-nav onClick={()=>setView(k)} style={{
+                display:'flex', alignItems:'center', gap:'10px',
+                padding:'10px 16px', margin:'2px 8px', borderRadius:'8px',
+                fontSize:'13px', fontWeight: active ? 600 : 500, cursor:'pointer',
+                transition:'all .12s', flexShrink:0,
+                color: active ? 'var(--text)' : 'var(--text2)',
+                background: active ? 'var(--surface3)' : 'transparent',
+              }}
+                onMouseEnter={e=>{ if(!active) e.currentTarget.style.background='var(--surface2)' }}
+                onMouseLeave={e=>{ if(!active) e.currentTarget.style.background='transparent' }}
+              >
+                <span style={{ fontSize:'16px', width:'20px', textAlign:'center' }}>{icon}</span>
+                <span style={{ flex:1 }}>{label}</span>
+              </div>
+            )
+          })}
         </div>
         <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
         <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
