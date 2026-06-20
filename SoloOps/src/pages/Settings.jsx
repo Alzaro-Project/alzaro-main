@@ -137,11 +137,12 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
     try {
       const { error } = await saveSettings(record)
       if (error) throw error
-      // keep business_name mirrored to soloops_access + auth metadata (drives sidebar/welcome)
+      // update sidebar FIRST — must not be blocked if a later mirror-write fails
+      if (tag === 'business') onBizChange?.(name.trim())
+      // keep business_name mirrored to soloops_access + auth metadata (drives welcome/login)
       if (tag === 'business') {
-        await updateAccessName(uid, name.trim())
-        await updateUser({ data: { business_name: name.trim() } })
-        onBizChange?.(name.trim())
+        try { await updateAccessName(uid, name.trim()) } catch (_) {}
+        try { await updateUser({ data: { business_name: name.trim() } }) } catch (_) {}
       }
       note('Saved')
     } catch (e) {
