@@ -1,105 +1,197 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, Status, Modal, ErrBox } from '../components/UI.jsx'
-import { insertClient, updateClient, deleteClient } from '../lib/db.js'
+import Papa from 'papaparse'
+import { card, inp, btnPri, btnSec, gbp, ErrBox, CATEGORIES } from '../components/UI.jsx'
+import { loadRules, insertExpenses, upsertRules } from '../lib/db.js'
 
-export default function Clients({ uid, clients, invoices, onChange, flash }) {
-  const [editing, setEditing] = React.useState(null)
-  const [selected, setSelected] = React.useState(null)
-  const blank = { name:'', email:'', phone:'', address:'', notes:'' }
-  const [form, setForm] = React.useState(blank)
+export default function BankImport({ uid, existingExpenses, onImported }) {
+  const [stage, setStage] = React.useState('upload')
+  const [rows, setRows] = React.useState([])
+  const [headers, setHeaders] = React.useState([])
+  const [map, setMap] = React.useState({ date:'', desc:'', amount:'', debit:'', credit:'' })
+  const [items, setItems] = React.useState([])
+  const [rules, setRules] = React.useState([])
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
 
-  const open = (c) => { setEditing(c||'new'); setForm(c ? {...c} : blank); setErr('') }
-  const save = async () => {
-    if (!form.name.trim()) { setErr('Client name is required'); return }
+  React.useEffect(() => {
+    loadRules().then(({ data }) => setRules(data || []))
+  }, [])
+
+  const guess = (cands, hs) => hs.find(h => cands.some(c => h.toLowerCase().includes(c))) || ''
+
+  const onFile = (e) => {
+    const file = e.target.files?.[0]; if (!file) return
+    setErr('')
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: (res) => {
+        if (!res.data.length) { setErr('That file looks empty.'); return }
+        const hs = res.meta.fields || Object.keys(res.data[0])
+        setHeaders(hs); setRows(res.data)
+
+        setMap({
+          date:   guess(['date'], hs),
+          desc:   guess(['description','desc','reference','memo','details','narrative','payee'], hs),
+          amount: guess(['amount','value'], hs),
+          debit:  guess(['debit','paid out','money out','withdraw','out'], hs),
+          credit: guess(['credit','paid in','money in','deposit','in'], hs),
+        })
+        setStage('map')
+      },
+      error: () => setErr('Could not read that CSV file.')
+    })
+  }
+
+  const categorise = (desc) => {
+    const up = (desc||'').toUpperCase()
+    const hit = rules.find(r => up.includes((r.pattern||'').toUpperCase()))
+    return hit ? hit.category : 'Other'
+  }
+
+  const buildReview = () => {
+    if (!map.date || !map.desc || (!map.amount && !map.debit)) {
+      setErr('Please choose at least Date, Description, and an Amount (or Debit) column.'); return
+    }
+    setErr('')
+    const existKeys = new Set((existingExpenses||[]).map(e => `${e.spent_on}|${Number(e.amount).toFixed(2)}`))
+    const out = []
+    rows.forEach((r, i) => {
+      const desc = (r[map.desc]||'').trim()
+      let amt = 0
+      if (map.debit && r[map.debit]) amt = Math.abs(parseFloat(String(r[map.debit]).replace(/[^0-9.\-]/g,''))) || 0
+      else if (map.amount && r[map.amount]) {
+        const v = parseFloat(String(r[map.amount]).replace(/[^0-9.\-]/g,'')) || 0
+        amt = v < 0 ? Math.abs(v) : 0
+      }
+      if (amt <= 0 || !desc) return
+
+      let d = (r[map.date]||'').trim()
+      const dt = new Date(d)
+      if (!isNaN(dt)) d = dt.toISOString().slice(0,10)
+      const dupKey = `${d}|${amt.toFixed(2)}`
+      out.push({
+        i, include: true, merchant: desc, category: categorise(desc),
+        amount: amt, spent_on: d, duplicate: existKeys.has(dupKey)
+      })
+    })
+    if (!out.length) { setErr('No expense (money-out) rows found with these columns. Check your mapping.'); return }
+    setItems(out); setStage('review')
+  }
+
+  const setItem = (idx, patch) => setItems(items.map((it,k) => k===idx ? {...it, ...patch} : it))
+
+  const doImport = async () => {
+    const chosen = items.filter(it => it.include)
+    if (!chosen.length) { setErr('Tick at least one row to import.'); return }
     setBusy(true); setErr('')
     try {
-      if (editing === 'new') {
-        const { error } = await insertClient({
-          user_id: uid, name: form.name.trim(), email: form.email?.trim(), phone: form.phone?.trim(), address: form.address?.trim(), notes: form.notes?.trim()
-        })
-        if (error) throw error
-      } else {
-        const { error } = await updateClient(editing.id, {
-          name: form.name.trim(), email: form.email?.trim(), phone: form.phone?.trim(), address: form.address?.trim(), notes: form.notes?.trim()
-        })
-        if (error) throw error
+      const payload = chosen.map(it => ({
+        user_id: uid, merchant: it.merchant, category: it.category,
+        amount: it.amount, spent_on: it.spent_on || null, source: 'import'
+      }))
+      const { error } = await insertExpenses(payload)
+      if (error) throw error
+
+      const ruleRows = chosen
+        .filter(it => it.category && it.category !== 'Other')
+        .map(it => ({ user_id: uid, pattern: (it.merchant.split(' ')[0]||'').toUpperCase(), category: it.category }))
+      if (ruleRows.length) {
+        await upsertRules(ruleRows).then(()=>{}).catch(()=>{})
       }
-      setEditing(null); onChange && onChange(); flash && flash('Client saved')
-    } catch (e) { setErr(e.message || 'Could not save client') }
-    setBusy(false)
-  }
-  const del = async (id) => {
-    setBusy(true)
-    try { await deleteClient(id); setSelected(null); onChange && onChange() }
-    catch (e) { setErr(e.message||'Could not delete') }
+      setStage('done')
+      onImported && onImported()
+    } catch (e) { setErr(e.message || 'Import failed') }
     setBusy(false)
   }
 
-  const clientInvoices = (name) => invoices.filter(i => (i.client_name||'') === name)
-  const lbl = { fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }
+  const reset = () => { setStage('upload'); setRows([]); setItems([]); setErr('') }
+
+  const sel = { ...inp, padding:'8px 10px' }
 
   return (
-    <div>
-      <div data-card style={card}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
-          <div style={{fontWeight:700}}>Clients</div>
-          <button style={btnPri} onClick={()=>open(null)}>+ New client</button>
-        </div>
-        {err && editing===null && <ErrBox m={err} />}
-        {clients.length===0 ? <Empty msg="No clients yet. Add one to attach to your invoices." />
-        : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-          <thead><Th cols={['Name','Email','Phone','']} /></thead>
-          <tbody>{clients.map(c => {
-            const isOpen = selected===c.id
-            return (
-            <React.Fragment key={c.id}>
-            <tr style={{cursor:'pointer', background: isOpen ? 'var(--surface2)' : undefined}} onClick={()=>setSelected(isOpen ? null : c.id)}>
-              <Td><span style={{display:'inline-flex',alignItems:'center',gap:'8px'}}><span style={{color:'var(--text3)',fontSize:'11px',display:'inline-block',transition:'transform .15s ease',transform:isOpen?'rotate(90deg)':'none'}}>▶</span>{c.name}</span></Td>
-              <Td muted>{c.email||'—'}</Td><Td muted>{c.phone||'—'}</Td>
-              <Td right><button style={{...btnSec, padding:'5px 11px'}} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button></Td>
-            </tr>
-            {isOpen && (
-            <tr>
-              <td colSpan={4} style={{ padding:0, borderBottom:'1px solid var(--border)' }}>
-                <div className="fade-in" style={{ background:'var(--surface2)', borderRadius:'12px', padding:'16px 18px', margin:'0 0 12px' }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'14px', marginBottom: c.notes ? '12px' : '4px' }}>
-                    <div><div style={lbl}>Email</div><div style={{fontSize:'13.5px'}}>{c.email||'—'}</div></div>
-                    <div><div style={lbl}>Phone</div><div style={{fontSize:'13.5px'}}>{c.phone||'—'}</div></div>
-                    <div><div style={lbl}>Address</div><div style={{fontSize:'13.5px', whiteSpace:'pre-wrap'}}>{c.address||'—'}</div></div>
-                  </div>
-                  {c.notes && <div style={{ fontSize:'13px', color:'var(--text2)', background:'var(--surface3)', padding:'10px 12px', borderRadius:'8px', marginBottom:'12px', whiteSpace:'pre-wrap' }}><span style={{...lbl, display:'block'}}>Notes</span>{c.notes}</div>}
-                  <div style={{ fontWeight:700, fontSize:'13px', marginBottom:'6px' }}>Invoices ({clientInvoices(c.name).length})</div>
-                  {clientInvoices(c.name).length===0 ? <div style={{fontSize:'13px',color:'var(--text3)'}}>No invoices for this client yet.</div>
-                  : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                    <tbody>{clientInvoices(c.name).map(i => (
-                      <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
-                    ))}</tbody>
-                  </table>}
-                  <div style={{ marginTop:'14px', display:'flex', gap:'8px' }}>
-                    <button style={btnSec} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button>
-                    <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={(e)=>{e.stopPropagation(); del(c.id)}}>Delete</button>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            )}
-            </React.Fragment>
-          )})}</tbody>
-        </table>}
-      </div>
+    <div style={card}>
+      <div style={{fontWeight:700, marginBottom:'4px'}}>Bank statement import</div>
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Upload a CSV from your bank. We auto-detect the columns and pre-categorise using your rules — you confirm before anything is saved.</div>
+      {err && <ErrBox m={err} />}
 
-      {editing!==null && (
-        <Modal title={editing==='new'?'New client':'Edit client'} onClose={()=>setEditing(null)}>
-          {err && <ErrBox m={err} />}
-          <input style={inp} placeholder="Client / company name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} />
-          <input style={{...inp,marginTop:'12px'}} placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
-          <input style={{...inp,marginTop:'12px'}} placeholder="Phone" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} />
-          <textarea style={{...inp,marginTop:'12px',minHeight:'60px',resize:'vertical'}} placeholder="Address" value={form.address} onChange={e=>setForm({...form,address:e.target.value})} />
-          <textarea style={{...inp,marginTop:'12px',minHeight:'50px',resize:'vertical'}} placeholder="Notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} />
-          <button style={{...btnPri,marginTop:'14px',width:'100%',opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save client'}</button>
-        </Modal>
+      {stage==='upload' && (
+        <label style={{ display:'block', border:'2px dashed var(--border-light)', borderRadius:'14px', padding:'40px', textAlign:'center', cursor:'pointer' }}>
+          <div style={{ fontSize:'15px', fontWeight:700, marginBottom:'6px' }}>Choose a CSV file</div>
+          <div style={{ fontSize:'13px', color:'var(--text3)' }}>Works with most UK bank exports</div>
+          <input type="file" accept=".csv,text/csv" onChange={onFile} style={{ display:'none' }} />
+        </label>
+      )}
+
+      {stage==='map' && (
+        <div>
+          <div style={{ fontSize:'13.5px', color:'var(--text2)', marginBottom:'14px' }}>We detected these columns — fix any that look wrong, then continue. ({rows.length} rows found)</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px', marginBottom:'18px' }}>
+            {[['date','Date'],['desc','Description'],['amount','Amount (signed)'],['debit','Debit / money out'],['credit','Credit / money in']].map(([k,label]) => (
+              <div key={k}>
+                <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>{label}</div>
+                <select style={sel} value={map[k]} onChange={e=>setMap({...map,[k]:e.target.value})}>
+                  <option value="">— none —</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:'10px' }}>
+            <button style={btnSec} onClick={reset}>Cancel</button>
+            <button style={btnPri} onClick={buildReview}>Continue</button>
+          </div>
+        </div>
+      )}
+
+      {stage==='review' && (
+        <div>
+          <div style={{ fontSize:'13.5px', color:'var(--text2)', marginBottom:'14px' }}>
+            {items.length} expense rows found. Untick anything you don't want, adjust categories, then import.
+            {items.some(it=>it.duplicate) && <span style={{color:'var(--amber)'}}> Possible duplicates are flagged.</span>}
+          </div>
+          <div style={{ maxHeight:'380px', overflowY:'auto', border:'1px solid var(--border)', borderRadius:'10px' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead><tr>
+                {['','Date','Merchant','Category','Amount'].map((h,i)=>(
+                  <th key={i} style={{ textAlign:i===4?'right':'left', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--text3)', fontWeight:700, padding:'10px 14px', borderBottom:'1px solid var(--border)', position:'sticky', top:0, background:'var(--surface)' }}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {items.map((it,idx) => (
+                  <tr key={idx} style={{ opacity: it.include?1:0.45 }}>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)'}}>
+                      <input type="checkbox" checked={it.include} onChange={e=>setItem(idx,{include:e.target.checked})} />
+                    </td>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px', color:'var(--text3)', fontFamily:'Fira Code, monospace'}}>{it.spent_on}</td>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px'}}>
+                      {it.merchant}{it.duplicate && <span style={{ marginLeft:'8px', fontSize:'10.5px', color:'var(--amber)', border:'1px solid rgba(245,158,11,.4)', borderRadius:'20px', padding:'1px 7px' }}>dup?</span>}
+                    </td>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)'}}>
+                      <select style={{...sel, padding:'6px 8px'}} value={it.category} onChange={e=>setItem(idx,{category:e.target.value})}>
+                        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px', textAlign:'right', fontFamily:'Fira Code, monospace'}}>{gbp(it.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display:'flex', gap:'10px', marginTop:'16px', alignItems:'center' }}>
+            <button style={btnSec} onClick={reset}>Start over</button>
+            <button style={{...btnPri, opacity:busy?.7:1}} disabled={busy} onClick={doImport}>
+              {busy ? 'Importing…' : `Import ${items.filter(i=>i.include).length} selected`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {stage==='done' && (
+        <div style={{ textAlign:'center', padding:'30px 20px' }}>
+          <div style={{ fontSize:'18px', fontWeight:800, marginBottom:'8px' }}>✓ Imported</div>
+          <div style={{ color:'var(--text2)', fontSize:'14px', marginBottom:'18px' }}>Your transactions were added as expenses and your category rules were updated.</div>
+          <button style={btnSec} onClick={reset}>Import another file</button>
+        </div>
       )}
     </div>
   )
