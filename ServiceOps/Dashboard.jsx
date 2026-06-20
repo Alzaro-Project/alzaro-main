@@ -737,7 +737,17 @@ function PropertiesPage({ user }) {
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit property" : "New property"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Belongs to customer
-              <select style={inp} value={form.customer_id || ""} onChange={(e) => { const c = customers.find((x) => String(x.id) === e.target.value); setForm({ ...form, customer_id: e.target.value ? +e.target.value : "", customer: c ? c.name : "" }); }}>
+              <select style={inp} value={form.customer_id || ""} onChange={(e) => {
+                const c = customers.find((x) => String(x.id) === e.target.value);
+                const existing = (rows || []).find((p) => String(p.customer_id) === e.target.value);
+                setForm((f) => ({
+                  ...f,
+                  customer_id: e.target.value ? +e.target.value : "",
+                  customer: c ? c.name : "",
+                  address: f.address.trim() ? f.address : (c && c.site ? c.site : (existing ? existing.address : f.address)),
+                  postcode: f.postcode.trim() ? f.postcode : (existing && existing.postcode ? existing.postcode : f.postcode),
+                }));
+              }}>
                 <option value="">— Select customer —</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
