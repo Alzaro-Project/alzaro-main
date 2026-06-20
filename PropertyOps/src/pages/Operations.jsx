@@ -206,10 +206,10 @@ ${biz}`
     }
   };
 
-  const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
-  const panel = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 22, width: 560, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" };
-  const labelTiny = { fontSize: 10, fontWeight: 700, color: "var(--txt-3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 };
-  const field = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 13, fontFamily: "Inter", outline: "none", width: "100%" };
+  const overlay = { position: "fixed", inset: 0, background: "rgba(15,16,22,.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
+  const panel = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: 24, width: 540, maxWidth: "95vw", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,.28)" };
+  const labelTiny = { fontSize: 10, fontWeight: 700, color: "var(--txt-3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5 };
+  const field = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "10px 12px", color: "var(--txt)", fontSize: 13, fontFamily: "Inter", outline: "none", width: "100%", boxSizing: "border-box" };
 
   return (
     <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget && status !== "sending") onClose(); }}>
