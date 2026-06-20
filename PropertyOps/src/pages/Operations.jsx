@@ -547,11 +547,28 @@ export function SettingsPage({ user }) {
   const [tab, setTab] = useState("organisation");
   const [org, setOrg] = useState({ company_name: "", vat_number: "" });
   const [notif, setNotif] = useState({ notify_compliance: true, notify_rent: true, reminder_lead: "30 / 7 days before expiry" });
+  const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
+  const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
+  const [showPass, setShowPass] = useState(false);
+  const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [smtpTestMsg, setSmtpTestMsg] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
   const currentPlan = "Enterprise"; // shown as current; real billing is future Stripe work
+
+  // SMTP provider presets — picking one fills in host/port/security
+  const SMTP_PRESETS = {
+    custom:   { host: "",                      port: 587, secure: false },
+    gmail:    { host: "smtp.gmail.com",        port: 587, secure: false },
+    outlook:  { host: "smtp-mail.outlook.com", port: 587, secure: false },
+    office365:{ host: "smtp.office365.com",    port: 587, secure: false },
+    zoho:     { host: "smtp.zoho.eu",          port: 587, secure: false },
+    ionos:    { host: "smtp.ionos.co.uk",      port: 587, secure: false },
+    resend:   { host: "smtp.resend.com",       port: 587, secure: false },
+    sendgrid: { host: "smtp.sendgrid.net",     port: 587, secure: false },
+  };
 
   const TABS = [
     { key: "organisation", label: "Organisation", icon: "ti-building" },
@@ -573,6 +590,22 @@ export function SettingsPage({ user }) {
             notify_rent: row.notify_rent !== false,
             reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
           });
+          setEmail({
+            smtp_provider: row.smtp_provider || "custom",
+            smtp_host: row.smtp_host || "",
+            smtp_port: row.smtp_port || 587,
+            smtp_secure: row.smtp_secure === true,
+            smtp_user: row.smtp_user || "",
+            smtp_pass: row.smtp_pass || "",
+            smtp_from_name: row.smtp_from_name || "",
+            smtp_from_email: row.smtp_from_email || "",
+            smtp_reply_to: row.smtp_reply_to || "",
+          });
+          setVat({
+            vat_scheme: row.vat_scheme || "standard",
+            vat_number: row.vat_number || "",
+            flat_rate: row.flat_rate != null ? row.flat_rate : 16.5,
+          });
         } else if (user.user_metadata && user.user_metadata.company_name) {
           setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
         }
@@ -583,7 +616,16 @@ export function SettingsPage({ user }) {
   const saveOrg = async () => {
     if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
     setErr(""); setSaving(true); setSaved(false);
-    const record = { user_id: user.id, company_name: org.company_name, vat_number: org.vat_number, notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead, updated_at: new Date().toISOString() };
+    const record = {
+      user_id: user.id,
+      company_name: org.company_name,
+      vat_number: vat.vat_number || org.vat_number,
+      notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead,
+      smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_port: email.smtp_port, smtp_secure: email.smtp_secure,
+      smtp_user: email.smtp_user, smtp_pass: email.smtp_pass, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
+      vat_scheme: vat.vat_scheme, flat_rate: vat.flat_rate,
+      updated_at: new Date().toISOString(),
+    };
     // upsert, then read back to confirm it actually persisted
     const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
     if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
@@ -591,9 +633,38 @@ export function SettingsPage({ user }) {
     setSaving(false);
     if (readErr) { setErr("Saved, but couldn't confirm: " + readErr.message); return; }
     const row = check && check.length ? check[0] : null;
-    if (!row) { setErr("Save didn't persist — this usually means the prop_settings table or its security policy is missing. Re-run the settings SQL in Supabase."); return; }
+    if (!row) { setErr("Save didn't persist — this usually means the prop_settings table is missing the new columns. Re-run the settings SQL in Supabase."); return; }
     setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "" });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+
+  // Picking a provider preset fills host/port/security
+  const pickProvider = (p) => {
+    const preset = SMTP_PRESETS[p];
+    setEmail({ ...email, smtp_provider: p, ...(preset ? { smtp_host: preset.host, smtp_port: preset.port, smtp_secure: preset.secure } : {}) });
+  };
+
+  // Tests the SMTP details for real against the shared /api/test-smtp endpoint
+  const testSmtp = async () => {
+    if (!email.smtp_host || !email.smtp_user || !email.smtp_pass) {
+      setSmtpTest("error"); setSmtpTestMsg("Fill in the SMTP host, username and password first.");
+      return;
+    }
+    setSmtpTest("testing"); setSmtpTestMsg("");
+    try {
+      const res = await fetch("/api/test-smtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: email.smtp_pass, fromName: email.smtp_from_name || org.company_name || "" }),
+      });
+      let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
+      setSmtpTest("success"); setSmtpTestMsg(""); setTimeout(() => setSmtpTest(null), 8000);
+    } catch (e) {
+      setSmtpTest("error");
+      if (e.message === "Failed to fetch") setSmtpTestMsg("Could not reach /api/test-smtp — the function may not be deployed yet.");
+      else setSmtpTestMsg(e.message);
+    }
   };
 
   const tiers = [
@@ -604,6 +675,7 @@ export function SettingsPage({ user }) {
 
   const inp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+  const lbl = { fontSize: 10.5, fontWeight: 600, color: "var(--txt-3)", display: "block", marginBottom: 5 };
   const card = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" };
   const head = (icon, title) => (
     <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
@@ -616,15 +688,6 @@ export function SettingsPage({ user }) {
     <span onClick={onClick} style={{ width: 38, height: 22, borderRadius: 11, background: on ? "var(--brand)" : "var(--line-2)", position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
       <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
     </span>
-  );
-
-  const ComingSoon = ({ icon, title, text }) => (
-    <div style={{ ...card, textAlign: "center", padding: "40px 24px" }}>
-      <span style={{ width: 44, height: 44, borderRadius: 11, background: "var(--brand-soft)", color: "var(--brand)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><i className={`ti ${icon}`} style={{ fontSize: 22 }} /></span>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 12.5, color: "var(--txt-3)", maxWidth: 360, margin: "0 auto", lineHeight: 1.5 }}>{text}</div>
-      <span style={{ display: "inline-block", marginTop: 14, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--brand)", background: "var(--brand-soft)", padding: "4px 12px", borderRadius: 20 }}>Coming soon</span>
-    </div>
   );
 
   return (
@@ -701,12 +764,123 @@ export function SettingsPage({ user }) {
 
       {/* EMAIL */}
       {tab === "email" && (
-        <ComingSoon icon="ti-mail" title="Email & SMTP" text="Connect your own email service to send compliance reminders, rent alerts and invoices straight from your domain. Custom SMTP setup is on the way." />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 760 }}>
+          <div style={card}>
+            {head("ti-mail", "Email & SMTP")}
+            <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>Send compliance reminders, rent alerts and invoices straight from your own domain. Pick a provider to auto-fill the server settings.</p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={lbl}>Email provider</label>
+              <select style={inp} value={email.smtp_provider} onChange={(e) => pickProvider(e.target.value)}>
+                <option value="custom">Custom SMTP server</option>
+                <option value="gmail">Gmail / Google Workspace</option>
+                <option value="outlook">Outlook / Hotmail</option>
+                <option value="office365">Microsoft 365</option>
+                <option value="zoho">Zoho Mail</option>
+                <option value="ionos">IONOS</option>
+                <option value="resend">Resend</option>
+                <option value="sendgrid">SendGrid</option>
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>SMTP host</label><input style={inp} value={email.smtp_host} onChange={(e) => setEmail({ ...email, smtp_host: e.target.value })} placeholder="smtp.resend.com" /></div>
+              <div><label style={lbl}>Port</label><input style={inp} type="number" value={email.smtp_port} onChange={(e) => setEmail({ ...email, smtp_port: parseInt(e.target.value) || 587 })} placeholder="587" /></div>
+              <div><label style={lbl}>Security</label>
+                <select style={inp} value={email.smtp_secure ? "ssl" : "tls"} onChange={(e) => setEmail({ ...email, smtp_secure: e.target.value === "ssl" })}>
+                  <option value="tls">TLS (587)</option>
+                  <option value="ssl">SSL (465)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>Username / Email</label><input style={inp} value={email.smtp_user} onChange={(e) => setEmail({ ...email, smtp_user: e.target.value })} placeholder="you@yourdomain.com" /></div>
+              <div><label style={lbl}>Password / API key</label>
+                <div style={{ position: "relative" }}>
+                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="••••••••••••" />
+                  <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>From name</label><input style={inp} value={email.smtp_from_name} onChange={(e) => setEmail({ ...email, smtp_from_name: e.target.value })} placeholder={org.company_name || "Alzaro PropertyOps"} /></div>
+              <div><label style={lbl}>From email</label><input style={inp} type="email" value={email.smtp_from_email} onChange={(e) => setEmail({ ...email, smtp_from_email: e.target.value })} placeholder="noreply@yourdomain.com" /></div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}><label style={lbl}>Reply-to email (optional)</label><input style={inp} type="email" value={email.smtp_reply_to} onChange={(e) => setEmail({ ...email, smtp_reply_to: e.target.value })} placeholder="support@yourdomain.com" /></div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span onClick={smtpTest === "testing" ? undefined : testSmtp}>
+                <Btn icon="ti-plug" label={smtpTest === "testing" ? "Connecting…" : smtpTest === "success" ? "✓ Connected!" : smtpTest === "error" ? "✗ Failed — retry" : "Test connection"} />
+              </span>
+              <span style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Sends a test email from {email.smtp_user || "your address"} to itself.</span>
+            </div>
+
+            {smtpTest === "success" && (
+              <div style={{ marginTop: 12, background: "var(--green-soft)", border: "0.5px solid var(--green)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--green)" }}>✓ Connected. A test email was sent from {email.smtp_user} — check that inbox, then Save changes below to keep these details.</div>
+            )}
+            {smtpTest === "error" && smtpTestMsg && (
+              <div style={{ marginTop: 12, background: "var(--red-soft)", border: "0.5px solid var(--red)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--red)" }}>✗ {smtpTestMsg}</div>
+            )}
+
+            {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 12 }}>{err}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+              <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+              {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* VAT */}
       {tab === "vat" && (
-        <ComingSoon icon="ti-receipt" title="VAT settings" text="Set your VAT scheme and registration details so they flow through to your invoices and reports automatically. This is coming soon." />
+        <div style={{ ...card, maxWidth: 760 }}>
+          {head("ti-receipt", "VAT")}
+          <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>Set your VAT scheme and registration details. These flow through to your invoices and reports.</p>
+
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div><label style={lbl}>VAT scheme</label>
+              <select style={inp} value={vat.vat_scheme} onChange={(e) => setVat({ ...vat, vat_scheme: e.target.value })}>
+                <option value="standard">Standard rate (20%)</option>
+                <option value="flatrate">Flat rate scheme</option>
+                <option value="exempt">Not VAT registered</option>
+              </select>
+            </div>
+            <div><label style={lbl}>VAT number</label><input style={inp} value={vat.vat_number} onChange={(e) => setVat({ ...vat, vat_number: e.target.value })} placeholder="GB 123 4567 89" /></div>
+            {vat.vat_scheme === "flatrate" && (
+              <div><label style={lbl}>Flat rate %</label><input style={inp} type="number" step="0.1" value={vat.flat_rate} onChange={(e) => setVat({ ...vat, flat_rate: parseFloat(e.target.value) })} placeholder="16.5" /><div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 4 }}>Check HMRC for your sector's flat rate.</div></div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            {vat.vat_scheme === "standard" && (
+              <div style={{ background: "var(--brand-soft)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, color: "var(--brand)", marginBottom: 5 }}>Standard rate (20%)</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Charge 20% VAT on invoices and reclaim VAT on purchases. Most landlords and agencies use this.</div>
+              </div>
+            )}
+            {vat.vat_scheme === "flatrate" && (
+              <div style={{ background: "var(--amber-soft)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, color: "var(--amber)", marginBottom: 5 }}>Flat rate scheme</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Pay a fixed percentage of gross turnover to HMRC. Simpler bookkeeping, but you can't reclaim VAT on most purchases.</div>
+              </div>
+            )}
+            {vat.vat_scheme === "exempt" && (
+              <div style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 5 }}>Not VAT registered</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Invoices will not include VAT charges.</div>
+              </div>
+            )}
+          </div>
+
+          {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 14 }}>{err}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
+            <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+            {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+          </div>
+        </div>
       )}
 
       {/* SUBSCRIPTION */}
