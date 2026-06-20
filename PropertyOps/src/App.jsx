@@ -135,9 +135,19 @@ function Dashboard({ user, signOut }) {
         {/* business name (real DB data, not email) */}
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
         {/* tier badge with crown icon */}
-        <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 600, color: "#2a1f5c", background: "#bcb3f5", padding: "2px 10px", borderRadius: 6, margin: "6px 0 16px" }}>
-          <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
-        </span>
+        {(() => {
+          const TIER_COL = {
+            starter:      { bg: "rgba(180,100,30,0.12)", color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
+            professional: { bg: "rgba(100,100,120,0.1)", color: "#6b7080", border: "rgba(100,100,120,0.25)" },
+            enterprise:   { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
+          };
+          const ts = TIER_COL[(biz.tier || "enterprise").toLowerCase()] || TIER_COL.enterprise;
+          return (
+            <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20, margin: "6px 0 16px" }}>
+              <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
+            </span>
+          );
+        })()}
         {/* working search bar */}
         <div style={{ position: "relative", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}>
@@ -164,9 +174,11 @@ function Dashboard({ user, signOut }) {
           {NAV.map((n) => {
             const on = n.id === active;
             return (
-              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "12px 11px" : "9px 11px", borderRadius: 8, cursor: "pointer", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", border: on ? "0.5px solid var(--line)" : "0.5px solid transparent" }}>
-                <i className={`ti ${n.icon}`} style={{ fontSize: 17, color: on ? "var(--brand)" : "var(--txt-2)" }} />
-                <span style={{ fontSize: 13 }}>{n.label}</span>
+              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--panel-2)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)" }}
+                onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--panel-2)"; }}
+                onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", color: on ? "var(--brand)" : "var(--txt-2)" }} />
+                <span style={{ flex: 1 }}>{n.label}</span>
               </div>
             );
           })}
