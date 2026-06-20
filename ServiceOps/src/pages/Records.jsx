@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db, DB_READY } from '../lib/db.js'
 import { REPORTS, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
-import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker } from '../components/UI.jsx'
+import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker, useIsMobile } from '../components/UI.jsx'
 
 // ---- Dashboard ----
 function WelcomeBanner({ d, go, user }) {
@@ -552,31 +552,377 @@ function ReportsPage() {
 // SETTINGS
 
 // ---- Settings ----
-function SettingsPage() {
-  const sections = [
-    { title: "Business", icon: "ti-building", rows: [["Trading name", "Alzaro Trade Services"], ["VAT number", "GB 123 4567 89"], ["Plan", "Pro"]] },
-    { title: "Team & engineers", icon: "ti-users", rows: [["Dave R.", "Admin / Engineer"], ["Mike T.", "Engineer"], ["Sub — DryWall Co", "Subcontractor"]] },
-    { title: "Notifications", icon: "ti-bell", rows: [["Certificate reminders", "Email + SMS"], ["Invoice overdue", "Email"], ["Job booked", "SMS to customer"]] },
-    { title: "Integrations", icon: "ti-plug", rows: [["Xero", "Not connected"], ["Stripe", "Not connected"], ["GoCardless", "Not connected"]] },
+function SettingsPage({ user }) {
+  const isMobile = useIsMobile();
+  const [tab, setTab] = useState("business");
+  const [biz, setBiz] = useState({ trading_name: "", vat_number: "" });
+  const [notif, setNotif] = useState({ notify_certificate: true, notify_invoice: true, notify_job: true, reminder_lead: "30 / 7 days before expiry" });
+  const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
+  const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
+  const [showPass, setShowPass] = useState(false);
+  const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [smtpTestMsg, setSmtpTestMsg] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+  const currentPlan = "Pro"; // shown as current; real billing is future Stripe work
+
+  const TABS = [
+    { key: "business", label: "Business", icon: "ti-building" },
+    { key: "notifications", label: "Notifications", icon: "ti-bell" },
+    { key: "email", label: "Email", icon: "ti-mail" },
+    { key: "vat", label: "VAT", icon: "ti-receipt" },
+    { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
   ];
+
+  // SMTP provider presets — picking one fills in host/port/security
+  const SMTP_PRESETS = {
+    custom:   { host: "",                      port: 587, secure: false },
+    gmail:    { host: "smtp.gmail.com",        port: 587, secure: false },
+    outlook:  { host: "smtp-mail.outlook.com", port: 587, secure: false },
+    office365:{ host: "smtp.office365.com",    port: 587, secure: false },
+    zoho:     { host: "smtp.zoho.eu",          port: 587, secure: false },
+    ionos:    { host: "smtp.ionos.co.uk",      port: 587, secure: false },
+    resend:   { host: "smtp.resend.com",       port: 587, secure: false },
+    sendgrid: { host: "smtp.sendgrid.net",     port: 587, secure: false },
+  };
+
+  useEffect(() => {
+    if (!DB_READY) { setLoaded(true); return; }
+    db.from("svc_settings").select("*").eq("user_id", user.id)
+      .then(({ data, error }) => {
+        const row = !error && data && data.length ? data[0] : null;
+        if (row) {
+          setBiz({ trading_name: row.trading_name || "", vat_number: row.vat_number || "" });
+          setNotif({
+            notify_certificate: row.notify_certificate !== false,
+            notify_invoice: row.notify_invoice !== false,
+            notify_job: row.notify_job !== false,
+            reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
+          });
+          setEmail({
+            smtp_provider: row.smtp_provider || "custom",
+            smtp_host: row.smtp_host || "",
+            smtp_port: row.smtp_port || 587,
+            smtp_secure: row.smtp_secure === true,
+            smtp_user: row.smtp_user || "",
+            smtp_pass: row.smtp_pass || "",
+            smtp_from_name: row.smtp_from_name || "",
+            smtp_from_email: row.smtp_from_email || "",
+            smtp_reply_to: row.smtp_reply_to || "",
+          });
+          setVat({
+            vat_scheme: row.vat_scheme || "standard",
+            vat_number: row.vat_number || "",
+            flat_rate: row.flat_rate != null ? row.flat_rate : 16.5,
+          });
+        } else if (user.user_metadata && user.user_metadata.company_name) {
+          setBiz((b) => ({ ...b, trading_name: user.user_metadata.company_name }));
+        }
+        setLoaded(true);
+      });
+  }, []);
+
+  const saveAll = async () => {
+    if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
+    setErr(""); setSaving(true); setSaved(false);
+    const record = {
+      user_id: user.id,
+      trading_name: biz.trading_name,
+      vat_number: vat.vat_number || biz.vat_number,
+      notify_certificate: notif.notify_certificate, notify_invoice: notif.notify_invoice, notify_job: notif.notify_job, reminder_lead: notif.reminder_lead,
+      smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_port: email.smtp_port, smtp_secure: email.smtp_secure,
+      smtp_user: email.smtp_user, smtp_pass: email.smtp_pass, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
+      vat_scheme: vat.vat_scheme, flat_rate: vat.flat_rate,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: upErr } = await db.from("svc_settings").upsert(record, { onConflict: "user_id" });
+    if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
+    const { data: check, error: readErr } = await db.from("svc_settings").select("trading_name,vat_number").eq("user_id", user.id);
+    setSaving(false);
+    if (readErr) { setErr("Saved, but couldn't confirm: " + readErr.message); return; }
+    const row = check && check.length ? check[0] : null;
+    if (!row) { setErr("Save didn't persist — the svc_settings table is likely missing the new columns. Re-run the settings SQL in Supabase."); return; }
+    setBiz({ trading_name: row.trading_name || "", vat_number: row.vat_number || "" });
+    setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+
+  // Picking a provider preset fills host/port/security
+  const pickProvider = (p) => {
+    const preset = SMTP_PRESETS[p];
+    setEmail({ ...email, smtp_provider: p, ...(preset ? { smtp_host: preset.host, smtp_port: preset.port, smtp_secure: preset.secure } : {}) });
+  };
+
+  // Tests the SMTP details for real against the shared /api/test-smtp endpoint
+  const testSmtp = async () => {
+    if (!email.smtp_host || !email.smtp_user || !email.smtp_pass) {
+      setSmtpTest("error"); setSmtpTestMsg("Fill in the SMTP host, username and password first.");
+      return;
+    }
+    setSmtpTest("testing"); setSmtpTestMsg("");
+    try {
+      const res = await fetch("/api/test-smtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: email.smtp_pass, fromName: email.smtp_from_name || biz.trading_name || "" }),
+      });
+      let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
+      setSmtpTest("success"); setSmtpTestMsg(""); setTimeout(() => setSmtpTest(null), 8000);
+    } catch (e) {
+      setSmtpTest("error");
+      if (e.message === "Failed to fetch") setSmtpTestMsg("Could not reach /api/test-smtp — the function may not be deployed yet.");
+      else setSmtpTestMsg(e.message);
+    }
+  };
+
+  const tiers = [
+    { name: "Starter", price: 29, sub: "per month", best: "Solo traders", features: ["Up to 50 jobs / month", "Customers & properties", "Quotes & invoices", "Certificate vault", "Email support"] },
+    { name: "Pro", price: 59, sub: "per month", best: "Small teams", features: ["Everything in Starter", "Unlimited jobs", "Engineer scheduling & diary", "Automated reminders", "Priority support"] },
+    { name: "Business", price: 109, sub: "per month", best: "Growing firms", features: ["Everything in Pro", "Multiple engineers & subbies", "Team roles & permissions", "Accounting integrations", "Dedicated account manager"] },
+  ];
+
+  const sInp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%" };
+  const sFld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+  const lbl = { fontSize: 10.5, fontWeight: 600, color: "var(--txt-3)", display: "block", marginBottom: 5 };
+  const card = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" };
+  const head = (icon, title) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
+      <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${icon}`} style={{ fontSize: 15 }} /></span>
+      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{title}</span>
+    </div>
+  );
+  const Toggle = ({ on, onClick }) => (
+    <span onClick={onClick} style={{ width: 38, height: 22, borderRadius: 11, background: on ? "var(--brand)" : "var(--line-2)", position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
+      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+    </span>
+  );
+  const SaveRow = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+      <span onClick={saveAll}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
+      {saved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+    </div>
+  );
+
   return (
     <div className="fade-in">
-      <PageHead title="Settings" sub="Manage your business, team, notifications and integrations." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
-        {sections.map((s, i) => (
-          <div key={i} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
-              <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${s.icon}`} style={{ fontSize: 15 }} /></span>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.title}</span>
-            </div>
-            {s.rows.map((r, j) => (
-              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j < s.rows.length - 1 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
-                <span style={{ color: "var(--txt-2)" }}>{r[0]}</span><span style={{ fontWeight: 500 }}>{r[1]}</span>
-              </div>
-            ))}
+      <PageHead title="Settings" sub="Manage your business, team and subscription." />
+
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 12, padding: 5, marginBottom: 18, width: isMobile ? "100%" : "fit-content", overflowX: "auto" }}>
+        {TABS.map((t) => (
+          <div key={t.key} onClick={() => setTab(t.key)} style={{ display: "flex", alignItems: "center", gap: 7, padding: isMobile ? "9px 12px" : "9px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: tab === t.key ? "var(--brand)" : "transparent", color: tab === t.key ? "#fff" : "var(--txt-2)" }}>
+            <i className={`ti ${t.icon}`} style={{ fontSize: 14 }} />{t.label}
           </div>
         ))}
       </div>
+
+      {/* BUSINESS */}
+      {tab === "business" && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12 }}>
+          <div style={card}>
+            {head("ti-building", "Business")}
+            {!loaded ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>Loading…</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label style={sFld}>Trading name<input style={sInp} placeholder="e.g. Alzaro Trade Services" value={biz.trading_name} onChange={(e) => setBiz({ ...biz, trading_name: e.target.value })} /></label>
+                <label style={sFld}>VAT number<input style={sInp} placeholder="e.g. GB 123 4567 89" value={biz.vat_number} onChange={(e) => setBiz({ ...biz, vat_number: e.target.value })} /></label>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
+                {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
+                <SaveRow />
+              </div>
+            )}
+          </div>
+
+          <div style={card}>
+            {head("ti-users", "Team & engineers")}
+            {[["You", user ? user.email : "—", "Admin"], ["Invite engineers", "Coming soon", ""]].map((r, j) => (
+              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j === 0 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
+                <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Add engineers and subcontractors on the Business plan.</div>
+          </div>
+        </div>
+      )}
+
+      {/* NOTIFICATIONS */}
+      {tab === "notifications" && (
+        <div style={{ ...card, maxWidth: 760 }}>
+          {head("ti-bell", "Notifications")}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Certificate reminders</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when certificates are due to expire</div></div>
+              <Toggle on={notif.notify_certificate} onClick={() => setNotif({ ...notif, notify_certificate: !notif.notify_certificate })} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Invoice overdue alerts</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when an invoice becomes overdue</div></div>
+              <Toggle on={notif.notify_invoice} onClick={() => setNotif({ ...notif, notify_invoice: !notif.notify_invoice })} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "0.5px solid var(--line)" }}>
+              <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Job booked confirmations</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Notify the customer when a job is booked in</div></div>
+              <Toggle on={notif.notify_job} onClick={() => setNotif({ ...notif, notify_job: !notif.notify_job })} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
+              <div style={{ fontSize: 12.5, color: "var(--txt)" }}>Reminder lead time</div>
+              <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "7px 10px", color: "var(--txt)", fontSize: 12, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none" }}>
+                {["60 / 30 / 7 days before expiry", "30 / 7 days before expiry", "14 / 1 days before expiry", "7 days before expiry"].map((x) => <option key={x}>{x}</option>)}
+              </select>
+            </div>
+          </div>
+          {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 10 }}>{err}</div>}
+          <SaveRow />
+          <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>Email delivery of these reminders is coming soon — alerts currently show in the app.</div>
+        </div>
+      )}
+
+      {/* EMAIL */}
+      {tab === "email" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 760 }}>
+          <div style={card}>
+            {head("ti-mail", "Email & SMTP")}
+            <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>Send certificate reminders, invoice alerts and job confirmations straight from your own domain. Pick a provider to auto-fill the server settings.</p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={lbl}>Email provider</label>
+              <select style={sInp} value={email.smtp_provider} onChange={(e) => pickProvider(e.target.value)}>
+                <option value="custom">Custom SMTP server</option>
+                <option value="gmail">Gmail / Google Workspace</option>
+                <option value="outlook">Outlook / Hotmail</option>
+                <option value="office365">Microsoft 365</option>
+                <option value="zoho">Zoho Mail</option>
+                <option value="ionos">IONOS</option>
+                <option value="resend">Resend</option>
+                <option value="sendgrid">SendGrid</option>
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>SMTP host</label><input style={sInp} value={email.smtp_host} onChange={(e) => setEmail({ ...email, smtp_host: e.target.value })} placeholder="smtp.resend.com" /></div>
+              <div><label style={lbl}>Port</label><input style={sInp} type="number" value={email.smtp_port} onChange={(e) => setEmail({ ...email, smtp_port: parseInt(e.target.value) || 587 })} placeholder="587" /></div>
+              <div><label style={lbl}>Security</label>
+                <select style={sInp} value={email.smtp_secure ? "ssl" : "tls"} onChange={(e) => setEmail({ ...email, smtp_secure: e.target.value === "ssl" })}>
+                  <option value="tls">TLS (587)</option>
+                  <option value="ssl">SSL (465)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>Username / Email</label><input style={sInp} value={email.smtp_user} onChange={(e) => setEmail({ ...email, smtp_user: e.target.value })} placeholder="you@yourdomain.com" /></div>
+              <div><label style={lbl}>Password / API key</label>
+                <div style={{ position: "relative" }}>
+                  <input style={{ ...sInp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="••••••••••••" />
+                  <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div><label style={lbl}>From name</label><input style={sInp} value={email.smtp_from_name} onChange={(e) => setEmail({ ...email, smtp_from_name: e.target.value })} placeholder={biz.trading_name || "Alzaro ServiceOps"} /></div>
+              <div><label style={lbl}>From email</label><input style={sInp} type="email" value={email.smtp_from_email} onChange={(e) => setEmail({ ...email, smtp_from_email: e.target.value })} placeholder="noreply@yourdomain.com" /></div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}><label style={lbl}>Reply-to email (optional)</label><input style={sInp} type="email" value={email.smtp_reply_to} onChange={(e) => setEmail({ ...email, smtp_reply_to: e.target.value })} placeholder="support@yourdomain.com" /></div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span onClick={smtpTest === "testing" ? undefined : testSmtp}>
+                <Btn icon="ti-plug" label={smtpTest === "testing" ? "Connecting…" : smtpTest === "success" ? "✓ Connected!" : smtpTest === "error" ? "✗ Failed — retry" : "Test connection"} />
+              </span>
+              <span style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Sends a test email from {email.smtp_user || "your address"} to itself.</span>
+            </div>
+
+            {smtpTest === "success" && (
+              <div style={{ marginTop: 12, background: "var(--green-soft)", border: "0.5px solid var(--green)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--green)" }}>✓ Connected. A test email was sent from {email.smtp_user} — check that inbox, then Save changes below to keep these details.</div>
+            )}
+            {smtpTest === "error" && smtpTestMsg && (
+              <div style={{ marginTop: 12, background: "var(--red-soft)", border: "0.5px solid var(--red)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--red)" }}>✗ {smtpTestMsg}</div>
+            )}
+
+            {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 12 }}>{err}</div>}
+            <SaveRow />
+          </div>
+        </div>
+      )}
+
+      {/* VAT */}
+      {tab === "vat" && (
+        <div style={{ ...card, maxWidth: 760 }}>
+          {head("ti-receipt", "VAT")}
+          <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>Set your VAT scheme and registration details. These flow through to your quotes and invoices.</p>
+
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div><label style={lbl}>VAT scheme</label>
+              <select style={sInp} value={vat.vat_scheme} onChange={(e) => setVat({ ...vat, vat_scheme: e.target.value })}>
+                <option value="standard">Standard rate (20%)</option>
+                <option value="flatrate">Flat rate scheme</option>
+                <option value="exempt">Not VAT registered</option>
+              </select>
+            </div>
+            <div><label style={lbl}>VAT number</label><input style={sInp} value={vat.vat_number} onChange={(e) => setVat({ ...vat, vat_number: e.target.value })} placeholder="GB 123 4567 89" /></div>
+            {vat.vat_scheme === "flatrate" && (
+              <div><label style={lbl}>Flat rate %</label><input style={sInp} type="number" step="0.1" value={vat.flat_rate} onChange={(e) => setVat({ ...vat, flat_rate: parseFloat(e.target.value) })} placeholder="9.5" /><div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 4 }}>Check HMRC for your trade's flat rate.</div></div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            {vat.vat_scheme === "standard" && (
+              <div style={{ background: "var(--brand-soft)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, color: "var(--brand)", marginBottom: 5 }}>Standard rate (20%)</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Charge 20% VAT on invoices and reclaim VAT on materials and purchases. Most trade businesses use this.</div>
+              </div>
+            )}
+            {vat.vat_scheme === "flatrate" && (
+              <div style={{ background: "var(--amber-soft)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, color: "var(--amber)", marginBottom: 5 }}>Flat rate scheme</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Pay a fixed percentage of gross turnover to HMRC. Simpler bookkeeping, but you can't reclaim VAT on most purchases.</div>
+              </div>
+            )}
+            {vat.vat_scheme === "exempt" && (
+              <div style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 5 }}>Not VAT registered</div>
+                <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.5 }}>Quotes and invoices will not include VAT charges.</div>
+              </div>
+            )}
+          </div>
+
+          {err && <div style={{ fontSize: 11.5, color: "var(--red)", marginTop: 14 }}>{err}</div>}
+          <SaveRow />
+        </div>
+      )}
+
+      {/* SUBSCRIPTION */}
+      {tab === "subscription" && (
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+            {tiers.map((t) => {
+              const isCurrent = t.name === currentPlan;
+              return (
+                <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
+                  {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
+                  <div style={{ marginBottom: 14 }}><span style={{ fontSize: 26, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /{t.sub.replace("per ", "")}</span></div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
+                    {t.features.map((f, k) => (
+                      <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, color: "var(--txt-2)" }}>
+                        <i className="ti ti-check" style={{ fontSize: 13, color: "var(--green)", marginTop: 1, flexShrink: 0 }} />{f}
+                      </div>
+                    ))}
+                  </div>
+                  {isCurrent ? (
+                    <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
+                  ) : (
+                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
+        </div>
+      )}
     </div>
   );
 }
