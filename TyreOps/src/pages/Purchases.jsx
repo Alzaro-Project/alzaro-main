@@ -3,6 +3,7 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
+import { deletePurchaseInvoice } from '../lib/db'
 
 export default function Purchases() {
   const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, updateBatch, deleteBatch, updateUsedTyre, deleteUsedTyre, garageId } = useStore()
@@ -224,8 +225,8 @@ export default function Purchases() {
           return
         }
         const updates = { ...data, remaining: data.qty - sold }
-        // Don't wipe an existing uploaded invoice unless a new one was added
-        if (!updates.invoiceUrl) delete updates.invoiceUrl
+        // invoiceUrl: null = no change (keep existing), '' = removed, string = new upload
+        if (updates.invoiceUrl === null || updates.invoiceUrl === undefined) delete updates.invoiceUrl
         updateBatch(editingBatch.id, updates)
         setEditingBatch(null)
       }} />}
@@ -259,6 +260,8 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef(null)
+  // Invoice already attached to this batch (when editing)
+  const [existingInvoice, setExistingInvoice] = useState(initial?.invoiceUrl || null)
 
   // Previously used suppliers, for the dropdown
   const allBatches = useStore(s => s.batches)
@@ -307,8 +310,21 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
     if (!form.skuId || !form.qty || !form.cost) {
       return alert('Please select a tyre and enter quantity and cost')
     }
-    let invoiceUrl = null
-    if (invoiceFile) invoiceUrl = await uploadInvoice()
+    let invoiceUrl
+    if (invoiceFile) {
+      // New file staged — upload it, and remove the old one if there was one
+      invoiceUrl = await uploadInvoice()
+      if (invoiceUrl === null) return // upload failed, error already shown
+      if (initial?.invoiceUrl) {
+        try { await deletePurchaseInvoice(initial.invoiceUrl) } catch (e) { console.error('Old invoice cleanup failed:', e) }
+      }
+    } else if (initial?.invoiceUrl && !existingInvoice) {
+      // User removed the existing invoice without adding a new one
+      try { await deletePurchaseInvoice(initial.invoiceUrl) } catch (e) { console.error('Invoice delete failed:', e) }
+      invoiceUrl = '' // explicit clear
+    } else {
+      invoiceUrl = null // no change — parent leaves existing invoice untouched
+    }
     onSave({ ...form, qty: parseInt(form.qty), cost: parseFloat(form.cost), invoiceUrl })
   }
 
@@ -340,15 +356,23 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
         <Field label="Purchase Invoice (optional)">
           <input ref={fileInputRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
-          {!invoiceFile ? (
-            <div onClick={() => fileInputRef.current?.click()} style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', cursor: 'pointer', border: '2px dashed var(--border)' }}>
-              <span>📄</span>
-              <span style={{ color: 'var(--text2)' }}>Click to upload PDF or image</span>
-            </div>
-          ) : (
+          {invoiceFile ? (
             <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}>
               <span style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '6px' }}>✓ {invoiceFile.name}</span>
               <button onClick={() => setInvoiceFile(null)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}>✕</button>
+            </div>
+          ) : existingInvoice ? (
+            <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}>
+              <a href={existingInvoice} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>📄 View invoice</a>
+              <span style={{ display: 'inline-flex', gap: '10px' }}>
+                <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Replace</button>
+                <button onClick={() => { if (confirm('Remove this invoice? It will be deleted when you save.')) setExistingInvoice(null) }} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
+              </span>
+            </div>
+          ) : (
+            <div onClick={() => fileInputRef.current?.click()} style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', cursor: 'pointer', border: '2px dashed var(--border)' }}>
+              <span>📄</span>
+              <span style={{ color: 'var(--text2)' }}>Click to upload PDF or image</span>
             </div>
           )}
         </Field>
