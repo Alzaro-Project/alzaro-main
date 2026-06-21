@@ -196,7 +196,8 @@ export async function insertBatch(garageId, batch) {
     supplier: batch.supplier,
     ref: batch.ref,
     notes: batch.notes,
-    invoice_url: batch.invoiceUrl || null
+    invoice_url: batch.invoiceUrl || null,
+    damaged: batch.damaged || 0
   }).select().single()
   if (error) throw error
   return data
@@ -453,6 +454,7 @@ export async function loadAllGarageData(email) {
       skuId: b.sku_id,
       remaining: b.remaining,
       invoiceUrl: b.invoice_url,
+      damaged: b.damaged || 0,
     }))
 
     return {
