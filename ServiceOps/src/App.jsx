@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { db, DB_READY } from './lib/db.js'
-import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard } from './lib/helpers.js'
+import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard, TIER_ORDER } from './lib/helpers.js'
 import { PageHead, Btn, useIsMobile, SearchGroup } from './components/UI.jsx'
 import { DashboardPage, CertificatesPage, DocumentsPage, ReportsPage, SettingsPage } from './pages/Records.jsx'
 import { CustomersPage, CustomerDetail, PropertiesPage } from './pages/CustomersProperties.jsx'
@@ -49,6 +49,11 @@ function Dashboard({ user, signOut }) {
     gold:     { bg: "rgba(79,70,229,0.1)",    color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
   };
   const tierStyle = TIER_COL[(biz.tier || "").toLowerCase()] || TIER_COL.gold;
+
+  // Tier gating: a nav item is allowed if the user's tier >= the item's min.
+  // Empty/unknown tier fails closed to bronze (locked down, not unlocked).
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "bronze").toLowerCase()));
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "bronze");
 
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
@@ -114,7 +119,11 @@ function Dashboard({ user, signOut }) {
   const openCustomer = (id) => { setSearch(""); setShowNotif(false); setOpenCustomerId(id); setActive("customers"); try { window.history.pushState({ page: "customers" }, "", "/serviceops/customers"); } catch (e) {} };
 
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range} go={goTo} user={user} />;
+  const activeNav = navItems.find((n) => n.id === active);
+  if (activeNav && !tierAllows(activeNav.min)) {
+    body = <TierLocked feature={activeNav.label} requiredTier={activeNav.min} currentTier={biz.tier} onUpgrade={() => goTo("settings")} />;
+  }
+  else if (active === "dashboard") body = <DashboardPage range={range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range} go={goTo} user={user} />;
   else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} go={goTo} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
@@ -142,12 +151,14 @@ function Dashboard({ user, signOut }) {
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", flex: 1, minHeight: 0, padding: "10px 0" }}>
           {navItems.map((n) => {
             const on = n.id === active;
+            const locked = !tierAllows(n.min);
             return (
-              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", background: on ? "var(--surface3)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0, transition: "background .12s" }}
+              <div key={n.id} onClick={() => goTo(n.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", background: on ? "var(--surface3)" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", fontWeight: on ? 600 : 500, flexShrink: 0, transition: "background .12s", opacity: locked ? 0.55 : 1 }}
                 onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--surface2)"; }}
                 onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", flexShrink: 0, color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ fontSize: 13, flex: 1 }}>{n.label}</span>
+                {locked && <i className="ti ti-lock" style={{ fontSize: 13, color: "var(--txt-3)", flexShrink: 0 }} title={`Upgrade to ${(n.min || "").charAt(0).toUpperCase() + (n.min || "").slice(1)}`} />}
               </div>
             );
           })}
@@ -276,6 +287,25 @@ function App() {
   }
   if (!member) return <ActivateScreen user={session.user} signOut={signOut} />;
   return <Dashboard user={session.user} signOut={signOut} />;
+}
+
+// Full-page lockout shown when the user's tier is below a feature's minimum.
+function TierLocked({ feature, requiredTier, currentTier, onUpgrade }) {
+  const name = (requiredTier || "").charAt(0).toUpperCase() + (requiredTier || "").slice(1);
+  return (
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div style={{ maxWidth: 460, width: "100%", textAlign: "center", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "40px 32px" }}>
+        <i className="ti ti-lock" style={{ fontSize: 44, color: "var(--brand)", marginBottom: 14, display: "block" }} />
+        <div className="font-head" style={{ fontSize: 21, fontWeight: 700, marginBottom: 8 }}>{feature} is a {name} feature</div>
+        <div style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+          Upgrade your plan to unlock {feature ? feature.toLowerCase() : "this feature"} and other advanced tools.
+        </div>
+        <div onClick={onUpgrade} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>
+          View plans
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Vite entry: wrap the existing App (which still uses pushState/pathname
