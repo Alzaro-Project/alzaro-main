@@ -399,6 +399,39 @@ export const useStore = create(
         }
       },
 
+      // Force-delete a SKU together with all of its batches (and their invoices).
+      // Used by the "delete anyway" escape hatch when a SKU still has stock.
+      deleteSKUWithBatches: async (id) => {
+        const garageId = get().garageId
+        const skuBatches = get().batches.filter(b => b.skuId === id)
+
+        // Optimistic local removal
+        set(s => ({
+          skus: s.skus.filter(sk => sk.id !== id),
+          batches: s.batches.filter(b => b.skuId !== id)
+        }))
+
+        if (garageId && !String(id).startsWith('temp-')) {
+          try {
+            // Explicitly remove batch rows first (don't rely on a DB cascade),
+            // cleaning up any attached invoice files as we go.
+            for (const b of skuBatches) {
+              if (String(b.id).startsWith('temp-')) continue
+              try {
+                await db.deleteBatch(b.id)
+                if (b.invoiceUrl) await db.deletePurchaseInvoice(b.invoiceUrl)
+              } catch (e) {
+                console.error('Failed to delete batch during SKU force-delete:', e)
+              }
+            }
+            await db.deleteSKU(id)
+          } catch (err) {
+            console.error('Failed to force-delete SKU:', err)
+            showToast('Failed to delete tyre from database.')
+          }
+        }
+      },
+
       // --------------------------------------------------------
       // BATCHES (TyreOps)
       // --------------------------------------------------------
@@ -453,6 +486,37 @@ export const useStore = create(
           } catch (err) {
             console.error('Failed to delete batch:', err)
             showToast('Failed to delete stock batch.')
+          }
+        }
+      },
+
+      // Mark some tyres in a batch as damaged: they leave sellable stock
+      // (remaining drops) but are recorded in the batch's damaged count.
+      // Pass a negative qty to un-mark (move damaged tyres back to sellable).
+      markDamaged: async (batchId, qty) => {
+        const batch = get().batches.find(b => b.id === batchId)
+        if (!batch) return
+        const n = parseInt(qty) || 0
+        if (n === 0) return
+        // Can't damage more than is sellable, can't un-damage more than is damaged
+        const move = n > 0 ? Math.min(n, batch.remaining) : Math.max(n, -(batch.damaged || 0))
+        if (move === 0) return
+        const newRemaining = batch.remaining - move
+        const newDamaged = (batch.damaged || 0) + move
+
+        set(s => ({
+          batches: s.batches.map(b =>
+            b.id === batchId ? { ...b, remaining: newRemaining, damaged: newDamaged } : b
+          )
+        }))
+
+        const garageId = get().garageId
+        if (garageId && !String(batchId).startsWith('temp-')) {
+          try {
+            await db.updateBatch(batchId, { remaining: newRemaining, damaged: newDamaged })
+          } catch (err) {
+            console.error('Failed to update damaged count:', err)
+            showToast('Failed to update damaged stock.')
           }
         }
       },
