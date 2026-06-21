@@ -431,6 +431,7 @@ EXAMPLE - delete this row,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
           season: 'season',
           quantity: 'qty', qty: 'qty', stock: 'qty',
           cost_per_tyre: 'cost', 'cost per tyre': 'cost', cost: 'cost',
+          type: 'type', condition: 'type',
         }
         const header = rawHeader.map(h => aliases[h] || h)
         const requiredFields = ['brand', 'model', 'w', 'p', 'r']
@@ -462,6 +463,17 @@ EXAMPLE - delete this row,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
           // Skip the template's example rows even if the user forgot to delete them
           if (row.brand && row.brand.trim().toLowerCase().startsWith('example')) {
             continue
+          }
+
+          // The 'type' column round-trips from export. CSV import currently
+          // only creates new SKUs, so flag any other type clearly rather than
+          // silently importing it as 'new' (which surprised users before).
+          if (row.type) {
+            const t = row.type.trim().toLowerCase()
+            if (t && t !== 'new') {
+              parseErrors.push(`Row ${i + 1}: type "${row.type}" can't be imported via CSV yet — only "new" is supported here. Add ${t === 'used' ? 'used/part-ex' : t} tyres from the Inventory screen instead.`)
+              continue
+            }
           }
 
           // Validate required fields
