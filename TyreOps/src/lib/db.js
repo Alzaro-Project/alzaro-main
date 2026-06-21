@@ -217,19 +217,41 @@ export async function deleteBatch(id) {
   if (error) throw error
 }
 
-// Remove a purchase-invoice file from storage given its public URL.
-// Best-effort: failures are logged but not thrown (the DB row is what matters).
-export async function deletePurchaseInvoice(publicUrl) {
-  if (!publicUrl) return
+// Remove a purchase-invoice file from storage given its stored path
+// (e.g. "{garageId}/123.pdf"). Best-effort: failures are logged, not thrown.
+// Also tolerates legacy full public URLs by extracting the path.
+export async function deletePurchaseInvoice(pathOrUrl) {
+  if (!pathOrUrl) return
   try {
+    let path = pathOrUrl
     const marker = '/purchase-invoices/'
-    const idx = publicUrl.indexOf(marker)
-    if (idx === -1) return
-    const path = publicUrl.slice(idx + marker.length)
+    const idx = pathOrUrl.indexOf(marker)
+    if (idx !== -1) path = pathOrUrl.slice(idx + marker.length)
     const { error } = await supabase.storage.from('purchase-invoices').remove([path])
     if (error) console.error('Failed to delete invoice file:', error)
   } catch (err) {
     console.error('Failed to delete invoice file:', err)
+  }
+}
+
+// Mint a short-lived signed URL to view a private invoice file.
+// `pathOrUrl` is the stored path; legacy full URLs are tolerated.
+// Returns a temporary URL (valid ~5 min) or null on failure.
+export async function getInvoiceSignedUrl(pathOrUrl) {
+  if (!pathOrUrl) return null
+  try {
+    let path = pathOrUrl
+    const marker = '/purchase-invoices/'
+    const idx = pathOrUrl.indexOf(marker)
+    if (idx !== -1) path = pathOrUrl.slice(idx + marker.length)
+    const { data, error } = await supabase.storage
+      .from('purchase-invoices')
+      .createSignedUrl(path, 300)
+    if (error) { console.error('Failed to sign invoice URL:', error); return null }
+    return data?.signedUrl || null
+  } catch (err) {
+    console.error('Failed to sign invoice URL:', err)
+    return null
   }
 }
 
