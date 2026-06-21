@@ -2,18 +2,20 @@
 // No React/JSX here (except none). Imported across UI, pages, and shell.
 
 const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand" },
-  { id: "customers", label: "Customers", icon: "ti-users", tint: "blue" },
-  { id: "properties", label: "Properties", icon: "ti-home", tint: "teal" },
-  { id: "quotes", label: "Quotes", icon: "ti-file-dollar", tint: "amber" },
-  { id: "jobs", label: "Jobs", icon: "ti-briefcase", tint: "purple" },
-  { id: "diary", label: "Diary", icon: "ti-calendar", tint: "blue" },
-  { id: "invoicing", label: "Invoicing", icon: "ti-receipt", tint: "brand" },
-  { id: "certificates", label: "Certificates", icon: "ti-shield-check", tint: "red" },
-  { id: "documents", label: "Documents", icon: "ti-folder", tint: "amber" },
-  { id: "reports", label: "Reports", icon: "ti-chart-bar", tint: "teal" },
-  { id: "settings", label: "Settings", icon: "ti-settings", tint: "blue" },
+  { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand", min: "bronze" },
+  { id: "customers", label: "Customers", icon: "ti-users", tint: "blue", min: "bronze" },
+  { id: "properties", label: "Properties", icon: "ti-home", tint: "teal", min: "bronze" },
+  { id: "quotes", label: "Quotes", icon: "ti-file-dollar", tint: "amber", min: "bronze" },
+  { id: "jobs", label: "Jobs", icon: "ti-briefcase", tint: "purple", min: "bronze" },
+  { id: "diary", label: "Diary", icon: "ti-calendar", tint: "blue", min: "silver" },
+  { id: "invoicing", label: "Invoicing", icon: "ti-receipt", tint: "brand", min: "bronze" },
+  { id: "certificates", label: "Certificates", icon: "ti-shield-check", tint: "red", min: "gold" },
+  { id: "documents", label: "Documents", icon: "ti-folder", tint: "amber", min: "gold" },
+  { id: "reports", label: "Reports", icon: "ti-chart-bar", tint: "teal", min: "silver" },
+  { id: "settings", label: "Settings", icon: "ti-settings", tint: "blue", min: "bronze" },
 ];
+
+const TIER_ORDER = ["bronze", "silver", "gold"];
 
 const REPORTS = [
   { cat: "Financial", tone: "green", icon: "ti-coin", items: [
@@ -52,4 +54,4 @@ const demoBanner = { fontSize: 11.5, color: "var(--amber)", background: "var(--a
 const errBanner = { fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 };
 const emptyCard = { color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" };
 
-export { NAV, REPORTS, RANGES, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard };
+export { NAV, TIER_ORDER, REPORTS, RANGES, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard };
