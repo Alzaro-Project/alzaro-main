@@ -384,10 +384,10 @@ function CSVImportModal({ onClose, onImport }) {
   // Generate CSV template
   const downloadTemplate = () => {
     const template = `brand,model,width,profile,rim,sell_price,low_stock_alert,season,quantity,cost_per_tyre
-Michelin,Pilot Sport 4,225,45,18,145.00,2,summer,10,85.00
-Continental,PremiumContact 6,205,55,16,99.00,3,allseason,8,62.00
-Pirelli,Cinturato P7,215,60,16,89.00,2,summer,0,0.00
-Bridgestone,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
+EXAMPLE - delete this row,Pilot Sport 4,225,45,18,145.00,2,summer,10,85.00
+EXAMPLE - delete this row,PremiumContact 6,205,55,16,99.00,3,allseason,8,62.00
+EXAMPLE - delete this row,Cinturato P7,215,60,16,89.00,2,summer,0,0.00
+EXAMPLE - delete this row,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
     
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -458,6 +458,11 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
           header.forEach((h, idx) => {
             row[h] = values[idx] || ''
           })
+
+          // Skip the template's example rows even if the user forgot to delete them
+          if (row.brand && row.brand.trim().toLowerCase().startsWith('example')) {
+            continue
+          }
 
           // Validate required fields
           if (!row.brand || !row.model || !row.w || !row.p || !row.r) {
@@ -543,7 +548,7 @@ Bridgestone,Turanza T005,195,65,15,72.00,2,allseason,4,48.00`
         <div>
           <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>CSV Template</div>
           <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
-            Download the template for the correct format. Fill in <strong>quantity</strong> and <strong>cost per tyre</strong> to import opening stock too (leave quantity blank or 0 for none).
+            Download the template for the correct format. Fill in <strong>quantity</strong> and <strong>cost per tyre</strong> to import opening stock too (leave quantity blank or 0 for none). The sample rows are marked <strong>EXAMPLE</strong> — they're skipped automatically, but you can delete them too.
           </div>
         </div>
         <Btn variant="secondary" onClick={downloadTemplate}>📥 Download Template</Btn>
