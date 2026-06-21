@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useStore } from '../store/useStore'
+import { useStore, TIER_ORDER } from '../store/useStore'
 import WelcomeBanner from '../components/WelcomeBanner'
 
 // ============================================================
@@ -113,7 +113,9 @@ const linkBtn = {
 // ============================================================
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod } = useStore()
+  const { invoices, customers, motReminders, vehicles, dashPeriod, setDashPeriod, tier } = useStore()
+  const hasSilver = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
+  const hasGold = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('gold')
   const period = dashPeriod || 'today'
   const [salesType, setSalesType] = useState('paid') // 'paid' | 'invoiced'
   const [search, setSearch] = useState('')
@@ -272,11 +274,15 @@ export default function Dashboard() {
         </div>
 
         {/* MOTs Due Soon */}
-        <div style={tile}>
-          <div style={tileLbl}>MOTs due soon</div>
-          <div style={{ ...tileNum, color: 'var(--amber)' }}>{motsDueSoon.length}</div>
-          <div style={tileSub}>Next 30 days</div>
-        </div>
+        {hasSilver ? (
+          <div style={tile}>
+            <div style={tileLbl}>MOTs due soon</div>
+            <div style={{ ...tileNum, color: 'var(--amber)' }}>{motsDueSoon.length}</div>
+            <div style={tileSub}>Next 30 days</div>
+          </div>
+        ) : (
+          <LockedTile label="MOT reminders" requiredTier="silver" onUpgrade={() => navigate('/settings', { state: { tab: 'subscription' } })} />
+        )}
 
         {/* Placeholder */}
         <PlaceholderTile />
@@ -284,7 +290,11 @@ export default function Dashboard() {
 
       {/* ===== MID ROW: P&L + CALENDAR ===== */}
       <div className="dash-mid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-        <RevenueChart invoices={invoices} />
+        {hasGold ? (
+          <RevenueChart invoices={invoices} />
+        ) : (
+          <LockedTile label="Monthly revenue chart" requiredTier="gold" onUpgrade={() => navigate('/settings', { state: { tab: 'subscription' } })} />
+        )}
         <MiniCalendar
           motsDueSoon={motsDueSoon}
           onOpenFull={() => navigate('/calendar')}
@@ -293,11 +303,15 @@ export default function Dashboard() {
       </div>
 
       {/* ===== MOTs DUE SOON LIST ===== */}
-      <SectionLabel>
-        MOTs due soon
-        <button onClick={() => navigate('/customers')} style={linkBtn}>View all →</button>
-      </SectionLabel>
-      <MotsList items={motsDueSoon.slice(0, 5)} />
+      {hasSilver && (
+        <>
+          <SectionLabel>
+            MOTs due soon
+            <button onClick={() => navigate('/customers')} style={linkBtn}>View all →</button>
+          </SectionLabel>
+          <MotsList items={motsDueSoon.slice(0, 5)} />
+        </>
+      )}
 
       {/* ===== BOTTOM 4 TILES ===== */}
       <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
@@ -337,6 +351,32 @@ export default function Dashboard() {
 // ============================================================
 // SUB-COMPONENTS
 // ============================================================
+
+function LockedTile({ label, requiredTier, onUpgrade }) {
+  const tierName = requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)
+  return (
+    <div
+      onClick={onUpgrade}
+      style={{
+        background: 'var(--surface)',
+        border: '0.5px dashed var(--border)',
+        borderRadius: '12px', padding: '14px', minHeight: '100px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', textAlign: 'center', gap: '6px',
+      }}
+      title={`Upgrade to ${tierName} to unlock`}
+    >
+      <i className="ti ti-lock" style={{ fontSize: '20px', color: 'var(--text3)', opacity: 0.7 }} aria-hidden="true" />
+      <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text2)' }}>{label}</div>
+      <div style={{
+        fontSize: '10px', fontFamily: 'monospace', color: 'var(--red)',
+        textTransform: 'uppercase', letterSpacing: '0.5px',
+      }}>
+        Upgrade to {tierName}
+      </div>
+    </div>
+  )
+}
 
 function PlaceholderTile() {
   return (
