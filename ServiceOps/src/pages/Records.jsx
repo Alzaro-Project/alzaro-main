@@ -566,7 +566,19 @@ function SettingsPage({ user }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
-  const currentPlan = "Pro"; // shown as current; real billing is future Stripe work
+  const [currentTier, setCurrentTier] = useState("bronze"); // loaded from product_members below
+
+  // Load the real subscription tier (same source App.jsx reads) so the
+  // Subscription tab highlights the customer's actual plan.
+  useEffect(() => {
+    if (!DB_READY || !user) return;
+    db.from("product_members").select("tier,plan").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
+      .then(({ data }) => {
+        const t = (data && (data.tier || data.plan) || "bronze").toLowerCase();
+        setCurrentTier(["bronze", "silver", "gold"].includes(t) ? t : "bronze");
+      })
+      .catch(() => {});
+  }, [user]);
 
   const TABS = [
     { key: "business", label: "Business", icon: "ti-building" },
@@ -678,9 +690,9 @@ function SettingsPage({ user }) {
   };
 
   const tiers = [
-    { name: "Starter", price: 29, sub: "per month", best: "Solo traders", features: ["Up to 50 jobs / month", "Customers & properties", "Quotes & invoices", "Certificate vault", "Email support"] },
-    { name: "Pro", price: 59, sub: "per month", best: "Small teams", features: ["Everything in Starter", "Unlimited jobs", "Engineer scheduling & diary", "Automated reminders", "Priority support"] },
-    { name: "Business", price: 109, sub: "per month", best: "Growing firms", features: ["Everything in Pro", "Multiple engineers & subbies", "Team roles & permissions", "Accounting integrations", "Dedicated account manager"] },
+    { name: "Bronze", key: "bronze", price: 60, sub: "per month", best: "Solo traders", features: ["Customers & properties", "Quotes & invoices", "Jobs management", "Email support"] },
+    { name: "Silver", key: "silver", price: 75, sub: "per month", best: "Growing firms", features: ["Everything in Bronze", "Engineer scheduling & diary", "Reports & insights", "Automated reminders", "Priority support"] },
+    { name: "Gold", key: "gold", price: 90, sub: "per month", best: "Full operation", features: ["Everything in Silver", "Certificate vault", "Document store", "Advanced reporting & export", "Dedicated support"] },
   ];
 
   const sInp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%" };
@@ -727,7 +739,7 @@ function SettingsPage({ user }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <label style={sFld}>Trading name<input style={sInp} placeholder="e.g. Alzaro Trade Services" value={biz.trading_name} onChange={(e) => setBiz({ ...biz, trading_name: e.target.value })} /></label>
                 <label style={sFld}>VAT number<input style={sInp} placeholder="e.g. GB 123 4567 89" value={biz.vat_number} onChange={(e) => setBiz({ ...biz, vat_number: e.target.value })} /></label>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentTier.charAt(0).toUpperCase() + currentTier.slice(1)}</span></div>
                 {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
                 <SaveRow />
               </div>
@@ -897,7 +909,7 @@ function SettingsPage({ user }) {
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
             {tiers.map((t) => {
-              const isCurrent = t.name === currentPlan;
+              const isCurrent = t.key === currentTier;
               return (
                 <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
                   {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
@@ -914,7 +926,7 @@ function SettingsPage({ user }) {
                   {isCurrent ? (
                     <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
                   ) : (
-                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
+                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > (tiers.find((x) => x.key === currentTier) || tiers[0]).price ? "Upgrade" : "Switch"} to {t.name}</div>
                   )}
                 </div>
               );
