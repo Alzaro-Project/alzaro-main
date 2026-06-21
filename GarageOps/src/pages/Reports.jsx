@@ -26,7 +26,7 @@ const REPORT_TYPES = [
     icon: '💰', 
     label: 'Profit & Loss', 
     desc: 'Revenue vs costs, gross profit margins',
-    tier: 'silver'
+    tier: 'gold'
   },
   { 
     key: 'inventory', 
@@ -339,6 +339,13 @@ function ReportsContent() {
 
   // Export functions
   const exportToCSV = (reportType) => {
+    // Tier guard: never export a report the user's plan doesn't include.
+    const rt = REPORT_TYPES.find(r => r.key === reportType)
+    if (rt && TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(rt.tier)) {
+      const needed = rt.tier.charAt(0).toUpperCase() + rt.tier.slice(1)
+      alert(`${rt.label} export is a ${needed} feature. Please upgrade to export this report.`)
+      return
+    }
     const data = generateReportData(reportType)
     const csvContent = [
       data.headers.join(','),
@@ -593,8 +600,8 @@ function ReportsContent() {
           <Btn variant="secondary" onClick={() => exportToCSV('sales')}>📊 Sales CSV</Btn>
           <Btn variant="secondary" onClick={() => exportToCSV('customers')}>👥 Customers CSV</Btn>
           <Btn variant="secondary" onClick={() => exportToCSV('inventory')}>📦 Inventory CSV</Btn>
-          {hasSilver && <Btn variant="secondary" onClick={() => exportToCSV('profit')}>💰 P&L CSV</Btn>}
           {hasSilver && <Btn variant="secondary" onClick={() => exportToCSV('vat')}>📈 VAT CSV</Btn>}
+          {hasGold && <Btn variant="secondary" onClick={() => exportToCSV('profit')}>💰 P&L CSV</Btn>}
         </div>
       </Card>
     </div>
