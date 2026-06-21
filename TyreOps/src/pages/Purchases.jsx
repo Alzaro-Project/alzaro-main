@@ -3,7 +3,7 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
-import { deletePurchaseInvoice } from '../lib/db'
+import { deletePurchaseInvoice, getInvoiceSignedUrl } from '../lib/db'
 
 export default function Purchases() {
   const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, updateBatch, deleteBatch, updateUsedTyre, deleteUsedTyre, garageId } = useStore()
@@ -13,6 +13,13 @@ export default function Purchases() {
   const [editingBatch, setEditingBatch] = useState(null)
   const [editingUsed, setEditingUsed] = useState(null)
   const [restock, setRestock] = useState(null)
+
+  // Open a private invoice by minting a short-lived signed URL on demand.
+  const openInvoice = async (pathOrUrl) => {
+    const url = await getInvoiceSignedUrl(pathOrUrl)
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    else alert('Could not open the invoice. Please try again.')
+  }
 
   // Pending delete with Undo: the record vanishes from the list immediately,
   // but the real deletion only runs after the toast expires. Undo cancels it
@@ -177,9 +184,8 @@ export default function Purchases() {
                   <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
                     {r.invoiceUrl ? (
                       <a
-                        href={r.invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); openInvoice(r.invoiceUrl) }}
                         title="View supplier invoice"
                         style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}
                       >
@@ -295,9 +301,8 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
       const fileName = `${garageId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
       const { error } = await supabase.storage.from('purchase-invoices').upload(fileName, invoiceFile)
       if (error) throw error
-      const { data: { publicUrl } } = supabase.storage.from('purchase-invoices').getPublicUrl(fileName)
       setUploading(false)
-      return publicUrl
+      return fileName // store the path, not a public URL (bucket is private)
     } catch (err) {
       console.error('Upload failed:', err)
       setUploadError('Upload failed. Please try again.')
@@ -363,7 +368,7 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
             </div>
           ) : existingInvoice ? (
             <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}>
-              <a href={existingInvoice} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>📄 View invoice</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); getInvoiceSignedUrl(existingInvoice).then(u => u ? window.open(u, '_blank', 'noopener,noreferrer') : alert('Could not open the invoice. Please try again.')) }} style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>📄 View invoice</a>
               <span style={{ display: 'inline-flex', gap: '10px' }}>
                 <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Replace</button>
                 <button onClick={() => { if (confirm('Remove this invoice? It will be deleted when you save.')) setExistingInvoice(null) }} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
