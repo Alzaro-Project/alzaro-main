@@ -90,7 +90,7 @@ export const useStore = create(
       // AUTH STATE
       // --------------------------------------------------------
       user: null,
-      tier: 'gold',
+      tier: 'bronze',
       garageId: null,
       garageStatus: null,
       trialEnds: null,
@@ -175,7 +175,7 @@ export const useStore = create(
               customers: data.customers,
               invoices: data.invoices,
               // Auth / garage metadata
-              tier: data.garage.tier,
+              tier: data.garage.tier || 'bronze',
               garageId: data.garage.id,
               garageStatus: data.garage.status,
               trialEnds: data.garage.trial_ends,
@@ -286,7 +286,7 @@ export const useStore = create(
         // Clear all state
         set({
           user: null,
-          tier: 'gold',
+          tier: 'bronze',
           garageId: null,
           garageStatus: null,
           trialEnds: null,
