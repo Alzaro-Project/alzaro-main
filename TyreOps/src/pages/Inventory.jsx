@@ -8,7 +8,7 @@ import { deletePurchaseInvoice, getInvoiceSignedUrl } from '../lib/db'
 
 export default function Inventory() {
   const location = useLocation()
-  const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, deleteSKUWithBatches, addBatch, updateBatch, deleteBatch, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
+  const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, deleteSKUWithBatches, addBatch, updateBatch, deleteBatch, markDamaged, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
   const [tab, setTab] = useState(location.state?.tab || 'all')
   const [search, setSearch] = useState('')
   const [showSKU, setShowSKU] = useState(false)
@@ -171,6 +171,7 @@ export default function Inventory() {
                 const fifo = getFIFOCost(sk.id)
                 const margin = sk.sell > 0 ? Math.round((sk.sell - fifo) / sk.sell * 100) : 0
                 const activeBatches = batches.filter(b => b.skuId === sk.id && b.remaining > 0).sort((a, b) => new Date(a.date) - new Date(b.date))
+                const damagedCount = batches.filter(b => b.skuId === sk.id).reduce((a, b) => a + (b.damaged || 0), 0)
                 const statusBadge = qty === 0 ? ['red', 'OUT'] : qty <= sk.alert ? ['yellow', 'LOW'] : ['green', 'OK']
                 return (
                   <tr key={sk.id} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
@@ -203,7 +204,10 @@ export default function Inventory() {
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>£{(fifo || 0).toFixed(2)}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)', whiteSpace: 'nowrap' }}>£{(sk.sell || 0).toFixed(2)}</td>
                     <td style={{ padding: '10px' }}><span style={{ color: margin > 40 ? 'var(--green)' : margin > 20 ? 'var(--accent)' : 'var(--red)' }}>{margin}%</span></td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>{qty}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 500 }}>
+                      {qty}
+                      {damagedCount > 0 && <div style={{ fontSize: '10px', color: 'var(--red)', fontWeight: 600 }}>⚠ {damagedCount} damaged</div>}
+                    </td>
                     <td style={{ padding: '10px' }}><Badge variant={statusBadge[0]}>{statusBadge[1]}</Badge></td>
                     <td style={{ padding: '10px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
@@ -304,7 +308,7 @@ export default function Inventory() {
       }} />}
 
       {/* View Batch Details Modal */}
-      {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} deleteBatch={deleteBatch} onClose={() => setViewingBatch(null)} />}
+      {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} deleteBatch={deleteBatch} markDamaged={markDamaged} onClose={() => setViewingBatch(null)} />}
 
       {pendingDelete && <UndoToast message={pendingDelete.label} onUndo={undoDelete} />}
     </div>
@@ -881,7 +885,7 @@ function UsedModal({ tyre, onClose, onSave }) {
   )
 }
 
-function BatchDetailsModal({ batch, skus, garageId, updateBatch, deleteBatch, onClose }) {
+function BatchDetailsModal({ batch, skus, garageId, updateBatch, deleteBatch, markDamaged, onClose }) {
   const sku = skus.find(s => s.id === batch.skuId)
   const skuLabel = sku ? `${sku.brand} ${sku.model} ${sku.w}/${sku.p}R${sku.r}` : 'Unknown Tyre'
 
@@ -892,6 +896,40 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, deleteBatch, on
   // Editable remaining-stock state
   const [editingStock, setEditingStock] = useState(false)
   const [stockVal, setStockVal] = useState(String(batch.remaining ?? 0))
+
+  // Mark-damaged state
+  const [damageVal, setDamageVal] = useState('1')
+
+  const doMarkDamaged = async () => {
+    const n = parseInt(damageVal, 10)
+    if (isNaN(n) || n < 1) { setError('Enter how many tyres are damaged (1 or more)'); return }
+    if (n > (batch.remaining || 0)) { setError(`Only ${batch.remaining} sellable in this batch`); return }
+    if (!confirm(`Mark ${n} tyre${n > 1 ? 's' : ''} as damaged? ${n > 1 ? 'They' : 'It'} will be removed from sellable stock.`)) return
+    setBusy(true); setError('')
+    try {
+      await markDamaged(batch.id, n)
+      setDamageVal('1')
+    } catch (e) {
+      console.error('Failed to mark damaged:', e)
+      setError('Could not mark as damaged. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const restoreDamaged = async () => {
+    if (busy || !(batch.damaged > 0)) return
+    if (!confirm(`Move 1 damaged tyre back to sellable stock?`)) return
+    setBusy(true); setError('')
+    try {
+      await markDamaged(batch.id, -1)
+    } catch (e) {
+      console.error('Failed to restore damaged:', e)
+      setError('Could not restore. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const saveStock = async () => {
     const n = parseInt(stockVal, 10)
@@ -1029,6 +1067,32 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, deleteBatch, on
           ) : (
             <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px', color: batch.remaining > 0 ? 'var(--green)' : 'var(--red)' }}>{batch.remaining}</div>
           )}
+        </div>
+      </div>
+
+      {/* Damaged tyres */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '8px' }}>Damaged</div>
+        <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px' }}>
+          {batch.damaged > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', color: 'var(--red)', fontWeight: 600 }}>⚠ {batch.damaged} damaged (removed from sellable stock)</span>
+              <Btn sm variant="ghost" onClick={restoreDamaged} disabled={busy}>↩ Restore 1</Btn>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Mark</span>
+            <input
+              type="number"
+              min="1"
+              max={batch.remaining}
+              value={damageVal}
+              onChange={e => setDamageVal(e.target.value)}
+              style={{ width: '56px', background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 7px', color: 'var(--text)', fontSize: '13px', fontFamily: 'DM Mono, monospace', outline: 'none' }}
+            />
+            <span style={{ fontSize: '12px', color: 'var(--text2)' }}>as damaged</span>
+            <Btn sm variant="danger" onClick={doMarkDamaged} disabled={busy || !(batch.remaining > 0)}>{busy ? '…' : 'Mark damaged'}</Btn>
+          </div>
         </div>
       </div>
 
