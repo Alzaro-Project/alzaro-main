@@ -352,7 +352,8 @@ function ReportsContent() {
       ...data.rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n')
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    // Prepend a UTF-8 BOM so Excel / WPS correctly read £ and other symbols.
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `${data.title.replace(/\s+/g, '_')}_${dateFrom.toISOString().split('T')[0]}_to_${dateTo.toISOString().split('T')[0]}.csv`
