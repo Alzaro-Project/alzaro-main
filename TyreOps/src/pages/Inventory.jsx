@@ -4,11 +4,11 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard, UndoToast } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
-import { deletePurchaseInvoice } from '../lib/db'
+import { deletePurchaseInvoice, getInvoiceSignedUrl } from '../lib/db'
 
 export default function Inventory() {
   const location = useLocation()
-  const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, addBatch, updateBatch, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
+  const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, deleteSKUWithBatches, addBatch, updateBatch, deleteBatch, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
   const [tab, setTab] = useState(location.state?.tab || 'all')
   const [search, setSearch] = useState('')
   const [showSKU, setShowSKU] = useState(false)
@@ -210,7 +210,9 @@ export default function Inventory() {
                         <Btn sm variant="ghost" onClick={() => { setEditingSKU(sk); setShowSKU(true) }}>✏️ Edit</Btn>
                         <Btn sm variant="danger" onClick={() => {
                           if (qty > 0) {
-                            alert(`Cannot delete ${sk.brand} ${sk.model} — it still has ${qty} in stock. Remove the stock/batches first.`)
+                            if (confirm(`"${sk.brand} ${sk.model}" still has ${qty} in stock across its batches.\n\nDelete the SKU AND all of its stock batches anyway? This cannot be undone after the toast expires.`)) {
+                              scheduleDelete(sk.id, `Deleted ${sk.brand} ${sk.model} (+${qty} stock)`, () => deleteSKUWithBatches(sk.id))
+                            }
                             return
                           }
                           if (confirm(`Delete ${sk.brand} ${sk.model}?`)) scheduleDelete(sk.id, `Deleted ${sk.brand} ${sk.model}`, () => deleteSKU(sk.id))
@@ -302,7 +304,7 @@ export default function Inventory() {
       }} />}
 
       {/* View Batch Details Modal */}
-      {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} onClose={() => setViewingBatch(null)} />}
+      {viewingBatch && <BatchDetailsModal batch={batches.find(b => b.id === viewingBatch.id) || viewingBatch} skus={skus} garageId={garageId} updateBatch={updateBatch} deleteBatch={deleteBatch} onClose={() => setViewingBatch(null)} />}
 
       {pendingDelete && <UndoToast message={pendingDelete.label} onUndo={undoDelete} />}
     </div>
@@ -714,13 +716,8 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave }) {
 
       if (error) throw error
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('purchase-invoices')
-        .getPublicUrl(fileName)
-
       setUploading(false)
-      return publicUrl
+      return fileName // store the path, not a public URL (bucket is private)
     } catch (err) {
       console.error('Upload failed:', err)
       setUploadError('Upload failed. Please try again.')
@@ -867,13 +864,47 @@ function UsedModal({ tyre, onClose, onSave }) {
   )
 }
 
-function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
+function BatchDetailsModal({ batch, skus, garageId, updateBatch, deleteBatch, onClose }) {
   const sku = skus.find(s => s.id === batch.skuId)
   const skuLabel = sku ? `${sku.brand} ${sku.model} ${sku.w}/${sku.p}R${sku.r}` : 'Unknown Tyre'
 
   const fileInputRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  // Editable remaining-stock state
+  const [editingStock, setEditingStock] = useState(false)
+  const [stockVal, setStockVal] = useState(String(batch.remaining ?? 0))
+
+  const saveStock = async () => {
+    const n = parseInt(stockVal, 10)
+    if (isNaN(n) || n < 0) { setError('Enter a valid stock number (0 or more)'); return }
+    if (n > (batch.qty || 0)) { setError(`Remaining can't exceed the original batch qty (${batch.qty})`); return }
+    setBusy(true); setError('')
+    try {
+      await updateBatch(batch.id, { remaining: n })
+      setEditingStock(false)
+    } catch (e) {
+      console.error('Failed to update remaining stock:', e)
+      setError('Could not update stock. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteBatch = async () => {
+    if (busy) return
+    if (!confirm(`Delete this batch (${batch.date} · £${batch.cost} · ${batch.remaining}pc)? This removes its stock and cannot be undone.`)) return
+    setBusy(true); setError('')
+    try {
+      await deleteBatch(batch.id)
+      onClose()
+    } catch (e) {
+      console.error('Failed to delete batch:', e)
+      setError('Could not delete this batch. Please try again.')
+      setBusy(false)
+    }
+  }
 
   const handleReplaceClick = () => {
     if (busy) return
@@ -909,13 +940,9 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
         .upload(fileName, file)
       if (upErr) throw upErr
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('purchase-invoices')
-        .getPublicUrl(fileName)
-
-      // Remove the old file (best effort) then point the batch at the new one
+      // Remove the old file (best effort) then point the batch at the new path
       if (batch.invoiceUrl) await deletePurchaseInvoice(batch.invoiceUrl)
-      await updateBatch(batch.id, { invoiceUrl: publicUrl })
+      await updateBatch(batch.id, { invoiceUrl: fileName })
     } catch (err) {
       console.error('Invoice upload failed:', err)
       setError('Upload failed. Please try again.')
@@ -962,8 +989,29 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
           <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px' }}>{batch.qty}</div>
         </div>
         <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase' }}>Remaining</div>
-          <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px', color: batch.remaining > 0 ? 'var(--green)' : 'var(--red)' }}>{batch.remaining}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase' }}>Remaining</div>
+            {!editingStock && (
+              <span onClick={() => { setStockVal(String(batch.remaining ?? 0)); setError(''); setEditingStock(true) }}
+                style={{ fontSize: '10px', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}>edit</span>
+            )}
+          </div>
+          {editingStock ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+              <input
+                type="number"
+                min="0"
+                max={batch.qty}
+                value={stockVal}
+                onChange={e => setStockVal(e.target.value)}
+                style={{ width: '64px', background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 7px', color: 'var(--text)', fontSize: '13px', fontFamily: 'DM Mono, monospace', outline: 'none' }}
+              />
+              <Btn sm variant="primary" onClick={saveStock} disabled={busy}>{busy ? '…' : 'Save'}</Btn>
+              <Btn sm variant="ghost" onClick={() => { setEditingStock(false); setError('') }} disabled={busy}>Cancel</Btn>
+            </div>
+          ) : (
+            <div style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', marginTop: '4px', color: batch.remaining > 0 ? 'var(--green)' : 'var(--red)' }}>{batch.remaining}</div>
+          )}
         </div>
       </div>
 
@@ -999,9 +1047,8 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
         {batch.invoiceUrl ? (
           <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
             <a
-              href={batch.invoiceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#"
+              onClick={(e) => { e.preventDefault(); getInvoiceSignedUrl(batch.invoiceUrl).then(u => u ? window.open(u, '_blank', 'noopener,noreferrer') : alert('Could not open the invoice. Please try again.')) }}
               style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
             >
               📄 View invoice
@@ -1059,7 +1106,8 @@ function BatchDetailsModal({ batch, skus, garageId, updateBatch, onClose }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+        <Btn variant="danger" onClick={handleDeleteBatch} disabled={busy}>{busy ? '…' : '🗑 Delete batch'}</Btn>
         <Btn variant="secondary" onClick={onClose}>Close</Btn>
       </div>
     </Modal>
