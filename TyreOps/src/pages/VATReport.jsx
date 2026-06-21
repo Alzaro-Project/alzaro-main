@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Btn } from '../components/UI'
+import { getInvoiceSignedUrl } from '../lib/db'
 
 // Print styles - hide sidebar when printing
 const printStyles = `
@@ -596,9 +597,8 @@ function PurchaseInvoiceModal({ data, batches, allBatches, onClose }) {
                 <td style={{ padding: '10px 8px' }}>
                   {b.invoiceUrl ? (
                     <a 
-                      href={b.invoiceUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); getInvoiceSignedUrl(b.invoiceUrl).then(u => u ? window.open(u, '_blank', 'noopener,noreferrer') : alert('Could not open the invoice. Please try again.')) }}
                       style={{ color: 'var(--accent)', textDecoration: 'underline' }}
                     >
                       📄 View
