@@ -38,6 +38,9 @@ export default function VATReport() {
   const current = getCurrentQuarterYear()
   const [quarter, setQuarter] = useState(current.quarter)
   const [year, setYear] = useState(current.year)
+  // Custom date range (used when quarter === 'custom')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   
   // Modal state for viewing purchase invoices
   const [viewingPurchaseInvoice, setViewingPurchaseInvoice] = useState(null)
@@ -47,6 +50,28 @@ export default function VATReport() {
 
   const qMonths = { Q1: [1, 3], Q2: [4, 6], Q3: [7, 9], Q4: [10, 12] }
   const [mFrom, mTo] = qMonths[quarter] || [10, 12]
+
+  const isCustom = quarter === 'custom'
+
+  // Unified period check — works for both quarter mode and custom date range.
+  const inPeriod = (dateStr) => {
+    const d = new Date(dateStr)
+    if (isNaN(d)) return false
+    if (isCustom) {
+      if (!customFrom || !customTo) return false
+      const from = new Date(customFrom)
+      const to = new Date(customTo)
+      to.setHours(23, 59, 59, 999) // include the whole 'to' day
+      return d >= from && d <= to
+    }
+    const m = d.getMonth() + 1
+    return d.getFullYear() === parseInt(year) && m >= mFrom && m <= mTo
+  }
+
+  // Human-readable label for the selected period (used in messages + CSV name)
+  const periodLabel = isCustom
+    ? (customFrom && customTo ? `${customFrom} to ${customTo}` : 'custom range')
+    : `${quarter} ${year}`
 
   // Track totals
   let totalSales = 0
@@ -65,7 +90,7 @@ export default function VATReport() {
     if (inv.status === 'paid' || inv.status === 'sent') {
       const d = new Date(inv.date)
       const m = d.getMonth() + 1
-      if (d.getFullYear() === parseInt(year) && m >= mFrom && m <= mTo) {
+      if (inPeriod(inv.date)) {
         inv.lines.forEach(l => {
           const lineTotal = l.qty * l.unit
           totalSales += lineTotal
@@ -177,8 +202,8 @@ export default function VATReport() {
         )}
       </Card>
 
-      {/* Period - Auto-selects current quarter/year */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxWidth: '380px', marginBottom: '18px' }}>
+      {/* Period - Auto-selects current quarter/year, or pick a custom range */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxWidth: '380px', marginBottom: isCustom ? '12px' : '18px' }}>
         <div>
           <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Quarter</label>
           <select style={inputStyle} value={quarter} onChange={e => setQuarter(e.target.value)}>
@@ -186,17 +211,34 @@ export default function VATReport() {
             <option value="Q2">Q2 (Apr–Jun)</option>
             <option value="Q3">Q3 (Jul–Sep)</option>
             <option value="Q4">Q4 (Oct–Dec)</option>
+            <option value="custom">📅 Custom range…</option>
           </select>
         </div>
         <div>
           <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Year</label>
-          <select style={inputStyle} value={year} onChange={e => setYear(e.target.value)}>
+          <select style={inputStyle} value={year} onChange={e => setYear(e.target.value)} disabled={isCustom}>
             {years.map(y => (
               <option key={y} value={y.toString()}>{y}</option>
             ))}
           </select>
         </div>
       </div>
+
+      {isCustom && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxWidth: '380px', marginBottom: '18px' }}>
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>From</label>
+            <input type="date" style={inputStyle} value={customFrom} max={customTo || undefined} onChange={e => setCustomFrom(e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>To</label>
+            <input type="date" style={inputStyle} value={customTo} min={customFrom || undefined} onChange={e => setCustomTo(e.target.value)} />
+          </div>
+          {(!customFrom || !customTo) && (
+            <div style={{ gridColumn: '1 / -1', fontSize: '11px', color: 'var(--text3)' }}>Pick both a start and end date to see the report.</div>
+          )}
+        </div>
+      )}
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
@@ -320,15 +362,13 @@ export default function VATReport() {
         {(() => {
           const periodInvoices = invoices.filter(inv => {
             if (inv.status !== 'paid' && inv.status !== 'sent') return false
-            const d = new Date(inv.date)
-            const m = d.getMonth() + 1
-            return d.getFullYear() === parseInt(year) && m >= mFrom && m <= mTo
+            return inPeriod(inv.date)
           })
 
           if (periodInvoices.length === 0) {
             return (
               <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text3)', fontSize: '12px' }}>
-                No invoices found for {quarter} {year}
+                No invoices found for {periodLabel}
               </div>
             )
           }
@@ -511,7 +551,7 @@ export default function VATReport() {
         <Btn variant="primary" onClick={() => window.print()}>🖨 Print Report</Btn>
         <Btn variant="secondary" onClick={() => {
           const csv = `Box,Description,Amount\nBox 1,VAT on sales,£${totalVAT.toFixed(2)}\nBox 4,VAT reclaimed on stock sold,£${vatOnPurchases.toFixed(2)}\nBox 5,Net VAT ${vatDue >= 0 ? 'due' : 'refund'},£${Math.abs(vatDue).toFixed(2)}\nBox 6,Total Sales,£${totalSales.toFixed(2)}\nBox 7,Stock Cost Sold,£${stockCostSold.toFixed(2)}\n`
-          const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = `VAT-${quarter}-${year}.csv`; a.click()
+          const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = `VAT-${periodLabel.replace(/[^a-zA-Z0-9-]/g, '_')}.csv`; a.click()
         }}>⬇ Export CSV</Btn>
       </div>
 
