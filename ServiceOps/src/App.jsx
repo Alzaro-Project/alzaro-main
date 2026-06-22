@@ -101,7 +101,7 @@ function Dashboard({ user, signOut }) {
     if (!term || !DB_READY) { setHits({ customers: [], jobs: [], invoices: [], quotes: [], properties: [] }); return; }
     const like = `%${term}%`;
     Promise.all([
-      db.from("svc_customers").select("id,name,site,area,type,contact,email").or(`name.ilike.${like},site.ilike.${like},area.ilike.${like}`).limit(8),
+      db.from("svc_customers").select("id,name,site,area,type,contact,email").or(`name.ilike.${like},site.ilike.${like},area.ilike.${like},email.ilike.${like}`).limit(8),
       db.from("svc_jobs").select("id,title,customer,status").or(`title.ilike.${like},customer.ilike.${like},site.ilike.${like}`).limit(8),
       db.from("svc_invoices").select("id,ref,customer,amount,status").or(`ref.ilike.${like},customer.ilike.${like}`).limit(8),
       db.from("svc_quotes").select("id,ref,customer,amount,status").or(`ref.ilike.${like},customer.ilike.${like}`).limit(8),
