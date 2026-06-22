@@ -3,15 +3,15 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import GlobalSearch from './GlobalSearch'
 
 const NAV = [
-  { path: '/dashboard', icon: '📊', label: 'Dashboard', min: 'bronze' },
-  { path: '/invoices', icon: '📄', label: 'Invoices', min: 'bronze' },
-  { path: '/inventory', icon: '⚙️', label: 'Inventory', min: 'bronze' },
-  { path: '/purchases', icon: '📦', label: 'Purchases', min: 'bronze' },
-  { path: '/customers', icon: '👥', label: 'Customers', min: 'bronze' },
+  { path: '/dashboard', icon: '📊', label: 'Dashboard', min: 'basic' },
+  { path: '/invoices', icon: '📄', label: 'Invoices', min: 'basic' },
+  { path: '/inventory', icon: '⚙️', label: 'Inventory', min: 'basic' },
+  { path: '/purchases', icon: '📦', label: 'Purchases', min: 'basic' },
+  { path: '/customers', icon: '👥', label: 'Customers', min: 'basic' },
   { path: '/follow-ups', icon: '🔔', label: 'Follow-Ups', min: 'bronze' },
   { path: '/vat', icon: '📈', label: 'VAT Report', min: 'silver' },
-  { path: '/settings', icon: '🔧', label: 'Settings', min: 'bronze' },
-  { path: '/recently-deleted', icon: '🗑️', label: 'Recently Deleted', min: 'bronze' },
+  { path: '/settings', icon: '🔧', label: 'Settings', min: 'basic' },
+  { path: '/recently-deleted', icon: '🗑️', label: 'Recently Deleted', min: 'basic' },
 ]
 
 const TIER_CLASSES = {
