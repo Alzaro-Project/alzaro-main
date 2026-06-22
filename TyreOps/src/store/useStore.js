@@ -161,6 +161,9 @@ export const useStore = create(
               batches: data.batches,
               usedTyres: data.usedTyres,
             })
+
+            // Best-effort cleanup of recycle-bin items older than 30 days
+            db.purgeExpiredDeleted(data.garage.id).catch(() => {})
           }
         } catch (err) {
           console.error('Failed to load garage data:', err)
@@ -667,9 +670,51 @@ export const useStore = create(
       },
 
       // --------------------------------------------------------
-      // DASHBOARD
+      // RECYCLE BIN
       // --------------------------------------------------------
-      setDashPeriod: (period) => set({ dashPeriod: period }),
+      deletedItems: [],
+
+      loadDeletedItems: async () => {
+        const garageId = get().garageId
+        if (!garageId) return
+        try {
+          const items = await db.getDeletedItems(garageId)
+          set({ deletedItems: items })
+        } catch (err) {
+          console.error('Failed to load recycle bin:', err)
+          showToast('Could not load recently deleted items.')
+        }
+      },
+
+      restoreItem: async (kind, id) => {
+        const garageId = get().garageId
+        if (!garageId) return
+        try {
+          await db.restoreDeletedItem(kind, id)
+          set(s => ({ deletedItems: s.deletedItems.filter(i => !(i.kind === kind && i.id === id)) }))
+          // Reload data so the restored item reappears in its normal place
+          const email = get().user?.email
+          if (email) await get().loadData(email)
+          showToast('Item restored.')
+        } catch (err) {
+          console.error('Failed to restore item:', err)
+          showToast('Could not restore this item.')
+        }
+      },
+
+      purgeItem: async (kind, id) => {
+        const garageId = get().garageId
+        if (!garageId) return
+        try {
+          await db.purgeDeletedItem(garageId, kind, id)
+          set(s => ({ deletedItems: s.deletedItems.filter(i => !(i.kind === kind && i.id === id)) }))
+          showToast('Item permanently deleted.')
+        } catch (err) {
+          console.error('Failed to permanently delete item:', err)
+          showToast('Could not permanently delete this item.')
+        }
+      },
+
       setDashWidgets: (widgets) => set({ dashWidgets: widgets }),
       dismissWelcomeBanner: () => set({ welcomeBannerDismissed: true }),
 
