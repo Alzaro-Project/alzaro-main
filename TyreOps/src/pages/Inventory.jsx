@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard, UndoToast } from '../components/UI'
@@ -352,43 +352,101 @@ export default function Inventory() {
   )
 }
 
-// Brand picker: dropdown of the built-in list + an "Other…" option that
-// reveals a free-text box. `value` is whatever brand string is stored; if it's
-// not in TYRE_BRANDS (e.g. an old custom entry or an "Other" choice), the box
-// shows automatically so the existing value stays editable.
+// Brand picker: a searchable combo-box over the built-in TYRE_BRANDS list.
+// Type to filter; click a result to pick it. Anything you type that isn't an
+// exact match is offered as a "Use '…'" row, so custom/unlisted brands still
+// work. The stored value is just the brand string — known or custom.
 function BrandField({ value, onChange, label = 'Brand' }) {
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
-  const knownBrand = value && TYRE_BRANDS.includes(value)
-  // "custom" when the user has explicitly chosen Other, or the stored value
-  // isn't a known brand (covers editing a pre-existing custom brand).
-  const [custom, setCustom] = useState(!!value && !knownBrand)
 
-  const selectValue = custom ? '__other__' : (value || '')
+  const [open, setOpen] = useState(false)
+  // What's shown in the box: when closed, the chosen brand; while typing, the query.
+  const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState(false) // true while the user is typing a search
+  const boxRef = useRef(null)
+
+  // Close the dropdown when clicking outside.
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) { setOpen(false); setEditing(false) } }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? TYRE_BRANDS.filter(b => b.toLowerCase().includes(q))
+    : TYRE_BRANDS
+  const exactMatch = TYRE_BRANDS.some(b => b.toLowerCase() === q)
+
+  const pick = (brand) => {
+    onChange(brand)
+    setQuery('')
+    setEditing(false)
+    setOpen(false)
+  }
+
+  // The text the input displays: the live query while editing, else the saved value.
+  const display = editing ? query : (value || '')
 
   return (
     <Field label={label}>
-      <select
-        style={inputStyle}
-        value={selectValue}
-        onChange={e => {
-          const v = e.target.value
-          if (v === '__other__') { setCustom(true); onChange('') }
-          else { setCustom(false); onChange(v) }
-        }}
-      >
-        <option value="">-- Select brand --</option>
-        {TYRE_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-        <option value="__other__">Other…</option>
-      </select>
-      {custom && (
+      <div ref={boxRef} style={{ position: 'relative' }}>
         <input
-          style={{ ...inputStyle, marginTop: '8px' }}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Type brand name"
-          autoFocus
+          style={inputStyle}
+          value={display}
+          placeholder="Search or type a brand…"
+          onFocus={() => { setOpen(true); setEditing(true); setQuery('') }}
+          onChange={e => { setQuery(e.target.value); setEditing(true); setOpen(true) }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (matches.length) pick(matches[0])
+              else if (q) pick(query.trim())
+            } else if (e.key === 'Escape') { setOpen(false); setEditing(false) }
+          }}
         />
-      )}
+
+        {open && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+            maxHeight: '220px', overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+          }}>
+            {/* Offer the typed value as a custom brand when it's not an exact list match */}
+            {q && !exactMatch && (
+              <div
+                onClick={() => pick(query.trim())}
+                style={{ padding: '8px 11px', fontSize: '12px', cursor: 'pointer', color: 'var(--accent)', borderBottom: matches.length ? '1px solid var(--border)' : 'none' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
+              >
+                Use “{query.trim()}”
+              </div>
+            )}
+
+            {matches.map(b => (
+              <div
+                key={b}
+                onClick={() => pick(b)}
+                style={{
+                  padding: '8px 11px', fontSize: '12px', cursor: 'pointer',
+                  background: b === value ? 'var(--surface2)' : 'transparent',
+                  fontWeight: b === value ? 600 : 400,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                onMouseLeave={e => e.currentTarget.style.background = b === value ? 'var(--surface2)' : ''}
+              >
+                {b}
+              </div>
+            ))}
+
+            {matches.length === 0 && !q && (
+              <div style={{ padding: '10px 11px', fontSize: '12px', color: 'var(--text3)' }}>No brands</div>
+            )}
+          </div>
+        )}
+      </div>
     </Field>
   )
 }
