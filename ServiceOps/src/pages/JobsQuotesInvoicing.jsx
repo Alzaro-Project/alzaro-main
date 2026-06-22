@@ -3,25 +3,126 @@ import { db, DB_READY } from '../lib/db.js'
 import { gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Metric, Pill, Table, Td, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker } from '../components/UI.jsx'
 
+/* ==================================================================
+   Dialog: raise an invoice FROM A QUOTE (Full / Deposit / Part / Final)
+   Lifted from the old CreateInvoiceForJob. Uses the quote's amount as
+   the total; on Full/Final it marks the quote "Invoiced".
+   ================================================================== */
+function ApproveToInvoice({ user, quote, alreadyInvoiced, onClose, onDone }) {
+  const total = +quote.amount || 0;
+  const outstanding = Math.max(0, total - alreadyInvoiced);
+  const [invType, setInvType] = useState(alreadyInvoiced > 0 ? "Final" : "Full");
+  const [mode, setMode] = useState("amount"); // amount | percent (for deposit)
+  const [amount, setAmount] = useState(outstanding ? String(outstanding) : "");
+  const [percent, setPercent] = useState("30");
+  const [ref, setRef] = useState("");
+  const [schedDate, setSchedDate] = useState(quote.scheduled_date || "");
+  const [schedTime, setSchedTime] = useState(quote.scheduled_time || "");
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+
+  const pickType = (t) => {
+    setInvType(t);
+    if (t === "Deposit") { setMode("percent"); }
+    else if (t === "Final" || t === "Full") { setMode("amount"); setAmount(String(outstanding)); }
+  };
+  const computedAmount = mode === "percent" ? Math.round(total * (+percent || 0)) / 100 : (+amount || 0);
+
+  const save = async () => {
+    if (!DB_READY) { setErr("Database not connected."); return; }
+    if (computedAmount <= 0) { setErr("Enter an amount greater than zero."); return; }
+    setBusy(true); setErr("");
+    const prefix = { Deposit: "DEP", Part: "PRT", Final: "INV", Full: "INV" }[invType] || "INV";
+    const payload = {
+      ref: ref.trim() || `${prefix}-${Date.now().toString().slice(-5)}`,
+      customer_id: quote.customer_id || null, customer: quote.customer || "",
+      property_id: quote.property_id || null, site: quote.site || "",
+      quote_id: quote.id, inv_type: invType,
+      amount: computedAmount, status: "Sent", user_id: user.id,
+    };
+    if (schedDate) payload.scheduled_date = schedDate;
+    if (schedTime) payload.scheduled_time = schedTime;
+    const { error } = await db.from("svc_invoices").insert([payload]);
+    if (error) { setErr(error.message); setBusy(false); return; }
+    // if this invoice clears the balance, mark the quote Invoiced
+    if (alreadyInvoiced + computedAmount >= total && total > 0) {
+      await db.from("svc_quotes").update({ status: "Invoiced", invoiced_at: new Date().toISOString() }).eq("id", quote.id);
+    } else {
+      // partial — at least move it off Draft/Sent so it shows as actioned
+      await db.from("svc_quotes").update({ status: "Approved" }).eq("id", quote.id);
+    }
+    setBusy(false); onDone();
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, padding: 20, width: 460, maxWidth: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Invoice from quote: {quote.ref || "—"}</div>
+        <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginBottom: 14 }}>{quote.customer || "—"}{quote.site ? ` · ${quote.site}` : ""}{quote.description ? ` · ${quote.description}` : ""}</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Quote total</div><div style={{ fontSize: 15, fontWeight: 600 }}>{gbp(total)}</div></div>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Invoiced</div><div style={{ fontSize: 15, fontWeight: 600, color: "var(--blue)" }}>{gbp(alreadyInvoiced)}</div></div>
+          <div style={{ flex: 1, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px" }}><div style={{ fontSize: 9.5, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase" }}>Outstanding</div><div style={{ fontSize: 15, fontWeight: 600, color: "var(--amber)" }}>{gbp(outstanding)}</div></div>
+        </div>
+        {err && <div style={errBanner}>{err}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <label style={fld}>Invoice type<select style={inp} value={invType} onChange={(e) => pickType(e.target.value)}>{["Full", "Deposit", "Part", "Final"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label style={fld}>Reference (optional)<input style={inp} placeholder="auto-generated" value={ref} onChange={(e) => setRef(e.target.value)} /></label>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {invType === "Deposit" && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <span onClick={() => setMode("percent")} style={{ cursor: "pointer", fontSize: 11.5, padding: "5px 11px", borderRadius: 7, background: mode === "percent" ? "var(--brand)" : "var(--panel-2)", color: mode === "percent" ? "#fff" : "var(--txt-2)", border: "0.5px solid var(--line)" }}>Percentage</span>
+              <span onClick={() => setMode("amount")} style={{ cursor: "pointer", fontSize: 11.5, padding: "5px 11px", borderRadius: 7, background: mode === "amount" ? "var(--brand)" : "var(--panel-2)", color: mode === "amount" ? "#fff" : "var(--txt-2)", border: "0.5px solid var(--line)" }}>Fixed amount</span>
+            </div>
+          )}
+          {mode === "percent" ? (
+            <label style={fld}>Deposit percentage of quote total
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input style={{ ...inp, width: 100 }} type="number" value={percent} onChange={(e) => setPercent(e.target.value)} /><span style={{ fontSize: 13, color: "var(--txt-2)" }}>% = <strong style={{ color: "var(--txt)" }}>{gbp(computedAmount)}</strong></span>
+              </div>
+            </label>
+          ) : (
+            <label style={fld}>Amount (£)<input style={inp} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+          <label style={fld}>Start / scheduled date<input style={inp} type="date" value={schedDate} onChange={(e) => setSchedDate(e.target.value)} /></label>
+          <label style={fld}>Time (optional)<input style={inp} type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} /></label>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+          <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
+          <span onClick={save}><Btn icon="ti-send" label={busy ? "Creating…" : `Raise ${invType} invoice`} primary /></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function QuotesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
   const [rows, setRows] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [invoiceFor, setInvoiceFor] = useState(null);
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", description: "", amount: "", status: "Draft", quote_date: "" };
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", description: "", amount: "", status: "Draft", quote_date: "", scheduled_date: "", scheduled_time: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
     db.from("svc_quotes").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+    db.from("svc_invoices").select("quote_id,amount").then(({ data }) => setInvoices(data || []));
   }, []);
+
+  const invoicedForQuote = (quoteId) => invoices.filter((v) => String(v.quote_id) === String(quoteId)).reduce((s, v) => s + (+v.amount || 0), 0);
+  const reloadInvoices = () => db.from("svc_invoices").select("quote_id,amount").then(({ data }) => setInvoices(data || []));
 
   const refresh = async () => { const { data } = await db.from("svc_quotes").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", property_id: q.property_id || "", site: q.site || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "" }); setEditId(q.id); setAdding(true); setErr(""); };
+  const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", property_id: q.property_id || "", site: q.site || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "", scheduled_date: q.scheduled_date || "", scheduled_time: q.scheduled_time || "" }); setEditId(q.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.customer.trim()) { setErr("Please select a customer."); return; }
@@ -29,6 +130,8 @@ function QuotesPage({ user }) {
     setErr("");
     const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null, property_id: form.property_id || null };
     if (!payload.quote_date) delete payload.quote_date;
+    if (!payload.scheduled_date) delete payload.scheduled_date;
+    if (!payload.scheduled_time) delete payload.scheduled_time;
     let error;
     if (editId) ({ error } = await db.from("svc_quotes").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_quotes").insert([{ ...payload, user_id: user.id }]));
@@ -43,7 +146,7 @@ function QuotesPage({ user }) {
   const open = data.filter((q) => q.status === "Sent" || q.status === "Draft");
   const openVal = open.reduce((s, q) => s + (q.amount || 0), 0);
   const approved = data.filter((q) => q.status === "Approved").length;
-  const toneFor = { Approved: "green", Sent: "blue", Draft: "amber", Rejected: "red" };
+  const toneFor = { Approved: "green", Sent: "blue", Draft: "amber", Rejected: "red", Invoiced: "brand" };
 
   return (
     <div className="fade-in">
@@ -65,8 +168,10 @@ function QuotesPage({ user }) {
             <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1850" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={{ ...fld, gridColumn: "span 2" }}>Description<input style={inp} placeholder="e.g. Full bathroom refit" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Approved", "Rejected"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Approved", "Rejected", "Invoiced"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Quote date<input style={inp} type="date" value={form.quote_date} onChange={(e) => setForm({ ...form, quote_date: e.target.value })} /></label>
+            <label style={fld}>Start / scheduled date<input style={inp} type="date" value={form.scheduled_date} onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })} /></label>
+            <label style={fld}>Scheduled time<input style={inp} type="time" value={form.scheduled_time} onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })} /></label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update quote" : "Save quote"} primary /></span></div>
         </div>
@@ -76,39 +181,52 @@ function QuotesPage({ user }) {
       ) : data.length === 0 ? (
         <div style={emptyCard}>No quotes yet. Click "New quote" to create your first one.</div>
       ) : (
-        <Table cols={["Ref", "Customer", "Description", "Amount", "Date", "Status", ""]}>
-          {data.map((q, i) => (
-            <tr key={q.id || i}>
-              <Td><span style={{ fontWeight: 500, fontFamily: "monospace" }}>{q.ref || "—"}</span></Td>
-              <Td>{q.customer}</Td>
-              <Td color="var(--txt-2)">{q.description || "—"}</Td>
-              <Td>{gbp(q.amount || 0)}</Td>
-              <Td color="var(--txt-2)">{q.quote_date || "—"}</Td>
-              <Td><Pill text={q.status || "Draft"} tone={toneFor[q.status] || "amber"} /></Td>
-              <Td>{q.id && rowActions(DB_READY, () => openEdit(q), () => askDelete(q))}</Td>
-            </tr>
-          ))}
+        <Table cols={["Ref", "Customer", "Description", "Amount", "Scheduled", "Status", "Actions"]}>
+          {data.map((q, i) => {
+            const inv = invoicedForQuote(q.id);
+            const canInvoice = q.id && DB_READY && q.status !== "Invoiced" && q.status !== "Rejected";
+            return (
+              <tr key={q.id || i}>
+                <Td><span style={{ fontWeight: 500, fontFamily: "monospace" }}>{q.ref || "—"}</span></Td>
+                <Td>{q.customer}</Td>
+                <Td color="var(--txt-2)">{q.description || "—"}</Td>
+                <Td>{gbp(q.amount || 0)}{inv > 0 && <div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{gbp(inv)} invoiced</div>}</Td>
+                <Td color="var(--txt-2)">{q.scheduled_date ? `${q.scheduled_date}${q.scheduled_time ? " " + q.scheduled_time : ""}` : "—"}</Td>
+                <Td><Pill text={q.status || "Draft"} tone={toneFor[q.status] || "amber"} /></Td>
+                <Td>
+                  {q.id && DB_READY ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {canInvoice && <i className="ti ti-file-invoice" onClick={() => setInvoiceFor(q)} style={{ fontSize: 15, color: "var(--brand)", cursor: "pointer" }} title="Approve → Invoice" />}
+                      <i className="ti ti-pencil" onClick={() => openEdit(q)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                      <i className="ti ti-trash" onClick={() => askDelete(q)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                    </div>
+                  ) : null}
+                </Td>
+              </tr>
+            );
+          })}
         </Table>
       )}
+      {invoiceFor && <ApproveToInvoice user={user} quote={invoiceFor} alreadyInvoiced={invoicedForQuote(invoiceFor.id)} onClose={() => setInvoiceFor(null)} onDone={() => { setInvoiceFor(null); refresh(); reloadInvoices(); }} />}
       {confirmNode}
     </div>
   );
 }
 
-// JOBS  (kanban)
-
-/* Dialog: raise an invoice against a job (Deposit / Part / Final / Full) */
+/* ==================================================================
+   JOBS (kanban) — RETAINED but no longer in the nav. Kept so App.jsx
+   imports still resolve; removed properly in a later batch.
+   ================================================================== */
 function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
   const total = +job.value || 0;
   const outstanding = Math.max(0, total - alreadyInvoiced);
   const [invType, setInvType] = useState(alreadyInvoiced > 0 ? "Final" : "Full");
-  const [mode, setMode] = useState("amount"); // amount | percent (for deposit)
+  const [mode, setMode] = useState("amount");
   const [amount, setAmount] = useState(outstanding ? String(outstanding) : "");
   const [percent, setPercent] = useState("30");
   const [ref, setRef] = useState("");
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
 
-  // when switching to Deposit default to percent mode; Final/Full default to outstanding
   const pickType = (t) => {
     setInvType(t);
     if (t === "Deposit") { setMode("percent"); }
@@ -130,7 +248,6 @@ function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
     };
     const { error } = await db.from("svc_invoices").insert([payload]);
     if (error) { setErr(error.message); setBusy(false); return; }
-    // if this invoice clears the balance, mark job Invoiced
     if (alreadyInvoiced + computedAmount >= total && total > 0) await db.from("svc_jobs").update({ status: "Invoiced" }).eq("id", job.id);
     setBusy(false); onDone();
   };
@@ -309,7 +426,10 @@ function JobsPage({ user }) {
   );
 }
 
-// DIARY  (week view)
+/* ==================================================================
+   DIARY — RETAINED placeholder so App.jsx import resolves. The real
+   calendar rewrite lands in batch 3.
+   ================================================================== */
 function DiaryPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -349,7 +469,6 @@ function DiaryPage({ user }) {
 
   const data = rows || [];
   const toneFor = { High: "red", Medium: "amber", Low: "blue" };
-  // group by date
   const byDate = {};
   data.forEach((b) => { const k = b.booking_date || "No date"; (byDate[k] = byDate[k] || []).push(b); });
   const dates = Object.keys(byDate).sort();
@@ -411,20 +530,20 @@ function DiaryPage({ user }) {
   );
 }
 
-// INVOICING
-// Email preview modal — review the invoice email, then send via Resend (/api/send-email)
+/* ==================================================================
+   INVOICING
+   ================================================================== */
 function InvoiceEmailModal({ invoice, user, onClose, onSent }) {
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [bizName, setBizName] = useState("Alzaro ServiceOps");
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(null); // null | 'sending' | 'success' | 'error'
+  const [status, setStatus] = useState(null);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
     const build = async () => {
-      // Pull the customer's email + the business name to compose a sensible default
       let custEmail = "", custName = invoice.customer || "there", biz = "Alzaro ServiceOps";
       if (DB_READY) {
         if (invoice.customer_id) {
@@ -473,7 +592,6 @@ ${biz}`
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
       setStatus("success");
-      // Mark the invoice as Sent (only bump up from Draft)
       if (DB_READY && invoice.id && invoice.status === "Draft") {
         await db.from("svc_invoices").update({ status: "Sent" }).eq("id", invoice.id);
       }
@@ -546,7 +664,7 @@ function InvoicingPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft" };
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft", scheduled_date: "", scheduled_time: "" };
   const [form, setForm] = useState(blank);
   const [emailInvoice, setEmailInvoice] = useState(null);
   const [filter, setFilter] = useState("All");
@@ -559,7 +677,7 @@ function InvoicingPage({ user }) {
 
   const refresh = async () => { const { data } = await db.from("svc_invoices").select("*").order("created_at", { ascending: false }); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", property_id: v.property_id || "", site: v.site || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft" }); setEditId(v.id); setAdding(true); setErr(""); };
+  const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", property_id: v.property_id || "", site: v.site || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft", scheduled_date: v.scheduled_date || "", scheduled_time: v.scheduled_time || "" }); setEditId(v.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.customer.trim()) { setErr("Please select a customer."); return; }
@@ -567,6 +685,8 @@ function InvoicingPage({ user }) {
     setErr("");
     const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, customer_id: form.customer_id || null, property_id: form.property_id || null };
     if (!payload.due_date) delete payload.due_date;
+    if (!payload.scheduled_date) delete payload.scheduled_date;
+    if (!payload.scheduled_time) delete payload.scheduled_time;
     let error;
     if (editId) ({ error } = await db.from("svc_invoices").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_invoices").insert([{ ...payload, user_id: user.id }]));
@@ -578,7 +698,6 @@ function InvoicingPage({ user }) {
   const [confirmNode, ask] = useConfirm();
   const askDelete = (v) => ask(<span>Delete invoice <strong>{v.ref || "(no ref)"}</strong> for <strong>{v.customer || "—"}</strong> ({gbp(+v.amount || 0)})? This can't be undone.</span>, () => remove(v.id));
 
-  // Stored amount is treated as the gross total; VAT (20%) is worked backward from it.
   const vatBreakdown = (total) => { const t = +total || 0; const sub = t / 1.2; return { sub, vat: t - sub, total: t }; };
   const money = (n) => "£" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -610,11 +729,12 @@ function InvoicingPage({ user }) {
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 540" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Draft", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Start / scheduled date<input style={inp} type="date" value={form.scheduled_date} onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })} /></label>
+            <label style={fld}>Scheduled time<input style={inp} type="time" value={form.scheduled_time} onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })} /></label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update invoice" : "Save invoice"} primary /></span></div>
         </div>
       )}
-      {/* Filter tabs */}
       <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
         {["All", "Draft", "Sent", "Paid", "Overdue"].map((f) => (
           <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
@@ -633,7 +753,7 @@ function InvoicingPage({ user }) {
           return <span onClick={onClick} title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: col, background: bg, border: "0.5px solid var(--line)" }}><i className={`ti ${icon}`} style={{ fontSize: 14 }} /></span>;
         };
         return (
-          <Table cols={["Ref", "Customer", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
+          <Table cols={["Ref", "Customer", "Subtotal", "VAT", "Total", "Scheduled", "Status", "Actions"]}>
             {shown.map((v, i) => {
               const b = vatBreakdown(v.amount);
               return (
@@ -643,7 +763,7 @@ function InvoicingPage({ user }) {
                   <Td color="var(--txt-2)">{money(b.sub)}</Td>
                   <Td color="var(--txt-2)">{money(b.vat)}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
-                  <Td color="var(--txt-2)">{v.due_date || "—"}</Td>
+                  <Td color="var(--txt-2)">{v.scheduled_date ? `${v.scheduled_date}${v.scheduled_time ? " " + v.scheduled_time : ""}` : "—"}</Td>
                   <Td><Pill text={v.status} tone={v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : v.status === "Sent" ? "blue" : "amber"} /></Td>
                   <Td>
                     {v.id && DB_READY ? (
