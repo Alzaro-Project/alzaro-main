@@ -30,7 +30,7 @@ export function StatCard({ label, value, delta, color = 'var(--text)' }) {
   )
 }
 
-export function Btn({ children, onClick, variant = 'secondary', sm = false }) {
+export function Btn({ children, onClick, variant = 'secondary', sm = false, disabled = false }) {
   const styles = {
     primary: { background: 'var(--accent)', color: '#000' },
     secondary: { background: 'var(--surface3)', color: 'var(--text)', border: '1px solid var(--border)' },
@@ -40,11 +40,12 @@ export function Btn({ children, onClick, variant = 'secondary', sm = false }) {
     teal: { background: 'rgba(45,212,191,0.1)', color: 'var(--teal)', border: '1px solid rgba(45,212,191,.2)' },
   }
   return (
-    <button onClick={onClick} style={{
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} style={{
       display: 'inline-flex', alignItems: 'center', gap: '5px',
       padding: sm ? '5px 10px' : '8px 14px',
       borderRadius: '8px', fontSize: sm ? '11px' : '12px', fontWeight: 600,
-      cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit',
+      cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all .15s', fontFamily: 'inherit',
+      opacity: disabled ? 0.4 : 1,
       ...styles[variant],
     }}>
       {children}
