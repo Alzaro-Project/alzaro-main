@@ -3,6 +3,14 @@ import { db, DB_READY } from '../lib/db.js'
 import { gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Pill, useConfirm, useCustomers, useProperties, CustomerPropertyPicker } from '../components/UI.jsx'
 
+// Next free INV-### across existing invoices (mirrors the Invoicing page).
+const nextInvRef = (rows) => {
+  const re = /^INV-(\d+)$/i;
+  let max = 0;
+  (rows || []).forEach((r) => { const m = (r.ref || "").trim().match(re); if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; } });
+  return `INV-${String(max + 1).padStart(3, "0")}`;
+};
+
 /* ==================================================================
    ServiceOps DIARY — calendar + list, modelled on GarageOps Calendar.
    Merges three sources onto one calendar:
@@ -525,18 +533,28 @@ function BookingInvoice({ booking, user, onClose, onDone }) {
     if (!DB_READY) { setErr("Database not connected."); return; }
     if (!(+amount > 0)) { setErr("Enter an amount greater than zero."); return; }
     setBusy(true); setErr("");
-    const payload = {
-      ref: ref.trim() || `INV-${Date.now().toString().slice(-5)}`,
+    const base = {
       customer_id: booking.customer_id || null, customer: booking.customer || "",
       property_id: booking.property_id || null, site: booking.site || "",
       booking_id: booking.id, amount: +amount, status, user_id: user.id,
     };
-    if (booking.booking_date) payload.scheduled_date = booking.booking_date;
-    if (booking.booking_time) payload.scheduled_time = booking.booking_time;
-    const { error } = await db.from("svc_invoices").insert([payload]);
+    if (booking.booking_date) base.scheduled_date = booking.booking_date;
+    if (booking.booking_time) base.scheduled_time = booking.booking_time;
+
+    const manual = ref.trim();
+    let lastErr = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let useRef = manual;
+      if (!useRef) { const { data } = await db.from("svc_invoices").select("ref"); useRef = nextInvRef(data); }
+      const { error } = await db.from("svc_invoices").insert([{ ...base, ref: useRef }]);
+      if (!error) { setBusy(false); onDone(); return; }
+      lastErr = error;
+      const clash = error.code === "23505" || /duplicate|unique/i.test(error.message || "");
+      if (!clash || manual) break; // surface manual clashes; retry only auto numbers
+    }
     setBusy(false);
-    if (error) { setErr(error.message); return; }
-    onDone();
+    if (lastErr && (lastErr.code === "23505" || /duplicate|unique/i.test(lastErr.message || "")) && manual) setErr(`Invoice number "${manual}" is already used. Clear it to auto-number, or pick another.`);
+    else if (lastErr) setErr(lastErr.message);
   };
 
   return (
