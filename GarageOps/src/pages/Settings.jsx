@@ -37,6 +37,8 @@ const TABS = [
 ]
 
 const TIERS = [
+  { key: 'basic', label: 'Basic', icon: '⚪', price: '£8/mo', color: '#6b7280',
+    features: ['Invoicing', 'Bookings calendar', 'Customers & vehicles', 'Items & purchases', '1 user'] },
   { key: 'bronze', label: 'Bronze', icon: '🥉', price: '£60/mo', color: '#cd7f32',
     features: ['50 invoices/month', 'Bookings calendar', 'Customers & vehicles', 'Purchases tracking', '1 user'] },
   { key: 'silver', label: 'Silver', icon: '🥈', price: '£75/mo', color: '#c0c0c0',
