@@ -3,6 +3,9 @@ import { db, DB_READY } from '../lib/db.js'
 import { REPORTS, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker, useIsMobile } from '../components/UI.jsx'
 
+// Shared storage bucket (same one the old Documents page used).
+const DOC_BUCKET = "svc-documents";
+
 // ---- Dashboard ----
 function WelcomeBanner({ d, go, user }) {
   const SUCCESS = "#22c55e";
@@ -21,7 +24,6 @@ function WelcomeBanner({ d, go, user }) {
     { id: "quote", label: "Create your first quote", done: (d.quotes || []).length > 0, page: "quotes" },
     { id: "invoice", label: "Raise your first invoice", done: (d.invoices || []).length > 0, page: "invoicing" },
   ];
-  // "Settings" ticks once any other step is done (no single settings flag exists).
   steps[0].done = steps.slice(1).some((s) => s.done);
 
   const completed = steps.filter((s) => s.done).length;
@@ -60,7 +62,7 @@ function WelcomeBanner({ d, go, user }) {
 }
 
 function DashboardPage({ range, go, user }) {
-  const [d, setD] = useState(null); // { customers, quotes, jobs, invoices }
+  const [d, setD] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setD({ customers: [], quotes: [], jobs: [], invoices: [], certs: [] }); return; }
@@ -91,7 +93,6 @@ function DashboardPage({ range, go, user }) {
   const quoteValue = openQuotes.reduce((s, q) => s + (+q.amount || 0), 0);
   const awaitingInvoice = d.jobs.filter((j) => j.status === "Completed").length;
 
-  // 6-month revenue: collected (paid) vs outstanding (sent+overdue) per month
   const months = [];
   for (let k = 5; k >= 0; k--) { const dt = new Date(); dt.setMonth(dt.getMonth() - k); months.push({ key: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`, label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
   const series = months.map((m) => {
@@ -105,10 +106,8 @@ function DashboardPage({ range, go, user }) {
     return { ...m, coll, out };
   });
   const maxVal = Math.max(1, ...series.map((s) => Math.max(s.coll, s.out)));
-  // certs expiring within 90 days, soonest first
   const expiring = (d.certs || []).map((c) => ({ ...c, days: c.expiry_date ? Math.ceil((new Date(c.expiry_date + "T00:00:00") - new Date()) / 86400000) : 9999 })).filter((c) => c.days <= 90).sort((a, b) => a.days - b.days).slice(0, 5);
 
-  // recent activity — newest records across tables
   const acts = [];
   d.invoices.forEach((v) => acts.push({ when: v.created_at, text: `Invoice ${v.status === "Paid" ? "paid" : "raised"} · ${v.ref || "—"} · ${gbp(+v.amount || 0)}`, tone: v.status === "Paid" ? "green" : v.status === "Overdue" ? "red" : "blue" }));
   d.quotes.forEach((q) => acts.push({ when: q.created_at, text: `Quote ${q.status?.toLowerCase() || "added"} · ${q.ref || "—"} · ${gbp(+q.amount || 0)}`, tone: q.status === "Approved" ? "green" : "amber" }));
@@ -133,7 +132,7 @@ function DashboardPage({ range, go, user }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
         <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
-        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("jobs")} />
+        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("quotes")} />
         <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -169,7 +168,7 @@ function DashboardPage({ range, go, user }) {
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Jobs by Stage" action="View all" onAction={() => go("jobs")}>
+        <Panel title="Jobs by Stage" action="View all" onAction={() => go("quotes")}>
           {["New", "Scheduled", "In Progress", "Completed", "Invoiced"].map((s, i, arr) => {
             const n = d.jobs.filter((j) => j.status === s).length;
             const tone = s === "Completed" ? "green" : s === "In Progress" ? "amber" : s === "Invoiced" ? "brand" : "blue";
@@ -199,9 +198,41 @@ function DashboardPage({ range, go, user }) {
   );
 }
 
-// CUSTOMERS
+// ---- shared file helpers (used by Certificates + Documents) ----
+const isImage = (name) => /\.(png|jpe?g|gif|webp|heic)$/i.test(name || "");
+const isPdf = (name) => /\.pdf$/i.test(name || "");
+const fmtSize = (b) => b == null ? "—" : b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
 
-// ---- Certificates ----
+function FileViewer({ name, url, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 30, zIndex: 60 }}>
+      <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ti ti-x" /></button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 900, height: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)", flexShrink: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
+            <a href={url} download={name}><i className="ti ti-download" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Download" /></a>
+            <a href={url} target="_blank" rel="noreferrer"><i className="ti ti-external-link" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Open in new tab" /></a>
+            <i className="ti ti-x" onClick={onClose} style={{ fontSize: 20, color: "var(--txt-2)", cursor: "pointer" }} title="Close" />
+          </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, background: "#0d0d10", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {url == null ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>
+            : isImage(name) ? <img src={url} alt={name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            : isPdf(name) ? <iframe src={url} title={name} style={{ width: "100%", height: "100%", border: "none" }} />
+            : <div style={{ textAlign: "center", color: "var(--txt-2)", fontSize: 13 }}><i className="ti ti-file" style={{ fontSize: 40, display: "block", marginBottom: 10 }} />Preview not available for this file type.<br /><a href={url} download={name} style={{ color: "var(--brand)" }}>Download instead</a></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Certificates (now with PDF/photo upload) ----
 function CertificatesPage({ user }) {
   const [customers, reloadCustomers] = useCustomers();
   const [properties, reloadProperties] = useProperties();
@@ -209,9 +240,13 @@ function CertificatesPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [busyId, setBusyId] = useState(null); // cert id currently uploading
+  const [viewer, setViewer] = useState(null); // { name, url }
   const TYPES = ["Gas Safety (CP12)", "EICR", "EIC (Installation)", "Boiler Service", "PAT Testing", "Completion Certificate", "Other"];
   const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", property_id: "", site: "", ref: "", issue_date: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
+  // a file chosen in the add/edit form, uploaded on save
+  const [pendingFile, setPendingFile] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -220,24 +255,85 @@ function CertificatesPage({ user }) {
   }, []);
 
   const refresh = async () => { const { data } = await db.from("svc_certificates").select("*").order("expiry_date", { ascending: true }); setRows(data || []); };
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (c) => { setForm({ cert_type: c.cert_type || "Other", customer_id: c.customer_id || "", customer: c.customer || "", property_id: c.property_id || "", site: c.site || "", ref: c.ref || "", issue_date: c.issue_date || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); };
+  const openAdd = () => { setForm(blank); setEditId(null); setPendingFile(null); setAdding(!adding); setErr(""); };
+  const openEdit = (c) => { setForm({ cert_type: c.cert_type || "Other", customer_id: c.customer_id || "", customer: c.customer || "", property_id: c.property_id || "", site: c.site || "", ref: c.ref || "", issue_date: c.issue_date || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setPendingFile(null); setAdding(true); setErr(""); };
+
+  // low-level: push a File to storage, return its path
+  const uploadToBucket = async (file) => {
+    const path = `${user.id}/certs/${Date.now()}_${file.name}`;
+    const { error: upErr } = await db.storage.from(DOC_BUCKET).upload(path, file, { upsert: false });
+    if (upErr) throw upErr;
+    return path;
+  };
 
   const save = async () => {
     if (!form.expiry_date) { setErr("Please set an expiry date."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, customer_id: form.customer_id || null, property_id: form.property_id || null };
-    if (!payload.issue_date) delete payload.issue_date;
-    let error;
-    if (editId) ({ error } = await db.from("svc_certificates").update(payload).eq("id", editId));
-    else ({ error } = await db.from("svc_certificates").insert([{ ...payload, user_id: user.id }]));
-    if (error) { setErr(error.message); return; }
-    setForm(blank); setAdding(false); setEditId(null); refresh();
+    try {
+      const payload = { ...form, customer_id: form.customer_id || null, property_id: form.property_id || null };
+      if (!payload.issue_date) delete payload.issue_date;
+      // attach a freshly-chosen file, if any
+      if (pendingFile) {
+        const path = await uploadToBucket(pendingFile);
+        payload.file_path = path;
+        payload.file_name = pendingFile.name;
+      }
+      let error;
+      if (editId) ({ error } = await db.from("svc_certificates").update(payload).eq("id", editId));
+      else ({ error } = await db.from("svc_certificates").insert([{ ...payload, user_id: user.id }]));
+      if (error) throw error;
+      setForm(blank); setPendingFile(null); setAdding(false); setEditId(null); refresh();
+    } catch (e) { setErr(e.message || "Couldn't save certificate."); }
   };
-  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_certificates").delete().eq("id", id); refresh(); } };
+
+  const remove = async (c) => {
+    if (!c.id || !DB_READY) return;
+    if (c.file_path) { try { await db.storage.from(DOC_BUCKET).remove([c.file_path]); } catch (e) { /* ignore */ } }
+    await db.from("svc_certificates").delete().eq("id", c.id);
+    refresh();
+  };
   const [confirmNode, ask] = useConfirm();
-  const askDelete = (c) => ask(<span>Delete <strong>{c.cert_type}</strong>{c.customer || c.site ? <> for <strong>{c.customer || c.site}</strong></> : ""}? This can't be undone.</span>, () => remove(c.id));
+  const askDelete = (c) => ask(<span>Delete <strong>{c.cert_type}</strong>{c.customer || c.site ? <> for <strong>{c.customer || c.site}</strong></> : ""}?{c.file_path ? " Its attached file will also be removed." : ""} This can't be undone.</span>, () => remove(c));
+
+  // pick + upload a file straight onto an existing cert row (inline button)
+  const pickFor = (c) => {
+    const el = document.createElement("input");
+    el.type = "file";
+    el.accept = ".pdf,.png,.jpg,.jpeg,.gif,.webp";
+    el.onchange = async () => {
+      const file = el.files[0];
+      if (!file) return;
+      setBusyId(c.id); setErr("");
+      try {
+        // remove the old file first if replacing
+        if (c.file_path) { try { await db.storage.from(DOC_BUCKET).remove([c.file_path]); } catch (e) { /* ignore */ } }
+        const path = await uploadToBucket(file);
+        const { error } = await db.from("svc_certificates").update({ file_path: path, file_name: file.name }).eq("id", c.id);
+        if (error) throw error;
+        refresh();
+      } catch (e) { setErr(e.message || "Upload failed."); }
+      setBusyId(null);
+    };
+    el.click();
+  };
+
+  const openFile = async (c) => {
+    if (!c.file_path) return;
+    setViewer({ name: c.file_name || "file", url: null });
+    const { data, error } = await db.storage.from(DOC_BUCKET).createSignedUrl(c.file_path, 3600);
+    if (error) { setErr(error.message); setViewer(null); return; }
+    setViewer({ name: c.file_name || "file", url: data.signedUrl });
+  };
+
+  // file chooser for the add/edit form (defers upload to save)
+  const pickPending = () => {
+    const el = document.createElement("input");
+    el.type = "file";
+    el.accept = ".pdf,.png,.jpg,.jpeg,.gif,.webp";
+    el.onchange = () => { if (el.files[0]) setPendingFile(el.files[0]); };
+    el.click();
+  };
 
   const iconForType = (ty) => /gas|cp12|boiler/i.test(ty) ? "ti-flame" : /eicr|eic|pat|electric/i.test(ty) ? "ti-bolt" : /completion/i.test(ty) ? "ti-circle-check" : "ti-shield-check";
   const daysLeft = (iso) => Math.ceil((new Date(iso + "T00:00:00") - new Date()) / 86400000);
@@ -268,6 +364,12 @@ function CertificatesPage({ user }) {
             <label style={fld}>Site / address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></label>
             <label style={{ ...fld, gridColumn: "span 2" }}>Reference / notes<input style={inp} placeholder="e.g. Landlord gas safety record" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>
           </div>
+          {/* file attach row */}
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span onClick={pickPending}><Btn icon="ti-paperclip" label={pendingFile ? "Change file" : "Attach PDF / photo"} /></span>
+            {pendingFile && <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{pendingFile.name} · {fmtSize(pendingFile.size)}</span>}
+            {!pendingFile && editId && <span style={{ fontSize: 11, color: "var(--txt-3)" }}>Leave empty to keep the existing file.</span>}
+          </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update certificate" : "Save certificate"} primary /></span></div>
         </div>
       )}
@@ -284,13 +386,22 @@ function CertificatesPage({ user }) {
           const status = c.days <= 7 ? "Urgent" : c.days <= 30 ? "Due soon" : "Valid";
           return (
             <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < data.length - 1 ? "0.5px solid var(--line)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${iconForType(c.cert_type)}`} style={{ fontSize: 16 }} /></span>
-                <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.cert_type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{[c.customer, c.site, c.ref].filter(Boolean).join(" · ") || "—"}</div></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${iconForType(c.cert_type)}`} style={{ fontSize: 16 }} /></span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{c.cert_type}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[c.customer, c.site, c.ref].filter(Boolean).join(" · ") || "—"}</div>
+                  {c.file_name && <div onClick={() => openFile(c)} style={{ fontSize: 10.5, color: "var(--brand)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, marginTop: 2 }}><i className="ti ti-paperclip" style={{ fontSize: 12 }} />{c.file_name}</div>}
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                 <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days < 0 ? `expired ${-c.days}d ago` : `in ${c.days} days`}</span>
                 <Pill text={status} tone={tone} />
+                {DB_READY && (
+                  c.file_path
+                    ? <i className="ti ti-eye" onClick={() => openFile(c)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="View attached file" />
+                    : <i className={`ti ${busyId === c.id ? "ti-loader" : "ti-upload"}`} onClick={() => busyId !== c.id && pickFor(c)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Attach a file" />
+                )}
                 {rowActions(DB_READY, () => openEdit(c), () => askDelete(c))}
               </div>
             </div>
@@ -298,16 +409,13 @@ function CertificatesPage({ user }) {
         })}
       </div>
       )}
+      {viewer && <FileViewer name={viewer.name} url={viewer.url} onClose={() => setViewer(null)} />}
       {confirmNode}
     </div>
   );
 }
 
-// DOCUMENTS
-
-// ---- Documents ----
-const DOC_BUCKET = "svc-documents";
-const fmtSize = (b) => b == null ? "—" : b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
+// ---- Documents (retained, no longer in nav; kept so App.jsx import resolves) ----
 const iconFor = (cat, name) => {
   const n = (name || "").toLowerCase();
   if (/\.(png|jpe?g|gif|webp|heic)$/.test(n)) return { icon: "ti-photo", tone: "blue" };
@@ -316,37 +424,6 @@ const iconFor = (cat, name) => {
   if (cat === "Quotes") return { icon: "ti-file-dollar", tone: "brand" };
   return { icon: "ti-file", tone: "blue" };
 };
-const isImage = (name) => /\.(png|jpe?g|gif|webp|heic)$/i.test(name || "");
-const isPdf = (name) => /\.pdf$/i.test(name || "");
-
-function DocViewer({ doc, url, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 30, zIndex: 60 }}>
-      <button onClick={onClose} title="Close (Esc)" style={{ position: "fixed", top: 18, right: 22, zIndex: 70, width: 40, height: 40, borderRadius: "50%", border: "none", background: "rgba(255,255,255,.12)", color: "#fff", fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><i className="ti ti-x" /></button>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 900, height: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{doc.name}</div>
-          <div style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
-            <a href={url} download={doc.name}><i className="ti ti-download" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Download" /></a>
-            <a href={url} target="_blank" rel="noreferrer"><i className="ti ti-external-link" style={{ fontSize: 18, color: "var(--txt-2)", cursor: "pointer" }} title="Open in new tab" /></a>
-            <i className="ti ti-x" onClick={onClose} style={{ fontSize: 20, color: "var(--txt-2)", cursor: "pointer" }} title="Close" />
-          </div>
-        </div>
-        <div style={{ flex: 1, minHeight: 0, background: "#0d0d10", overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {url == null ? <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>
-            : isImage(doc.name) ? <img src={url} alt={doc.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-            : isPdf(doc.name) ? <iframe src={url} title={doc.name} style={{ width: "100%", height: "100%", border: "none" }} />
-            : <div style={{ textAlign: "center", color: "var(--txt-2)", fontSize: 13 }}><i className="ti ti-file" style={{ fontSize: 40, display: "block", marginBottom: 10 }} />Preview not available for this file type.<br /><a href={url} download={doc.name} style={{ color: "var(--brand)" }}>Download instead</a></div>}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DocumentsPage({ user }) {
   const [customers] = useCustomers();
@@ -357,7 +434,7 @@ function DocumentsPage({ user }) {
   const [busy, setBusy] = useState(false);
   const [uploadCat, setUploadCat] = useState("Certificates");
   const [uploadCust, setUploadCust] = useState({ id: "", name: "" });
-  const [viewer, setViewer] = useState(null); // { doc, url }
+  const [viewer, setViewer] = useState(null);
 
   const load = () => {
     if (!DB_READY) { setRows([]); return; }
@@ -375,7 +452,6 @@ function DocumentsPage({ user }) {
       const { error: upErr } = await db.storage.from(DOC_BUCKET).upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       if (replaceDoc) {
-        // delete old file, point row at new one (keep its customer + category)
         await db.storage.from(DOC_BUCKET).remove([replaceDoc.path]);
         const { error } = await db.from("svc_documents").update({ path, name: file.name, size: file.size, cat: replaceDoc.cat }).eq("id", replaceDoc.id);
         if (error) throw error;
@@ -389,10 +465,10 @@ function DocumentsPage({ user }) {
   };
 
   const openView = async (d) => {
-    setViewer({ doc: d, url: null });
+    setViewer({ name: d.name, url: null });
     const { data, error } = await db.storage.from(DOC_BUCKET).createSignedUrl(d.path, 3600);
     if (error) { setErr(error.message); setViewer(null); return; }
-    setViewer({ doc: d, url: data.signedUrl });
+    setViewer({ name: d.name, url: data.signedUrl });
   };
 
   const remove = async (d) => {
@@ -405,11 +481,11 @@ function DocumentsPage({ user }) {
   const askDelete = (d) => ask(<span>Delete document <strong>{d.name}</strong>? The file will be permanently removed from storage. This can't be undone.</span>, () => remove(d));
 
   const pickFile = (onPick) => {
-    const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = ".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx";
-    inp.onchange = () => inp.files[0] && onPick(inp.files[0]);
-    inp.click();
+    const el = document.createElement("input");
+    el.type = "file";
+    el.accept = ".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx";
+    el.onchange = () => el.files[0] && onPick(el.files[0]);
+    el.click();
   };
 
   const data = rows || [];
@@ -462,13 +538,11 @@ function DocumentsPage({ user }) {
           })}
         </div>
       )}
-      {viewer && <DocViewer doc={viewer.doc} url={viewer.url} onClose={() => setViewer(null)} />}
+      {viewer && <FileViewer name={viewer.name} url={viewer.url} onClose={() => setViewer(null)} />}
       {confirmNode}
     </div>
   );
 }
-
-// REPORTS  (+ click-to-preview)
 
 // ---- Reports ----
 function ReportPreview({ report, onClose }) {
@@ -549,8 +623,6 @@ function ReportsPage() {
   );
 }
 
-// SETTINGS
-
 // ---- Settings ----
 function SettingsPage({ user }) {
   const isMobile = useIsMobile();
@@ -560,16 +632,14 @@ function SettingsPage({ user }) {
   const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
   const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
   const [showPass, setShowPass] = useState(false);
-  const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [smtpTest, setSmtpTest] = useState(null);
   const [smtpTestMsg, setSmtpTestMsg] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
-  const [currentTier, setCurrentTier] = useState("bronze"); // loaded from product_members below
+  const [currentTier, setCurrentTier] = useState("bronze");
 
-  // Load the real subscription tier (same source App.jsx reads) so the
-  // Subscription tab highlights the customer's actual plan.
   useEffect(() => {
     if (!DB_READY || !user) return;
     db.from("product_members").select("tier,plan").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
@@ -588,7 +658,6 @@ function SettingsPage({ user }) {
     { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
   ];
 
-  // SMTP provider presets — picking one fills in host/port/security
   const SMTP_PRESETS = {
     custom:   { host: "",                      port: 587, secure: false },
     gmail:    { host: "smtp.gmail.com",        port: 587, secure: false },
@@ -660,13 +729,11 @@ function SettingsPage({ user }) {
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
-  // Picking a provider preset fills host/port/security
   const pickProvider = (p) => {
     const preset = SMTP_PRESETS[p];
     setEmail({ ...email, smtp_provider: p, ...(preset ? { smtp_host: preset.host, smtp_port: preset.port, smtp_secure: preset.secure } : {}) });
   };
 
-  // Tests the SMTP details for real against the shared /api/test-smtp endpoint
   const testSmtp = async () => {
     if (!email.smtp_host || !email.smtp_user || !email.smtp_pass) {
       setSmtpTest("error"); setSmtpTestMsg("Fill in the SMTP host, username and password first.");
@@ -721,7 +788,6 @@ function SettingsPage({ user }) {
     <div className="fade-in">
       <PageHead title="Settings" sub="Manage your business, team and subscription." />
 
-      {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 12, padding: 5, marginBottom: 18, width: isMobile ? "100%" : "fit-content", overflowX: "auto" }}>
         {TABS.map((t) => (
           <div key={t.key} onClick={() => setTab(t.key)} style={{ display: "flex", alignItems: "center", gap: 7, padding: isMobile ? "9px 12px" : "9px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: tab === t.key ? "var(--brand)" : "transparent", color: tab === t.key ? "#fff" : "var(--txt-2)" }}>
@@ -730,7 +796,6 @@ function SettingsPage({ user }) {
         ))}
       </div>
 
-      {/* BUSINESS */}
       {tab === "business" && (
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 12 }}>
           <div style={card}>
@@ -758,7 +823,6 @@ function SettingsPage({ user }) {
         </div>
       )}
 
-      {/* NOTIFICATIONS */}
       {tab === "notifications" && (
         <div style={{ ...card, maxWidth: 760 }}>
           {head("ti-bell", "Notifications")}
@@ -788,7 +852,6 @@ function SettingsPage({ user }) {
         </div>
       )}
 
-      {/* EMAIL */}
       {tab === "email" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 760 }}>
           <div style={card}>
@@ -857,7 +920,6 @@ function SettingsPage({ user }) {
         </div>
       )}
 
-      {/* VAT */}
       {tab === "vat" && (
         <div style={{ ...card, maxWidth: 760 }}>
           {head("ti-receipt", "VAT")}
@@ -903,7 +965,6 @@ function SettingsPage({ user }) {
         </div>
       )}
 
-      {/* SUBSCRIPTION */}
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
@@ -938,7 +999,5 @@ function SettingsPage({ user }) {
     </div>
   );
 }
-
-// AUTH SCREEN  (login + sign up)
 
 export { DashboardPage, CertificatesPage, DocumentsPage, ReportsPage, SettingsPage };
