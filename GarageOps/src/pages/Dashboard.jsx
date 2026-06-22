@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import WelcomeBanner from '../components/WelcomeBanner'
@@ -500,36 +500,82 @@ function RevenueChart({ invoices }) {
           })
         }
       })
-      months.push({ name, rev, cost })
+      months.push({ name, rev, cost, profit: rev - cost })
     }
     return months
   }, [invoices])
 
-  const max = Math.max(...monthData.map(m => m.rev), 1) * 1.1
+  const max = Math.max(...monthData.map(m => Math.max(m.rev, m.cost)), 1) * 1.1
+  const [mounted, setMounted] = useState(false)
+  const [hov, setHov] = useState(null)
+  useEffect(() => { const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t) }, [])
+
+  const h = (v) => mounted ? `${Math.max((v / max) * 100, v > 0 ? 2 : 0.5)}%` : '0%'
 
   return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text)' }}>Monthly revenue</div>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: 'var(--text2)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '8px', height: '8px', background: 'var(--red)', borderRadius: '2px' }} />Revenue
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '8px', height: '8px', background: 'var(--text2)', borderRadius: '2px' }} />Cost
-          </span>
+        <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'monospace' }}>Monthly P&amp;L</div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'var(--red)', borderRadius: '2px', display: 'inline-block' }} />Rev</span>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', background: 'var(--text2)', opacity: 0.75, borderRadius: '2px', display: 'inline-block' }} />Cost</span>
         </div>
       </div>
-      <div style={{ height: '150px', display: 'flex', alignItems: 'flex-end', gap: '10px', padding: '0 4px' }}>
-        {monthData.map((m, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%' }}>
-            <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', flex: 1, justifyContent: 'center', width: '100%' }}>
-              <div title={`Revenue: ${money(m.rev)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: 'var(--red)', height: `${(m.rev / max) * 100}%`, minHeight: m.rev > 0 ? '2px' : '0' }} />
-              <div title={`Cost: ${money(m.cost)}`} style={{ width: '10px', borderRadius: '2px 2px 0 0', background: 'var(--text2)', height: `${(m.cost / max) * 100}%`, minHeight: m.cost > 0 ? '2px' : '0' }} />
+
+      <div style={{ position: 'relative' }}>
+        {hov !== null && (
+          <div style={{
+            position: 'absolute', top: '-6px', left: `${(hov + 0.5) * (100 / 6)}%`, transform: 'translateX(-50%)',
+            background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '8px',
+            padding: '7px 10px', zIndex: 10, pointerEvents: 'none', whiteSpace: 'nowrap',
+            boxShadow: '0 6px 18px rgba(0,0,0,.3)', fontSize: '11px', fontFamily: 'monospace',
+          }}>
+            <div style={{ color: 'var(--text2)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: '3px' }}>{monthData[hov].name}</div>
+            <div style={{ color: 'var(--red)' }}>Rev {money(monthData[hov].rev)}</div>
+            <div style={{ color: 'var(--text2)' }}>Cost {money(monthData[hov].cost)}</div>
+            <div style={{ color: monthData[hov].profit >= 0 ? 'var(--green)' : 'var(--red)', borderTop: '1px solid var(--border)', marginTop: '3px', paddingTop: '3px' }}>
+              P/L {monthData[hov].profit >= 0 ? '+' : '−'}{money(Math.abs(monthData[hov].profit))}
             </div>
-            <div style={{ fontSize: '9px', color: 'var(--text3)', fontFamily: 'monospace' }}>{m.name}</div>
           </div>
-        ))}
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '160px', paddingBottom: '20px', position: 'relative' }}>
+          {[0.25, 0.5, 0.75].map(g => (
+            <div key={g} style={{ position: 'absolute', left: 0, right: 0, bottom: `${20 + g * (140)}px`, borderTop: '1px dashed var(--border)', opacity: 0.5 }} />
+          ))}
+
+          {monthData.map((m, i) => (
+            <div
+              key={i}
+              onMouseEnter={() => setHov(i)}
+              onMouseLeave={() => setHov(null)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                height: '100%', justifyContent: 'flex-end', cursor: 'default',
+                opacity: hov === null || hov === i ? 1 : 0.35, transition: 'opacity .15s',
+              }}
+            >
+              <div style={{ width: '100%', display: 'flex', gap: '3px', alignItems: 'flex-end', flex: 1 }}>
+                <div style={{
+                  flex: 1, borderRadius: '4px 4px 0 0', height: h(m.rev),
+                  background: 'linear-gradient(180deg, var(--red), color-mix(in srgb, var(--red) 45%, transparent))',
+                  transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70}ms`,
+                  boxShadow: hov === i ? '0 0 12px color-mix(in srgb, var(--red) 45%, transparent)' : 'none',
+                }} />
+                <div style={{
+                  flex: 1, borderRadius: '4px 4px 0 0', height: h(m.cost),
+                  background: 'linear-gradient(180deg, var(--text2), color-mix(in srgb, var(--text2) 40%, transparent))',
+                  opacity: 0.7,
+                  transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70 + 40}ms`,
+                }} />
+              </div>
+              <div style={{
+                fontSize: '10px', fontFamily: 'monospace',
+                color: hov === i ? 'var(--text)' : 'var(--text3)', fontWeight: hov === i ? 700 : 400,
+              }}>{m.name}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
