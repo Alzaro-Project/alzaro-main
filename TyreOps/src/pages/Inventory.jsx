@@ -178,7 +178,16 @@ export default function Inventory() {
                     <td style={{ padding: '10px', fontWeight: 600, whiteSpace: 'nowrap' }}>{sk.brand}</td>
                     <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>{sk.model}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>{sk.w}/{sk.p}R{sk.r}</td>
-                    <td style={{ padding: '10px' }}><Badge variant="blue">New</Badge></td>
+                    <td style={{ padding: '10px' }}>
+                      {(() => {
+                        const openBatch = activeBatches[0] || batches.filter(b => b.skuId === sk.id).sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+                        return openBatch ? (
+                          <span onClick={() => setViewingBatch(openBatch)} style={{ cursor: 'pointer' }} title="View batch details">
+                            <Badge variant="blue">New</Badge>
+                          </span>
+                        ) : <Badge variant="blue">New</Badge>
+                      })()}
+                    </td>
                     <td style={{ padding: '10px' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                         {activeBatches.length === 0 ? <span style={{ color: 'var(--text3)', fontSize: '11px' }}>No stock</span> :
@@ -235,7 +244,11 @@ export default function Inventory() {
                     <td style={{ padding: '10px', fontWeight: 600 }}>{u.brand}</td>
                     <td style={{ padding: '10px' }}>{u.model}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>{u.w}/{u.p}R{u.r}</td>
-                    <td style={{ padding: '10px' }}><Badge variant="teal">♻ Used</Badge></td>
+                    <td style={{ padding: '10px' }}>
+                      <span onClick={() => { setEditingUsed(u); setShowUsed(true) }} style={{ cursor: 'pointer' }} title="Edit used tyre">
+                        <Badge variant="teal">♻ Used</Badge>
+                      </span>
+                    </td>
                     <td style={{ padding: '10px', fontSize: '11px', color: 'var(--text2)' }}>
                       {u.tread}mm · {u.year} · {u.sourceCust || 'Part-ex'}
                     </td>
