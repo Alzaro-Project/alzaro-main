@@ -11,6 +11,7 @@ import Purchases from './pages/Purchases'
 import Customers from './pages/Customers'
 import VATReport from './pages/VATReport'
 import Settings from './pages/Settings'
+import RecentlyDeleted from './pages/RecentlyDeleted'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 
@@ -95,6 +96,7 @@ function AppLayout() {
             <Route path="/customers" element={<Customers />} />
             <Route path="/vat" element={<VATReport />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/recently-deleted" element={<RecentlyDeleted />} />
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
         </div>
