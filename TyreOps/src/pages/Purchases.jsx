@@ -252,6 +252,145 @@ export default function Purchases() {
     </div>
   )
 }
+// ============================================================
+// SkuCombo — type to filter existing tyre SKUs, or add a new one inline.
+// Replaces the plain <select>. Keeps batches attached to a real SKU record
+// (free text would break stock tracking), but lets you create that record
+// without leaving the purchase form.
+// ============================================================
+function SkuCombo({ skus, value, onChange, inputStyle }) {
+  const skuLabel = sk => `${sk.brand} ${sk.model} ${sk.w}/${sk.p}R${sk.r}`.trim()
+  const addSKU = useStore(s => s.addSKU)
+
+  const selected = skus.find(s => s.id === value) || null
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState({ brand: '', model: '', w: '', p: '', r: '', sell: '' })
+  const boxRef = useRef(null)
+
+  const filtered = query.trim()
+    ? skus.filter(sk => skuLabel(sk).toLowerCase().includes(query.trim().toLowerCase()))
+    : skus
+
+  const pick = (sk) => { onChange(sk.id); setOpen(false); setQuery('') }
+
+  const startAdd = () => {
+    // Pre-fill brand from the first typed word, model from the rest — a guess
+    // the user can correct.
+    const parts = query.trim().split(/\s+/)
+    setDraft({ brand: parts[0] || '', model: parts.slice(1).join(' ') || '', w: '', p: '', r: '', sell: '' })
+    setAdding(true)
+  }
+
+  const saveNew = async () => {
+    if (!draft.brand || !draft.model) return
+    const sku = {
+      id: `temp-${Date.now()}`,
+      brand: draft.brand.trim(),
+      model: draft.model.trim(),
+      w: Number(draft.w) || 0,
+      p: Number(draft.p) || 0,
+      r: Number(draft.r) || 0,
+      sell: Number(draft.sell) || 0,
+      season: 'all-season',
+    }
+    await addSKU(sku)
+    onChange(sku.id)      // select it for this batch
+    setAdding(false)
+    setOpen(false)
+    setQuery('')
+  }
+
+  const df = (k, v) => setDraft(p => ({ ...p, [k]: v }))
+  const miniInput = { ...inputStyle, padding: '6px 9px' }
+
+  return (
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      {/* Closed state: show selected label, or the search box when open */}
+      {!open ? (
+        <div
+          onClick={() => { setOpen(true); setAdding(false) }}
+          style={{ ...inputStyle, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <span style={{ color: selected ? 'var(--text)' : 'var(--text3)' }}>
+            {selected ? skuLabel(selected) : '-- Select or type a tyre --'}
+          </span>
+          <span style={{ color: 'var(--text3)', fontSize: '10px' }}>▾</span>
+        </div>
+      ) : (
+        <input
+          autoFocus
+          style={inputStyle}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Type to search tyres..."
+          onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQuery('') } }}
+        />
+      )}
+
+      {open && !adding && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px',
+          boxShadow: '0 8px 28px rgba(0,0,0,.35)', zIndex: 50, maxHeight: '240px', overflowY: 'auto',
+        }}>
+          {filtered.map(sk => (
+            <div
+              key={sk.id}
+              onClick={() => pick(sk)}
+              style={{ padding: '9px 12px', fontSize: '12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
+            >
+              {skuLabel(sk)}
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text3)' }}>No matching tyres</div>
+          )}
+          <div
+            onClick={startAdd}
+            style={{ padding: '10px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600 }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+            onMouseLeave={e => e.currentTarget.style.background = ''}
+          >
+            ➕ Add new tyre{query.trim() ? ` "${query.trim()}"` : ''}
+          </div>
+        </div>
+      )}
+
+      {open && adding && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px',
+          boxShadow: '0 8px 28px rgba(0,0,0,.35)', zIndex: 50, padding: '12px',
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text2)', marginBottom: '10px' }}>New tyre SKU</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+            <input style={miniInput} value={draft.brand} onChange={e => df('brand', e.target.value)} placeholder="Brand (Michelin)" />
+            <input style={miniInput} value={draft.model} onChange={e => df('model', e.target.value)} placeholder="Model (Pilot Sport 4)" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+            <input style={miniInput} type="number" value={draft.w} onChange={e => df('w', e.target.value)} placeholder="W 225" />
+            <input style={miniInput} type="number" value={draft.p} onChange={e => df('p', e.target.value)} placeholder="P 45" />
+            <input style={miniInput} type="number" value={draft.r} onChange={e => df('r', e.target.value)} placeholder="R 18" />
+            <input style={miniInput} type="number" step="0.01" value={draft.sell} onChange={e => df('sell', e.target.value)} placeholder="Sell £" />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button onClick={() => setAdding(false)} style={{ ...miniInput, width: 'auto', cursor: 'pointer', background: 'var(--surface3)' }}>Back</button>
+            <button
+              onClick={saveNew}
+              disabled={!draft.brand || !draft.model}
+              style={{ ...miniInput, width: 'auto', cursor: (!draft.brand || !draft.model) ? 'not-allowed' : 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 700, opacity: (!draft.brand || !draft.model) ? 0.5 : 1, border: 'none' }}
+            >Add &amp; select</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
   const [form, setForm] = useState(initial ? {
     skuId: initial.skuId || '',
@@ -336,10 +475,7 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
   return (
     <Modal title="Purchase Stock Batch" onClose={onClose} onSave={handleSave} saveDisabled={uploading} saveText={uploading ? 'Uploading...' : 'Save Batch'}>
       <Field label="Select Tyre SKU">
-        <select style={inputStyle} value={form.skuId} onChange={e => f('skuId', e.target.value)}>
-          <option value="">-- Select tyre --</option>
-          {skus.map(sk => <option key={sk.id} value={sk.id}>{sk.brand} {sk.model} {sk.w}/{sk.p}R{sk.r}</option>)}
-        </select>
+        <SkuCombo skus={skus} value={form.skuId} onChange={(id) => f('skuId', id)} inputStyle={inputStyle} />
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '12px' }}>
         <Field label="Date"><input style={inputStyle} type="date" value={form.date} onChange={e => f('date', e.target.value)} /></Field>
