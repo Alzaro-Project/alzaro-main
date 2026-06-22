@@ -716,6 +716,7 @@ export const useStore = create(
       },
 
       setDashWidgets: (widgets) => set({ dashWidgets: widgets }),
+      setDashPeriod: (period) => set({ dashPeriod: period }),
       dismissWelcomeBanner: () => set({ welcomeBannerDismissed: true }),
 
       // --------------------------------------------------------
