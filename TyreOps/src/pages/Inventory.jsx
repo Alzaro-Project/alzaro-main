@@ -6,6 +6,30 @@ import GlobalSearch from '../components/GlobalSearch'
 import { supabase } from '../lib/supabase'
 import { deletePurchaseInvoice, getInvoiceSignedUrl } from '../lib/db'
 
+// ============================================================
+// Built-in tyre brand list (~100). Feeds the Brand dropdown in the
+// New/Edit SKU and Used/Part-Ex forms. Picking "Other…" reveals a free-text
+// box so anything not listed can still be typed. Alphabetical so it scrolls
+// predictably. Add/remove entries here — it's purely client-side, no DB.
+// ============================================================
+const TYRE_BRANDS = [
+  'Accelera', 'Achilles', 'Aeolus', 'Antares', 'Apollo', 'Arivo', 'Atlas',
+  'Atturo', 'Austone', 'Avon', 'Barum', 'BFGoodrich', 'Bridgestone',
+  'Continental', 'Cooper', 'Cordiant', 'CST', 'Davanti', 'Dayton', 'Delinte',
+  'Dunlop', 'Durun', 'Event', 'Evergreen', 'Falken', 'Firemax', 'Firestone',
+  'Fortuna', 'Fullrun', 'Fulda', 'General Tire', 'Giti', 'GoodRide',
+  'Goodyear', 'GT Radial', 'Habilead', 'Hankook', 'Headway', 'Hifly',
+  'Ironman', 'Kapsen', 'Kenda', 'Kleber', 'Kormoran', 'Kumho', 'Lassa',
+  'Landsail', 'Laufenn', 'Linglong', 'Maxxis', 'Mazzini', 'Michelin',
+  'Milestone', 'Minerva', 'Mirage', 'Momo', 'Nankang', 'Nexen', 'Nokian',
+  'Nordexx', 'Ovation', 'Pace', 'Petlas', 'Pirelli', 'Powertrac', 'Premiorri',
+  'Radar', 'Riken', 'Roadstone', 'Roadx', 'Rotalla', 'Rovelo', 'Royal Black',
+  'Sailun', 'Sava', 'Seiberling', 'Semperit', 'Sonar', 'Sumitomo', 'Sunny',
+  'Sunew', 'Superia', 'Syron', 'Tigar', 'Toyo', 'Tracmax', 'Triangle',
+  'Tristar', 'Uniroyal', 'Vredestein', 'Wanli', 'Westlake', 'Windforce',
+  'Yokohama', 'Zeetex', 'Zeta',
+]
+
 export default function Inventory() {
   const location = useLocation()
   const { skus, batches, usedTyres, tier, addSKU, updateSKU, deleteSKU, deleteSKUWithBatches, addBatch, updateBatch, deleteBatch, markDamaged, addUsedTyre, updateUsedTyre, deleteUsedTyre, getTotalStock, getFIFOCost, garageId, bulkAddSKUs } = useStore()
@@ -328,6 +352,47 @@ export default function Inventory() {
   )
 }
 
+// Brand picker: dropdown of the built-in list + an "Other…" option that
+// reveals a free-text box. `value` is whatever brand string is stored; if it's
+// not in TYRE_BRANDS (e.g. an old custom entry or an "Other" choice), the box
+// shows automatically so the existing value stays editable.
+function BrandField({ value, onChange, label = 'Brand' }) {
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+  const knownBrand = value && TYRE_BRANDS.includes(value)
+  // "custom" when the user has explicitly chosen Other, or the stored value
+  // isn't a known brand (covers editing a pre-existing custom brand).
+  const [custom, setCustom] = useState(!!value && !knownBrand)
+
+  const selectValue = custom ? '__other__' : (value || '')
+
+  return (
+    <Field label={label}>
+      <select
+        style={inputStyle}
+        value={selectValue}
+        onChange={e => {
+          const v = e.target.value
+          if (v === '__other__') { setCustom(true); onChange('') }
+          else { setCustom(false); onChange(v) }
+        }}
+      >
+        <option value="">-- Select brand --</option>
+        {TYRE_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+        <option value="__other__">Other…</option>
+      </select>
+      {custom && (
+        <input
+          style={{ ...inputStyle, marginTop: '8px' }}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Type brand name"
+          autoFocus
+        />
+      )}
+    </Field>
+  )
+}
+
 function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
   const [form, setForm] = useState(sku || { brand: '', model: '', w: '', p: '', r: '', sell: '', alert: 2, season: 'allseason' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
@@ -366,7 +431,7 @@ function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
-        <Field label="Brand"><input style={inputStyle} value={form.brand} onChange={e => f('brand', e.target.value)} placeholder="Michelin" /></Field>
+        <BrandField value={form.brand} onChange={v => f('brand', v)} />
         <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -875,7 +940,7 @@ function UsedModal({ tyre, onClose, onSave }) {
       onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
-        <Field label="Brand"><input style={inputStyle} value={form.brand} onChange={e => f('brand', e.target.value)} placeholder="Michelin" /></Field>
+        <BrandField value={form.brand} onChange={v => f('brand', v)} />
         <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
