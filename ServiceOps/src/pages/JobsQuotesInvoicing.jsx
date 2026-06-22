@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react'
 import { db, DB_READY } from '../lib/db.js'
 import { gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Metric, Pill, Table, Td, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker } from '../components/UI.jsx'
+// Diary now lives in its own file (calendar + list). Re-exported below so
+// App.jsx can keep importing DiaryPage from this module unchanged.
+import DiaryPage from './Diary.jsx'
 
 /* ==================================================================
    Dialog: raise an invoice FROM A QUOTE (Full / Deposit / Part / Final)
-   Lifted from the old CreateInvoiceForJob. Uses the quote's amount as
-   the total; on Full/Final it marks the quote "Invoiced".
    ================================================================== */
 function ApproveToInvoice({ user, quote, alreadyInvoiced, onClose, onDone }) {
   const total = +quote.amount || 0;
   const outstanding = Math.max(0, total - alreadyInvoiced);
   const [invType, setInvType] = useState(alreadyInvoiced > 0 ? "Final" : "Full");
-  const [mode, setMode] = useState("amount"); // amount | percent (for deposit)
+  const [mode, setMode] = useState("amount");
   const [amount, setAmount] = useState(outstanding ? String(outstanding) : "");
   const [percent, setPercent] = useState("30");
   const [ref, setRef] = useState("");
@@ -43,11 +44,9 @@ function ApproveToInvoice({ user, quote, alreadyInvoiced, onClose, onDone }) {
     if (schedTime) payload.scheduled_time = schedTime;
     const { error } = await db.from("svc_invoices").insert([payload]);
     if (error) { setErr(error.message); setBusy(false); return; }
-    // if this invoice clears the balance, mark the quote Invoiced
     if (alreadyInvoiced + computedAmount >= total && total > 0) {
       await db.from("svc_quotes").update({ status: "Invoiced", invoiced_at: new Date().toISOString() }).eq("id", quote.id);
     } else {
-      // partial — at least move it off Draft/Sent so it shows as actioned
       await db.from("svc_quotes").update({ status: "Approved" }).eq("id", quote.id);
     }
     setBusy(false); onDone();
@@ -421,110 +420,6 @@ function JobsPage({ user }) {
         </div>
       )}
       {invoiceFor && <CreateInvoiceForJob user={user} job={invoiceFor} alreadyInvoiced={invoicedForJob(invoiceFor.id)} onClose={() => setInvoiceFor(null)} onDone={() => { setInvoiceFor(null); refresh(); reloadInvoices(); }} />}
-      {confirmNode}
-    </div>
-  );
-}
-
-/* ==================================================================
-   DIARY — RETAINED placeholder so App.jsx import resolves. The real
-   calendar rewrite lands in batch 3.
-   ================================================================== */
-function DiaryPage({ user }) {
-  const [customers, reloadCustomers] = useCustomers();
-  const [properties, reloadProperties] = useProperties();
-  const [rows, setRows] = useState(null);
-  const [err, setErr] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const blank = { title: "", customer_id: "", customer: "", property_id: "", site: "", engineer: "", booking_date: "", booking_time: "", priority: "Medium" };
-  const [form, setForm] = useState(blank);
-
-  useEffect(() => {
-    if (!DB_READY) { setRows([]); return; }
-    db.from("svc_bookings").select("*").order("booking_date", { ascending: true })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
-  }, []);
-
-  const refresh = async () => { const { data } = await db.from("svc_bookings").select("*").order("booking_date", { ascending: true }); setRows(data || []); };
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (b) => { setForm({ title: b.title || "", customer_id: b.customer_id || "", customer: b.customer || "", property_id: b.property_id || "", site: b.site || "", engineer: b.engineer || "", booking_date: b.booking_date || "", booking_time: b.booking_time || "", priority: b.priority || "Medium" }); setEditId(b.id); setAdding(true); setErr(""); };
-
-  const save = async () => {
-    if (!form.title.trim()) { setErr("Booking title is required."); return; }
-    if (!form.booking_date) { setErr("Please choose a date."); return; }
-    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
-    setErr("");
-    const payload = { ...form, customer_id: form.customer_id || null, property_id: form.property_id || null };
-    if (!payload.booking_time) delete payload.booking_time;
-    let error;
-    if (editId) ({ error } = await db.from("svc_bookings").update(payload).eq("id", editId));
-    else ({ error } = await db.from("svc_bookings").insert([{ ...payload, user_id: user.id }]));
-    if (error) { setErr(error.message); return; }
-    setForm(blank); setAdding(false); setEditId(null); refresh();
-  };
-  const remove = async (id) => { if (id && DB_READY) { await db.from("svc_bookings").delete().eq("id", id); refresh(); } };
-  const [confirmNode, ask] = useConfirm();
-  const askDelete = (b) => ask(<span>Delete booking <strong>{b.title}</strong>{b.booking_date ? <> on <strong>{b.booking_date}</strong></> : ""}? This can't be undone.</span>, () => remove(b.id));
-
-  const data = rows || [];
-  const toneFor = { High: "red", Medium: "amber", Low: "blue" };
-  const byDate = {};
-  data.forEach((b) => { const k = b.booking_date || "No date"; (byDate[k] = byDate[k] || []).push(b); });
-  const dates = Object.keys(byDate).sort();
-  const fmtDay = (iso) => iso === "No date" ? "No date" : new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-
-  return (
-    <div className="fade-in">
-      <PageHead title="Diary" sub={rows ? `${data.length} booking${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
-        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New booking"} primary /></span>} />
-      {!DB_READY && <div style={demoBanner}>Demo mode — add your keys in supabase.js to use the live database.</div>}
-      {err && <div style={errBanner}>{err}</div>}
-      {adding && (
-        <div style={formCard}>
-          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit booking" : "New booking"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
-            <label style={fld}>Booking title<input style={inp} placeholder="e.g. Boiler service" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label style={fld}>Date<input style={inp} type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></label>
-            <label style={fld}>Time<input style={inp} type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></label>
-            <CustomerPropertyPicker user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} form={form} onSet={(patch) => setForm({ ...form, ...patch })} />
-            <label style={fld}>Engineer<input style={inp} placeholder="e.g. Dave R." value={form.engineer} onChange={(e) => setForm({ ...form, engineer: e.target.value })} /></label>
-            <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
-          </div>
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update booking" : "Save booking"} primary /></span></div>
-        </div>
-      )}
-      {rows === null ? (
-        <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading diary…</div>
-      ) : data.length === 0 ? (
-        <div style={emptyCard}>No bookings yet. Click "New booking" to schedule your first job.</div>
-      ) : (
-        dates.map((dk) => (
-          <div key={dk} style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 9 }}>{fmtDay(dk)}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {byDate[dk].sort((a, b) => (a.booking_time || "").localeCompare(b.booking_time || "")).map((b) => {
-                const t = toneVar(toneFor[b.priority] || "blue");
-                return (
-                  <div key={b.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderLeft: `2px solid ${t.color}`, borderRadius: 8, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: t.color, fontFamily: "monospace", minWidth: 46 }}>{b.booking_time || "—"}</span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{b.title}</div>
-                        <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{b.customer || "—"}{b.site ? ` · ${b.site}` : ""}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <span style={{ fontSize: 11, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><i className="ti ti-user-cog" style={{ fontSize: 13 }} />{b.engineer || "Unassigned"}</span>
-                      {rowActions(DB_READY, () => openEdit(b), () => askDelete(b))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))
-      )}
       {confirmNode}
     </div>
   );
