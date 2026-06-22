@@ -6,8 +6,8 @@ import * as db from '../lib/db'
 // ============================================================
 // CONSTANTS
 // ============================================================
-const TIER_ORDER = ['bronze', 'silver', 'gold']
-const TIER_PRICE = { bronze: 60, silver: 75, gold: 90 }
+const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
+const TIER_PRICE = { basic: 8, bronze: 60, silver: 75, gold: 90 }
 
 // ============================================================
 // THEME HELPER
