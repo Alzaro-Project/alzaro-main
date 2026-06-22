@@ -10,6 +10,7 @@ const NAV = [
   { path: '/customers', icon: '👥', label: 'Customers', min: 'bronze' },
   { path: '/vat', icon: '📈', label: 'VAT Report', min: 'silver' },
   { path: '/settings', icon: '🔧', label: 'Settings', min: 'bronze' },
+  { path: '/recently-deleted', icon: '🗑️', label: 'Recently Deleted', min: 'bronze' },
 ]
 
 const TIER_CLASSES = {
