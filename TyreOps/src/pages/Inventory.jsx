@@ -451,6 +451,105 @@ function BrandField({ value, onChange, label = 'Brand' }) {
   )
 }
 
+// Common UK passenger-car tyre sizes, "width/profileRrim". Feeds the Size
+// quick-fill search. Not exhaustive — it's a shortcut; the three boxes below
+// stay editable for anything not here. Ordered by width then profile then rim.
+const COMMON_SIZES = [
+  '155/65R14', '155/70R13', '165/60R14', '165/65R14', '165/70R13', '165/70R14',
+  '175/60R15', '175/65R14', '175/65R15', '175/70R13', '175/70R14',
+  '185/55R15', '185/55R16', '185/60R14', '185/60R15', '185/65R14', '185/65R15',
+  '195/45R16', '195/50R15', '195/55R15', '195/55R16', '195/60R15', '195/65R15', '195/65R16',
+  '205/40R17', '205/45R16', '205/45R17', '205/50R16', '205/50R17', '205/55R16',
+  '205/55R17', '205/60R15', '205/60R16', '205/65R15', '205/65R16',
+  '215/40R17', '215/40R18', '215/45R17', '215/45R18', '215/50R17', '215/55R16',
+  '215/55R17', '215/55R18', '215/60R16', '215/60R17', '215/65R16', '215/65R17',
+  '225/40R18', '225/40R19', '225/45R17', '225/45R18', '225/45R19', '225/50R17',
+  '225/50R18', '225/55R16', '225/55R17', '225/55R18', '225/60R17', '225/60R18', '225/65R17',
+  '235/35R19', '235/40R18', '235/40R19', '235/45R17', '235/45R18', '235/50R18',
+  '235/55R17', '235/55R18', '235/55R19', '235/60R18', '235/65R17', '235/65R18',
+  '245/35R19', '245/35R20', '245/40R18', '245/40R19', '245/45R18', '245/45R19',
+  '245/45R20', '245/50R18', '255/35R19', '255/35R20', '255/40R19', '255/40R20',
+  '255/45R18', '255/45R19', '255/45R20', '255/50R19', '255/50R20', '255/55R18',
+  '265/35R19', '265/40R21', '265/50R20', '275/40R19', '275/40R20', '275/45R20',
+  '275/45R21', '285/35R19', '285/40R21', '285/45R20', '295/35R21', '315/35R20',
+]
+
+// Searchable quick-fill for tyre size. Picking a size sets width/profile/rim
+// in one go via onPick(w, p, r). The three number inputs remain the source of
+// truth and stay editable below this for non-standard sizes.
+function SizeQuickFill({ w, p, r, onPick }) {
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  // The current size, shown when not actively searching.
+  const current = (w && p && r) ? `${w}/${p}R${r}` : ''
+  // Normalise the query so "225 45 18", "225/45/18", "225/45r18" all match.
+  const qNorm = query.toLowerCase().replace(/[^0-9]/g, '')
+  const matches = qNorm
+    ? COMMON_SIZES.filter(s => s.toLowerCase().replace(/[^0-9]/g, '').includes(qNorm))
+    : COMMON_SIZES
+
+  const parse = (s) => {
+    const m = s.match(/(\d+)\/(\d+)R(\d+)/i)
+    return m ? { w: m[1], p: m[2], r: m[3] } : null
+  }
+  const pick = (s) => {
+    const parts = parse(s)
+    if (parts) onPick(parts.w, parts.p, parts.r)
+    setQuery(''); setOpen(false)
+  }
+
+  return (
+    <Field label="Quick size (optional)">
+      <div ref={boxRef} style={{ position: 'relative' }}>
+        <input
+          style={inputStyle}
+          value={open ? query : current}
+          placeholder="Search e.g. 225/45R18"
+          onFocus={() => { setOpen(true); setQuery('') }}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); if (matches.length) pick(matches[0]) }
+            else if (e.key === 'Escape') setOpen(false)
+          }}
+        />
+        {open && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+            maxHeight: '220px', overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+          }}>
+            {matches.length === 0 ? (
+              <div style={{ padding: '10px 11px', fontSize: '12px', color: 'var(--text3)' }}>
+                No standard size matches — type into the boxes below.
+              </div>
+            ) : matches.map(s => (
+              <div
+                key={s}
+                onClick={() => pick(s)}
+                style={{ padding: '8px 11px', fontSize: '12px', fontFamily: 'DM Mono, monospace', cursor: 'pointer', background: s === current ? 'var(--surface2)' : 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                onMouseLeave={e => e.currentTarget.style.background = s === current ? 'var(--surface2)' : ''}
+              >
+                {s}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Field>
+  )
+}
+
 function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
   const [form, setForm] = useState(sku || { brand: '', model: '', w: '', p: '', r: '', sell: '', alert: 2, season: 'allseason' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
@@ -491,6 +590,9 @@ function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
         <BrandField value={form.brand} onChange={v => f('brand', v)} />
         <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <SizeQuickFill w={form.w} p={form.p} r={form.r} onPick={(w, p, r) => setForm(prev => ({ ...prev, w, p, r }))} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
         <Field label="Width (mm)"><input style={inputStyle} type="number" value={form.w} onChange={e => f('w', e.target.value)} placeholder="225" /></Field>
@@ -1000,6 +1102,9 @@ function UsedModal({ tyre, onClose, onSave }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
         <BrandField value={form.brand} onChange={v => f('brand', v)} />
         <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <SizeQuickFill w={form.w} p={form.p} r={form.r} onPick={(w, p, r) => setForm(prev => ({ ...prev, w, p, r }))} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
         <Field label="Width (mm)"><input style={inputStyle} type="number" value={form.w} onChange={e => f('w', e.target.value)} placeholder="225" /></Field>
