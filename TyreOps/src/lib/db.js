@@ -152,7 +152,7 @@ export async function updateGarage(garageId, updates) {
 // SKUS  (TyreOps)
 // ============================================================
 export async function getSKUs(garageId) {
-  const { data, error } = await supabase.from('skus').select('*').eq('account_id', garageId).order('brand')
+  const { data, error } = await supabase.from('skus').select('*').eq('account_id', garageId).is('deleted_at', null).order('brand')
   if (error) throw error
   return data || []
 }
@@ -172,7 +172,7 @@ export async function updateSKU(id, updates) {
 }
 
 export async function deleteSKU(id) {
-  const { error } = await supabase.from('skus').delete().eq('id', id)
+  const { error } = await supabase.from('skus').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
@@ -180,7 +180,7 @@ export async function deleteSKU(id) {
 // BATCHES  (TyreOps)
 // ============================================================
 export async function getBatches(garageId) {
-  const { data, error } = await supabase.from('batches').select('*').eq('account_id', garageId).order('date')
+  const { data, error } = await supabase.from('batches').select('*').eq('account_id', garageId).is('deleted_at', null).order('date')
   if (error) throw error
   return data || []
 }
@@ -214,7 +214,7 @@ export async function updateBatch(id, updates) {
 }
 
 export async function deleteBatch(id) {
-  const { error } = await supabase.from('batches').delete().eq('id', id)
+  const { error } = await supabase.from('batches').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
@@ -260,7 +260,7 @@ export async function getInvoiceSignedUrl(pathOrUrl) {
 // USED TYRES  (TyreOps)
 // ============================================================
 export async function getUsedTyres(garageId) {
-  const { data, error } = await supabase.from('used_tyres').select('*').eq('account_id', garageId).order('date', { ascending: false })
+  const { data, error } = await supabase.from('used_tyres').select('*').eq('account_id', garageId).is('deleted_at', null).order('date', { ascending: false })
   if (error) throw error
   return (data || []).map(u => ({
     ...u, sourceCust: u.source_cust, lineType: 'used'
@@ -286,7 +286,7 @@ export async function updateUsedTyre(id, updates) {
 }
 
 export async function deleteUsedTyre(id) {
-  const { error } = await supabase.from('used_tyres').delete().eq('id', id)
+  const { error } = await supabase.from('used_tyres').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
@@ -294,7 +294,7 @@ export async function deleteUsedTyre(id) {
 // CUSTOMERS  (shared — TyreOps + GarageOps)
 // ============================================================
 export async function getCustomers(garageId) {
-  const { data, error } = await supabase.from('customers').select('*').eq('account_id', garageId).order('name')
+  const { data, error } = await supabase.from('customers').select('*').eq('account_id', garageId).is('deleted_at', null).order('name')
   if (error) throw error
   return data || []
 }
@@ -353,7 +353,7 @@ export async function updateCustomer(id, updates) {
 }
 
 export async function deleteCustomer(id) {
-  const { error } = await supabase.from('customers').delete().eq('id', id)
+  const { error } = await supabase.from('customers').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
@@ -362,7 +362,7 @@ export async function deleteCustomer(id) {
 // ============================================================
 export async function getInvoices(garageId) {
   const { data: invs, error } = await supabase
-    .from('invoices').select('*').eq('account_id', garageId).order('created_at', { ascending: false })
+    .from('invoices').select('*').eq('account_id', garageId).is('deleted_at', null).order('created_at', { ascending: false })
   if (error) throw error
   if (!invs?.length) return []
 
@@ -426,9 +426,10 @@ export async function updateInvoiceStatus(garageId, id, status) {
 }
 
 export async function deleteInvoice(garageId, id) {
-  await supabase.from('invoice_lines').delete()
-    .eq('account_id', garageId).eq('invoice_id', id)
-  const { error } = await supabase.from('invoices').delete()
+  // Soft delete: mark the invoice deleted but keep its lines so it can be
+  // restored intact. Lines are loaded only for non-deleted invoices.
+  const { error } = await supabase.from('invoices')
+    .update({ deleted_at: new Date().toISOString() })
     .eq('account_id', garageId).eq('id', id)
   if (error) throw error
 }
@@ -468,5 +469,65 @@ export async function loadAllGarageData(email) {
   } catch (err) {
     console.error('Error loading garage data:', err)
     return null
+  }
+}
+
+// ============================================================
+// RECYCLE BIN  (soft-delete restore / permanent delete)
+// ============================================================
+
+const RECYCLE_DAYS = 30
+
+// Fetch all soft-deleted items across tables for a garage.
+// Returns a flat list tagged with `kind` so the UI can show them together.
+export async function getDeletedItems(garageId) {
+  const [skus, batches, used, customers, invoices] = await Promise.all([
+    supabase.from('skus').select('*').eq('account_id', garageId).not('deleted_at', 'is', null),
+    supabase.from('batches').select('*').eq('account_id', garageId).not('deleted_at', 'is', null),
+    supabase.from('used_tyres').select('*').eq('account_id', garageId).not('deleted_at', 'is', null),
+    supabase.from('customers').select('*').eq('account_id', garageId).not('deleted_at', 'is', null),
+    supabase.from('invoices').select('*').eq('account_id', garageId).not('deleted_at', 'is', null),
+  ])
+  const items = []
+  for (const r of (skus.data || [])) items.push({ kind: 'sku', id: r.id, deletedAt: r.deleted_at, label: `${r.brand} ${r.model} ${r.w}/${r.p}R${r.r}`, sub: 'New tyre SKU' })
+  for (const r of (batches.data || [])) items.push({ kind: 'batch', id: r.id, deletedAt: r.deleted_at, label: `Batch · ${r.date} · £${r.cost} · ${r.remaining}pc`, sub: r.supplier || 'Stock batch' })
+  for (const r of (used.data || [])) items.push({ kind: 'used', id: r.id, deletedAt: r.deleted_at, label: `${r.brand} ${r.model} ${r.w}/${r.p}R${r.r}`, sub: 'Used / part-ex tyre' })
+  for (const r of (customers.data || [])) items.push({ kind: 'customer', id: r.id, deletedAt: r.deleted_at, label: r.name, sub: 'Customer' })
+  for (const r of (invoices.data || [])) items.push({ kind: 'invoice', id: r.id, deletedAt: r.deleted_at, label: `${r.id} · ${r.cust_name}`, sub: 'Invoice' })
+  // Most recently deleted first
+  items.sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt))
+  return items
+}
+
+const TABLE_FOR_KIND = { sku: 'skus', batch: 'batches', used: 'used_tyres', customer: 'customers', invoice: 'invoices' }
+
+// Restore a soft-deleted item (clear deleted_at).
+export async function restoreDeletedItem(kind, id) {
+  const table = TABLE_FOR_KIND[kind]
+  if (!table) throw new Error('Unknown item type')
+  const { error } = await supabase.from(table).update({ deleted_at: null }).eq('id', id)
+  if (error) throw error
+}
+
+// Permanently delete a single soft-deleted item (hard delete).
+export async function purgeDeletedItem(garageId, kind, id) {
+  const table = TABLE_FOR_KIND[kind]
+  if (!table) throw new Error('Unknown item type')
+  if (kind === 'invoice') {
+    await supabase.from('invoice_lines').delete().eq('account_id', garageId).eq('invoice_id', id)
+  }
+  const { error } = await supabase.from(table).delete().eq('id', id)
+  if (error) throw error
+}
+
+// Auto-purge anything deleted more than RECYCLE_DAYS ago. Best-effort.
+export async function purgeExpiredDeleted(garageId) {
+  const cutoff = new Date(Date.now() - RECYCLE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  for (const table of ['skus', 'batches', 'used_tyres', 'customers', 'invoices']) {
+    try {
+      await supabase.from(table).delete().eq('account_id', garageId).lt('deleted_at', cutoff)
+    } catch (e) {
+      console.error(`Auto-purge failed for ${table}:`, e)
+    }
   }
 }
