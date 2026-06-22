@@ -9,6 +9,39 @@ import DiaryPage from './Diary.jsx'
 // Default any new-record date field to today (YYYY-MM-DD). User can change it.
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// Auto-numbering, mirrors SoloOps (INV-001 / QUO-001 onwards, editable).
+// Scans existing refs matching PREFIX-###, returns the next free padded number.
+// Ignores any free-text refs that don't match the pattern.
+const nextRef = (rows, prefix) => {
+  const re = new RegExp(`^${prefix}-(\\d+)$`, "i");
+  let max = 0;
+  (rows || []).forEach((r) => {
+    const m = (r.ref || "").trim().match(re);
+    if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
+  });
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+};
+
+// Insert an invoice, auto-assigning the next free INV-### when no manual ref
+// is given. If a custom ref is supplied it's used as-is. Handles the unique-index
+// clash (two near-simultaneous inserts) by recomputing and retrying a few times.
+// Returns { error } like a normal supabase insert.
+const insertInvoiceWithRef = async (db, basePayload, manualRef) => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let ref = (manualRef || "").trim();
+    if (!ref) {
+      const { data } = await db.from("svc_invoices").select("ref");
+      ref = nextRef(data, "INV");
+    }
+    const { error } = await db.from("svc_invoices").insert([{ ...basePayload, ref }]);
+    if (!error) return { error: null, ref };
+    const clash = error.code === "23505" || /duplicate|unique/i.test(error.message || "");
+    // only retry auto-generated refs; a manual clash should surface to the user
+    if (!clash || manualRef) return { error, ref };
+  }
+  return { error: { message: "Couldn't allocate a free invoice number — please try again." } };
+};
+
 /* ==================================================================
    Dialog: raise an invoice FROM A QUOTE (Full / Deposit / Part / Final)
    ================================================================== */
@@ -35,9 +68,7 @@ function ApproveToInvoice({ user, quote, alreadyInvoiced, onClose, onDone }) {
     if (!DB_READY) { setErr("Database not connected."); return; }
     if (computedAmount <= 0) { setErr("Enter an amount greater than zero."); return; }
     setBusy(true); setErr("");
-    const prefix = { Deposit: "DEP", Part: "PRT", Final: "INV", Full: "INV" }[invType] || "INV";
     const payload = {
-      ref: ref.trim() || `${prefix}-${Date.now().toString().slice(-5)}`,
       customer_id: quote.customer_id || null, customer: quote.customer || "",
       property_id: quote.property_id || null, site: quote.site || "",
       quote_id: quote.id, inv_type: invType,
@@ -45,8 +76,12 @@ function ApproveToInvoice({ user, quote, alreadyInvoiced, onClose, onDone }) {
     };
     if (schedDate) payload.scheduled_date = schedDate;
     if (schedTime) payload.scheduled_time = schedTime;
-    const { error } = await db.from("svc_invoices").insert([payload]);
-    if (error) { setErr(error.message); setBusy(false); return; }
+    const { error } = await insertInvoiceWithRef(db, payload, ref);
+    if (error) {
+      if (error.code === "23505" || /duplicate|unique/i.test(error.message || "")) setErr(`Invoice number "${ref}" is already used. Clear it to auto-number, or pick another.`);
+      else setErr(error.message);
+      setBusy(false); return;
+    }
     if (alreadyInvoiced + computedAmount >= total && total > 0) {
       await db.from("svc_quotes").update({ status: "Invoiced", invoiced_at: new Date().toISOString() }).eq("id", quote.id);
     } else {
@@ -123,7 +158,7 @@ function QuotesPage({ user }) {
   const reloadInvoices = () => db.from("svc_invoices").select("quote_id,amount").then(({ data }) => setInvoices(data || []));
 
   const refresh = async () => { const { data } = await db.from("svc_quotes").select("*").order("created_at", { ascending: false }); setRows(data || []); };
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openAdd = () => { const willOpen = !adding; setForm({ ...blank, ref: willOpen ? nextRef(rows, "QUO") : "" }); setEditId(null); setAdding(willOpen); setErr(""); };
   const openEdit = (q) => { setForm({ ref: q.ref || "", customer_id: q.customer_id || "", customer: q.customer || "", property_id: q.property_id || "", site: q.site || "", description: q.description || "", amount: q.amount || "", status: q.status || "Draft", quote_date: q.quote_date || "", scheduled_date: q.scheduled_date || "", scheduled_time: q.scheduled_time || "" }); setEditId(q.id); setAdding(true); setErr(""); };
 
   const save = async () => {
@@ -137,7 +172,14 @@ function QuotesPage({ user }) {
     let error;
     if (editId) ({ error } = await db.from("svc_quotes").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_quotes").insert([{ ...payload, user_id: user.id }]));
-    if (error) { setErr(error.message); return; }
+    if (error) {
+      if (error.code === "23505" || /duplicate|unique/i.test(error.message || "")) {
+        const suggestion = nextRef(rows, "QUO");
+        setErr(`Quote number "${form.ref}" is already used. Try ${suggestion}.`);
+        setForm((f) => ({ ...f, ref: suggestion }));
+      } else { setErr(error.message); }
+      return;
+    }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_quotes").delete().eq("id", id); refresh(); } };
@@ -240,16 +282,18 @@ function CreateInvoiceForJob({ user, job, alreadyInvoiced, onClose, onDone }) {
     if (!DB_READY) { setErr("Database not connected."); return; }
     if (computedAmount <= 0) { setErr("Enter an amount greater than zero."); return; }
     setBusy(true); setErr("");
-    const prefix = { Deposit: "DEP", Part: "PRT", Final: "INV", Full: "INV" }[invType] || "INV";
     const payload = {
-      ref: ref.trim() || `${prefix}-${Date.now().toString().slice(-5)}`,
       customer_id: job.customer_id || null, customer: job.customer || "",
       property_id: job.property_id || null, site: job.site || "",
       job_id: job.id, inv_type: invType,
       amount: computedAmount, status: "Sent", user_id: user.id,
     };
-    const { error } = await db.from("svc_invoices").insert([payload]);
-    if (error) { setErr(error.message); setBusy(false); return; }
+    const { error } = await insertInvoiceWithRef(db, payload, ref);
+    if (error) {
+      if (error.code === "23505" || /duplicate|unique/i.test(error.message || "")) setErr(`Invoice number "${ref}" is already used. Clear it to auto-number, or pick another.`);
+      else setErr(error.message);
+      setBusy(false); return;
+    }
     if (alreadyInvoiced + computedAmount >= total && total > 0) await db.from("svc_jobs").update({ status: "Invoiced" }).eq("id", job.id);
     setBusy(false); onDone();
   };
@@ -574,7 +618,7 @@ function InvoicingPage({ user }) {
   }, []);
 
   const refresh = async () => { const { data } = await db.from("svc_invoices").select("*").order("created_at", { ascending: false }); setRows(data || []); };
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openAdd = () => { const willOpen = !adding; setForm({ ...blank, ref: willOpen ? nextRef(rows, "INV") : "" }); setEditId(null); setAdding(willOpen); setErr(""); };
   const openEdit = (v) => { setForm({ ref: v.ref || "", customer_id: v.customer_id || "", customer: v.customer || "", property_id: v.property_id || "", site: v.site || "", amount: v.amount || "", due_date: v.due_date || "", status: v.status || "Draft", scheduled_date: v.scheduled_date || "", scheduled_time: v.scheduled_time || "" }); setEditId(v.id); setAdding(true); setErr(""); };
 
   const save = async () => {
@@ -588,7 +632,14 @@ function InvoicingPage({ user }) {
     let error;
     if (editId) ({ error } = await db.from("svc_invoices").update(payload).eq("id", editId));
     else ({ error } = await db.from("svc_invoices").insert([{ ...payload, user_id: user.id }]));
-    if (error) { setErr(error.message); return; }
+    if (error) {
+      if (error.code === "23505" || /duplicate|unique/i.test(error.message || "")) {
+        const suggestion = nextRef(rows, "INV");
+        setErr(`Invoice number "${form.ref}" is already used. Try ${suggestion}.`);
+        setForm((f) => ({ ...f, ref: suggestion }));
+      } else { setErr(error.message); }
+      return;
+    }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
   const remove = async (id) => { if (id && DB_READY) { await db.from("svc_invoices").delete().eq("id", id); refresh(); } };
