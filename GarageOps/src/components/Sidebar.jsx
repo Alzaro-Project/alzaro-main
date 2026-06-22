@@ -11,14 +11,14 @@ import GlobalSearch from './GlobalSearch'
 // ============================================================
 
 const NAV = [
-  { path: '/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', min: 'bronze' },
-  { path: '/invoices',  icon: 'ti-file-text',        label: 'Invoices',  min: 'bronze' },
-  { path: '/customers', icon: 'ti-users',            label: 'Customers', min: 'bronze' },
-  { path: '/items',     icon: 'ti-package',          label: 'Items',     min: 'bronze' },
-  { path: '/purchases', icon: 'ti-shopping-cart',    label: 'Purchases', min: 'bronze' },
-  { path: '/calendar',  icon: 'ti-calendar',         label: 'Calendar',  min: 'bronze' },
+  { path: '/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', min: 'basic' },
+  { path: '/invoices',  icon: 'ti-file-text',        label: 'Invoices',  min: 'basic' },
+  { path: '/customers', icon: 'ti-users',            label: 'Customers', min: 'basic' },
+  { path: '/items',     icon: 'ti-package',          label: 'Items',     min: 'basic' },
+  { path: '/purchases', icon: 'ti-shopping-cart',    label: 'Purchases', min: 'basic' },
+  { path: '/calendar',  icon: 'ti-calendar',         label: 'Calendar',  min: 'basic' },
   { path: '/reports',   icon: 'ti-receipt-tax',      label: 'VAT & Reports', min: 'silver' },
-  { path: '/settings',  icon: 'ti-settings',         label: 'Settings',  min: 'bronze' },
+  { path: '/settings',  icon: 'ti-settings',         label: 'Settings',  min: 'basic' },
 ]
 
 const TIER_STYLE = {
