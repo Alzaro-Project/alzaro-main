@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import WelcomeBanner from '../components/WelcomeBanner'
@@ -70,18 +70,6 @@ const searchBox = {
   background: 'var(--surface2)', border: '1px solid var(--border)',
   padding: '10px 13px', borderRadius: '10px',
 }
-const tile = {
-  background: 'var(--surface)', border: '0.5px solid var(--border)',
-  borderRadius: '12px', padding: '14px', minHeight: '100px',
-}
-const tileLbl = {
-  fontSize: '10px', color: 'var(--text2)',
-  textTransform: 'uppercase', letterSpacing: '0.8px',
-  fontWeight: 500, marginBottom: '8px', fontFamily: 'monospace',
-}
-const tileNum = {
-  fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1.1, color: 'var(--text)',
-}
 const tileSub = { fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }
 const toggleBtn = (on) => ({
   padding: '4px 8px', fontSize: '10px',
@@ -106,6 +94,107 @@ const iconBtn = {
 const linkBtn = {
   background: 'none', border: 'none',
   color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
+}
+
+// ============================================================
+// ANIMATED CARDS (ported from TyreOps) — 3D tilt-follow, hover glow,
+// click-through arrow hint. Pass `onClick` to make a card navigate.
+// ============================================================
+function DashCard({ label, value, delta, color = 'var(--text)', onClick, hint, index = 0, children }) {
+  const ref = useRef(null)
+  const [transform, setTransform] = useState('')
+  const [hover, setHover] = useState(false)
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    setTransform(`perspective(700px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-4px) scale(1.02)`)
+  }
+  const onLeave = () => { setTransform(''); setHover(false) }
+
+  return (
+    <div
+      ref={ref}
+      className="dash-card"
+      onMouseMove={onMove}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={onLeave}
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px',
+        minHeight: '100px', cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden',
+        transform, animationDelay: `${index * 60}ms`,
+      }}
+    >
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: hover ? 1 : 0, transition: 'opacity .25s',
+        background: `radial-gradient(420px circle at 30% 0%, color-mix(in srgb, ${color} 14%, transparent), transparent 70%)`,
+      }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'monospace' }}>{label}</div>
+        {onClick && (
+          <div style={{
+            fontSize: '13px', color, transition: 'transform .2s, opacity .2s',
+            opacity: hover ? 1 : 0.35, transform: hover ? 'translateX(2px)' : 'none',
+          }}>→</div>
+        )}
+      </div>
+      {children ? children : (<>
+        <div style={{ fontFamily: 'monospace', fontSize: '24px', fontWeight: 700, marginTop: '5px', marginBottom: '3px', color }}>{value}</div>
+        {delta && <div style={{ fontSize: '11px', color: 'var(--text2)' }}>{hover && hint ? hint : delta}</div>}
+      </>)}
+    </div>
+  )
+}
+
+function TiltPanel({ title, accent = 'var(--text2)', onClick, children, index = 0, right }) {
+  const ref = useRef(null)
+  const [transform, setTransform] = useState('')
+  const [hover, setHover] = useState(false)
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    setTransform(`perspective(900px) rotateX(${(-y * 2.5).toFixed(2)}deg) rotateY(${(x * 3.5).toFixed(2)}deg) translateY(-3px)`)
+  }
+  const onLeave = () => { setTransform(''); setHover(false) }
+
+  return (
+    <div
+      ref={ref}
+      className="dash-card"
+      onMouseMove={onMove}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={onLeave}
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '16px',
+        cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden',
+        transform, animationDelay: `${index * 60}ms`,
+      }}
+    >
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: hover ? 1 : 0, transition: 'opacity .25s',
+        background: `radial-gradient(560px circle at 25% 0%, color-mix(in srgb, ${accent} 10%, transparent), transparent 70%)`,
+      }} />
+      {title && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'monospace' }}>{title}</div>
+          {right ? right : (onClick && (
+            <div style={{
+              fontSize: '13px', color: accent, transition: 'transform .2s, opacity .2s',
+              opacity: hover ? 1 : 0.35, transform: hover ? 'translateX(2px)' : 'none',
+            }}>→</div>
+          ))}
+        </div>
+      )}
+      {children}
+    </div>
+  )
 }
 
 // ============================================================
@@ -255,31 +344,30 @@ export default function Dashboard() {
 
       {/* ===== TOP 4 TILES ===== */}
       <div className="dash-top4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
-        {/* Sales */}
-        <div style={tile}>
-          <div style={tileLbl}>Sales</div>
-          <div style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '6px', padding: '2px', marginBottom: '10px' }}>
-            <button onClick={() => setSalesType('paid')} style={toggleBtn(salesType === 'paid')}>Money in</button>
-            <button onClick={() => setSalesType('invoiced')} style={toggleBtn(salesType === 'invoiced')}>Invoiced</button>
+        {/* Sales (has an internal toggle, so use the children slot) */}
+        <DashCard label="Sales" index={0} onClick={() => navigate('/invoices')} color="var(--green)">
+          <div style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '6px', padding: '2px', margin: '6px 0 10px' }}>
+            <button onClick={(e) => { e.stopPropagation(); setSalesType('paid') }} style={toggleBtn(salesType === 'paid')}>Money in</button>
+            <button onClick={(e) => { e.stopPropagation(); setSalesType('invoiced') }} style={toggleBtn(salesType === 'invoiced')}>Invoiced</button>
           </div>
-          <div style={{ ...tileNum, color: 'var(--green)' }}>{money(sales.total)}</div>
+          <div style={{ fontFamily: 'monospace', fontSize: '24px', fontWeight: 700, color: 'var(--green)' }}>{money(sales.total)}</div>
           <div style={tileSub}>{sales.count} {salesType === 'paid' ? 'paid' : 'invoice'}{sales.count === 1 ? '' : 's'}</div>
-        </div>
+        </DashCard>
 
         {/* Overdue */}
-        <div style={tile}>
-          <div style={tileLbl}>Overdue invoices</div>
-          <div style={{ ...tileNum, color: 'var(--red)' }}>{overdue.count}</div>
-          <div style={tileSub}>{money(overdue.total)} outstanding</div>
-        </div>
+        <DashCard
+          label="Overdue invoices" index={1} color="var(--red)"
+          value={overdue.count} delta={`${money(overdue.total)} outstanding`}
+          hint="View invoices →" onClick={() => navigate('/invoices', { state: { filter: 'overdue' } })}
+        />
 
         {/* MOTs Due Soon */}
         {hasSilver ? (
-          <div style={tile}>
-            <div style={tileLbl}>MOTs due soon</div>
-            <div style={{ ...tileNum, color: 'var(--amber)' }}>{motsDueSoon.length}</div>
-            <div style={tileSub}>Next 30 days</div>
-          </div>
+          <DashCard
+            label="MOTs due soon" index={2} color="var(--amber)"
+            value={motsDueSoon.length} delta="Next 30 days"
+            hint="View customers →" onClick={() => navigate('/customers')}
+          />
         ) : (
           <LockedTile label="MOT reminders" requiredTier="silver" onUpgrade={() => navigate('/settings', { state: { tab: 'subscription' } })} />
         )}
@@ -315,21 +403,21 @@ export default function Dashboard() {
 
       {/* ===== BOTTOM 4 TILES ===== */}
       <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-        <div style={tile}>
-          <div style={tileLbl}>Unpaid sent</div>
-          <div style={{ ...tileNum, color: 'var(--blue)' }}>{unpaidSent.count}</div>
-          <div style={tileSub}>{money(unpaidSent.total)} awaiting</div>
-        </div>
-        <div style={tile}>
-          <div style={tileLbl}>Avg invoice</div>
-          <div style={tileNum}>{money(avgInvoice)}</div>
-          <div style={tileSub}>This month</div>
-        </div>
-        <div style={tile}>
-          <div style={tileLbl}>Total customers</div>
-          <div style={tileNum}>{customers.length}</div>
-          <div style={tileSub}>On the books</div>
-        </div>
+        <DashCard
+          label="Unpaid sent" index={0} color="var(--blue)"
+          value={unpaidSent.count} delta={`${money(unpaidSent.total)} awaiting`}
+          hint="View invoices →" onClick={() => navigate('/invoices', { state: { filter: 'sent' } })}
+        />
+        <DashCard
+          label="Avg invoice" index={1}
+          value={money(avgInvoice)} delta="This month"
+          hint="View invoices →" onClick={() => navigate('/invoices')}
+        />
+        <DashCard
+          label="Total customers" index={2}
+          value={customers.length} delta="On the books"
+          hint="View customers →" onClick={() => navigate('/customers')}
+        />
         <PlaceholderTile />
       </div>
 
