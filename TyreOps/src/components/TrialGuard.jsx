@@ -129,7 +129,7 @@ export default function TrialGuard({ children }) {
                 Subscribe Now
               </a>
               <div style={{ color: 'var(--text3)', fontSize: '12px' }}>
-                Starting from £60/month
+                Starting from £8/month
               </div>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '16px' }}>
