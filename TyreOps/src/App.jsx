@@ -9,6 +9,7 @@ import Invoices from "./pages/Invoices"
 import Inventory from './pages/Inventory'
 import Purchases from './pages/Purchases'
 import Customers from './pages/Customers'
+import FollowUps from './pages/FollowUps'
 import VATReport from './pages/VATReport'
 import Settings from './pages/Settings'
 import RecentlyDeleted from './pages/RecentlyDeleted'
@@ -94,6 +95,7 @@ function AppLayout() {
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/customers" element={<Customers />} />
+            <Route path="/follow-ups" element={<FollowUps />} />
             <Route path="/vat" element={<VATReport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/recently-deleted" element={<RecentlyDeleted />} />
