@@ -952,6 +952,7 @@ export default function Invoices() {
 
   const saveInv = (status) => {
     if (!lines.length) { alert('Add at least one item'); return }
+    if (lines.some(l => !l.desc || !l.desc.trim())) { alert('Fill in the tyre and service line items (or remove any blank rows)'); return }
     if (!form.custName) { alert('Enter customer name'); return }
     
     // Determine final status based on payment method
@@ -1424,16 +1425,17 @@ export default function Invoices() {
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '14px', flexWrap: 'wrap' }}>
               <Btn variant="secondary" onClick={() => { setShowModal(false); setEditingInvoice(null) }}>Cancel</Btn>
-              <Btn variant="secondary" onClick={() => { saveInv('draft'); setShowModal(false); setEditingInvoice(null) }}>Save Draft</Btn>
+              <Btn variant="secondary" onClick={() => { if (saveInv('draft')) { setShowModal(false); setEditingInvoice(null) } }}>Save Draft</Btn>
               <Btn variant="primary" onClick={() => { 
                 const inv = saveInv('sent')
-                if (inv && inv.custEmail) {
+                if (!inv) return
+                if (inv.custEmail) {
                   setSendingInv(inv)
                 }
                 setShowModal(false)
                 setEditingInvoice(null)
               }}>✉️ Send Invoice</Btn>
-              <Btn variant="success" onClick={() => { saveInv('sent'); setShowModal(false); setEditingInvoice(null) }}>
+              <Btn variant="success" onClick={() => { if (saveInv('sent')) { setShowModal(false); setEditingInvoice(null) } }}>
                 {form.paymentMethod !== 'pending' ? '✓ Save as Paid' : '✓ Mark Sent'}
               </Btn>
             </div>
