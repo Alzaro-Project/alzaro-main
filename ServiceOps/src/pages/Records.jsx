@@ -6,6 +6,9 @@ import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomer
 // Shared storage bucket (same one the old Documents page used).
 const DOC_BUCKET = "svc-documents";
 
+// Default any new-record date field to today (YYYY-MM-DD). User can change it.
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 // ---- Dashboard ----
 function WelcomeBanner({ d, go, user }) {
   const SUCCESS = "#22c55e";
@@ -243,7 +246,7 @@ function CertificatesPage({ user }) {
   const [busyId, setBusyId] = useState(null); // cert id currently uploading
   const [viewer, setViewer] = useState(null); // { name, url }
   const TYPES = ["Gas Safety (CP12)", "EICR", "EIC (Installation)", "Boiler Service", "PAT Testing", "Completion Certificate", "Other"];
-  const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", property_id: "", site: "", ref: "", issue_date: "", expiry_date: "" };
+  const blank = { cert_type: "Gas Safety (CP12)", customer_id: "", customer: "", property_id: "", site: "", ref: "", issue_date: todayStr(), expiry_date: todayStr() };
   const [form, setForm] = useState(blank);
   // a file chosen in the add/edit form, uploaded on save
   const [pendingFile, setPendingFile] = useState(null);
