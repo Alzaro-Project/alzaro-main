@@ -467,6 +467,57 @@ export async function sendViaResend(toEmail, toName, subject, htmlContent) {
 }
 
 /**
+ * Send an arbitrary email (not invoice-specific) via the authenticated
+ * /api/send-email endpoint. Used by the customer follow-up feature.
+ *
+ * Same transport, auth and deliverability as invoice email — the server holds
+ * the Resend/SMTP credentials and only accepts logged-in users. Stage 2's
+ * automated sender can post to the same endpoint with a service token.
+ *
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function sendCustomEmail({ to, subject, html, text, fromName, replyTo }) {
+  if (!to) return { success: false, error: 'No recipient email address' }
+  if (!subject || (!html && !text)) {
+    return { success: false, error: 'Email needs a subject and a body' }
+  }
+
+  const token = await getAccessToken()
+  if (!token) return { success: false, error: 'You must be logged in to send email' }
+
+  try {
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ to, subject, html, text, fromName, replyTo }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      return { success: false, error: err.error || err.message || 'Failed to send email' }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to send email' }
+  }
+}
+
+/** Wrap a plain-text body in a minimal branded HTML shell for deliverability. */
+export function plainToHtml(text, settings = {}) {
+  const safe = String(text || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;">
+<div style="font-size:14px;">${safe}</div>
+<div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#888;">${settings.name || 'Alzaro TyreOps'}${settings.phone ? ' &middot; ' + settings.phone : ''}</div>
+</body></html>`
+}
+
+/**
  * Send via SMTP (requires Edge Function with Nodemailer)
  * Pass SMTP config to your backend endpoint
  */
