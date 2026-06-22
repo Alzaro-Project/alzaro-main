@@ -6,6 +6,9 @@ import { PageHead, Btn, Metric, Pill, Table, Td, rowActions, useConfirm, useCust
 // App.jsx can keep importing DiaryPage from this module unchanged.
 import DiaryPage from './Diary.jsx'
 
+// Default any new-record date field to today (YYYY-MM-DD). User can change it.
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 /* ==================================================================
    Dialog: raise an invoice FROM A QUOTE (Full / Deposit / Part / Final)
    ================================================================== */
@@ -106,7 +109,7 @@ function QuotesPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", description: "", amount: "", status: "Draft", quote_date: "", scheduled_date: "", scheduled_time: "" };
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", description: "", amount: "", status: "Draft", quote_date: todayStr(), scheduled_date: todayStr(), scheduled_time: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -559,7 +562,7 @@ function InvoicingPage({ user }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: "", status: "Draft", scheduled_date: "", scheduled_time: "" };
+  const blank = { ref: "", customer_id: "", customer: "", property_id: "", site: "", amount: "", due_date: todayStr(), status: "Draft", scheduled_date: todayStr(), scheduled_time: "" };
   const [form, setForm] = useState(blank);
   const [emailInvoice, setEmailInvoice] = useState(null);
   const [filter, setFilter] = useState("All");
