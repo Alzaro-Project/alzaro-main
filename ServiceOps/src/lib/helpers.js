@@ -4,13 +4,10 @@
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", tint: "brand", min: "bronze" },
   { id: "customers", label: "Customers", icon: "ti-users", tint: "blue", min: "bronze" },
-  { id: "properties", label: "Properties", icon: "ti-home", tint: "teal", min: "bronze" },
   { id: "quotes", label: "Quotes", icon: "ti-file-dollar", tint: "amber", min: "bronze" },
-  { id: "jobs", label: "Jobs", icon: "ti-briefcase", tint: "purple", min: "bronze" },
   { id: "diary", label: "Diary", icon: "ti-calendar", tint: "blue", min: "silver" },
   { id: "invoicing", label: "Invoicing", icon: "ti-receipt", tint: "brand", min: "bronze" },
   { id: "certificates", label: "Certificates", icon: "ti-shield-check", tint: "red", min: "gold" },
-  { id: "documents", label: "Documents", icon: "ti-folder", tint: "amber", min: "gold" },
   { id: "reports", label: "Reports", icon: "ti-chart-bar", tint: "teal", min: "silver" },
   { id: "settings", label: "Settings", icon: "ti-settings", tint: "blue", min: "bronze" },
 ];
