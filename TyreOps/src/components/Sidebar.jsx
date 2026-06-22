@@ -8,6 +8,7 @@ const NAV = [
   { path: '/inventory', icon: '⚙️', label: 'Inventory', min: 'bronze' },
   { path: '/purchases', icon: '📦', label: 'Purchases', min: 'bronze' },
   { path: '/customers', icon: '👥', label: 'Customers', min: 'bronze' },
+  { path: '/follow-ups', icon: '🔔', label: 'Follow-Ups', min: 'bronze' },
   { path: '/vat', icon: '📈', label: 'VAT Report', min: 'silver' },
   { path: '/settings', icon: '🔧', label: 'Settings', min: 'bronze' },
   { path: '/recently-deleted', icon: '🗑️', label: 'Recently Deleted', min: 'bronze' },
