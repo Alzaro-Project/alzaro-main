@@ -161,16 +161,18 @@
     .tl-item h3{font-size:16.5px;font-weight:600;margin-bottom:7px}
     .tl-item p{font-size:14px;color:var(--text2);line-height:1.75;max-width:560px}
 
-    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch}
+    @media(max-width:1000px){.plans{grid-template-columns:repeat(2,1fr)}}
     .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
     .plan:hover{transform:translateY(-3px)}
     .plan.popular{border-color:rgba(234,179,8,0.45);background:linear-gradient(180deg,rgba(234,179,8,0.06),var(--surface) 40%)}
     .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--gold);color:#1a1400;border-radius:5px;padding:4px 12px}
     .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;gap:9px}
     .tier-dot{width:9px;height:9px;border-radius:50%}
-    .starter .tier-dot{background:#cd7f32}
-    .pro .tier-dot{background:#c0c0c0}
-    .portfolio .tier-dot{background:var(--gold)}
+    .basic .tier-dot{background:#6b7280}
+    .bronze .tier-dot{background:#cd7f32}
+    .silver .tier-dot{background:#c0c0c0}
+    .gold .tier-dot{background:var(--gold)}
     .plan-limit{font-family:var(--mono);font-size:10.5px;color:var(--text3);margin-bottom:14px;letter-spacing:0.04em}
     .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:18px}
     .plan-price b{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-0.02em}
@@ -412,45 +414,53 @@
       <p class="sec-sub">Every plan starts with a 14-day free trial with full access. No card required, cancel any time.</p>
     </div>
     <div class="plans">
-      <div class="plan starter reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Starter</div>
-        <div class="plan-limit">Up to 3 properties</div>
-        <div class="plan-price"><b>£35</b><span>/month</span></div>
+      <div class="plan basic reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Basic</div>
+        <div class="plan-price"><b>£12.99</b><span>/month</span></div>
         <ul>
           <li>Property records</li>
-          <li>Basic tenant info</li>
+          <li>Tenant records</li>
           <li>Rent tracking</li>
-          <li>Document storage (1GB)</li>
-          <li class="off">Tenant portal</li>
+          <li>Document storage</li>
           <li class="off">Maintenance tracking</li>
+          <li class="off">Compliance &amp; reports</li>
         </ul>
         <a href="/propertyops/register" class="btn btn-ghost">Start free trial</a>
       </div>
-      <div class="plan pro popular reveal">
-        <div class="plan-flag">Most popular</div>
-        <div class="plan-tier"><span class="tier-dot"></span>Professional</div>
-        <div class="plan-limit">Up to 15 properties</div>
-        <div class="plan-price"><b>£65</b><span>/month</span></div>
+      <div class="plan bronze reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
+        <div class="plan-price"><b>£18.99</b><span>/month</span></div>
         <ul>
-          <li>Everything in Starter</li>
-          <li>Tenant portal</li>
+          <li>Everything in Basic</li>
           <li>Maintenance tracking</li>
-          <li>Compliance reminders</li>
+          <li>Contractor jobs</li>
           <li>Auto rent reminders</li>
-          <li>Priority support</li>
+          <li class="off">Compliance &amp; reports</li>
+          <li class="off">Finance &amp; documents</li>
+        </ul>
+        <a href="/propertyops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
+      <div class="plan silver popular reveal">
+        <div class="plan-flag">Most popular</div>
+        <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
+        <div class="plan-price"><b>£28.99</b><span>/month</span></div>
+        <ul>
+          <li>Everything in Bronze</li>
+          <li>Compliance &amp; certificates</li>
+          <li>Reports &amp; insights</li>
+          <li>Expiry reminders</li>
+          <li class="off">Finance &amp; documents store</li>
         </ul>
         <a href="/propertyops/register" class="btn btn-gold">Start free trial</a>
       </div>
-      <div class="plan portfolio reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Portfolio</div>
-        <div class="plan-limit">Unlimited properties</div>
-        <div class="plan-price"><b>£120</b><span>/month</span></div>
+      <div class="plan gold reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
+        <div class="plan-price"><b>£39.99</b><span>/month</span></div>
         <ul>
-          <li>Everything in Professional</li>
-          <li>Financial reports</li>
-          <li>Multi-user access</li>
+          <li>Everything in Silver</li>
+          <li>Full finance &amp; landlord statements</li>
+          <li>Document store</li>
           <li>Accountant export</li>
-          <li>API access</li>
           <li>Dedicated support</li>
         </ul>
         <a href="/propertyops/register" class="btn btn-ghost">Start free trial</a>
@@ -543,9 +553,10 @@
 
           <h2>3. Pricing</h2>
           <ul>
-            <li><strong>Starter:</strong> £35/month (up to 3 properties)</li>
-            <li><strong>Professional:</strong> £65/month (up to 15 properties)</li>
-            <li><strong>Portfolio:</strong> £120/month (unlimited)</li>
+            <li><strong>Basic:</strong> £12.99/month</li>
+            <li><strong>Bronze:</strong> £18.99/month</li>
+            <li><strong>Silver:</strong> £28.99/month</li>
+            <li><strong>Gold:</strong> £39.99/month</li>
           </ul>
           <p>14-day free trial. Billed monthly via Stripe.</p>
 
