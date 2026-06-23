@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db, DB_READY } from "./lib/supabase.js";
-import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile } from "./lib/helpers.js";
+import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile, TIER_ORDER } from "./lib/helpers.js";
 import {
   DashboardPage, PropertiesPage, CompliancePage, TenantsPage,
 } from "./pages/Portfolio.jsx";
@@ -31,7 +31,7 @@ function Dashboard({ user, signOut }) {
   // Priority: prop_settings.company_name → product_members.company_name →
   // user_metadata.company_name → email prefix (last resort). Tier read from
   // settings/membership if a column exists, else defaults to Enterprise.
-  const [biz, setBiz] = useState({ name: "", tier: "enterprise", loaded: false });
+  const [biz, setBiz] = useState({ name: "", tier: "basic", loaded: false });
 
   useEffect(() => {
     if (!DB_READY) {
@@ -58,7 +58,7 @@ function Dashboard({ user, signOut }) {
       if (!name) name = user.user_metadata?.company_name || "";
       // 4) last resort — email prefix
       if (!name) name = (user.email || "").split("@")[0];
-      if (!cancelled) setBiz({ name, tier: tier || "enterprise", loaded: true });
+      if (!cancelled) setBiz({ name, tier: tier || "basic", loaded: true });
     };
     loadBiz();
     return () => { cancelled = true; };
@@ -113,10 +113,30 @@ function Dashboard({ user, signOut }) {
   alerts.sort((a, b) => a.days - b.days);
 
   let body;
-  if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
+  const activeNavItem = NAV.find((n) => n.id === active);
+  if (activeLocked) {
+    const tn = navMin(active);
+    body = (
+      <div style={{ minHeight: "55vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+        <div style={{ maxWidth: 440, width: "100%", textAlign: "center", background: "var(--panel, var(--surface))", border: "0.5px solid var(--line, var(--border))", borderRadius: 16, padding: "40px 32px" }}>
+          <i className="ti ti-lock" style={{ fontSize: 44, color: "var(--brand)", marginBottom: 14, display: "block" }} />
+          <div style={{ fontSize: 21, fontWeight: 700, marginBottom: 8 }}>{activeNavItem ? activeNavItem.label : "This feature"} is a {tn.charAt(0).toUpperCase() + tn.slice(1)} feature</div>
+          <div style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>Upgrade your plan to unlock this and other tools.</div>
+          <div onClick={() => setActive("settings")} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>View plans</div>
+        </div>
+      </div>
+    );
+  }
+  else if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
   else { const P = PAGES[active]; body = <P user={user} go={setActive} />; }
 
   const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
+
+  // Tier gating — fail closed to basic if unknown.
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
+  const navMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
+  const activeLocked = !tierAllows(navMin(active));
 
   // resolved sidebar identity
   const badge = tierBadge(biz.tier);
@@ -139,11 +159,12 @@ function Dashboard({ user, signOut }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
           {(() => {
             const TIER_COL = {
-              starter:      { bg: "rgba(180,100,30,0.12)", color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
-              professional: { bg: "rgba(100,100,120,0.1)", color: "#6b7080", border: "rgba(100,100,120,0.25)" },
-              enterprise:   { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
+              basic:    { bg: "rgba(107,114,128,0.1)", color: "#6b7280", border: "rgba(107,114,128,0.25)" },
+              bronze:   { bg: "rgba(180,100,30,0.12)", color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
+              silver:   { bg: "rgba(100,100,120,0.1)", color: "#6b7080", border: "rgba(100,100,120,0.25)" },
+              gold:     { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
             };
-            const ts = TIER_COL[(biz.tier || "enterprise").toLowerCase()] || TIER_COL.enterprise;
+            const ts = TIER_COL[(biz.tier || "basic").toLowerCase()] || TIER_COL.basic;
             return (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20 }}>
                 <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
@@ -176,12 +197,14 @@ function Dashboard({ user, signOut }) {
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 0", flex: 1 }}>
           {NAV.map((n) => {
             const on = n.id === active;
+            const locked = !tierAllows(n.min);
             return (
-              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--brand-soft, rgba(79,70,229,0.1))" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)" }}
+              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--brand-soft, rgba(79,70,229,0.1))" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", opacity: locked ? 0.55 : 1 }}
                 onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "rgba(127,127,127,0.08)"; }}
                 onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", color: on ? "var(--brand)" : "var(--txt-2)" }} />
                 <span style={{ flex: 1 }}>{n.label}</span>
+                {locked && <i className="ti ti-lock" style={{ fontSize: 13, color: "var(--txt-3)" }} title={`Upgrade to ${(n.min || "").charAt(0).toUpperCase() + (n.min || "").slice(1)}`} />}
               </div>
             );
           })}
