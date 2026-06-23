@@ -5,7 +5,7 @@ import {
   loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
   updateUser, loadSettings,
 } from './lib/db.js'
-import { NAV, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
+import { NAV, TIER_ORDER, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
 import { MonthlyChart, Donut } from './components/Charts.jsx'
 import WelcomeBanner from './components/WelcomeBanner.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
@@ -177,6 +177,13 @@ function Shell() {
 
   const uid = session.user.id
 
+  // Subscription tier + gating. Fail closed to 'basic' if unknown.
+  const tier = (session.user.user_metadata?.tier || 'basic').toLowerCase()
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf(tier))
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || 'basic')
+  const navMin = (k) => { const n = NAV.find(x => x[0] === k); return n ? n[3] : 'basic' }
+  const viewLocked = !tierAllows(navMin(view))
+
   return (
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
 
@@ -186,13 +193,13 @@ function Shell() {
 
         {(() => {
           const TIER_META = {
+            basic:  { icon:'⚪', color:'#6b7280', bg:'rgba(107,114,128,0.12)', border:'rgba(107,114,128,0.25)' },
             bronze: { icon:'🥉', color:'#b36b1a', bg:'rgba(180,100,30,0.12)', border:'rgba(180,100,30,0.25)' },
             silver: { icon:'🥈', color:'#9ca3af', bg:'rgba(100,100,120,0.12)', border:'rgba(100,100,120,0.25)' },
             gold:   { icon:'👑', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.25)' },
           }
           const name = bizName || session.user.user_metadata?.business_name || session.user.email.split('@')[0]
-          const tier = (session.user.user_metadata?.tier || 'gold').toLowerCase()
-          const tm = TIER_META[tier] || TIER_META.gold
+          const tm = TIER_META[tier] || TIER_META.basic
           return (
             <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
               <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
@@ -236,14 +243,21 @@ function Shell() {
         </div>
 
         <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
-          {NAV.map(([k,label]) => (
+          {NAV.map(([k,label,,min]) => {
+            const locked = !tierAllows(min)
+            return (
             <div key={k} data-nav onClick={()=>setView(k)} style={{
               padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px',
               color: view===k ? 'var(--text)' : 'var(--text2)',
               background: view===k ? 'var(--surface3)' : 'transparent',
-              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent'
-            }}>{label}</div>
-          ))}
+              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent',
+              opacity: locked ? 0.55 : 1
+            }}>
+              <span>{label}</span>
+              {locked && <span style={{ fontSize:'12px' }} title={`Upgrade to ${min.charAt(0).toUpperCase()+min.slice(1)}`}>🔒</span>}
+            </div>
+          )})}
         </div>
         <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
         <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
@@ -277,7 +291,16 @@ function Shell() {
         </div>
 
         <div style={{ padding:'28px' }} className="fade-in">
-          {loading ? <div style={{color:'var(--text2)'}}>Loading your data…</div> : <>
+          {loading ? <div style={{color:'var(--text2)'}}>Loading your data…</div> : viewLocked ? (
+            <div style={{ minHeight:'50vh', display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center' }}>
+              <div style={{ ...card, maxWidth:'420px' }}>
+                <div style={{ fontSize:'40px', marginBottom:'10px' }}>🔒</div>
+                <div style={{ fontSize:'18px', fontWeight:800, marginBottom:'8px' }}>{NAV.find(n=>n[0]===view)[1]} is a {navMin(view).charAt(0).toUpperCase()+navMin(view).slice(1)} feature</div>
+                <div style={{ color:'var(--text2)', fontSize:'14px', marginBottom:'18px' }}>Upgrade your plan to unlock this and more.</div>
+                <button onClick={()=>setView('settings')} style={{...btnPri}}>View plans</button>
+              </div>
+            </div>
+          ) : <>
 
           {view==='dashboard' && <>
             <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} />
