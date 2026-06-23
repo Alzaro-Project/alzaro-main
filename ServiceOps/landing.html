@@ -151,13 +151,15 @@
     .tl-item h3{font-size:16.5px;font-weight:600;margin-bottom:7px}
     .tl-item p{font-size:14px;color:var(--text2);line-height:1.75;max-width:560px}
 
-    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch}
+    @media(max-width:1000px){.plans{grid-template-columns:repeat(2,1fr)}}
     .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
     .plan:hover{transform:translateY(-3px)}
     .plan.popular{border-color:rgba(34,197,94,0.45);background:linear-gradient(180deg,rgba(34,197,94,0.06),var(--surface) 40%)}
     .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--green);color:#04130a;border-radius:5px;padding:4px 12px}
     .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
     .tier-dot{width:9px;height:9px;border-radius:50%}
+    .basic .tier-dot{background:#6b7280}
     .bronze .tier-dot{background:#cd7f32}
     .silver .tier-dot{background:#c0c0c0}
     .gold .tier-dot{background:var(--amber)}
@@ -388,45 +390,57 @@
       <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time.</p>
     </div>
     <div class="plans">
-      <div class="plan bronze reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
-        <div class="plan-price"><b>£60</b><span>/month</span></div>
+      <div class="plan basic reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Basic</div>
+        <div class="plan-price"><b>£12.99</b><span>/month</span></div>
         <p class="plan-desc"></p>
         <ul>
-          <li>30 quotes/month</li>
-          <li>Unlimited invoices</li>
+          <li>Quotes &amp; invoices</li>
           <li>Customer database</li>
-          <li>Basic scheduling</li>
-          <li class="off">Team access</li>
-          <li class="off">VAT reports</li>
+          <li>Properties &amp; jobs</li>
+          <li class="off">Diary &amp; scheduling</li>
+          <li class="off">Reports</li>
+          <li class="off">Certificates &amp; documents</li>
+        </ul>
+        <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
+      </div>
+      <div class="plan bronze reveal">
+        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
+        <div class="plan-price"><b>£18.99</b><span>/month</span></div>
+        <p class="plan-desc"></p>
+        <ul>
+          <li>Everything in Basic</li>
+          <li>Customer follow-ups</li>
+          <li>Automated reminders</li>
+          <li class="off">Diary &amp; scheduling</li>
+          <li class="off">Reports</li>
+          <li class="off">Certificates &amp; documents</li>
         </ul>
         <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
       </div>
       <div class="plan silver popular reveal">
         <div class="plan-flag">Most popular</div>
         <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
-        <div class="plan-price"><b>£75</b><span>/month</span></div>
+        <div class="plan-price"><b>£28.99</b><span>/month</span></div>
         <p class="plan-desc"></p>
         <ul>
-          <li>Unlimited quotes</li>
-          <li>Team scheduling</li>
-          <li>Online payments</li>
+          <li>Everything in Bronze</li>
+          <li>Diary &amp; team scheduling</li>
+          <li>Reports &amp; insights</li>
           <li>Materials library</li>
-          <li>Basic reports</li>
-          <li>2 users</li>
+          <li class="off">Certificates &amp; documents</li>
         </ul>
         <a href="/serviceops/register" class="btn btn-green">Start free trial</a>
       </div>
       <div class="plan gold reveal">
         <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
-        <div class="plan-price"><b>£90</b><span>/month</span></div>
+        <div class="plan-price"><b>£39.99</b><span>/month</span></div>
         <p class="plan-desc"></p>
         <ul>
           <li>Everything in Silver</li>
-          <li>Full business reports</li>
-          <li>VAT tracking &amp; export</li>
-          <li>Custom branding</li>
-          <li>Unlimited users</li>
+          <li>Certificate vault</li>
+          <li>Document store</li>
+          <li>Advanced reporting &amp; export</li>
           <li>Priority support</li>
         </ul>
         <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
@@ -600,9 +614,10 @@
           
           <h3>Pricing</h3>
           <ul>
-            <li><strong>Bronze:</strong> £60/month</li>
-            <li><strong>Silver:</strong> £75/month</li>
-            <li><strong>Gold:</strong> £90/month</li>
+            <li><strong>Basic:</strong> £12.99/month</li>
+            <li><strong>Bronze:</strong> £18.99/month</li>
+            <li><strong>Silver:</strong> £28.99/month</li>
+            <li><strong>Gold:</strong> £39.99/month</li>
           </ul>
           
           <h3>Billing</h3>
