@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard } from '../components/UI'
 import { getAllGarages, updateGarageTier, updateGarageStatus, deleteGarage } from '../lib/db'
 
-const TIER_PRICE = { bronze: 60, silver: 75, gold: 90 }
+const TIER_PRICE = { basic: 12.99, bronze: 18.99, silver: 28.99, gold: 39.99 }
 
 export default function Admin() {
   const { isAdmin } = useStore()
@@ -128,7 +128,7 @@ export default function Admin() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '18px' }}>
         <StatCard label="Total Garages" value={garages.length} delta={`${trialGarages.length} on trial`} color="var(--accent)" />
-        <StatCard label="Monthly Revenue" value={`£${mrr.toLocaleString()}`} delta="MRR from active" color="var(--green)" />
+        <StatCard label="Monthly Revenue" value={`£${mrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} delta="MRR from active" color="var(--green)" />
         <StatCard label="Active Subscriptions" value={activeGarages.length} delta={`${suspendedGarages.length} suspended`} color="var(--blue)" />
         <StatCard label="Trials Expiring Soon" value={expiringTrials} delta="need follow-up" color={expiringTrials > 0 ? 'var(--red)' : 'var(--green)'} />
       </div>
@@ -137,15 +137,15 @@ export default function Admin() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '18px' }}>
         <Card>
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace', marginBottom: '14px' }}>Tier Breakdown</div>
-          {['bronze', 'silver', 'gold'].map(t => {
+          {['basic', 'bronze', 'silver', 'gold'].map(t => {
             const pct = garages.length ? Math.round(tierCounts[t] / garages.length * 100) : 0
-            const col = t === 'bronze' ? '#cd7f32' : t === 'silver' ? '#c0c0c0' : 'var(--accent)'
+            const col = t === 'basic' ? '#6b7280' : t === 'bronze' ? '#cd7f32' : t === 'silver' ? '#c0c0c0' : 'var(--accent)'
             const revenue = tierCounts[t] * TIER_PRICE[t]
             return (
               <div key={t} style={{ marginBottom: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px' }}>
-                  <span style={{ fontWeight: 600 }}>{t === 'bronze' ? '🥉' : t === 'silver' ? '🥈' : '🥇'} {t.charAt(0).toUpperCase() + t.slice(1)}</span>
-                  <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{tierCounts[t]} · £{revenue}/mo</span>
+                  <span style={{ fontWeight: 600 }}>{t === 'basic' ? '⚪' : t === 'bronze' ? '🥉' : t === 'silver' ? '🥈' : '🥇'} {t.charAt(0).toUpperCase() + t.slice(1)}</span>
+                  <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{tierCounts[t]} · £{revenue.toFixed(2)}/mo</span>
                 </div>
                 <div style={{ height: '5px', background: 'var(--surface3)', borderRadius: '3px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', background: col, borderRadius: '3px', width: `${pct}%`, transition: 'width .3s' }} />
@@ -156,7 +156,7 @@ export default function Admin() {
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600 }}>
               <span>Total MRR</span>
-              <span style={{ color: 'var(--green)', fontFamily: 'DM Mono, monospace' }}>£{mrr}/mo</span>
+              <span style={{ color: 'var(--green)', fontFamily: 'DM Mono, monospace' }}>£{mrr.toFixed(2)}/mo</span>
             </div>
           </div>
         </Card>
