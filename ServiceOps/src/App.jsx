@@ -42,18 +42,19 @@ function Dashboard({ user, signOut }) {
     return () => { cancelled = true; };
   }, [user]);
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "Your Business")) : "…";
-  const tierLabel = (biz.tier || "BRONZE").toUpperCase();
+  const tierLabel = (biz.tier || "BASIC").toUpperCase();
   const TIER_COL = {
+    basic:    { bg: "rgba(107,114,128,0.1)", color: "#6b7280", border: "rgba(107,114,128,0.25)" },
     bronze:   { bg: "rgba(180,100,30,0.12)",  color: "#b36b1a", border: "rgba(180,100,30,0.25)" },
     silver:   { bg: "rgba(100,100,120,0.1)",  color: "#6b7080", border: "rgba(100,100,120,0.25)" },
     gold:     { bg: "rgba(79,70,229,0.1)",    color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
   };
-  const tierStyle = TIER_COL[(biz.tier || "").toLowerCase()] || TIER_COL.bronze;
+  const tierStyle = TIER_COL[(biz.tier || "").toLowerCase()] || TIER_COL.basic;
 
   // Tier gating: a nav item is allowed if the user's tier >= the item's min.
   // Empty/unknown tier fails closed to bronze (locked down, not unlocked).
-  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "bronze").toLowerCase()));
-  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "bronze");
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
 
   // keep the URL in sync: handle back/forward, and tidy /login → /dashboard on entry
   useEffect(() => {
