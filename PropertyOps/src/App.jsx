@@ -112,6 +112,12 @@ function Dashboard({ user, signOut }) {
   }
   alerts.sort((a, b) => a.days - b.days);
 
+  // Tier gating — fail closed to basic if unknown.
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
+  const navMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
+  const activeLocked = !tierAllows(navMin(active));
+
   let body;
   const activeNavItem = NAV.find((n) => n.id === active);
   if (activeLocked) {
@@ -131,12 +137,6 @@ function Dashboard({ user, signOut }) {
   else { const P = PAGES[active]; body = <P user={user} go={setActive} />; }
 
   const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
-
-  // Tier gating — fail closed to basic if unknown.
-  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
-  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
-  const navMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
-  const activeLocked = !tierAllows(navMin(active));
 
   // resolved sidebar identity
   const badge = tierBadge(biz.tier);
