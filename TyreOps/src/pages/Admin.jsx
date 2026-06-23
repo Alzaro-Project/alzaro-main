@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn, StatCard } from '../components/UI'
 import { getAllGarages, updateGarageTier, updateGarageStatus, deleteGarage } from '../lib/db'
 
-const TIER_PRICE = { basic: 40, bronze: 60, silver: 75, gold: 90 }
+const TIER_PRICE = { basic: 12.99, bronze: 18.99, silver: 28.99, gold: 39.99 }
 
 export default function Admin() {
   const { isAdmin } = useStore()
