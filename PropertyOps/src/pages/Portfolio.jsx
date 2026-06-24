@@ -392,7 +392,8 @@ export function TenantsPage({ user, go }) {
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
   const properties = usePropertyList();
-  const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending" };  const [form, setForm] = useState(blank);
+  const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending" };  
+  const [form, setForm] = useState(blank);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -414,7 +415,8 @@ export function TenantsPage({ user, go }) {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };    if (!payload.tenancy_end) delete payload.tenancy_end;
+    const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };    
+    if (!payload.tenancy_end) delete payload.tenancy_end;
     if (!payload.tenancy_start) delete payload.tenancy_start;
     let error;
     if (editId) {
