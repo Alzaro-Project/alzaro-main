@@ -274,6 +274,8 @@ export function FinancePage({ user, go }) {
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
   const [filter, setFilter] = useState("All");
+  const [fullProps, setFullProps] = useState([]);
+  const [raising, setRaising] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -282,6 +284,7 @@ export function FinancePage({ user, go }) {
     Promise.all([
       db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"),
     ]).then(([t, c, m]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [] }));
+    db.from("prop_properties").select("*").then(({ data }) => setFullProps(data || []));
   }, []);
 
   const refresh = async () => {
@@ -309,12 +312,55 @@ export function FinancePage({ user, go }) {
 
   const markReceived = async (p) => { if (p.id && DB_READY) { await db.from("prop_payments").update({ status: "Paid" }).eq("id", p.id); refresh(); } };
 
+  // Build forward projection of rent invoices from Let properties' rent + invoice_day
+  const buildProjection = () => {
+    const out = [];
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    // months already raised, keyed property_id + YYYY-MM
+    const raised = new Set((rows || []).map((r) => `${r.property_id}|${(r.due_date || "").slice(0, 7)}`));
+    fullProps.filter((p) => p.status === "Let" && p.rent && p.invoice_day).forEach((p) => {
+      const day = Math.min(28, Math.max(1, +p.invoice_day));
+      for (let m = 0; m < 12; m++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + m, day);
+        if (d < now) continue;
+        const key = `${p.id}|${ym(d)}`;
+        if (raised.has(key)) continue;
+        const tenant = related.tenants.find((t) => String(t.property_id) === String(p.id));
+        out.push({
+          property_id: p.id,
+          property: p.address,
+          tenant: tenant ? tenant.name : "",
+          tenant_email: tenant ? tenant.email : "",
+          amount: p.rent,
+          due_date: d.toISOString().slice(0, 10),
+          month: ym(d),
+        });
+      }
+    });
+    return out.sort((a, b) => a.due_date.localeCompare(b.due_date));
+  };
+
+  const raiseInvoice = async (proj) => {
+    if (!DB_READY) return;
+    setRaising(proj.property_id + proj.month);
+    const invoiceNo = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const { error } = await db.from("prop_payments").insert([{
+      tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
+      amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
+      status: "sent", user_id: user.id,
+    }]);
+    setRaising(null);
+    if (error) { setErr(error.message); return; }
+    refresh();
+  };
+
   const remove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
 
-  const data = rows || [];
+const data = rows || [];
   const collected = data.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
   const overdue = data.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const pending = data.filter((p) => p.status === "Pending").reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = data.filter((p) => p.status === "Pending" || p.status === "sent").reduce((s, p) => s + (p.amount || 0), 0);
   const expected = collected + overdue + pending;
   const rate = expected ? Math.round((collected / expected) * 100) : 0;
   const paidCount = data.filter((p) => p.status === "Paid").length;
@@ -363,14 +409,33 @@ export function FinancePage({ user, go }) {
         </div>
       )}
 
-      {/* Filter tabs */}
-      {rows && data.length > 0 && (
+     {/* Filter tabs */}
+      {rows && (
         <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-          {["All", "Pending", "Paid", "Overdue"].map((f) => (
+          {["All", "Pending", "Paid", "Overdue", "Future"].map((f) => (
             <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
           ))}
         </div>
       )}
+
+      {/* FUTURE — projected recurring invoices, not yet raised */}
+      {filter === "Future" && (() => {
+        const proj = buildProjection();
+        if (proj.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No upcoming invoices. Set a rent and invoice day on your Let properties to project recurring invoices here.</div>;
+        return (
+          <Table cols={["Property", "Tenant", "Amount", "Invoice date", ""]}>
+            {proj.map((r, i) => (
+              <tr key={i}>
+                <Td><span style={{ fontWeight: 500 }}>{r.property}</span></Td>
+                <Td color="var(--txt-2)">{r.tenant || "—"}</Td>
+                <Td>{gbp(r.amount)}</Td>
+                <Td color="var(--txt-2)">{r.due_date}</Td>
+                <Td>{DB_READY ? <span onClick={() => raiseInvoice(r)}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
+              </tr>
+            ))}
+          </Table>
+        );
+      })()}
 
       <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger</div>
       {rows === null ? (
