@@ -31,10 +31,10 @@ if (typeof document !== "undefined" && !document.getElementById("propops-mobile-
 export const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", min: "basic" },
   { id: "properties", label: "Properties", icon: "ti-building-estate", min: "basic" },
-  { id: "compliance", label: "Compliance", icon: "ti-shield-check", min: "silver" },
   { id: "tenants", label: "Tenants", icon: "ti-users", min: "basic" },
-  { id: "maintenance", label: "Maintenance", icon: "ti-tools", min: "bronze" },
   { id: "finance", label: "Finance", icon: "ti-coin", min: "gold" },
+  { id: "maintenance", label: "Maintenance", icon: "ti-tools", min: "bronze" },
+  { id: "compliance", label: "Compliance", icon: "ti-shield-check", min: "silver" },
   { id: "documents", label: "Documents", icon: "ti-folder", min: "gold" },
   { id: "reports", label: "Reports", icon: "ti-chart-bar", min: "silver" },
   { id: "settings", label: "Settings", icon: "ti-settings", min: "basic" },
