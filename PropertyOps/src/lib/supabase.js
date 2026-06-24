@@ -9,7 +9,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storageKey: "alzaro-propertyops-auth" },
+  auth: { storageKey: "alzaro-propertyops-auth", persistSession: false },
   global: { headers: { "x-product": "propertyops" } },
 });
 
