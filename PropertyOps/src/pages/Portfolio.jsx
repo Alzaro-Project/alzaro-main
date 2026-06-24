@@ -113,7 +113,7 @@ export function PropertiesPage({ user, go }) {
   const [editId, setEditId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [], pays: [] });
-  const blank = { address: "", area: "", type: "House", status: "Let", rent: "" };
+  const blank = { address: "", area: "", type: "House", status: "Let", rent: "", invoice_day: "" };
   const [form, setForm] = useState(blank);
 
   React.useEffect(() => {
@@ -135,13 +135,12 @@ export function PropertiesPage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "" }); setEditId(p.id); setAdding(true); setErr(""); };
-
+  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "", invoice_day: p.invoice_day || "" }); setEditId(p.id); setAdding(true); setErr(""); };
   const save = async () => {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
     setErr("");
-    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, invoice_day: form.invoice_day === "" ? null : Math.min(28, Math.max(1, +form.invoice_day)) };
     let error;
     if (editId) {
       ({ error } = await db.from("prop_properties").update(payload).eq("id", editId));
@@ -173,8 +172,9 @@ export function PropertiesPage({ user, go }) {
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
-          </div>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Invoice day (1–28)<input style={inp} type="number" min="1" max="28" placeholder="e.g. 1" value={form.invoice_day} onChange={(e) => setForm({ ...form, invoice_day: e.target.value })} /><span style={{ fontSize: 9.5, color: "var(--txt-3)" }}>Day each month rent is invoiced</span></label>
+            </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update property" : "Save property"} primary /></span></div>
         </div>
       )}
