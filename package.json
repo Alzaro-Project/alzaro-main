@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "nodemailer": "^6.9.16",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "stripe": "^22.3.0"
   }
 }
