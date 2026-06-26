@@ -641,7 +641,7 @@ function SettingsPage({ user }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
-  const [currentTier, setCurrentTier] = useState("bronze");
+  const [currentTier, setCurrentTier] = useState("basic");
   const [memberId, setMemberId] = useState(null);
   const [changingTier, setChangingTier] = useState(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -650,11 +650,11 @@ function SettingsPage({ user }) {
     if (!DB_READY || !user) return;
     // Load the product_members row: its `id` is the webhook's PATCH key, and
     // tier/plan is the source of truth for the current plan.
-    db.from("product_members").select("id,tier,plan").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
+    db.from("product_members").select("id,tier").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
       .then(({ data }) => {
         if (data?.id) setMemberId(data.id);
         const t = (data && (data.tier || data.plan) || "bronze").toLowerCase();
-        setCurrentTier(["bronze", "silver", "gold"].includes(t) ? t : "bronze");
+        setCurrentTier(["basic", "bronze", "silver", "gold"].includes(t) ? t : "basic");
       })
       .catch(() => {});
   }, [user]);
@@ -835,6 +835,7 @@ function SettingsPage({ user }) {
   };
 
   const tiers = [
+    { name: "Basic", key: "basic", price: 12.99, sub: "per month", best: "Getting started", features: ["Customers & properties", "Quotes & invoices", "Email support", "1 user"] },
     { name: "Bronze", key: "bronze", price: 18.99, sub: "per month", best: "Solo traders", features: ["Customers & properties", "Quotes & invoices", "Jobs management", "Email support"] },
     { name: "Silver", key: "silver", price: 28.99, sub: "per month", best: "Growing firms", features: ["Everything in Bronze", "Engineer scheduling & diary", "Reports & insights", "Automated reminders", "Priority support"] },
     { name: "Gold", key: "gold", price: 39.99, sub: "per month", best: "Full operation", features: ["Everything in Silver", "Certificate vault", "Document store", "Advanced reporting & export", "Dedicated support"] },
@@ -1046,7 +1047,7 @@ function SettingsPage({ user }) {
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 12 }}>
             {tiers.map((t) => {
               const isCurrent = t.key === currentTier;
               return (
