@@ -808,15 +808,84 @@ export default function Settings() {
 function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
   const settings = useStore(s => s.settings)
   const trialEnds = useStore(s => s.trialEnds)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const user = useStore(s => s.user)
+  const garageId = useStore(s => s.garageId)
+  const loadData = useStore(s => s.loadData)
   const [showInvoicesModal, setShowInvoicesModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [changingTier, setChangingTier] = useState(null)
+  const [portalLoading, setPortalLoading] = useState(false)
 
+  // Returning from Stripe Checkout? The webhook updates the row server-side;
+  // refresh local state so the new tier/status shows, then tidy the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('billing') === 'success' && user?.email) {
+      loadData(user.email)
+    }
+    if (params.get('billing')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [user?.email, loadData])
+
+  // Get the current Supabase access token for authenticating API calls.
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+    }
+  }
+
+  // Start a real Stripe Checkout for the chosen tier, then redirect to it.
   const handleTierChange = async (newTier) => {
+    if (!garageId || !user?.email) {
+      alert('Your account is still loading — please try again in a moment.')
+      return
+    }
     setChangingTier(newTier)
-    await setTier(newTier)
-    setChangingTier(null)
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          email: user.email,
+          garageId,
+          product: 'tyreops',
+          tier: newTier,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout')
+      // Redirect to Stripe Checkout (no need to clear changingTier — we leave).
+      window.location.href = data.url
+    } catch (err) {
+      alert(err.message || 'Could not start checkout')
+      setChangingTier(null)
+    }
+  }
+
+  // Open the Stripe Billing Portal so the customer can update payment details
+  // or cancel. Used by "Manage subscription", "Update Payment" and "Cancel".
+  const openPortal = async () => {
+    if (!garageId) {
+      alert('Your account is still loading — please try again in a moment.')
+      return
+    }
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ garageId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not open billing portal')
+      window.location.href = data.url
+    } catch (err) {
+      alert(err.message || 'Could not open billing portal')
+      setPortalLoading(false)
+    }
   }
 
   // Build billing history from real subscription data.
@@ -1098,7 +1167,10 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Btn variant="secondary" onClick={() => setShowPaymentModal(true)}>Update Payment</Btn>
+          <Btn variant="primary" onClick={openPortal} disabled={portalLoading}>
+            {portalLoading ? 'Opening…' : 'Manage Subscription'}
+          </Btn>
+          <Btn variant="secondary" onClick={openPortal} disabled={portalLoading}>Update Payment</Btn>
           <Btn variant="ghost" onClick={() => setShowInvoicesModal(true)}>View Invoices</Btn>
         </div>
       </Card>
@@ -1117,50 +1189,6 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
           <Btn variant="danger" onClick={() => setShowCancelModal(true)}>Cancel Plan</Btn>
         </div>
       </Card>
-
-      {/* Update Payment Modal */}
-      {showPaymentModal && (
-        <Modal title="Update Payment Method" onClose={() => setShowPaymentModal(false)}>
-          <div style={{ marginBottom: '16px' }}>
-            <p style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '16px' }}>
-              Update your payment details securely. This will be used for future billing.
-            </p>
-            
-            <div style={{ background: 'var(--surface2)', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>Current Card</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '20px' }}>💳</span>
-                <div>
-                  <div style={{ fontFamily: 'DM Mono, monospace', fontWeight: 600 }}>Visa •••• 4242</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Expires 12/2027</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ 
-              background: 'rgba(96,165,250,0.1)', 
-              border: '1px solid rgba(96,165,250,0.2)', 
-              borderRadius: '8px', 
-              padding: '14px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '13px', color: 'var(--blue)', marginBottom: '8px' }}>
-                🔒 Secure Payment via Stripe
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text3)' }}>
-                In production, this opens Stripe's secure payment form
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <Btn variant="secondary" onClick={() => setShowPaymentModal(false)}>Cancel</Btn>
-            <Btn variant="primary" onClick={() => { alert('In production, this would open Stripe checkout'); setShowPaymentModal(false) }}>
-              Update Card
-            </Btn>
-          </div>
-        </Modal>
-      )}
 
       {/* View Invoices Modal */}
       {showInvoicesModal && (
@@ -1274,17 +1302,14 @@ function SubscriptionTab({ tier, setTier, TIERS, sectionTitle }) {
             </div>
 
             <div style={{ fontSize: '13px', color: 'var(--text2)' }}>
-              Your current plan will end on <strong>1st April 2026</strong>
+              You'll be taken to the secure Stripe billing portal to confirm cancellation.
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <Btn variant="secondary" onClick={() => setShowCancelModal(false)}>Keep Subscription</Btn>
-            <Btn variant="danger" onClick={() => { 
-              alert('Subscription cancelled. In production, this would process via Stripe.'); 
-              setShowCancelModal(false) 
-            }}>
-              Yes, Cancel
+            <Btn variant="danger" disabled={portalLoading} onClick={() => { setShowCancelModal(false); openPortal() }}>
+              {portalLoading ? 'Opening…' : 'Continue to Cancel'}
             </Btn>
           </div>
         </Modal>
