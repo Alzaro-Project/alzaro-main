@@ -8,6 +8,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // that share the same Supabase project.
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { storageKey: 'alzaro-soloops-auth' },
+  // product_members RLS keys off this header (same as the other verticals).
+  global: { headers: { 'x-product': 'soloops' } },
 })
 
 // Some legacy/co-located code still references window.sb — keep it available.

@@ -34,7 +34,8 @@ export const BILLING = {
   garageops:   { ...STANDARD_TIERS },
   serviceops:  { ...STANDARD_TIERS },
   propertyops: { ...STANDARD_TIERS },
-  // soloops / stockops: not on product_members billing yet.
+  soloops:     { ...STANDARD_TIERS },
+  // stockops: not on product_members billing yet.
 }
 
 // Resolve a Stripe Price ID for (product, tier).

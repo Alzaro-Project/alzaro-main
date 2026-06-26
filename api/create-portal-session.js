@@ -31,7 +31,7 @@ function appBaseUrl() {
 
 // Allow only known vertical route prefixes so the return_url can't be steered
 // to an arbitrary path. Falls back to tyreops.
-const KNOWN_PRODUCTS = ['tyreops', 'garageops', 'serviceops', 'propertyops']
+const KNOWN_PRODUCTS = ['tyreops', 'garageops', 'serviceops', 'propertyops', 'soloops']
 function settingsPathFor(product) {
   const p = KNOWN_PRODUCTS.includes(product) ? product : 'tyreops'
   return `/${p}/settings`
