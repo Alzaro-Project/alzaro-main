@@ -784,25 +784,21 @@ export function SettingsPage({ user }) {
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
   const [memberId, setMemberId] = useState(null);
-  const [currentPlan, setCurrentPlan] = useState(null); // display name, derived from product_members (source of truth)
+  const [currentTier, setCurrentTier] = useState("basic"); // billing key, from product_members (source of truth)
   const [changingTier, setChangingTier] = useState(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
-  // PropertyOps shows its plans as Starter/Professional/Enterprise, but billing
-  // is standardised on bronze/silver/gold keys (api/_billing-config.js + the
-  // webhook write product_members.tier using those keys). Map between the two.
-  const NAME_TO_KEY = { Starter: "bronze", Professional: "silver", Enterprise: "gold" };
-  const KEY_TO_NAME = { basic: "Starter", bronze: "Starter", silver: "Professional", gold: "Enterprise" };
-
   // product_members is the source of truth for the paid tier (kept in sync by
   // the Stripe webhook). Load the row id (the webhook's PATCH key) + tier.
+  // PropertyOps uses the same standardised tier keys as the other verticals
+  // (basic/bronze/silver/gold), so the key goes straight to checkout.
   useEffect(() => {
     if (!DB_READY || !user) return;
     db.from("product_members").select("id,tier,plan").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
       .then(({ data }) => {
         if (data?.id) setMemberId(data.id);
-        const key = (data && (data.tier || data.plan) || "").toLowerCase();
-        setCurrentPlan(KEY_TO_NAME[key] || null);
+        const key = (data && (data.tier || data.plan) || "basic").toLowerCase();
+        setCurrentTier(["basic", "bronze", "silver", "gold"].includes(key) ? key : "basic");
       })
       .catch(() => {});
   }, [user]);
@@ -828,13 +824,12 @@ export function SettingsPage({ user }) {
   // Start a real Stripe Checkout for the chosen plan, then redirect to it.
   // `garageId` carries the product_members row id (the webhook's PATCH key);
   // `tier` is the standardised billing key.
-  const startCheckout = async (tierName) => {
-    const tierKey = NAME_TO_KEY[tierName];
+  const startCheckout = async (tierKey) => {
     if (!memberId || !user?.email || !tierKey) {
       alert("Your account is still loading — please try again in a moment.");
       return;
     }
-    setChangingTier(tierName);
+    setChangingTier(tierKey);
     try {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
@@ -986,10 +981,14 @@ export function SettingsPage({ user }) {
     }
   };
 
+  // Standardised four-tier plan, consistent with the other verticals. Prices
+  // match the shared Stripe prices (api/_billing-config.js): the tier key is
+  // sent straight to checkout.
   const tiers = [
-    { name: "Starter", price: 35, sub: "per month", best: "Up to 5 properties", features: ["Up to 5 properties", "Compliance tracking", "Tenant & rent records", "Document vault", "Email support"] },
-    { name: "Professional", price: 65, sub: "per month", best: "Up to 25 properties", features: ["Everything in Starter", "Up to 25 properties", "Automated reminders", "Custom reports & exports", "Priority support"] },
-    { name: "Enterprise", price: 120, sub: "per month", best: "Unlimited", features: ["Everything in Professional", "Unlimited properties", "Team roles & permissions", "API & integrations", "Dedicated account manager"] },
+    { key: "basic",  name: "Basic",  icon: "⚪", price: 12.99, sub: "per month", best: "Getting started",     features: ["Up to 5 properties", "Compliance tracking", "Tenant & rent records", "Document vault", "1 user"] },
+    { key: "bronze", name: "Bronze", icon: "🥉", price: 18.99, sub: "per month", best: "Small portfolios",     features: ["Up to 15 properties", "Compliance tracking", "Tenant & rent records", "Maintenance log", "1 user"] },
+    { key: "silver", name: "Silver", icon: "🥈", price: 28.99, sub: "per month", best: "Growing portfolios",   features: ["Unlimited properties", "Automated reminders", "Custom reports & export", "Finance tracking", "2 users"] },
+    { key: "gold",   name: "Gold",   icon: "🥇", price: 39.99, sub: "per month", best: "Full operation",       features: ["Everything in Silver", "Team roles & permissions", "Advanced reporting & export", "Priority support", "Unlimited users"] },
   ];
 
   const inp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
@@ -1031,7 +1030,7 @@ export function SettingsPage({ user }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <label style={fld}>Company name<input style={inp} placeholder="e.g. Alzaro Property Co." value={org.company_name} onChange={(e) => setOrg({ ...org, company_name: e.target.value })} /></label>
                 <label style={fld}>VAT number<input style={inp} placeholder="e.g. GB 123 4567 89" value={org.vat_number} onChange={(e) => setOrg({ ...org, vat_number: e.target.value })} /></label>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{currentPlan}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{(tiers.find((t) => t.key === currentTier) || {}).name || "Basic"}</span></div>
                 {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
@@ -1048,7 +1047,7 @@ export function SettingsPage({ user }) {
                 <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] && r[1] !== "Coming soon" ? ` · ${r[1]}` : ""}{r[1] === "Coming soon" ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
               </div>
             ))}
-            <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Enterprise plan.</div>
+            <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Silver and Gold plans.</div>
           </div>
         </div>
       )}
@@ -1206,13 +1205,13 @@ export function SettingsPage({ user }) {
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 12 }}>
             {tiers.map((t) => {
-              const isCurrent = t.name === currentPlan;
+              const isCurrent = t.key === currentTier;
               return (
-                <div key={t.name} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
+                <div key={t.key} style={{ background: "var(--panel-2)", border: isCurrent ? "1.5px solid var(--brand)" : "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "18px 18px", position: "relative" }}>
                   {isCurrent && <span style={{ position: "absolute", top: 14, right: 14, fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--brand)", padding: "3px 9px", borderRadius: 6 }}>CURRENT</span>}
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.icon} {t.name}</div>
                   <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
                   <div style={{ marginBottom: 14 }}><span style={{ fontSize: 26, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /{t.sub.replace("per ", "")}</span></div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
@@ -1225,7 +1224,7 @@ export function SettingsPage({ user }) {
                   {isCurrent ? (
                     <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
                   ) : (
-                    <div onClick={() => { if (!changingTier) startCheckout(t.name); }} style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: changingTier ? "default" : "pointer", opacity: changingTier && changingTier !== t.name ? 0.6 : 1 }}>{changingTier === t.name ? "Starting checkout…" : `${t.price > ((tiers.find((x) => x.name === currentPlan) || {}).price || 0) ? "Upgrade" : "Switch"} to ${t.name}`}</div>
+                    <div onClick={() => { if (!changingTier) startCheckout(t.key); }} style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: changingTier ? "default" : "pointer", opacity: changingTier && changingTier !== t.key ? 0.6 : 1 }}>{changingTier === t.key ? "Starting checkout…" : `${t.price > ((tiers.find((x) => x.key === currentTier) || {}).price || 0) ? "Upgrade" : "Switch"} to ${t.name}`}</div>
                   )}
                 </div>
               );
