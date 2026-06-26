@@ -794,7 +794,7 @@ export function SettingsPage({ user }) {
   // (basic/bronze/silver/gold), so the key goes straight to checkout.
   useEffect(() => {
     if (!DB_READY || !user) return;
-    db.from("product_members").select("id,tier,plan").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
+    db.from("product_members").select("id,tier").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
       .then(({ data }) => {
         if (data?.id) setMemberId(data.id);
         const key = (data && (data.tier || data.plan) || "basic").toLowerCase();
