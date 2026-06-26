@@ -41,19 +41,20 @@ function Dashboard({ user, signOut }) {
     let cancelled = false;
     const loadBiz = async () => {
       let name = "", tier = "";
-      // 1) prop_settings (most likely to be user-corrected)
+      // 1) product_members is the SOURCE OF TRUTH for tier (kept in sync by the
+      // Stripe webhook). Read it FIRST so a paid tier can't be overridden by the
+      // prop_settings / user_metadata fallbacks below. select * so a missing
+      // tier/plan column can't throw and swallow the company_name.
+      try {
+        const { data: m } = await db.from("product_members").select("*").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
+        if (m) { name = m.company_name || name; tier = m.tier || m.plan || tier; }
+      } catch (e) {}
+      // 2) prop_settings — company_name here is user-corrected, so let it win for
+      // the name; tier only falls back here if product_members had none.
       try {
         const { data: s } = await db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle();
-        if (s) { name = s.company_name || name; tier = s.tier || s.plan || tier; }
+        if (s) { name = s.company_name || name; if (!tier) tier = s.tier || s.plan || ""; }
       } catch (e) {}
-      // 2) product_members (set at signup / join) — select * so a missing
-      // tier/plan column can't throw and swallow the company_name.
-      if (!name || !tier) {
-        try {
-          const { data: m } = await db.from("product_members").select("*").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
-          if (m) { name = name || m.company_name || ""; tier = tier || m.tier || m.plan || ""; }
-        } catch (e) {}
-      }
       // 3) auth metadata (always set at signup)
       if (!name) name = user.user_metadata?.company_name || "";
       // 4) last resort — email prefix

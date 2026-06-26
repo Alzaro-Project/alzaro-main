@@ -570,16 +570,82 @@ export default function Settings() {
 // ============================================================
 // SUBSCRIPTION TAB
 // ============================================================
-function SubscriptionTab({ tier, setTier }) {
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
+function SubscriptionTab({ tier }) {
+  const user = useStore(s => s.user)
+  const garageId = useStore(s => s.garageId)
+  const reloadData = useStore(s => s.reloadData)
   const [showInvoicesModal, setShowInvoicesModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [changingTier, setChangingTier] = useState(null)
+  const [portalLoading, setPortalLoading] = useState(false)
 
+  // Returning from Stripe Checkout? The webhook updates the product_members row
+  // server-side; refresh local state so the new tier/status shows, then tidy URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('billing') === 'success') reloadData()
+    if (params.get('billing')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [reloadData])
+
+  // Current Supabase access token for authenticating API calls.
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+    }
+  }
+
+  // Start a real Stripe Checkout for the chosen tier, then redirect to it.
+  // garageId is the product_members row id — the webhook's PATCH key.
   const handleTierChange = async (newTier) => {
+    if (!garageId || !user?.email) {
+      alert('Your account is still loading — please try again in a moment.')
+      return
+    }
     setChangingTier(newTier)
-    await setTier(newTier)
-    setChangingTier(null)
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          email: user.email,
+          garageId,
+          product: 'garageops',
+          tier: newTier,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout')
+      window.location.href = data.url
+    } catch (err) {
+      alert(err.message || 'Could not start checkout')
+      setChangingTier(null)
+    }
+  }
+
+  // Open the Stripe Billing Portal to update payment details or cancel.
+  const openPortal = async () => {
+    if (!garageId) {
+      alert('Your account is still loading — please try again in a moment.')
+      return
+    }
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ garageId, product: 'garageops' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not open billing portal')
+      window.location.href = data.url
+    } catch (err) {
+      alert(err.message || 'Could not open billing portal')
+      setPortalLoading(false)
+    }
   }
 
   // Placeholder billing history until Stripe is wired up
@@ -654,7 +720,9 @@ function SubscriptionTab({ tier, setTier }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button style={ghostBtn} onClick={() => setShowPaymentModal(true)}>Update payment</button>
+          <button style={{ ...ghostBtn, opacity: portalLoading ? 0.6 : 1 }} onClick={openPortal} disabled={portalLoading}>
+            {portalLoading ? 'Opening…' : 'Manage subscription'}
+          </button>
           <button style={{ ...ghostBtn, background: 'transparent', border: 'none', color: T.text2 }} onClick={() => setShowInvoicesModal(true)}>View invoices</button>
         </div>
       </Panel>
@@ -672,20 +740,6 @@ function SubscriptionTab({ tier, setTier }) {
       </Panel>
 
       {/* Modals */}
-      {showPaymentModal && (
-        <Modal title="Update payment method" onClose={() => setShowPaymentModal(false)}>
-          <p style={{ fontSize: '13px', color: T.text2, marginBottom: '16px' }}>
-            To change how you pay for your Alzaro GarageOps subscription, contact us and we'll sort it the same day.
-          </p>
-          <div style={{ background: T.surface2, borderRadius: '8px', padding: '16px', marginBottom: '16px', fontSize: '13px' }}>
-            📧 <a href="mailto:support@alzaro.co.uk?subject=GarageOps payment method" style={{ color: T.red }}>support@alzaro.co.uk</a>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button style={ghostBtn} onClick={() => setShowPaymentModal(false)}>Close</button>
-          </div>
-        </Modal>
-      )}
-
       {showInvoicesModal && (
         <Modal title="Billing invoices" onClose={() => setShowInvoicesModal(false)}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '16px' }}>

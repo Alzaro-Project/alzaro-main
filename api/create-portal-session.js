@@ -21,13 +21,20 @@
 
 import Stripe from 'stripe'
 
-function appBaseUrl(req) {
+// Canonical base for the portal return_url. Same rationale as the checkout
+// session: always the canonical www host so the return is consistent across
+// verticals. APP_BASE_URL can override for staging.
+function appBaseUrl() {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '')
-  const origin = req.headers.origin
-  if (origin) return origin.replace(/\/$/, '')
-  const host = req.headers.host
-  if (host) return `https://${host}`
-  return 'https://alzaro.co.uk'
+  return 'https://www.alzaro.co.uk'
+}
+
+// Allow only known vertical route prefixes so the return_url can't be steered
+// to an arbitrary path. Falls back to tyreops.
+const KNOWN_PRODUCTS = ['tyreops', 'garageops', 'serviceops', 'propertyops']
+function settingsPathFor(product) {
+  const p = KNOWN_PRODUCTS.includes(product) ? product : 'tyreops'
+  return `/${p}/settings`
 }
 
 // Look up the stored Stripe customer id for a product_members row using the
@@ -77,7 +84,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'STRIPE_SECRET_KEY not set on server' })
     }
 
-    const { stripeCustomerId, garageId } = req.body || {}
+    const { stripeCustomerId, garageId, product = 'tyreops' } = req.body || {}
     let customerId = stripeCustomerId || null
     if (!customerId && garageId) {
       customerId = await customerIdForGarage(garageId)
@@ -89,10 +96,10 @@ export default async function handler(req, res) {
     }
 
     const stripe = new Stripe(stripeKey)
-    const base = appBaseUrl(req)
+    const base = appBaseUrl()
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${base}/tyreops/settings`,
+      return_url: `${base}${settingsPathFor(product)}`,
     })
 
     return res.status(200).json({ url: session.url })
