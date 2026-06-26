@@ -41,6 +41,29 @@ export async function updateUser(payload) {
   return sb.auth.updateUser(payload)
 }
 
+// ---------- product_members (shared billing/tier table) ----------
+// SoloOps' subscription tier + status now live in the shared product_members
+// table (product='soloops'), so the Stripe webhook can update them like the
+// other verticals. One row per user for this product.
+export async function getMember(uid) {
+  const { data } = await sb
+    .from('product_members')
+    .select('id, tier, status, trial_ends')
+    .eq('user_id', uid).eq('product', 'soloops').maybeSingle()
+  return data || null
+}
+
+// Create the product_members row for this user (idempotent: the RPC returns
+// the existing id if one already exists). Mirrors GarageOps/TyreOps.
+export async function joinProduct(businessName) {
+  const { data, error } = await sb.rpc('join_product', {
+    p_product: 'soloops',
+    p_garage_name: businessName || '',
+  })
+  if (error) throw error
+  return data
+}
+
 // ---------- core data loads ----------
 export async function loadInvoices() {
   const { data } = await sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false })

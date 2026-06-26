@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
-  updateUser, loadSettings,
+  updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
+import TrialGuard from './components/TrialGuard.jsx'
 import { NAV, TIER_ORDER, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
 import { MonthlyChart, Donut } from './components/Charts.jsx'
 import WelcomeBanner from './components/WelcomeBanner.jsx'
@@ -38,6 +39,9 @@ function Shell() {
   const [clients, setClients] = useState([])
   const [bizName, setBizName] = useState('')
   const [settings, setSettings] = useState(null)
+  // Subscription membership row (product_members, product='soloops').
+  // undefined = not loaded yet (gate rendering); null = no row.
+  const [member, setMember] = useState(undefined)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
@@ -83,6 +87,11 @@ function Shell() {
         if (st && st.business_name) nm = st.business_name
       } catch (_) {}
       setBizName(nm)
+      // Ensure a product_members row exists (idempotent), then load the
+      // subscription tier/status from it — the source of truth, kept in sync
+      // by the Stripe webhook. Covers new, backfilled, and restored sessions.
+      try { await joinProduct(nm) } catch (_) {}
+      try { setMember((await getMember(uid)) || null) } catch (_) { setMember(null) }
     }
     const [inv, exp, mil, cli] = await Promise.all([
       loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
@@ -175,16 +184,23 @@ function Shell() {
     return null
   }
 
+  // Wait for the membership row before rendering, so gating uses the real tier
+  // rather than briefly showing 'basic' and locking pages.
+  if (member === undefined)
+    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
+
   const uid = session.user.id
 
-  // Subscription tier + gating. Fail closed to 'basic' if unknown.
-  const tier = (session.user.user_metadata?.tier || 'basic').toLowerCase()
+  // Subscription tier + gating. Source of truth: product_members (synced by the
+  // Stripe webhook). Fail closed to 'basic' if there's no row yet.
+  const tier = (member?.tier || 'basic').toLowerCase()
   const userTierIdx = Math.max(0, TIER_ORDER.indexOf(tier))
   const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || 'basic')
   const navMin = (k) => { const n = NAV.find(x => x[0] === k); return n ? n[3] : 'basic' }
   const viewLocked = !tierAllows(navMin(view))
 
   return (
+   <TrialGuard memberId={member?.id}>
     <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
 
       <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
@@ -536,6 +552,7 @@ function Shell() {
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
+   </TrialGuard>
   )
 }
 

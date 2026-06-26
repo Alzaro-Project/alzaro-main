@@ -1,6 +1,6 @@
 import React from 'react'
 import { card, inp, btnPri, btnSec } from '../components/UI.jsx'
-import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings } from '../lib/db.js'
+import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession } from '../lib/db.js'
 
 // SMTP provider presets (inlined — SoloOps has no lib/email.js)
 const SMTP_PRESETS = {
@@ -120,6 +120,92 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
     }
   }
 
+  // ---- subscription / billing ----
+  // The product_members row id is the webhook's PATCH key; its tier is the
+  // source of truth for the current plan.
+  const [memberId, setMemberId] = React.useState(null)
+  const [currentTier, setCurrentTier] = React.useState('basic')
+  const [changingTier, setChangingTier] = React.useState(null)
+  const [portalLoading, setPortalLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    let alive = true
+    getMember(uid)
+      .then((m) => {
+        if (!alive || !m) return
+        if (m.id) setMemberId(m.id)
+        const t = (m.tier || 'basic').toLowerCase()
+        setCurrentTier(['basic', 'bronze', 'silver', 'gold'].includes(t) ? t : 'basic')
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [uid])
+
+  // Tidy the ?billing= param after returning from Stripe Checkout.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('billing')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  const authHeaders = async () => {
+    const sess = await getSession()
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sess?.access_token || ''}`,
+    }
+  }
+
+  // Start a real Stripe Checkout for the chosen tier, then redirect to it.
+  const startCheckout = async (tierKey) => {
+    if (!memberId || !session.user?.email) {
+      flash('Your account is still loading — please try again in a moment.')
+      return
+    }
+    setChangingTier(tierKey)
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          email: session.user.email,
+          garageId: memberId,
+          product: 'soloops',
+          tier: tierKey,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout')
+      window.location.href = data.url
+    } catch (e) {
+      flash(e.message || 'Could not start checkout')
+      setChangingTier(null)
+    }
+  }
+
+  // Open the Stripe Billing Portal to update payment details or cancel.
+  const openPortal = async () => {
+    if (!memberId) {
+      flash('Your account is still loading — please try again in a moment.')
+      return
+    }
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ garageId: memberId, product: 'soloops' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Could not open billing portal')
+      window.location.href = data.url
+    } catch (e) {
+      flash(e.message || 'Could not open billing portal')
+      setPortalLoading(false)
+    }
+  }
+
   // ---- saves ----
   const persist = async (extra, tag) => {
     setBusy(tag); setErr('')
@@ -230,10 +316,14 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
     }
   }
 
+  // Standardised four-tier plan, consistent with the other verticals. Prices
+  // match the shared Stripe prices (api/_billing-config.js); the tier key is
+  // sent straight to checkout.
   const tiers = [
-    { name:'Bronze', price:'£40/mo', feats:'Dashboard, income & expenses, invoicing, mileage, CSV import' },
-    { name:'Silver', price:'£55/mo', feats:'Everything in Bronze + recurring detection, receipt matching, tax estimates' },
-    { name:'Gold',   price:'£70/mo', feats:'Everything in Silver + accountant export pack, priority support', current:true },
+    { key:'basic',  name:'Basic',  price:'£12.99/mo', feats:'Dashboard, income & expenses, invoicing, mileage, CSV import' },
+    { key:'bronze', name:'Bronze', price:'£18.99/mo', feats:'Everything in Basic + recurring detection, receipt matching' },
+    { key:'silver', name:'Silver', price:'£28.99/mo', feats:'Everything in Bronze + tax estimates, document store' },
+    { key:'gold',   name:'Gold',   price:'£39.99/mo', feats:'Everything in Silver + accountant export pack, priority support' },
   ]
 
   const sectionTitle = { fontWeight:700, fontSize:'15px', marginBottom:'14px' }
@@ -426,18 +516,24 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         <>
           <div data-card style={card}>
             <div style={sectionTitle}>Billing &amp; plan</div>
-            <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>Gold</strong> · 14-day trial.</div>
-            {tiers.map(t => (
-              <div key={t.name} style={{ border:'1px solid '+(t.current?'var(--orange)':'var(--border)'), borderRadius:'12px', padding:'14px', marginBottom:'10px', background: t.current?'var(--orange-subtle)':'transparent' }}>
+            <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>{(tiers.find(x=>x.key===currentTier)||tiers[0]).name}</strong>.</div>
+            {tiers.map((t, i) => {
+              const isCurrent = t.key === currentTier
+              const currentIdx = tiers.findIndex(x => x.key === currentTier)
+              return (
+              <div key={t.key} style={{ border:'1px solid '+(isCurrent?'var(--orange)':'var(--border)'), borderRadius:'12px', padding:'14px', marginBottom:'10px', background: isCurrent?'var(--orange-subtle)':'transparent' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ fontWeight:700 }}>{t.name} <span style={{ color:'var(--text3)', fontWeight:500, fontSize:'13px' }}>{t.price}</span></div>
-                  {t.current ? <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', border:'1px solid var(--orange)', borderRadius:'20px', padding:'2px 10px' }}>CURRENT</span>
-                    : <button style={{...btnSec, padding:'6px 12px'}} onClick={()=>flash('Plan changes are coming soon — billing isn\u2019t live yet.')}>Switch</button>}
+                  {isCurrent ? <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', border:'1px solid var(--orange)', borderRadius:'20px', padding:'2px 10px' }}>CURRENT</span>
+                    : <button style={{...btnSec, padding:'6px 12px', opacity:changingTier?0.7:1}} disabled={!!changingTier} onClick={()=>startCheckout(t.key)}>{changingTier===t.key ? 'Starting…' : (i > currentIdx ? 'Upgrade' : 'Switch')}</button>}
                 </div>
                 <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{t.feats}</div>
               </div>
-            ))}
-            <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'4px' }}>Online payments &amp; plan changes are coming soon.</div>
+            )})}
+            <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', marginTop:'6px' }}>
+              <button style={{...btnSec, opacity:portalLoading?0.7:1}} disabled={portalLoading} onClick={openPortal}>{portalLoading ? 'Opening…' : 'Manage subscription'}</button>
+              <span style={{ fontSize:'11.5px', color:'var(--text3)' }}>Update payment details or cancel anytime via the secure billing portal.</span>
+            </div>
           </div>
 
           <div data-card style={{...card, marginTop:'16px'}}>
