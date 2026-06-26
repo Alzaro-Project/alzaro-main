@@ -642,16 +642,91 @@ function SettingsPage({ user }) {
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
   const [currentTier, setCurrentTier] = useState("bronze");
+  const [memberId, setMemberId] = useState(null);
+  const [changingTier, setChangingTier] = useState(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     if (!DB_READY || !user) return;
-    db.from("product_members").select("tier,plan").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
+    // Load the product_members row: its `id` is the webhook's PATCH key, and
+    // tier/plan is the source of truth for the current plan.
+    db.from("product_members").select("id,tier,plan").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
       .then(({ data }) => {
+        if (data?.id) setMemberId(data.id);
         const t = (data && (data.tier || data.plan) || "bronze").toLowerCase();
         setCurrentTier(["bronze", "silver", "gold"].includes(t) ? t : "bronze");
       })
       .catch(() => {});
   }, [user]);
+
+  // Returning from Stripe Checkout: the webhook has already updated
+  // product_members and the effect above re-reads the tier on load — just tidy
+  // the URL so the ?billing= param doesn't linger.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // Current Supabase access token for authenticating API calls.
+  const authHeaders = async () => {
+    const { data: { session } } = await db.auth.getSession();
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token || ""}`,
+    };
+  };
+
+  // Start a real Stripe Checkout for the chosen tier, then redirect to it.
+  // `garageId` carries the product_members row id (the webhook's PATCH key).
+  const startCheckout = async (newTier) => {
+    if (!memberId || !user?.email) {
+      alert("Your account is still loading — please try again in a moment.");
+      return;
+    }
+    setChangingTier(newTier);
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          email: user.email,
+          garageId: memberId,
+          product: "serviceops",
+          tier: newTier,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not start checkout");
+      window.location.href = data.url;
+    } catch (e) {
+      alert(e.message || "Could not start checkout");
+      setChangingTier(null);
+    }
+  };
+
+  // Open the Stripe Billing Portal to update payment details or cancel.
+  const openPortal = async () => {
+    if (!memberId) {
+      alert("Your account is still loading — please try again in a moment.");
+      return;
+    }
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/create-portal-session", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ garageId: memberId, product: "serviceops" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal");
+      window.location.href = data.url;
+    } catch (e) {
+      alert(e.message || "Could not open billing portal");
+      setPortalLoading(false);
+    }
+  };
 
   const TABS = [
     { key: "business", label: "Business", icon: "ti-building" },
@@ -990,13 +1065,18 @@ function SettingsPage({ user }) {
                   {isCurrent ? (
                     <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
                   ) : (
-                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > (tiers.find((x) => x.key === currentTier) || tiers[0]).price ? "Upgrade" : "Switch"} to {t.name}</div>
+                    <div onClick={() => { if (!changingTier) startCheckout(t.key); }} style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: changingTier ? "default" : "pointer", opacity: changingTier && changingTier !== t.key ? 0.6 : 1 }}>{changingTier === t.key ? "Starting checkout…" : `${t.price > (tiers.find((x) => x.key === currentTier) || tiers[0]).price ? "Upgrade" : "Switch"} to ${t.name}`}</div>
                   )}
                 </div>
               );
             })}
           </div>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+            <span onClick={portalLoading ? undefined : openPortal} style={{ cursor: portalLoading ? "default" : "pointer", opacity: portalLoading ? 0.6 : 1 }}>
+              <Btn icon="ti-credit-card" label={portalLoading ? "Opening…" : "Manage subscription"} />
+            </span>
+            <span style={{ fontSize: 11, color: "var(--txt-3)" }}>Update payment details or cancel anytime via the secure billing portal.</span>
+          </div>
         </div>
       )}
     </div>

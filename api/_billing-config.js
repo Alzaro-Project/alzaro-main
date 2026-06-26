@@ -18,14 +18,23 @@ export const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
 
 export const LOWEST_TIER = 'basic'
 
+// Tiers are standardised across verticals, so every product currently maps to
+// the SAME set of Stripe TEST price IDs. If a vertical's pricing diverges
+// later, just give it its own price IDs here — the structure already supports
+// per-product mappings.
+const STANDARD_TIERS = {
+  basic:  'price_1TmbnjRWazRh8KC4VPdWlQzb',
+  bronze: 'price_1TmboIRWazRh8KC4bHUalyfW',
+  silver: 'price_1TmbpZRWazRh8KC4pwSwVqUG',
+  gold:   'price_1TmbqBRWazRh8KC4qEjJu6T3',
+}
+
 export const BILLING = {
-  tyreops: {
-    basic:  'price_1TmbnjRWazRh8KC4VPdWlQzb',
-    bronze: 'price_1TmboIRWazRh8KC4bHUalyfW',
-    silver: 'price_1TmbpZRWazRh8KC4pwSwVqUG',
-    gold:   'price_1TmbqBRWazRh8KC4qEjJu6T3',
-  },
-  // garageops: { ... },   // future verticals go here
+  tyreops:     { ...STANDARD_TIERS },
+  garageops:   { ...STANDARD_TIERS },
+  serviceops:  { ...STANDARD_TIERS },
+  propertyops: { ...STANDARD_TIERS },
+  // soloops / stockops: not on product_members billing yet.
 }
 
 // Resolve a Stripe Price ID for (product, tier).

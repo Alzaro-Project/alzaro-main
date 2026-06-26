@@ -19,13 +19,13 @@
 import Stripe from 'stripe'
 import { priceIdFor, safeTier } from './_billing-config.js'
 
-function appBaseUrl(req) {
+// Canonical base for success/cancel redirects. We always send users back to the
+// canonical www host (not the request origin, which could be the apex domain or
+// a preview URL) so the post-checkout return is consistent across verticals.
+// APP_BASE_URL can override for staging.
+function appBaseUrl() {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '')
-  const origin = req.headers.origin
-  if (origin) return origin.replace(/\/$/, '')
-  const host = req.headers.host
-  if (host) return `https://${host}`
-  return 'https://alzaro.co.uk'
+  return 'https://www.alzaro.co.uk'
 }
 
 export default async function handler(req, res) {
@@ -77,7 +77,10 @@ export default async function handler(req, res) {
     }
 
     const stripe = new Stripe(stripeKey)
-    const base = appBaseUrl(req)
+    // Return the user to THIS vertical's own settings page. `product` is the
+    // route prefix for every billed vertical (tyreops, garageops, ...).
+    const base = appBaseUrl()
+    const settingsPath = `/${product}/settings`
 
     // Put the lookup keys on BOTH the session and the subscription so the
     // webhook can find the product_members row from either event shape.
@@ -96,8 +99,8 @@ export default async function handler(req, res) {
       metadata,
       subscription_data: { metadata },
       allow_promotion_codes: true,
-      success_url: `${base}/tyreops/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/tyreops/settings?billing=cancelled`,
+      success_url: `${base}${settingsPath}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${base}${settingsPath}?billing=cancelled`,
     })
 
     return res.status(200).json({ url: session.url })

@@ -783,7 +783,99 @@ export function SettingsPage({ user }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
-  const currentPlan = "Enterprise"; // shown as current; real billing is future Stripe work
+  const [memberId, setMemberId] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState(null); // display name, derived from product_members (source of truth)
+  const [changingTier, setChangingTier] = useState(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // PropertyOps shows its plans as Starter/Professional/Enterprise, but billing
+  // is standardised on bronze/silver/gold keys (api/_billing-config.js + the
+  // webhook write product_members.tier using those keys). Map between the two.
+  const NAME_TO_KEY = { Starter: "bronze", Professional: "silver", Enterprise: "gold" };
+  const KEY_TO_NAME = { basic: "Starter", bronze: "Starter", silver: "Professional", gold: "Enterprise" };
+
+  // product_members is the source of truth for the paid tier (kept in sync by
+  // the Stripe webhook). Load the row id (the webhook's PATCH key) + tier.
+  useEffect(() => {
+    if (!DB_READY || !user) return;
+    db.from("product_members").select("id,tier,plan").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
+      .then(({ data }) => {
+        if (data?.id) setMemberId(data.id);
+        const key = (data && (data.tier || data.plan) || "").toLowerCase();
+        setCurrentPlan(KEY_TO_NAME[key] || null);
+      })
+      .catch(() => {});
+  }, [user]);
+
+  // Tidy the ?billing= param after returning from Stripe Checkout (the effect
+  // above already re-reads the tier on this fresh page load).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // Current Supabase access token for authenticating API calls.
+  const authHeaders = async () => {
+    const { data: { session } } = await db.auth.getSession();
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token || ""}`,
+    };
+  };
+
+  // Start a real Stripe Checkout for the chosen plan, then redirect to it.
+  // `garageId` carries the product_members row id (the webhook's PATCH key);
+  // `tier` is the standardised billing key.
+  const startCheckout = async (tierName) => {
+    const tierKey = NAME_TO_KEY[tierName];
+    if (!memberId || !user?.email || !tierKey) {
+      alert("Your account is still loading — please try again in a moment.");
+      return;
+    }
+    setChangingTier(tierName);
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          email: user.email,
+          garageId: memberId,
+          product: "propertyops",
+          tier: tierKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not start checkout");
+      window.location.href = data.url;
+    } catch (e) {
+      alert(e.message || "Could not start checkout");
+      setChangingTier(null);
+    }
+  };
+
+  // Open the Stripe Billing Portal to update payment details or cancel.
+  const openPortal = async () => {
+    if (!memberId) {
+      alert("Your account is still loading — please try again in a moment.");
+      return;
+    }
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/create-portal-session", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ garageId: memberId, product: "propertyops" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal");
+      window.location.href = data.url;
+    } catch (e) {
+      alert(e.message || "Could not open billing portal");
+      setPortalLoading(false);
+    }
+  };
 
   // SMTP provider presets — picking one fills in host/port/security
   const SMTP_PRESETS = {
@@ -1133,13 +1225,18 @@ export function SettingsPage({ user }) {
                   {isCurrent ? (
                     <div style={{ textAlign: "center", fontSize: 12, color: "var(--txt-3)", padding: "9px", border: "0.5px solid var(--line)", borderRadius: 8 }}>Your current plan</div>
                   ) : (
-                    <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: "pointer" }} title="Billing coming soon">{t.price > tiers.find((x) => x.name === currentPlan).price ? "Upgrade" : "Switch"} to {t.name}</div>
+                    <div onClick={() => { if (!changingTier) startCheckout(t.name); }} style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "var(--brand)", padding: "9px", border: "1px solid var(--brand)", borderRadius: 8, cursor: changingTier ? "default" : "pointer", opacity: changingTier && changingTier !== t.name ? 0.6 : 1 }}>{changingTier === t.name ? "Starting checkout…" : `${t.price > ((tiers.find((x) => x.name === currentPlan) || {}).price || 0) ? "Upgrade" : "Switch"} to ${t.name}`}</div>
                   )}
                 </div>
               );
             })}
           </div>
-          <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 12 }}>Plan changes and billing are handled by our payments provider — secure checkout is coming soon. Contact support to change your plan in the meantime.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+            <span onClick={portalLoading ? undefined : openPortal} style={{ cursor: portalLoading ? "default" : "pointer", opacity: portalLoading ? 0.6 : 1 }}>
+              <Btn icon="ti-credit-card" label={portalLoading ? "Opening…" : "Manage subscription"} />
+            </span>
+            <span style={{ fontSize: 11, color: "var(--txt-3)" }}>Update payment details or cancel anytime via the secure billing portal.</span>
+          </div>
         </div>
       )}
     </div>
