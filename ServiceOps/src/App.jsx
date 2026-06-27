@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { db, DB_READY } from './lib/db.js'
 import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard, TIER_ORDER } from './lib/helpers.js'
 import { PageHead, Btn, useIsMobile, SearchGroup } from './components/UI.jsx'
+import TrialGuard from './components/TrialGuard.jsx'
 import { DashboardPage, CertificatesPage, DocumentsPage, ReportsPage, SettingsPage } from './pages/Records.jsx'
 import { CustomersPage, CustomerDetail, PropertiesPage } from './pages/CustomersProperties.jsx'
 import { QuotesPage, JobsPage, DiaryPage, InvoicingPage } from './pages/JobsQuotesInvoicing.jsx'
@@ -268,7 +269,9 @@ function App() {
       // registered via the ServiceOps register page? auto-activate silently
       const meta = session.user.user_metadata || {};
       if (meta.product === "serviceops") {
-        const { error: insErr } = await db.from("product_members").insert([{ user_id: session.user.id, email: session.user.email, product: "serviceops", company_name: meta.company_name || "My Company" }]);
+        // Create the membership via the SECURITY DEFINER RPC (idempotent) so no
+        // client INSERT into product_members is needed; it sets tier/status.
+        const { error: insErr } = await db.rpc("join_product", { p_product: "serviceops", p_garage_name: meta.company_name || "My Company" });
         setMember(!insErr);
         if (insErr) console.error("Auto-join:", insErr);
       } else {
@@ -287,7 +290,11 @@ function App() {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!member) return <ActivateScreen user={session.user} signOut={signOut} />;
-  return <Dashboard user={session.user} signOut={signOut} />;
+  return (
+    <TrialGuard user={session.user}>
+      <Dashboard user={session.user} signOut={signOut} />
+    </TrialGuard>
+  );
 }
 
 // Full-page lockout shown when the user's tier is below a feature's minimum.

@@ -54,7 +54,7 @@ function AuthScreen() {
         setBusy(false);
         return setMsg("An Alzaro account with this email already exists (from another Alzaro product). Enter that account's password here to activate ServiceOps on it — the password you entered didn't match.");
       }
-      await db.from("product_members").insert([{ user_id: si.user.id, email: si.user.email, product: "serviceops", company_name: company.trim() }]); // duplicate-safe: errors ignored
+      await db.rpc("join_product", { p_product: "serviceops", p_garage_name: company.trim() }); // idempotent (SECURITY DEFINER); duplicate-safe
       setBusy(false);
       window.location.href = "/serviceops/login"; // fresh load → straight into the app
       return;
@@ -156,12 +156,7 @@ function ActivateScreen({ user, signOut }) {
     setMsg("");
     if (!company.trim()) return setMsg("Please enter your company name.");
     setBusy(true);
-    const { error } = await db.from("product_members").insert([{
-      user_id: user.id,
-      email: user.email,
-      product: "serviceops",
-      company_name: company.trim(),
-    }]);
+    const { error } = await db.rpc("join_product", { p_product: "serviceops", p_garage_name: company.trim() });
     setBusy(false);
     if (error) return setMsg(error.message || "Could not set up your ServiceOps account.");
     window.location.href = "/serviceops/login"; // fresh load → straight into the app

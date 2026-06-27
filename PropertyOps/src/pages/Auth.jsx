@@ -142,12 +142,7 @@ export function JoinScreen({ user, onJoined, signOut }) {
     setMsg("");
     if (!company.trim()) return setMsg("Please enter your company name.");
     setBusy(true);
-    const { error } = await db.from("product_members").insert([{
-      user_id: user.id,
-      email: user.email,
-      product: "propertyops",
-      company_name: company.trim(),
-    }]);
+    const { error } = await db.rpc("join_product", { p_product: "propertyops", p_garage_name: company.trim() });
     setBusy(false);
     if (error) return setMsg(error.message || "Could not set up your PropertyOps account.");
     onJoined();
