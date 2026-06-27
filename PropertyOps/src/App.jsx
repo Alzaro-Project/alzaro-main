@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db, DB_READY } from "./lib/supabase.js";
+import TrialGuard from "./components/TrialGuard.jsx";
 import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile, TIER_ORDER } from "./lib/helpers.js";
 import {
   DashboardPage, PropertiesPage, CompliancePage, TenantsPage,
@@ -316,12 +317,12 @@ function App() {
       // No membership row — if they originally registered via PropertyOps,
       // create it silently (covers pre-existing users and fresh signups).
       if (session.user.user_metadata?.product === "propertyops") {
-        const { error: insErr } = await db.from("product_members").insert([{
-          user_id: session.user.id,
-          email: session.user.email,
-          product: "propertyops",
-          company_name: session.user.user_metadata?.company_name || "My Company",
-        }]);
+        // Create the membership via the SECURITY DEFINER RPC (idempotent) so no
+        // client INSERT into product_members is needed; it sets tier/status.
+        const { error: insErr } = await db.rpc("join_product", {
+          p_product: "propertyops",
+          p_garage_name: session.user.user_metadata?.company_name || "My Company",
+        });
         if (!cancelled) setMember(!insErr);
         if (insErr) console.error("Auto-join:", insErr);
         return;
@@ -342,7 +343,11 @@ function App() {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!member) return <JoinScreen user={session.user} onJoined={() => setMember(true)} signOut={signOut} />;
-  return <Dashboard user={session.user} signOut={signOut} />;
+  return (
+    <TrialGuard user={session.user}>
+      <Dashboard user={session.user} signOut={signOut} />
+    </TrialGuard>
+  );
 }
 
 
