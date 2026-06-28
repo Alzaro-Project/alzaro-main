@@ -299,6 +299,15 @@ export function FinancePage({ user, go }) {
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
+
+  // Whenever the selected property changes (or rent data arrives) and amount is empty, fill it from rent.
+  useEffect(() => {
+    if (adding && form.property_id && !form.amount) {
+      const r = rentForProp(form.property_id);
+      if (r) setForm((f) => (f.amount ? f : { ...f, amount: r }));
+    }
+  }, [form.property_id, fullProps, adding]);
+
   // Pick a tenant → auto-fill their property and the rent amount (rent only if not already typed).
   const onPickTenant = (name) => {
     const t = related.tenants.find((x) => x.name === name);
