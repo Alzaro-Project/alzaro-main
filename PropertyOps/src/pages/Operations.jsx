@@ -297,6 +297,28 @@ export function FinancePage({ user, go }) {
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
   const openEdit = (p) => { setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status: p.status || "Pending" }); setEditId(p.id); setAdding(true); setErr(""); };
 
+  // Rent for a property (from the full property rows, which include rent).
+  const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
+  // Pick a tenant → auto-fill their property and the rent amount (rent only if not already typed).
+  const onPickTenant = (name) => {
+    const t = related.tenants.find((x) => x.name === name);
+    setForm((f) => {
+      const next = { ...f, tenant: name };
+      if (t && t.property_id) { next.property_id = t.property_id; if (!f.amount) { const r = rentForProp(t.property_id); if (r) next.amount = r; } }
+      return next;
+    });
+  };
+  // Pick a property → auto-fill the tenant (if exactly one lives there) and the rent amount.
+  const onPickProperty = (pid) => {
+    const tenantsHere = related.tenants.filter((x) => String(x.property_id) === String(pid));
+    setForm((f) => {
+      const next = { ...f, property_id: pid };
+      if (!f.tenant && tenantsHere.length === 1) next.tenant = tenantsHere[0].name;
+      if (!f.amount) { const r = rentForProp(pid); if (r) next.amount = r; }
+      return next;
+    });
+  };
+
   const save = async () => {
     if (!form.tenant.trim()) { setErr("Tenant is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
@@ -399,9 +421,9 @@ const data = rows || [];
         <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
-            <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => setForm({ ...form, tenant: e.target.value })}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
-            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
-            <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 1250" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => onPickTenant(e.target.value)}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
+            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => onPickProperty(e.target.value)}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
+            <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="auto-fills from rent — editable" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Billing date (optional)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
