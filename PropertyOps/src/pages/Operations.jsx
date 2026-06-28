@@ -299,34 +299,26 @@ export function FinancePage({ user, go }) {
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
+  const propIdForTenant = (name) => { const t = related.tenants.find((x) => x.name === name); return t ? (t.property_id || "") : ""; };
+  const tenantForProp = (pid) => { const t = related.tenants.find((x) => String(x.property_id) === String(pid)); return t ? t.name : ""; };
 
-  // Whenever the selected property changes (or rent data arrives) and amount is empty, fill it from rent.
+  // Strict binding: pick a tenant → their property + rent. Amount always follows the property.
+  const onPickTenant = (name) => {
+    const pid = propIdForTenant(name);
+    setForm((f) => ({ ...f, tenant: name, property_id: pid || f.property_id, amount: pid ? (rentForProp(pid) || f.amount) : f.amount }));
+  };
+  // Pick a property → its tenant + rent. Amount always follows.
+  const onPickProperty = (pid) => {
+    setForm((f) => ({ ...f, property_id: pid, tenant: pid ? (tenantForProp(pid) || f.tenant) : f.tenant, amount: pid ? (rentForProp(pid) || f.amount) : f.amount }));
+  };
+
+  // Safety net: once rent data has loaded, fill amount if a property is chosen but amount is still blank.
   useEffect(() => {
     if (adding && form.property_id && !form.amount) {
       const r = rentForProp(form.property_id);
       if (r) setForm((f) => (f.amount ? f : { ...f, amount: r }));
     }
   }, [form.property_id, fullProps, adding]);
-
-  // Pick a tenant → auto-fill their property and the rent amount (rent only if not already typed).
-  const onPickTenant = (name) => {
-    const t = related.tenants.find((x) => x.name === name);
-    setForm((f) => {
-      const next = { ...f, tenant: name };
-      if (t && t.property_id) { next.property_id = t.property_id; if (!f.amount) { const r = rentForProp(t.property_id); if (r) next.amount = r; } }
-      return next;
-    });
-  };
-  // Pick a property → auto-fill the tenant (if exactly one lives there) and the rent amount.
-  const onPickProperty = (pid) => {
-    const tenantsHere = related.tenants.filter((x) => String(x.property_id) === String(pid));
-    setForm((f) => {
-      const next = { ...f, property_id: pid };
-      if (!f.tenant && tenantsHere.length === 1) next.tenant = tenantsHere[0].name;
-      if (!f.amount) { const r = rentForProp(pid); if (r) next.amount = r; }
-      return next;
-    });
-  };
 
   const save = async () => {
     if (!form.tenant.trim()) { setErr("Tenant is required."); return; }
