@@ -69,7 +69,23 @@ export default async function handler(req, res) {
     const data = await response.json()
     if (!response.ok) {
       console.error('Resend error:', data)
-      return res.status(response.status).json({ error: data.message || 'Resend API error' })
+      // Translate common Resend failures into plain English so users see a real reason.
+      const raw = data.message || data.error || 'Resend API error'
+      const name = data.name || ''
+      const lower = String(raw).toLowerCase()
+      let reason = raw
+      if (name === 'validation_error' && lower.includes('domain')) {
+        reason = 'Your sending domain (alzaro.co.uk) is not verified in Resend, or this address is not allowed yet. Check the domain is verified in the Resend dashboard.'
+      } else if (name === 'validation_error' && (lower.includes('to') || lower.includes('recipient') || lower.includes('email'))) {
+        reason = `The recipient address looks invalid — check "${to}" for typos.`
+      } else if (response.status === 401 || name === 'unauthorized' || lower.includes('api key')) {
+        reason = 'Email service rejected the API key. RESEND_API_KEY may be missing or wrong in the server settings.'
+      } else if (response.status === 429 || name === 'rate_limit_exceeded' || lower.includes('rate limit')) {
+        reason = 'Too many emails sent in a short time — wait a moment and try again.'
+      } else if (lower.includes('attachment')) {
+        reason = 'The attachment was rejected — it may be too large or an unsupported file type.'
+      }
+      return res.status(response.status).json({ error: reason, detail: raw })
     }
     return res.status(200).json({ success: true, id: data.id })
   } catch (err) {
