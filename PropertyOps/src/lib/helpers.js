@@ -70,6 +70,18 @@ export const REPORTS = [
 
 export const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
 export const gbp = (n) => "£" + n.toLocaleString("en-GB");
+
+// Format a stored date (ISO YYYY-MM-DD, or any parseable date) as UK DD/MM/YYYY.
+// Returns the dash placeholder for empty/invalid values so callers can drop their own "|| '—'".
+export const ukDate = (v) => {
+  if (!v) return "—";
+  const s = String(v);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // ISO date or datetime
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(s);
+  if (isNaN(d)) return s; // leave anything unrecognised untouched
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
 export const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
 
 export const TIER_BADGE = {
@@ -111,9 +123,9 @@ export function buildReport(name, d) {
   switch (name) {
     case "Rent statement":
     case "Landlord statement":
-      return { cols: ["Tenant", "Property", "Amount", "Due date", "Status"], rows: d.pays.map((p) => [p.tenant, p.property, gbpc(p.amount), p.due_date || "—", p.status]) };
+      return { cols: ["Tenant", "Property", "Amount", "Due date", "Status"], rows: d.pays.map((p) => [p.tenant, p.property, gbpc(p.amount), ukDate(p.due_date), p.status]) };
     case "Arrears report":
-      return { cols: ["Tenant", "Property", "Amount", "Due date"], rows: d.pays.filter((p) => p.status === "Overdue").map((p) => [p.tenant, p.property, gbpc(p.amount), p.due_date || "—"]) };
+      return { cols: ["Tenant", "Property", "Amount", "Due date"], rows: d.pays.filter((p) => p.status === "Overdue").map((p) => [p.tenant, p.property, gbpc(p.amount), ukDate(p.due_date)]) };
     case "Profit & loss":
     case "Tax-year summary": {
       const collected = d.pays.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
@@ -123,15 +135,15 @@ export function buildReport(name, d) {
       return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Maintenance expenses", "-" + gbpc(maintCost)], ["Net (collected − expenses)", gbpc(net)], ["Properties", d.props.length]] };
     }
     case "Compliance audit":
-      return { cols: ["Type", "Property", "Reference", "Expiry date"], rows: d.comp.map((c) => [c.type, c.property || "—", c.reference || "—", c.expiry_date || "—"]) };
+      return { cols: ["Type", "Property", "Reference", "Expiry date"], rows: d.comp.map((c) => [c.type, c.property || "—", c.reference || "—", ukDate(c.expiry_date)]) };
     case "Expiring certificates":
-      return { cols: ["Type", "Property", "Expiry date", "Days left"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 90).sort((a, b) => a.dd - b.dd).map((c) => [c.type, c.property || "—", c.expiry_date, c.dd]) };
+      return { cols: ["Type", "Property", "Expiry date", "Days left"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 90).sort((a, b) => a.dd - b.dd).map((c) => [c.type, c.property || "—", ukDate(c.expiry_date), c.dd]) };
     case "Overdue & at-risk":
-      return { cols: ["Type", "Property", "Expiry date", "Status"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 30).map((c) => [c.type, c.property || "—", c.expiry_date, c.dd < 0 ? "Expired" : c.dd <= 7 ? "Urgent" : "Due soon"]) };
+      return { cols: ["Type", "Property", "Expiry date", "Status"], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 30).map((c) => [c.type, c.property || "—", ukDate(c.expiry_date), c.dd < 0 ? "Expired" : c.dd <= 7 ? "Urgent" : "Due soon"]) };
     case "Occupancy report":
       return { cols: ["Property", "Area", "Type", "Status", "Rent"], rows: d.props.map((p) => [p.address || p.addr, p.area || "—", p.type || "—", p.status, gbpc(p.rent)]) };
     case "Tenancy renewals":
-      return { cols: ["Tenant", "Property", "Tenancy ends"], rows: d.tenants.map((t) => [t.name, t.property || "—", t.tenancy_end || "—"]) };
+      return { cols: ["Tenant", "Property", "Tenancy ends"], rows: d.tenants.map((t) => [t.name, t.property || "—", ukDate(t.tenancy_end)]) };
     case "Maintenance summary":
       return { cols: ["Job", "Property", "Priority", "Status", "Contractor", "Cost"], rows: d.maint.map((m) => [m.title, m.property || "—", m.priority, m.status, m.contractor || "—", gbpc(+m.cost || 0)]) };
     case "Spend by category": {
