@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Btn, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td } from "../components/UI.jsx";
-import { REPORTS, buildReport, gbp, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
+import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 export function MaintenancePage({ user, go }) {
@@ -166,7 +166,7 @@ function PaymentEmailModal({ payment, tenant, propName, user, onClose, onSent })
       const tName = tenant?.name || payment.tenant || "there";
       const ref = payment.invoice_no || "your invoice";
       const amount = gbp(payment.amount || 0);
-      const due = payment.due_date ? ` by ${payment.due_date}` : "";
+      const due = payment.due_date ? ` by ${ukDate(payment.due_date)}` : "";
       const propLine = propName && propName !== "—" ? ` for ${propName}` : "";
       setTo(tenant?.email || "");
       setSubject(`Invoice ${payment.invoice_no || ""} from ${biz}`.trim());
@@ -457,7 +457,7 @@ const data = rows || [];
                 <Td><span style={{ fontWeight: 500 }}>{r.property}</span></Td>
                 <Td color="var(--txt-2)">{r.tenant || "—"}</Td>
                 <Td>{gbp(r.amount)}</Td>
-                <Td color="var(--txt-2)">{r.due_date}</Td>
+                <Td color="var(--txt-2)">{ukDate(r.due_date)}</Td>
                 <Td>{DB_READY ? <span onClick={() => raiseInvoice(r)}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
               </tr>
             ))}
@@ -494,7 +494,7 @@ const data = rows || [];
                   <Td color="var(--txt-2)">{money(b.sub)}</Td>
                   <Td color="var(--txt-2)">{money(b.vat)}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
-                  <Td color="var(--txt-2)">{p.due_date || p.due || "—"}</Td>
+                  <Td color="var(--txt-2)">{ukDate(p.due_date || p.due)}</Td>
                   <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
                   <Td>{p.id && DB_READY ? (
                     <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
@@ -514,7 +514,7 @@ const data = rows || [];
                             {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
                           </DetailBox>
                           <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText={pid ? "No certificates." : "No property linked."} onClick={() => go && go("compliance")}>
-                            {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                            {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${ukDate(c.expiry_date)}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
                           </DetailBox>
                           <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText={pid ? "No jobs." : "No property linked."} onClick={() => go && go("maintenance")}>
                             {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
