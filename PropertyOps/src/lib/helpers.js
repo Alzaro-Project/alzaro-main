@@ -118,7 +118,9 @@ export function buildReport(name, d) {
     case "Tax-year summary": {
       const collected = d.pays.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
       const due = d.pays.reduce((s, p) => s + (p.amount || 0), 0);
-      return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Properties", d.props.length]] };
+      const maintCost = d.maint.reduce((s, m) => s + (+m.cost || 0), 0);
+      const net = collected - maintCost;
+      return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Maintenance expenses", "-" + gbpc(maintCost)], ["Net (collected − expenses)", gbpc(net)], ["Properties", d.props.length]] };
     }
     case "Compliance audit":
       return { cols: ["Type", "Property", "Reference", "Expiry date"], rows: d.comp.map((c) => [c.type, c.property || "—", c.reference || "—", c.expiry_date || "—"]) };
@@ -131,7 +133,15 @@ export function buildReport(name, d) {
     case "Tenancy renewals":
       return { cols: ["Tenant", "Property", "Tenancy ends"], rows: d.tenants.map((t) => [t.name, t.property || "—", t.tenancy_end || "—"]) };
     case "Maintenance summary":
-      return { cols: ["Job", "Property", "Priority", "Status", "Contractor"], rows: d.maint.map((m) => [m.title, m.property || "—", m.priority, m.status, m.contractor || "—"]) };
+      return { cols: ["Job", "Property", "Priority", "Status", "Contractor", "Cost"], rows: d.maint.map((m) => [m.title, m.property || "—", m.priority, m.status, m.contractor || "—", gbpc(+m.cost || 0)]) };
+    case "Spend by category": {
+      const byp = {};
+      d.maint.forEach((m) => { const k = m.property || "Unassigned"; byp[k] = (byp[k] || 0) + (+m.cost || 0); });
+      const total = Object.values(byp).reduce((s, n) => s + n, 0);
+      const rows = Object.entries(byp).sort((a, b) => b[1] - a[1]).map(([k, n]) => [k, gbpc(n)]);
+      rows.push(["Total", gbpc(total)]);
+      return { cols: ["Property", "Maintenance spend"], rows };
+    }
     case "Contractor performance": {
       const byc = {};
       d.maint.forEach((m) => { const c = m.contractor || "Unassigned"; byc[c] = (byc[c] || 0) + 1; });
