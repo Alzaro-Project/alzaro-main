@@ -478,6 +478,13 @@ export function TenantsPage({ user, go, tier }) {
       ({ error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]));
     }
     if (error) { setErr(error.message); return; }
+    // If this tenant is assigned to a property that isn't already Let, mark it Let.
+    if (form.property_id && DB_READY) {
+      const { data: prop } = await db.from("prop_properties").select("status").eq("id", form.property_id).maybeSingle();
+      if (prop && prop.status !== "Let") {
+        await db.from("prop_properties").update({ status: "Let" }).eq("id", form.property_id);
+      }
+    }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
