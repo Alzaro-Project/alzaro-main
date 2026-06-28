@@ -8,18 +8,19 @@ export function DashboardPage({ range, go, user }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    if (!DB_READY) { setData({ props: [], comp: [], pays: [], maint: [] }); return; }
+    if (!DB_READY) { setData({ props: [], comp: [], pays: [], maint: [], tenants: [] }); return; }
     Promise.all([
       db.from("prop_properties").select("*"),
       db.from("prop_compliance").select("*"),
       db.from("prop_payments").select("*"),
       db.from("prop_maintenance").select("*"),
-    ]).then(([p, c, pay, mt]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [] }));
+      db.from("prop_tenants").select("*"),
+    ]).then(([p, c, pay, mt, tn]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
   }, []);
 
   if (!data) return <div className="fade-in" style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading your portfolio…</div>;
 
-  const { props, comp, pays, maint } = data;
+  const { props, comp, pays, maint, tenants = [] } = data;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   // properties / occupancy
@@ -33,8 +34,17 @@ export function DashboardPage({ range, go, user }) {
   const valid = certs.filter((c) => c.days !== null && c.days > 30).length;
   const hasCerts = certs.length > 0;
   const score = hasCerts ? Math.max(0, Math.round((valid / certs.length) * 100)) : null;
-  const expiringSoon = certs.filter((c) => c.days !== null && c.days <= 30).sort((a, b) => a.days - b.days).slice(0, 5);
   const attention = certs.filter((c) => c.days !== null && c.days <= 30).length;
+
+  // Combined "Expiring Soon" — certificates AND tenancy end dates, within 60 days (or already passed).
+  const certItems = certs
+    .filter((c) => c.days !== null && c.days <= 60)
+    .map((c) => ({ kind: "cert", id: "c" + c.id, label: c.type, sub: c.property || c.reference || "—", days: c.days, icon: toneFor[c.type] || "ti-shield-check", page: "compliance" }));
+  const tenancyItems = (tenants || [])
+    .filter((t) => t.tenancy_end)
+    .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
+    .filter((t) => t.days <= 60);
+  const expiringSoon = [...certItems, ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
 
   // finance
   const arrears = pays.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
@@ -60,16 +70,16 @@ export function DashboardPage({ range, go, user }) {
         <Metric label="Monthly Income" value={gbp(income)} sub="From let properties" color="var(--brand)" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Expiring Certificates" action="View all" onAction={() => go("compliance")}>
+        <Panel title="Expiring Soon" action="View all" onAction={() => go("compliance")}>
           {expiringSoon.length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 30 days. {certs.length === 0 && "Add certificates in Compliance to track them here."}</div>
+            <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 60 days. {(certs.length === 0 && (tenants || []).length === 0) && "Add certificates and tenants to track renewals here."}</div>
           ) : expiringSoon.map((c, i) => {
             const t = toneVar(certTone(c.days));
             return (
-              <div key={c.id || i} onClick={() => go("compliance")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
+              <div key={c.id || i} onClick={() => go(c.page)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${toneFor[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
-                  <div><div style={{ fontSize: 12.5 }}>{c.type}{c.property ? " · " + c.property : ""}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.reference || "—"}</div></div>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
+                  <div><div style={{ fontSize: 12.5 }}>{c.label}{c.sub && c.sub !== "—" ? " · " + c.sub : ""}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.kind === "tenancy" ? "Tenancy end date" : "Certificate"}</div></div>
                 </div>
                 <Pill text={c.days < 0 ? "expired" : c.days + " days"} tone={certTone(c.days)} />
               </div>
@@ -413,6 +423,15 @@ export function TenantsPage({ user, go }) {
   const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
+    if (form.tenancy_end) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const end = new Date(form.tenancy_end); end.setHours(0, 0, 0, 0);
+      if (end < today) { setErr("Tenancy end date can't be in the past. Pick today or a future date."); return; }
+      if (form.tenancy_start) {
+        const start = new Date(form.tenancy_start); start.setHours(0, 0, 0, 0);
+        if (end < start) { setErr("Tenancy end date can't be before the start date."); return; }
+      }
+    }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };    
