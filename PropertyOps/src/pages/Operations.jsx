@@ -12,7 +12,7 @@ export function MaintenancePage({ user, go }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const properties = usePropertyList();
-  const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported" };
+  const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
   const [form, setForm] = useState(blank);
 
   useEffect(() => {
@@ -27,13 +27,13 @@ export function MaintenancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported" }); setEditId(j.id); setAdding(true); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Job title is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    const payload = { ...form, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     let error;
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]));
@@ -79,6 +79,7 @@ export function MaintenancePage({ user, go }) {
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
             <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Cost (£)<input style={inp} type="number" step="0.01" placeholder="e.g. 120.00" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update job" : "Save job"} primary /></span></div>
@@ -115,6 +116,7 @@ export function MaintenancePage({ user, go }) {
                       <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 6 }}>{propLabel(properties, j.property_id) || j.property || j.prop || "—"}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-2)", marginBottom: j.id && DB_READY ? 9 : 0 }}>
                         <i className="ti ti-user-cog" style={{ fontSize: 13 }} />{j.contractor || "Unassigned"}
+                        {(j.cost !== null && j.cost !== undefined && j.cost !== "") ? <span style={{ marginLeft: "auto", fontWeight: 600, color: "var(--txt)" }}>{gbp(j.cost)}</span> : null}
                       </div>
                       {j.id && DB_READY && (
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid var(--line)", paddingTop: 8 }}>
