@@ -393,7 +393,7 @@ export function CompliancePage({ user, go }) {
 }
 
 
-export function TenantsPage({ user, go }) {
+export function TenantsPage({ user, go, tier }) {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
@@ -402,8 +402,15 @@ export function TenantsPage({ user, go }) {
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
   const properties = usePropertyList();
-  const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending" };  
+  const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending", co_tenant_name: "", co_tenant_email: "", co_tenant_phone: "" };
   const [form, setForm] = useState(blank);
+
+  // HMO / Block multi-tenant limits by subscription tier.
+  const HMO_LIMIT = { basic: 1, bronze: 2, silver: 3, gold: 5 };
+  const hmoCap = HMO_LIMIT[(tier || "basic").toLowerCase()] || 1;
+  // House / Flat = one joint tenancy (a couple share one agreement). HMO / Block = multiple separate tenants.
+  const propTypeOf = (pid) => { const p = properties.find((x) => String(x.id) === String(pid)); return p ? (p.type || "House") : null; };
+  const isMultiType = (t) => t === "HMO" || t === "Block";
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -420,7 +427,7 @@ export function TenantsPage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending" }); setEditId(t.id); setAdding(true); setErr(""); };
+  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending", co_tenant_name: t.co_tenant_name || "", co_tenant_email: t.co_tenant_email || "", co_tenant_phone: t.co_tenant_phone || "" }); setEditId(t.id); setAdding(true); setErr(""); };
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (form.tenancy_end) {
@@ -432,9 +439,24 @@ export function TenantsPage({ user, go }) {
         if (end < start) { setErr("Tenancy end date can't be before the start date."); return; }
       }
     }
+    // Per-property tenant limits.
+    if (form.property_id) {
+      const ptype = propTypeOf(form.property_id);
+      const existing = (rows || []).filter((t) => String(t.property_id) === String(form.property_id) && t.id !== editId);
+      if (!isMultiType(ptype)) {
+        // House / Flat: only one tenancy record (the second person goes in the co-tenant section).
+        if (existing.length >= 1) { setErr(`A ${ptype} holds one tenancy. To add a partner, edit the existing tenant and use "Add co-tenant" — a joint agreement counts as one tenancy.`); return; }
+      } else {
+        // HMO / Block: multiple separate tenants, capped by tier.
+        if (existing.length >= hmoCap) { setErr(`Your ${(tier || "basic")} plan allows up to ${hmoCap} tenant${hmoCap === 1 ? "" : "s"} per ${ptype}. Upgrade to add more.`); return; }
+      }
+    }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
-    const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };    
+    const multi = isMultiType(propTypeOf(form.property_id));
+    const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    // Co-tenant only applies to a joint House/Flat tenancy — clear it on HMO/Block.
+    if (multi) { payload.co_tenant_name = ""; payload.co_tenant_email = ""; payload.co_tenant_phone = ""; }
     if (!payload.tenancy_end) delete payload.tenancy_end;
     if (!payload.tenancy_start) delete payload.tenancy_start;
     let error;
@@ -482,6 +504,22 @@ export function TenantsPage({ user, go }) {
               </div>
             </label>
           </div>
+
+          {form.property_id && !isMultiType(propTypeOf(form.property_id)) && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
+              <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 4, fontWeight: 500 }}>Co-tenant (optional)</div>
+              <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginBottom: 10, lineHeight: 1.5 }}>For a joint tenancy — e.g. a couple sharing one agreement. Counts as one tenancy.</div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
+                <label style={fld}>Co-tenant name<input style={inp} placeholder="e.g. James Connor" value={form.co_tenant_name} onChange={(e) => setForm({ ...form, co_tenant_name: e.target.value })} /></label>
+                <label style={fld}>Co-tenant email<input style={inp} type="email" placeholder="e.g. james@email.com" value={form.co_tenant_email} onChange={(e) => setForm({ ...form, co_tenant_email: e.target.value })} /></label>
+                <label style={fld}>Co-tenant phone<input style={inp} placeholder="e.g. 07700 900124" value={form.co_tenant_phone} onChange={(e) => setForm({ ...form, co_tenant_phone: e.target.value })} /></label>
+              </div>
+            </div>
+          )}
+          {form.property_id && isMultiType(propTypeOf(form.property_id)) && (
+            <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--txt-3)" }}>{propTypeOf(form.property_id)} — add separate tenants individually (up to {hmoCap} on your {(tier || "basic")} plan).</div>
+          )}
+
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update tenant" : "Save tenant"} primary /></span></div>
         </div>
       )}
@@ -508,7 +546,10 @@ export function TenantsPage({ user, go }) {
                   <Td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600 }}>{(t.name || "?").split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
-                      <span style={{ fontWeight: 500 }}>{t.name}</span>
+                      <span style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: 500 }}>{t.name}</span>
+                        {t.co_tenant_name ? <span style={{ fontSize: 10.5, color: "var(--txt-3)" }}>+ {t.co_tenant_name} (joint)</span> : null}
+                      </span>
                     </div>
                   </Td>
                   <Td color="var(--txt-2)">{propName}</Td>
