@@ -345,9 +345,12 @@ export function FinancePage({ user, go }) {
     // months already raised, keyed property_id + YYYY-MM
     const raised = new Set((rows || []).map((r) => `${r.property_id}|${(r.due_date || "").slice(0, 7)}`));
     fullProps.filter((p) => p.status === "Let" && p.rent && p.invoice_day).forEach((p) => {
-      const day = Math.min(28, Math.max(1, +p.invoice_day));
+      const wantDay = Math.min(31, Math.max(1, +p.invoice_day));
       for (let m = 0; m < 12; m++) {
-        const d = new Date(now.getFullYear(), now.getMonth() + m, day);
+        const yr = now.getFullYear(), mo = now.getMonth() + m;
+        const lastDay = new Date(yr, mo + 1, 0).getDate(); // last calendar day of this month
+        const day = Math.min(wantDay, lastDay);            // 31 → 28/29/30 as appropriate
+        const d = new Date(yr, mo, day);
         if (d < now) continue;
         const key = `${p.id}|${ym(d)}`;
         if (raised.has(key)) continue;
