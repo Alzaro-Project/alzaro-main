@@ -36,16 +36,6 @@ export function DashboardPage({ range, go, user }) {
   const score = hasCerts ? Math.max(0, Math.round((valid / certs.length) * 100)) : null;
   const attention = certs.filter((c) => c.days !== null && c.days <= 30).length;
 
-  // Combined "Expiring Soon" — certificates AND tenancy end dates, within 60 days (or already passed).
-  const certItems = certs
-    .filter((c) => c.days !== null && c.days <= 60)
-    .map((c) => ({ kind: "cert", id: "c" + c.id, label: c.type, sub: c.property || c.reference || "—", days: c.days, icon: toneFor[c.type] || "ti-shield-check", page: "compliance" }));
-  const tenancyItems = (tenants || [])
-    .filter((t) => t.tenancy_end)
-    .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
-    .filter((t) => t.days <= 60);
-  const expiringSoon = [...certItems, ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
-
   // finance
   const arrears = pays.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
   const arrearsCount = pays.filter((p) => p.status === "Overdue").length;
@@ -56,6 +46,16 @@ export function DashboardPage({ range, go, user }) {
 
   const toneFor = { "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing", "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug", "Buildings Insurance": "ti-umbrella", "HMO Licence": "ti-license", "Fire Risk Assessment": "ti-fire-extinguisher" };
   const certTone = (d) => d < 0 || d <= 7 ? "red" : d <= 30 ? "amber" : "blue";
+
+  // Combined "Expiring Soon" — certificates AND tenancy end dates, within 60 days (or already passed).
+  const certItems = certs
+    .filter((c) => c.days !== null && c.days <= 60)
+    .map((c) => ({ kind: "cert", id: "c" + c.id, label: c.type, sub: c.property || c.reference || "—", days: c.days, icon: toneFor[c.type] || "ti-shield-check", page: "compliance" }));
+  const tenancyItems = (tenants || [])
+    .filter((t) => t.tenancy_end)
+    .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
+    .filter((t) => t.days <= 60);
+  const expiringSoon = [...certItems, ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
   const name = user ? user.email.split("@")[0] : "there";
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
