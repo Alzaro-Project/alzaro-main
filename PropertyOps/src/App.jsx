@@ -136,7 +136,7 @@ function Dashboard({ user, signOut }) {
     );
   }
   else if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
-  else { const P = PAGES[active]; body = <P user={user} go={setActive} />; }
+  else { const P = PAGES[active]; body = <P user={user} go={setActive} tier={biz.tier} />; }
 
   const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
 
