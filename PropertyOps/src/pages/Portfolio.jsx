@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Btn, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner } from "../components/UI.jsx";
-import { gbp, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 export function DashboardPage({ range, go, user }) {
@@ -236,13 +236,13 @@ export function PropertiesPage({ user, go }) {
                           {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
                         </DetailBox>
                         <DetailBox title="Compliance" icon="ti-shield-check" empty={pC.length === 0} emptyText="No certificates tracked." onClick={() => go && go("compliance")}>
-                          {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                          {pC.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${ukDate(c.expiry_date)}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
                         </DetailBox>
                         <DetailBox title="Maintenance" icon="ti-tools" empty={pM.length === 0} emptyText="No maintenance jobs." onClick={() => go && go("maintenance")}>
                           {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
                         </DetailBox>
                         <DetailBox title="Payments" icon="ti-coin" empty={pP.length === 0} emptyText="No payments logged." onClick={() => go && go("finance")}>
-                          {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                          {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
                         </DetailBox>
                       </div>
                     </td>
@@ -565,8 +565,8 @@ export function TenantsPage({ user, go, tier }) {
                     </div>
                   </Td>
                   <Td color="var(--txt-2)">{propName}</Td>
-                  <Td color="var(--txt-2)">{t.tenancy_start || "—"}</Td>
-                  <Td color="var(--txt-2)">{t.tenancy_end || "—"}</Td>
+                  <Td color="var(--txt-2)">{ukDate(t.tenancy_start)}</Td>
+                  <Td color="var(--txt-2)">{ukDate(t.tenancy_end)}</Td>
                   <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
                   <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
                   <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
@@ -582,10 +582,10 @@ export function TenantsPage({ user, go, tier }) {
                           {(t.deposit_amount || t.deposit_protected) && <DetailRow main={t.deposit_amount ? gbp(t.deposit_amount) : "—"} sub="Deposit" pill={t.deposit_protected ? "DPS protected" : "Not protected"} tone={t.deposit_protected ? "green" : "amber"} />}
                         </DetailBox>
                         <DetailBox title="Payments" icon="ti-coin" empty={tPays.length === 0} emptyText="No payments linked." onClick={() => go && go("finance")}>
-                          {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date || ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                          {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
                         </DetailBox>
                         <DetailBox title="Property Compliance" icon="ti-shield-check" empty={tComp.length === 0} emptyText={pid ? "No certificates on this property." : "Link a property to see its certificates."} onClick={() => go && go("compliance")}>
-                          {tComp.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${c.expiry_date}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
+                          {tComp.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${ukDate(c.expiry_date)}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
                         </DetailBox>
                         <DetailBox title="Property Maintenance" icon="ti-tools" empty={tMaint.length === 0} emptyText={pid ? "No maintenance on this property." : "Link a property to see its jobs."} onClick={() => go && go("maintenance")}>
                           {tMaint.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
