@@ -170,7 +170,7 @@ function Dashboard({ user, signOut }) {
       </div>
     );
   }
-  else if (active === "dashboard") body = <DashboardPage range={range} go={navigate} user={user} />;
+  else if (active === "dashboard") body = <DashboardPage range={range} go={navigate} user={user} tier={biz.tier} />;
   else { const P = PAGES[active]; body = <P user={user} go={navigate} tier={biz.tier} />; }
 
   const goTo = navigate;
