@@ -114,7 +114,7 @@ export function DashboardPage({ range, go, user }) {
 }
 
 
-export function PropertiesPage({ user, go }) {
+export function PropertiesPage({ user, go, tier }) {
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
   const [rows, setRows] = useState(null);   // null = loading
@@ -125,6 +125,13 @@ export function PropertiesPage({ user, go }) {
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [], pays: [] });
   const blank = { address: "", area: "", type: "House", status: "Let", rent: "", invoice_day: "" };
   const [form, setForm] = useState(blank);
+
+  // Property count limits by subscription tier. Infinity = unlimited.
+  // Matches the plan cards: Basic 5, Bronze 15, Silver & Gold unlimited.
+  const PROPERTY_LIMIT = { basic: 5, bronze: 15, silver: Infinity, gold: Infinity };
+  const propCap = PROPERTY_LIMIT[(tier || "basic").toLowerCase()] ?? 5;
+  const propCount = (rows || []).length;
+  const atLimit = propCount >= propCap;
 
   React.useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -144,11 +151,22 @@ export function PropertiesPage({ user, go }) {
     setRows(data || []);
   };
 
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openAdd = () => {
+    if (!adding && atLimit) {
+      setErr(`Your ${(tier || "basic")} plan includes up to ${propCap} properties. Upgrade to add more.`);
+      return;
+    }
+    setForm(blank); setEditId(null); setAdding(!adding); setErr("");
+  };
   const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "", invoice_day: p.invoice_day || "" }); setEditId(p.id); setAdding(true); setErr(""); };
   const save = async () => {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
+    // Enforce the property cap on new additions (edits are always allowed).
+    if (!editId && atLimit) {
+      setErr(`Your ${(tier || "basic")} plan includes up to ${propCap} properties. Upgrade to add more.`);
+      return;
+    }
     setErr("");
     const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, invoice_day: form.invoice_day === "" ? null : Math.min(31, Math.max(1, +form.invoice_day)) };
     let error;
@@ -168,8 +186,8 @@ export function PropertiesPage({ user, go }) {
 
   return (
     <div className="fade-in">
-      <PageHead title="Properties" sub={rows ? `${list.length} ${DB_READY ? "" : "(demo) "}properties` : "Loading…"}
-        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add property"} primary /></span>} />
+      <PageHead title="Properties" sub={rows ? `${propCount}${propCap === Infinity ? "" : ` / ${propCap}`} ${DB_READY ? "" : "(demo) "}properties${atLimit && propCap !== Infinity ? " · limit reached" : ""}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : (atLimit ? "ti-lock" : "ti-plus")} label={adding ? "Cancel" : "Add property"} primary /></span>} />
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
