@@ -19,7 +19,14 @@ const PAGES = {
 function Dashboard({ user, signOut }) {
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState(() => {
+    // Derive the starting page from the URL, e.g. /propertyops/reports -> "reports".
+    try {
+      const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+      const known = ["dashboard", ...Object.keys(PAGES)];
+      return known.includes(seg) ? seg : "dashboard";
+    } catch (e) { return "dashboard"; }
+  });
   const [range, setRange] = useState("This Month");
   const [light, setLight] = useState(() => {
     try { return localStorage.getItem("propops_theme") === "light"; } catch (e) { return false; }
@@ -27,6 +34,34 @@ function Dashboard({ user, signOut }) {
   const [allData, setAllData] = useState(null);
   const [query, setQuery] = useState("");
   const [showNotif, setShowNotif] = useState(false);
+
+  // ---- URL sync: keep the browser address bar in step with the active page ----
+  // Base path the app is served under, e.g. "/propertyops". Everything routes
+  // to /propertyops/<page> so each screen is a real, shareable, refreshable URL.
+  const BASE = "/propertyops";
+  const navigate = (page, push = true) => {
+    setActive(page);
+    setQuery("");
+    setShowNotif(false);
+    if (push && typeof window !== "undefined") {
+      const url = `${BASE}/${page}`;
+      if (window.location.pathname !== url) window.history.pushState({ page }, "", url);
+    }
+  };
+  useEffect(() => {
+    const onPop = () => {
+      const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+      const known = ["dashboard", ...Object.keys(PAGES)];
+      setActive(known.includes(seg) ? seg : "dashboard");
+    };
+    window.addEventListener("popstate", onPop);
+    // Normalise the address bar on first load (e.g. /propertyops or /register
+    // becomes /propertyops/<active>) without adding a history entry.
+    const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+    const known = ["dashboard", ...Object.keys(PAGES)];
+    if (!known.includes(seg)) window.history.replaceState({ page: active }, "", `${BASE}/${active}`);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   // ---- business identity for the sidebar (real DB data, not email) ----
   // Priority: prop_settings.company_name → product_members.company_name →
@@ -130,15 +165,15 @@ function Dashboard({ user, signOut }) {
           <i className="ti ti-lock" style={{ fontSize: 44, color: "var(--brand)", marginBottom: 14, display: "block" }} />
           <div style={{ fontSize: 21, fontWeight: 700, marginBottom: 8 }}>{activeNavItem ? activeNavItem.label : "This feature"} is a {tn.charAt(0).toUpperCase() + tn.slice(1)} feature</div>
           <div style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>Upgrade your plan to unlock this and other tools.</div>
-          <div onClick={() => setActive("settings")} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>View plans</div>
+          <div onClick={() => navigate("settings")} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>View plans</div>
         </div>
       </div>
     );
   }
-  else if (active === "dashboard") body = <DashboardPage range={range} go={setActive} user={user} />;
-  else { const P = PAGES[active]; body = <P user={user} go={setActive} tier={biz.tier} />; }
+  else if (active === "dashboard") body = <DashboardPage range={range} go={navigate} user={user} />;
+  else { const P = PAGES[active]; body = <P user={user} go={navigate} tier={biz.tier} />; }
 
-  const goTo = (page) => { setActive(page); setQuery(""); setShowNotif(false); };
+  const goTo = navigate;
 
   // resolved sidebar identity
   const badge = tierBadge(biz.tier);
@@ -201,7 +236,7 @@ function Dashboard({ user, signOut }) {
             const on = n.id === active;
             const locked = !tierAllows(n.min);
             return (
-              <div key={n.id} onClick={() => { setActive(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--brand-soft, rgba(79,70,229,0.1))" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", opacity: locked ? 0.55 : 1 }}
+              <div key={n.id} onClick={() => { navigate(n.id); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px" : "10px 16px", margin: "2px 8px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: on ? 600 : 500, transition: "all .12s", background: on ? "var(--brand-soft, rgba(79,70,229,0.1))" : "transparent", color: on ? "var(--txt)" : "var(--txt-2)", opacity: locked ? 0.55 : 1 }}
                 onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "rgba(127,127,127,0.08)"; }}
                 onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
                 <i className={`ti ${n.icon}`} style={{ fontSize: 16, width: 20, textAlign: "center", color: on ? "var(--brand)" : "var(--txt-2)" }} />
