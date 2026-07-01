@@ -24,3 +24,22 @@
     body.light input[type=date]{color-scheme:light;}
     .fade-in{animation:fade .5s ease both;}
     @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+    /* Never allow the page itself to scroll sideways on a phone. */
+    html,body{max-width:100%;overflow-x:hidden;}
+
+    /* ===== Mobile (phones / small tablets) ===== */
+    @media (max-width: 880px){
+      /* 16px inputs stop iOS Safari from auto-zooming when a field is focused. */
+      input, select, textarea, button{font-size:16px !important;}
+      /* Comfortable tap height for form controls. */
+      input:not([type=checkbox]):not([type=radio]), select{min-height:44px;}
+      /* Wide tables scroll inside their own container, not the whole page. */
+      .tbl-scroll{-webkit-overflow-scrolling:touch;}
+      /* Headings scale down a touch so they don't dominate small screens. */
+      h1{font-size:22px;} h2{font-size:18px;}
+      /* Long words / emails / references wrap instead of forcing overflow. */
+      body{word-break:break-word;}
+    }
+    /* Give any element opting in a guaranteed 44px tap target. */
+    .tap-target{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;}
