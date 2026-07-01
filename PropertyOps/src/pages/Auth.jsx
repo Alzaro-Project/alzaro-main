@@ -2,7 +2,10 @@ import { useState, useEffect } from "react";
 import { db, DB_READY } from "../lib/supabase.js";
 
 export function AuthScreen() {
-  const wantsSignup = typeof window !== "undefined" && (window.location.hash === "#signup" || window.location.hash === "#register");
+  const wantsSignup = typeof window !== "undefined" && (
+    window.location.hash === "#signup" || window.location.hash === "#register" ||
+    /\/register\/?$/.test(window.location.pathname)
+  );
   const [tab, setTab] = useState(wantsSignup ? "register" : "login");   // "login" | "register"
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -15,8 +18,9 @@ export function AuthScreen() {
   useEffect(() => {
     const applyHash = () => {
       const h = window.location.hash;
-      if (h === "#signup" || h === "#register") setTab("register");
-      else if (h === "#login") setTab("login");
+      const p = window.location.pathname;
+      if (h === "#signup" || h === "#register" || /\/register\/?$/.test(p)) setTab("register");
+      else if (h === "#login" || /\/login\/?$/.test(p)) setTab("login");
     };
     applyHash();
     window.addEventListener("hashchange", applyHash);
