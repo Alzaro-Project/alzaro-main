@@ -3,6 +3,143 @@ import { Btn, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, We
 import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
+// ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
+// Injected once. Scoped to .pdash-* so it can't collide with other styles.
+if (typeof document !== "undefined" && !document.getElementById("pdash-css")) {
+  const st = document.createElement("style");
+  st.id = "pdash-css";
+  st.textContent = `
+    .pdash-card {
+      transition: transform .25s cubic-bezier(.2,.8,.3,1), box-shadow .25s ease, border-color .25s ease;
+      will-change: transform;
+      animation: pdashIn .45s cubic-bezier(.2,.8,.3,1) backwards;
+    }
+    .pdash-card:hover {
+      box-shadow: 0 16px 36px rgba(0,0,0,.28);
+      border-color: var(--line-2) !important;
+      transition: transform .06s linear, box-shadow .25s ease, border-color .25s ease;
+    }
+    @keyframes pdashIn { from { opacity:0; transform: translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
+    .pdash-row { transition: background .15s ease, padding-left .15s ease; }
+    .pdash-row:hover { background: var(--panel-2); padding-left: 12px !important; }
+    @media (prefers-reduced-motion: reduce) { .pdash-card { animation:none; transition:none; } }
+  `;
+  document.head.appendChild(st);
+}
+
+// Interactive card: follows the cursor with a subtle 3D tilt, lifts on hover,
+// shows a soft glow in the accent colour, and slides an arrow if clickable.
+function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onClick, index = 0, children }) {
+  const ref = React.useRef(null);
+  const [transform, setTransform] = useState("");
+  const [hover, setHover] = useState(false);
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    setTransform(`perspective(700px) rotateX(${(-y * 5).toFixed(2)}deg) rotateY(${(x * 7).toFixed(2)}deg) translateY(-4px) scale(1.02)`);
+  };
+  const onLeave = () => { setTransform(""); setHover(false); };
+  return (
+    <div ref={ref} className="pdash-card" onMouseMove={onMove} onMouseEnter={() => setHover(true)} onMouseLeave={onLeave} onClick={onClick}
+      style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: 16, cursor: onClick ? "pointer" : "default", position: "relative", overflow: "hidden", transform, animationDelay: `${index * 55}ms` }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hover ? 1 : 0, transition: "opacity .25s",
+        background: `radial-gradient(420px circle at 30% 0%, color-mix(in srgb, ${color} 16%, transparent), transparent 70%)` }} />
+      {children ? children : (<>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {icon && <span style={{ width: 26, height: 26, borderRadius: 7, background: `color-mix(in srgb, ${color} 14%, transparent)`, color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${icon}`} style={{ fontSize: 15 }} /></span>}
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: ".6px", textTransform: "uppercase", color: "var(--txt-3)" }}>{label}</div>
+          </div>
+          {onClick && <i className="ti ti-arrow-right" style={{ fontSize: 15, color, opacity: hover ? 1 : 0.3, transform: hover ? "translateX(2px)" : "none", transition: "transform .2s, opacity .2s" }} />}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color }}>{value}</div>
+        {sub && <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)" }}>{sub}</div>}
+      </>)}
+    </div>
+  );
+}
+
+// 6-month rent chart: Collected (Paid) vs Outstanding (Pending + Overdue),
+// grouped by due-date month. Hand-drawn bars (no chart library), with a hover
+// tooltip, gridlines and a legend — matching the interactive card style.
+function RentChart({ pays, go }) {
+  const [hov, setHov] = useState(null);
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    months.push({ key, label: d.toLocaleDateString("en-GB", { month: "short" }), collected: 0, outstanding: 0 });
+  }
+  const idx = Object.fromEntries(months.map((m, i) => [m.key, i]));
+  (pays || []).forEach((p) => {
+    const dateStr = p.due_date || p.billing_date;
+    if (!dateStr) return;
+    const key = String(dateStr).slice(0, 7);
+    if (!(key in idx)) return;
+    const amt = +p.amount || 0;
+    if (p.status === "Paid") months[idx[key]].collected += amt;
+    else months[idx[key]].outstanding += amt; // Pending or Overdue
+  });
+  const maxVal = Math.max(...months.map((m) => m.collected + m.outstanding), 1) * 1.15;
+  const totalCollected = months.reduce((s, m) => s + m.collected, 0);
+  const hasAny = months.some((m) => m.collected || m.outstanding);
+
+  return (
+    <div className="pdash-card" onClick={() => go("finance")}
+      style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: 16, cursor: "pointer", position: "relative", overflow: "hidden", animationDelay: "0ms" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: ".6px", textTransform: "uppercase", color: "var(--txt-3)" }}>Rent Collected · Last 6 Months</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--green)" }}>{gbp(totalCollected)}</div>
+      </div>
+
+      {!hasAny ? (
+        <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "28px 0", textAlign: "center" }}>No rent payments logged yet. Add payments in Finance to see them here.</div>
+      ) : (
+        <>
+          <div style={{ position: "relative", height: 150, marginTop: 14 }}>
+            {[0.25, 0.5, 0.75, 1].map((g) => (
+              <div key={g} style={{ position: "absolute", left: 0, right: 0, bottom: `${g * 100}%`, borderTop: "0.5px solid var(--line)", opacity: 0.6 }} />
+            ))}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: "100%", position: "relative" }}>
+              {months.map((m, i) => {
+                const total = m.collected + m.outstanding;
+                const collH = (m.collected / maxVal) * 100;
+                const outH = (m.outstanding / maxVal) * 100;
+                return (
+                  <div key={m.key} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
+                    style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", cursor: "pointer" }}>
+                    <div style={{ width: "72%", maxWidth: 46, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", borderRadius: 6, overflow: "hidden", opacity: hov === null || hov === i ? 1 : 0.45, transition: "opacity .15s" }}>
+                      {outH > 0 && <div style={{ height: `${outH}%`, background: "var(--amber)", transition: "height .3s ease" }} />}
+                      <div style={{ height: `${collH}%`, background: "var(--green)", transition: "height .3s ease" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {hov !== null && (
+              <div style={{ position: "absolute", top: -6, left: `${(hov + 0.5) * (100 / 6)}%`, transform: "translateX(-50%)", background: "var(--panel-2)", border: "0.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 11, whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5, boxShadow: "0 8px 20px rgba(0,0,0,.25)" }}>
+                <div style={{ color: "var(--txt-3)", fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{months[hov].label}</div>
+                <div style={{ color: "var(--green)" }}>Collected {gbp(Math.round(months[hov].collected))}</div>
+                <div style={{ color: "var(--amber)" }}>Outstanding {gbp(Math.round(months[hov].outstanding))}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+            {months.map((m) => <div key={m.key} style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: "var(--txt-3)" }}>{m.label}</div>)}
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--line)" }}>
+            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, background: "var(--green)", borderRadius: 2 }} />Collected</span>
+            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, background: "var(--amber)", borderRadius: 2 }} />Outstanding</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function DashboardPage({ range, go, user }) {
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
@@ -64,10 +201,15 @@ export function DashboardPage({ range, go, user }) {
     <div className="fade-in">
       <WelcomeBanner data={data} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Compliance Score" value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
-        <Metric label="Rent Arrears" value={gbp(arrears)} sub={`${arrearsCount} overdue`} color={arrears ? "var(--red)" : "var(--green)"} />
-        <Metric label="Occupancy" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} color="var(--blue)" />
-        <Metric label="Monthly Income" value={gbp(income)} sub="From let properties" color="var(--brand)" />
+        <TiltCard index={0} onClick={() => go("compliance")} icon="ti-shield-check" label="Compliance Score" color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"}
+          value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>}
+          sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} />
+        <TiltCard index={1} onClick={() => go("finance")} icon="ti-coin" label="Rent Arrears" color={arrears ? "var(--red)" : "var(--green)"} value={gbp(arrears)} sub={`${arrearsCount} overdue`} />
+        <TiltCard index={2} onClick={() => go("properties")} icon="ti-home-check" label="Occupancy" color="var(--blue)" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} />
+        <TiltCard index={3} onClick={() => go("finance")} icon="ti-cash" label="Monthly Income" color="var(--brand)" value={gbp(income)} sub="From let properties" />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <RentChart pays={pays} go={go} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
         <Panel title="Expiring Soon" action="View all" onAction={() => go("compliance")}>
@@ -76,7 +218,7 @@ export function DashboardPage({ range, go, user }) {
           ) : expiringSoon.map((c, i) => {
             const t = toneVar(certTone(c.days));
             return (
-              <div key={c.id || i} onClick={() => go(c.page)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer" }}>
+              <div key={c.id || i} className="pdash-row" onClick={() => go(c.page)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < expiringSoon.length - 1 ? "0.5px solid var(--line)" : "none", cursor: "pointer", margin: "0 -8px", paddingLeft: 8, paddingRight: 8, borderRadius: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                   <span style={{ width: 30, height: 30, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${c.icon}`} style={{ fontSize: 16 }} /></span>
                   <div><div style={{ fontSize: 12.5 }}>{c.label}{c.sub && c.sub !== "—" ? " · " + c.sub : ""}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{c.kind === "tenancy" ? "Tenancy end date" : "Certificate"}</div></div>
@@ -95,8 +237,7 @@ export function DashboardPage({ range, go, user }) {
               { label: "Open maintenance", val: openMaint, page: "maintenance" },
               { label: "Payments logged", val: pays.length, page: "finance" },
             ].map((r, i) => (
-              <div key={i} onClick={() => go(r.page)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "8px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer" }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "var(--panel-2)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+              <div key={i} className="pdash-row" onClick={() => go(r.page)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "8px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer" }}>
                 <span style={{ color: "var(--txt-2)" }}>{r.label}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ fontWeight: 600 }}>{r.val}</span><i className="ti ti-chevron-right" style={{ fontSize: 13, color: "var(--txt-3)" }} /></span>
               </div>
@@ -105,9 +246,9 @@ export function DashboardPage({ range, go, user }) {
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
-        <span style={{ cursor: "pointer" }} onClick={() => go("maintenance")}><Metric label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" /></span>
-        <span style={{ cursor: "pointer" }} onClick={() => go("compliance")}><Metric label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" /></span>
-        <span style={{ cursor: "pointer" }} onClick={() => go("properties")}><Metric label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} color="var(--txt)" subColor={score >= 90 ? "var(--green)" : "var(--amber)"} /></span>
+        <TiltCard index={4} onClick={() => go("maintenance")} icon="ti-tools" label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
+        <TiltCard index={5} onClick={() => go("compliance")} icon="ti-alert-triangle" label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
+        <TiltCard index={6} onClick={() => go("properties")} icon="ti-building-estate" label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} subColor={score >= 90 ? "var(--green)" : "var(--amber)"} color="var(--txt)" />
       </div>
     </div>
   );
