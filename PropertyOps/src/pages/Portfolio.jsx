@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Btn, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner } from "../components/UI.jsx";
-import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
@@ -29,11 +29,13 @@ if (typeof document !== "undefined" && !document.getElementById("pdash-css")) {
 
 // Interactive card: follows the cursor with a subtle 3D tilt, lifts on hover,
 // shows a soft glow in the accent colour, and slides an arrow if clickable.
-function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onClick, index = 0, children }) {
+// When `locked`, it shows a lock + tier tag instead of the value (upgrade nudge).
+function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onClick, index = 0, children, locked = false, lockTier }) {
   const ref = React.useRef(null);
   const [transform, setTransform] = useState("");
   const [hover, setHover] = useState(false);
   const onMove = (e) => {
+    if (locked) return;
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
     const x = (e.clientX - r.left) / r.width - 0.5;
@@ -41,21 +43,33 @@ function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onC
     setTransform(`perspective(700px) rotateX(${(-y * 5).toFixed(2)}deg) rotateY(${(x * 7).toFixed(2)}deg) translateY(-4px) scale(1.02)`);
   };
   const onLeave = () => { setTransform(""); setHover(false); };
+  const tierName = lockTier ? lockTier.charAt(0).toUpperCase() + lockTier.slice(1) : "Silver";
   return (
     <div ref={ref} className="pdash-card" onMouseMove={onMove} onMouseEnter={() => setHover(true)} onMouseLeave={onLeave} onClick={onClick}
-      style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: 16, cursor: onClick ? "pointer" : "default", position: "relative", overflow: "hidden", transform, animationDelay: `${index * 55}ms` }}>
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hover ? 1 : 0, transition: "opacity .25s",
+      style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: 16, cursor: onClick ? "pointer" : "default", position: "relative", overflow: "hidden", transform, animationDelay: `${index * 55}ms`, opacity: locked ? 0.82 : 1 }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hover && !locked ? 1 : 0, transition: "opacity .25s",
         background: `radial-gradient(420px circle at 30% 0%, color-mix(in srgb, ${color} 16%, transparent), transparent 70%)` }} />
       {children ? children : (<>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {icon && <span style={{ width: 26, height: 26, borderRadius: 7, background: `color-mix(in srgb, ${color} 14%, transparent)`, color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${icon}`} style={{ fontSize: 15 }} /></span>}
+            {icon && <span style={{ width: 26, height: 26, borderRadius: 7, background: locked ? "var(--panel-2)" : `color-mix(in srgb, ${color} 14%, transparent)`, color: locked ? "var(--txt-3)" : color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${icon}`} style={{ fontSize: 15 }} /></span>}
             <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: ".6px", textTransform: "uppercase", color: "var(--txt-3)" }}>{label}</div>
           </div>
-          {onClick && <i className="ti ti-arrow-right" style={{ fontSize: 15, color, opacity: hover ? 1 : 0.3, transform: hover ? "translateX(2px)" : "none", transition: "transform .2s, opacity .2s" }} />}
+          {locked
+            ? <i className="ti ti-lock" style={{ fontSize: 14, color: "var(--txt-3)" }} />
+            : (onClick && <i className="ti ti-arrow-right" style={{ fontSize: 15, color, opacity: hover ? 1 : 0.3, transform: hover ? "translateX(2px)" : "none", transition: "transform .2s, opacity .2s" }} />)}
         </div>
-        <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color }}>{value}</div>
-        {sub && <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)" }}>{sub}</div>}
+        {locked ? (
+          <>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 4, background: "var(--brand-soft)", color: "var(--brand)", fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7 }}>
+              <i className="ti ti-sparkles" style={{ fontSize: 13 }} />{tierName} feature
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Upgrade to unlock</div>
+          </>
+        ) : (<>
+          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color }}>{value}</div>
+          {sub && <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)" }}>{sub}</div>}
+        </>)}
       </>)}
     </div>
   );
@@ -140,9 +154,18 @@ function RentChart({ pays, go }) {
   );
 }
 
-export function DashboardPage({ range, go, user }) {
+export function DashboardPage({ range, go, user, tier }) {
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
+
+  // Which features this plan can open. Mirrors the nav gate so a dashboard card
+  // never promises data from a page the user is locked out of.
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((tier || "basic").toLowerCase()));
+  const featureMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
+  const allows = (id) => userTierIdx >= TIER_ORDER.indexOf(featureMin(id));
+  const canCompliance = allows("compliance");
+  const canFinance = allows("finance");
+  const canMaint = allows("maintenance");
 
   useEffect(() => {
     if (!DB_READY) { setData({ props: [], comp: [], pays: [], maint: [], tenants: [] }); return; }
@@ -192,7 +215,7 @@ export function DashboardPage({ range, go, user }) {
     .filter((t) => t.tenancy_end)
     .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
     .filter((t) => t.days <= 60);
-  const expiringSoon = [...certItems, ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
+  const expiringSoon = [...(canCompliance ? certItems : []), ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
   const name = user ? user.email.split("@")[0] : "there";
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -201,20 +224,22 @@ export function DashboardPage({ range, go, user }) {
     <div className="fade-in">
       <WelcomeBanner data={data} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <TiltCard index={0} onClick={() => go("compliance")} icon="ti-shield-check" label="Compliance Score" color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"}
+        <TiltCard index={0} onClick={() => go("compliance")} icon="ti-shield-check" locked={!canCompliance} lockTier={featureMin("compliance")} label="Compliance Score" color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"}
           value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>}
           sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} />
-        <TiltCard index={1} onClick={() => go("finance")} icon="ti-coin" label="Rent Arrears" color={arrears ? "var(--red)" : "var(--green)"} value={gbp(arrears)} sub={`${arrearsCount} overdue`} />
+        <TiltCard index={1} onClick={() => go("finance")} icon="ti-coin" locked={!canFinance} lockTier={featureMin("finance")} label="Rent Arrears" color={arrears ? "var(--red)" : "var(--green)"} value={gbp(arrears)} sub={`${arrearsCount} overdue`} />
         <TiltCard index={2} onClick={() => go("properties")} icon="ti-home-check" label="Occupancy" color="var(--blue)" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} />
-        <TiltCard index={3} onClick={() => go("finance")} icon="ti-cash" label="Monthly Income" color="var(--brand)" value={gbp(income)} sub="From let properties" />
+        <TiltCard index={3} onClick={() => go("finance")} icon="ti-cash" locked={!canFinance} lockTier={featureMin("finance")} label="Monthly Income" color="var(--brand)" value={gbp(income)} sub="From let properties" />
       </div>
-      <div style={{ marginBottom: 12 }}>
-        <RentChart pays={pays} go={go} />
-      </div>
+      {canFinance && (
+        <div style={{ marginBottom: 12 }}>
+          <RentChart pays={pays} go={go} />
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Expiring Soon" action="View all" onAction={() => go("compliance")}>
+        <Panel title="Expiring Soon" action="View all" onAction={() => go(canCompliance ? "compliance" : "tenants")}>
           {expiringSoon.length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 60 days. {(certs.length === 0 && (tenants || []).length === 0) && "Add certificates and tenants to track renewals here."}</div>
+            <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "8px 0" }}>Nothing expiring in the next 60 days. {((canCompliance ? certs.length : 0) === 0 && (tenants || []).length === 0) && (canCompliance ? "Add certificates and tenants to track renewals here." : "Add tenants to track tenancy renewals here.")}</div>
           ) : expiringSoon.map((c, i) => {
             const t = toneVar(certTone(c.days));
             return (
@@ -231,12 +256,12 @@ export function DashboardPage({ range, go, user }) {
         <Panel title="Portfolio Summary">
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {[
-              { label: "Properties", val: totalProps, page: "properties" },
-              { label: "Let / Vacant", val: `${letProps} / ${totalProps - letProps}`, page: "properties" },
-              { label: "Certificates tracked", val: certs.length, page: "compliance" },
-              { label: "Open maintenance", val: openMaint, page: "maintenance" },
-              { label: "Payments logged", val: pays.length, page: "finance" },
-            ].map((r, i) => (
+              { label: "Properties", val: totalProps, page: "properties", show: true },
+              { label: "Let / Vacant", val: `${letProps} / ${totalProps - letProps}`, page: "properties", show: true },
+              { label: "Certificates tracked", val: certs.length, page: "compliance", show: canCompliance },
+              { label: "Open maintenance", val: openMaint, page: "maintenance", show: canMaint },
+              { label: "Payments logged", val: pays.length, page: "finance", show: canFinance },
+            ].filter((r) => r.show).map((r, i) => (
               <div key={i} className="pdash-row" onClick={() => go(r.page)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "8px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer" }}>
                 <span style={{ color: "var(--txt-2)" }}>{r.label}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 7 }}><span style={{ fontWeight: 600 }}>{r.val}</span><i className="ti ti-chevron-right" style={{ fontSize: 13, color: "var(--txt-3)" }} /></span>
@@ -246,8 +271,8 @@ export function DashboardPage({ range, go, user }) {
         </Panel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
-        <TiltCard index={4} onClick={() => go("maintenance")} icon="ti-tools" label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
-        <TiltCard index={5} onClick={() => go("compliance")} icon="ti-alert-triangle" label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
+        <TiltCard index={4} onClick={() => go("maintenance")} icon="ti-tools" locked={!canMaint} lockTier={featureMin("maintenance")} label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
+        <TiltCard index={5} onClick={() => go("compliance")} icon="ti-alert-triangle" locked={!canCompliance} lockTier={featureMin("compliance")} label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
         <TiltCard index={6} onClick={() => go("properties")} icon="ti-building-estate" label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} subColor={score >= 90 ? "var(--green)" : "var(--amber)"} color="var(--txt)" />
       </div>
     </div>
