@@ -155,23 +155,26 @@ export function DetailRow({ main, sub, pill, tone }) {
 
 /* ===== ReportPreview ===== */
 export function ReportPreview({ report, onClose }) {
+  const isMobile = useIsMobile();
   const empty = report.rows.length === 0;
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? "0" : "40px 20px", zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: isMobile ? "16px 16px 0 0" : 14, width: "100%", maxWidth: isMobile ? "100%" : 640, maxHeight: isMobile ? "92vh" : "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)" }}>
           <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · ${report.period || "All time"} · your live data` : "Preview · coming soon"}</div></div>
-          <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
+          <i className="ti ti-x tap-target" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
         </div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: isMobile ? 16 : 20 }}>
           <div style={{ fontSize: 12.5, color: "var(--txt-2)", marginBottom: 16, lineHeight: 1.6 }}>{report.desc}</div>
           {empty ? (
             <div style={{ fontSize: 12.5, color: "var(--txt-3)", padding: "20px 0", textAlign: "center" }}>{report.wired ? "No data for this report yet — add some in the relevant section first." : "This report isn't wired to live data yet."}</div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)" }}>{c}</th>)}</tr></thead>
-              <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)" }}>{cell}</td>)}</tr>)}</tbody>
-            </table>
+            <div className="tbl-scroll" style={{ overflowX: "auto", margin: isMobile ? "0 -16px" : 0, padding: isMobile ? "0 16px" : 0 }}>
+              <table style={{ width: "100%", minWidth: isMobile ? Math.max(480, report.cols.length * 110) : undefined, borderCollapse: "collapse", fontSize: 12 }}>
+                <thead><tr style={{ borderBottom: "0.5px solid var(--line)" }}>{report.cols.map((c, i) => <th key={i} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--txt-3)", whiteSpace: "nowrap" }}>{c}</th>)}</tr></thead>
+                <tbody>{report.rows.map((r, i) => <tr key={i}>{r.map((cell, j) => <td key={j} style={{ padding: "9px 10px", borderBottom: "0.5px solid var(--line)", color: j === 0 ? "var(--txt)" : "var(--txt-2)", whiteSpace: "nowrap" }}>{cell}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
           )}
           {report.wired && !empty && (
             <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
