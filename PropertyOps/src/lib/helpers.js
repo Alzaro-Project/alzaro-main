@@ -32,7 +32,7 @@ export const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "ti-layout-dashboard", min: "basic" },
   { id: "properties", label: "Properties", icon: "ti-building-estate", min: "basic" },
   { id: "tenants", label: "Tenants", icon: "ti-users", min: "basic" },
-  { id: "finance", label: "Finance", icon: "ti-coin", min: "gold" },
+  { id: "finance", label: "Finance", icon: "ti-coin", min: "silver" },
   { id: "maintenance", label: "Maintenance", icon: "ti-tools", min: "bronze" },
   { id: "compliance", label: "Compliance", icon: "ti-shield-check", min: "silver" },
   { id: "documents", label: "Documents", icon: "ti-folder", min: "gold" },
