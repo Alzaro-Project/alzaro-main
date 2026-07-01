@@ -800,7 +800,9 @@ export function ReportsPage({ user }) {
 export function SettingsPage({ user }) {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("organisation");
-  const [org, setOrg] = useState({ company_name: "", vat_number: "" });
+  const [org, setOrg] = useState({ company_name: "", vat_number: "", address: "", city: "", postcode: "", phone: "", business_email: "", website: "", logo_url: "" });
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
   const [notif, setNotif] = useState({ notify_compliance: true, notify_rent: true, reminder_lead: "30 / 7 days before expiry" });
   const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
   const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
@@ -926,7 +928,7 @@ export function SettingsPage({ user }) {
       .then(({ data, error }) => {
         const row = !error && data && data.length ? data[0] : null;
         if (row) {
-          setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "" });
+          setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "", address: row.address || "", city: row.city || "", postcode: row.postcode || "", phone: row.phone || "", business_email: row.business_email || "", website: row.website || "", logo_url: row.logo_url || "" });
           setNotif({
             notify_compliance: row.notify_compliance !== false,
             notify_rent: row.notify_rent !== false,
@@ -962,6 +964,9 @@ export function SettingsPage({ user }) {
       user_id: user.id,
       company_name: org.company_name,
       vat_number: vat.vat_number || org.vat_number,
+      address: org.address, city: org.city, postcode: org.postcode,
+      phone: org.phone, business_email: org.business_email, website: org.website,
+      logo_url: org.logo_url,
       notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead,
       smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_port: email.smtp_port, smtp_secure: email.smtp_secure,
       smtp_user: email.smtp_user, smtp_pass: email.smtp_pass, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
@@ -971,13 +976,35 @@ export function SettingsPage({ user }) {
     // upsert, then read back to confirm it actually persisted
     const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
     if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
-    const { data: check, error: readErr } = await db.from("prop_settings").select("company_name,vat_number").eq("user_id", user.id);
+    const { data: check, error: readErr } = await db.from("prop_settings").select("company_name,vat_number,address,city,postcode,phone,business_email,website,logo_url").eq("user_id", user.id);
     setSaving(false);
     if (readErr) { setErr("Saved, but couldn't confirm: " + readErr.message); return; }
     const row = check && check.length ? check[0] : null;
     if (!row) { setErr("Save didn't persist — this usually means the prop_settings table is missing the new columns. Re-run the settings SQL in Supabase."); return; }
-    setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "" });
+    setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "", address: row.address || "", city: row.city || "", postcode: row.postcode || "", phone: row.phone || "", business_email: row.business_email || "", website: row.website || "", logo_url: row.logo_url || "" });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+
+  // Upload a company logo to the Supabase "logos" bucket, keyed by user id.
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError("");
+    if (!file.type.startsWith("image/")) { setLogoError("Please choose an image file (PNG or JPG)."); return; }
+    if (file.size > 2 * 1024 * 1024) { setLogoError("Logo must be under 2MB."); return; }
+    if (!DB_READY) { setLogoError("Add your Supabase keys to upload."); return; }
+    setLogoUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const path = `${user.id}.${ext}`;
+      const { error: upErr } = await db.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = db.storage.from("logos").getPublicUrl(path);
+      setOrg((o) => ({ ...o, logo_url: `${data.publicUrl}?v=${Date.now()}` }));
+    } catch (err) {
+      setLogoError("Upload failed: " + (err.message || "unknown error"));
+    }
+    setLogoUploading(false);
   };
 
   // Picking a provider preset fills host/port/security
@@ -1057,7 +1084,31 @@ export function SettingsPage({ user }) {
             {!loaded ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>Loading…</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <label style={fld}>Company name<input style={inp} placeholder="e.g. Alzaro Property Co." value={org.company_name} onChange={(e) => setOrg({ ...org, company_name: e.target.value })} /></label>
+                <label style={fld}>Address<input style={inp} placeholder="123 High Street" value={org.address} onChange={(e) => setOrg({ ...org, address: e.target.value })} /></label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <label style={fld}>City<input style={inp} placeholder="Bradford" value={org.city} onChange={(e) => setOrg({ ...org, city: e.target.value })} /></label>
+                  <label style={fld}>Postcode<input style={inp} placeholder="BD1 1AA" value={org.postcode} onChange={(e) => setOrg({ ...org, postcode: e.target.value })} /></label>
+                </div>
+                <label style={fld}>Phone<input style={inp} placeholder="01274 123456" value={org.phone} onChange={(e) => setOrg({ ...org, phone: e.target.value })} /></label>
+                <label style={fld}>Business email<input style={inp} placeholder="info@yourcompany.co.uk" value={org.business_email} onChange={(e) => setOrg({ ...org, business_email: e.target.value })} /></label>
+                <label style={fld}>Website<input style={inp} placeholder="www.yourcompany.co.uk" value={org.website} onChange={(e) => setOrg({ ...org, website: e.target.value })} /></label>
                 <label style={fld}>VAT number<input style={inp} placeholder="e.g. GB 123 4567 89" value={org.vat_number} onChange={(e) => setOrg({ ...org, vat_number: e.target.value })} /></label>
+                <div style={{ ...fld, gap: 8 }}>
+                  <span>Company logo</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 10, border: "0.5px solid var(--line)", background: "var(--panel-2)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                      {org.logo_url ? <img src={org.logo_url} alt="Company logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <i className="ti ti-photo" style={{ fontSize: 22, color: "var(--txt-3)" }} />}
+                    </div>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: logoUploading ? "default" : "pointer", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 13px", fontSize: 12, color: "var(--txt-2)" }}>
+                      <i className={`ti ${logoUploading ? "ti-loader" : "ti-upload"}`} style={{ fontSize: 14 }} />
+                      {logoUploading ? "Uploading…" : org.logo_url ? "Replace logo" : "Upload logo"}
+                      <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLogoUpload} disabled={logoUploading} style={{ display: "none" }} />
+                    </label>
+                    {org.logo_url && <span onClick={() => setOrg({ ...org, logo_url: "" })} style={{ fontSize: 12, color: "var(--red)", cursor: "pointer" }}>Remove</span>}
+                  </div>
+                  {logoError && <span style={{ fontSize: 11.5, color: "var(--red)" }}>{logoError}</span>}
+                  <span style={{ fontSize: 11, color: "var(--txt-3)" }}>PNG or JPG, under 2MB. Remember to Save changes.</span>
+                </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{(tiers.find((t) => t.key === currentTier) || {}).name || "Basic"}</span></div>
                 {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
