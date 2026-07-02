@@ -2,7 +2,7 @@ import React from 'react'
 import JSZip from 'jszip'
 import { card, btnPri, btnSec } from '../components/UI.jsx'
 
-export default function Reports({ invoices, expenses, mileage }) {
+export default function Reports({ invoices, expenses, mileage, canGold = false }) {
   const [msg, setMsg] = React.useState('')
 
   const download = (filename, rows) => {
@@ -95,14 +95,19 @@ export default function Reports({ invoices, expenses, mileage }) {
     }},
   ]
 
+  // The Tax summary and the Accountant export pack are sold as Gold features.
+  // On silver (Reports' own tier) they must not be reachable — hide the tax
+  // report card and keep it out of the zipped pack.
+  const visibleReports = canGold ? reports : reports.filter(r => r.id !== 'tax')
+
   return (
     <div style={card}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px', gap:'12px', flexWrap:'wrap' }}>
         <div style={{fontWeight:700}}>Reports</div>
-        <button style={btnPri} onClick={async () => {
+        {canGold && <button style={btnPri} onClick={async () => {
           try {
             const zip = new JSZip()
-            reports.forEach(r => { const [fn, rows] = r.build(); zip.file(fn, rows.map(row => row.map(c => {
+            visibleReports.forEach(r => { const [fn, rows] = r.build(); zip.file(fn, rows.map(row => row.map(c => {
               const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s
             }).join(',')).join('\n')) })
             const blob = await zip.generateAsync({ type:'blob' })
@@ -110,12 +115,12 @@ export default function Reports({ invoices, expenses, mileage }) {
             a.download = 'soloops-accountant-pack-' + new Date().toISOString().slice(0,10) + '.zip'; a.click()
             setMsg('Accountant pack downloaded (all reports zipped)'); setTimeout(()=>setMsg(''), 3000)
           } catch (e) { setMsg('Could not build pack: ' + (e.message||'')); setTimeout(()=>setMsg(''), 4000) }
-        }}>⬇ Accountant export pack</button>
+        }}>⬇ Accountant export pack</button>}
       </div>
-      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets). The accountant pack zips them all together.</div>
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets).{canGold && ' The accountant pack zips them all together.'}</div>
       {msg && <div style={{ background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--green)', marginBottom:'14px' }}>✓ {msg}</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px' }}>
-        {reports.map(r => (
+        {visibleReports.map(r => (
           <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'12px' }}>
             <div>
               <div style={{ fontWeight:700, fontSize:'14px' }}>{r.name}</div>

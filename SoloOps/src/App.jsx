@@ -3,10 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
+  deleteExpense, deleteMileage,
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
-import { NAV, TIER_ORDER, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
 import { MonthlyChart, Donut } from './components/Charts.jsx'
 import WelcomeBanner from './components/WelcomeBanner.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
@@ -27,6 +28,11 @@ function Shell() {
   const navigate = useNavigate()
   const { view: routeView } = useParams()
   const view = VALID_VIEWS.includes(routeView) ? routeView : 'dashboard'
+  // An unknown view (/soloops/<garbage>) still renders the dashboard; correct
+  // the URL to match rather than leaving a stale/invalid path in the bar.
+  useEffect(() => {
+    if (routeView && !VALID_VIEWS.includes(routeView)) navigate('/dashboard', { replace: true })
+  }, [routeView, navigate])
   const setView = (v) => navigate(`/${v}`)
 
   const [session, setSession] = useState(undefined)
@@ -46,6 +52,8 @@ function Shell() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [editInvoice, setEditInvoice] = useState(null)
+  const [editExpense, setEditExpense] = useState(null)
+  const [editMileage, setEditMileage] = useState(null)
   const [incFilter, setIncFilter] = useState('all')
   const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
@@ -140,6 +148,20 @@ function Shell() {
     if(error){ flash('Update failed'); return }
     loadAll(); flash('Marked as paid')
   }
+  const onEditExpense = (e) => { setEditExpense(e); setModal('expense') }
+  const onDeleteExpense = async (e) => {
+    if(!window.confirm(`Delete expense ${e.merchant||''} (${gbp(e.amount)})? This cannot be undone.`)) return
+    const { error } = await deleteExpense(e.id)
+    if(error){ flash('Delete failed'); return }
+    loadAll(); flash('Expense deleted')
+  }
+  const onEditMileage = (m) => { setEditMileage(m); setModal('mileage') }
+  const onDeleteMileage = async (m) => {
+    if(!window.confirm(`Delete journey ${m.start_loc||''} → ${m.end_loc||''} (${m.miles} mi)? This cannot be undone.`)) return
+    const { error } = await deleteMileage(m.id)
+    if(error){ flash('Delete failed'); return }
+    loadAll(); flash('Journey deleted')
+  }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
 
   const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
@@ -192,8 +214,18 @@ function Shell() {
   const uid = session.user.id
 
   // Subscription tier + gating. Source of truth: product_members (synced by the
-  // Stripe webhook). Fail closed to 'basic' if there's no row yet.
+  // Stripe webhook). Fail closed to 'basic' if there's no row yet. join_product
+  // already writes tier='gold' for new trial rows, so trials get full Gold
+  // access with no extra client-side grant needed.
   const tier = (member?.tier || 'basic').toLowerCase()
+  // Detect a genuinely live trial purely to annotate the badge ("gold · trial")
+  // so it isn't mistaken for a paid plan. Mirrors TrialGuard's midnight compare.
+  const onLiveTrial = (() => {
+    if (member?.status !== 'trial' || !member?.trial_ends) return false
+    const trialEnd = new Date(member.trial_ends); trialEnd.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return today <= trialEnd
+  })()
   const userTierIdx = Math.max(0, TIER_ORDER.indexOf(tier))
   const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || 'basic')
   const navMin = (k) => { const n = NAV.find(x => x[0] === k); return n ? n[3] : 'basic' }
@@ -201,9 +233,9 @@ function Shell() {
 
   return (
    <TrialGuard memberId={member?.id}>
-    <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
+    <div className="solo-shell" style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
 
-      <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
+      <aside className="solo-sidebar" style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
         <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
 
@@ -220,7 +252,7 @@ function Shell() {
             <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
               <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
               <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
-                <span>{tm.icon}</span>{tier}
+                <span>{tm.icon}</span>{tier}{onLiveTrial && ' · trial'}
               </span>
             </div>
           )
@@ -239,7 +271,9 @@ function Shell() {
             clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'clients' }) })
             invoices.forEach(i => { if ((`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q)) hits.push({ type:'Invoice', label:`${i.number||'—'} · ${i.client_name||''}`, view:'income' }) })
             expenses.forEach(e => { if ((`${e.merchant||''} ${e.category||''}`).toLowerCase().includes(q)) hits.push({ type:'Expense', label:`${e.merchant} · ${gbp(e.amount)}`, view:'expenses' }) })
-            const top = hits.slice(0, 8)
+            // Never surface hits that lead to a tier-locked page (e.g. expense
+            // hits at Basic) — clicking would just bounce off the lock screen.
+            const top = hits.filter(h => tierAllows(navMin(h.view))).slice(0, 8)
             return (
               <div style={{ position:'absolute', left:'4px', right:'4px', top:'46px', zIndex:50, background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'12px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', overflow:'hidden', maxHeight:'340px', overflowY:'auto' }}>
                 {top.length === 0
@@ -258,7 +292,7 @@ function Shell() {
           })()}
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
+        <div className="solo-nav" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
           {NAV.map(([k,label,,min]) => {
             const locked = !tierAllows(min)
             return (
@@ -300,7 +334,7 @@ function Shell() {
               </div>
             )}
             {['dashboard','income','expenses'].includes(view) && <>
-              <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
+              {tierAllows('bronze') && <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>}
               <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
             </>}
           </div>
@@ -319,23 +353,23 @@ function Shell() {
           ) : <>
 
           {view==='dashboard' && <>
-            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} />
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
+            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} canExpense={tierAllows('bronze')} />
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
               <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
-              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>
+              {tierAllows('bronze') && <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>}
               <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
               <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
             </div>
 
             <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
-              <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
+            <div style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
+              {tierAllows('bronze') && <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
                 {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
                   : <Donut rows={catRows} />}
-              </div>
+              </div>}
               <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <div style={{fontWeight:700}}>Outstanding invoices</div>
@@ -386,7 +420,7 @@ function Shell() {
                   <tbody>{rows.map(i => (
                     <tr key={i.id}>
                       <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
-                      <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
+                      <Td muted>{fmtDate(i.issue_date)}</Td><Td mono right>{gbp(i.total)}</Td>
                       <Td><Status s={i.status}/></Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
@@ -411,12 +445,18 @@ function Shell() {
             <div style={card}>
               {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
+                <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
                 <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
-                    <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
+                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
+                    <Td right>
+                      <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                        <button style={actBtn} onClick={()=>onEditExpense(e)}>Edit</button>
+                        <button style={actBtnDanger} onClick={()=>onDeleteExpense(e)}>Delete</button>
+                      </div>
+                    </Td>
                   </tr>))}</tbody>
               </table>}
             </div>
@@ -435,7 +475,7 @@ function Shell() {
           )}
 
           {view==='reports' && (
-            <Reports invoices={invoices} expenses={expenses} mileage={mileage} />
+            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} />
           )}
 
           {view==='documents' && (
@@ -482,12 +522,18 @@ function Shell() {
                 </div>
                 {fMileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
                 : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
+                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim','Actions']} /></thead>
                   <tbody>{fMileage.map(m => (
                     <tr key={m.id}>
-                      <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
+                      <Td muted mono>{fmtDate(m.journey_date)}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
                       <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
+                      <Td right>
+                        <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                          <button style={actBtn} onClick={()=>onEditMileage(m)}>Edit</button>
+                          <button style={actBtnDanger} onClick={()=>onDeleteMileage(m)}>Delete</button>
+                        </div>
+                      </Td>
                     </tr>))}</tbody>
                 </table>}
               </div>
@@ -527,7 +573,7 @@ function Shell() {
                     <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
                   </div>
                 </div>
-                <button style={btnSec} onClick={async()=>{ await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
+                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
                 <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
                 <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
                 <Check ok={invoices.length>0} t="Income recorded" />
@@ -546,9 +592,9 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={(r)=>{setModal(null);loadAll();flash(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added')}} uid={uid} expenses={expenses} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
-      {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
+      {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>

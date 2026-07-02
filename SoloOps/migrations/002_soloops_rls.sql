@@ -1,0 +1,42 @@
+-- ============================================================================
+-- SoloOps Row-Level Security — NO-OP / documentation only (do NOT run)
+-- ============================================================================
+-- This migration originally added ownership policies for every soloops_* table
+-- on the assumption that 001 had left them locked (RLS on, no policies).
+--
+-- A live policy check disproved that premise:
+--   * 8 of the 9 tables ALREADY had complete ownership RLS from before this
+--     bug sweep — own_select / own_insert / own_update / own_delete, plus an
+--     admin_select (and per-table variants like admin_docs / admin_access) that
+--     let an admin panel read across users.
+--   * The ONLY table genuinely missing a policy was soloops_invoice_lines, and
+--     that was already fixed earlier in the sweep by the soloops_invoice_lines_owner
+--     policy. (invoice_lines carries user_id, so a plain ownership policy in the
+--     same style as the other tables is correct and sufficient — FOR ALL covers
+--     select/insert/update/delete.)
+--
+-- Therefore there is NOTHING TO RUN here. Re-adding blanket "<table>_owner"
+-- FOR ALL policies would only stack redundant, overlapping permissive rules on
+-- top of the working own_*/admin_* policies (RLS is permissive-OR, so extra
+-- policies just add more ways in and make the rules hard to reason about), and
+-- it would needlessly re-touch soloops_access — the login table, which already
+-- works via own_access + insert_access.
+--
+-- This file is intentionally left as a no-op comment so the decision is on the
+-- record next to the schema migration (001).
+--
+-- ----------------------------------------------------------------------------
+-- Pre-existing cleanup opportunity (NOT from this sweep, optional, not urgent):
+--   * soloops_clients appears to have duplicate ownership policy sets
+--     (own_clients_* alongside own_*). Harmless but messy; consolidate to one
+--     set when convenient. Left alone here to avoid touching working policies.
+--
+-- Still genuinely deferred (bug #7, part 2 — a later, separately reviewed
+-- migration, only if/when you want server-side tier enforcement):
+--   * Tier/status enforcement: restrict INSERT on bronze+ tables to callers
+--     whose product_members row (product='soloops') has an active status and a
+--     sufficient tier. Reads the shared product_members table and can lock out
+--     paying users if the logic is wrong, so it must be reviewed on its own.
+--   * Unique index on soloops_invoices (user_id, number) — the backend
+--     equivalent of the client-side invoice-number uniqueness check.
+-- ============================================================================

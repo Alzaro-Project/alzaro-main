@@ -49,3 +49,60 @@ tbody tr:hover{ background: var(--surface2); }
 /* link/file inputs */
 label[data-hover]{ transition: border-color .15s ease, background .15s ease; }
 label[data-hover]:hover{ border-color: var(--orange) !important; }
+
+/* ============================================================
+   Responsive / mobile (bug #8)
+   The app shell, sidebar and content grids are laid out with
+   inline styles in App.jsx. These breakpoints override the
+   layout only: the fixed 230px+1fr shell collapses, the sticky
+   full-height sidebar becomes a top bar with a horizontally
+   scrolling nav, multi-column KPI/card grids stack, and wide
+   tables scroll sideways instead of overflowing the viewport.
+   Grids are matched by their inline grid-template-columns value
+   (rendered verbatim by React); the shell/sidebar/nav use the
+   solo-shell / solo-sidebar / solo-nav class hooks.
+   ============================================================ */
+@media (max-width: 860px){
+  /* Shell: single column, sidebar stacks above content */
+  .solo-shell{ grid-template-columns: 1fr !important; }
+  .solo-sidebar{
+    position: static !important;
+    height: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Nav: horizontal, swipeable strip instead of a tall vertical list.
+     Nav items already have flex-shrink:0, so they keep size and scroll. */
+  .solo-nav{
+    flex-direction: row !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+  }
+  .solo-nav [data-nav]{ white-space: nowrap; }
+  .solo-nav [data-nav]:hover{ padding-left: 14px !important; } /* cancel the desktop slide-in */
+
+  /* KPI / dense grids: 4- and 3-up become 2-up on tablets */
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(3,1fr)"]{ grid-template-columns: repeat(2,1fr) !important; }
+}
+
+@media (max-width: 560px){
+  /* Everything stacks to a single column on phones */
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(3,1fr)"],
+  [style*="repeat(2,1fr)"],
+  [style*="1fr 1fr"],
+  [style*="1.4fr 1fr 1fr auto"]{ grid-template-columns: 1fr !important; }
+
+  /* Tighter page padding */
+  .fade-in{ padding: 16px !important; }
+
+  /* Wide tables scroll horizontally rather than blowing out the layout */
+  .fade-in table{
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}

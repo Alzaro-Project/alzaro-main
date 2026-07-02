@@ -1,6 +1,6 @@
 import React from 'react'
 import Papa from 'papaparse'
-import { card, inp, btnPri, btnSec, gbp, ErrBox, CATEGORIES } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, gbp, ErrBox, CATEGORIES, parseDate } from '../components/UI.jsx'
 import { loadRules, insertExpenses, upsertRules } from '../lib/db.js'
 
 export default function BankImport({ uid, existingExpenses, onImported }) {
@@ -65,13 +65,14 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
       }
       if (amt <= 0 || !desc) return
 
-      let d = (r[map.date]||'').trim()
-      const dt = new Date(d)
-      if (!isNaN(dt)) d = dt.toISOString().slice(0,10)
-      const dupKey = `${d}|${amt.toFixed(2)}`
+      const rawDate = (r[map.date]||'').trim()
+      const iso = parseDate(rawDate)   // null if unparseable — never fall through to Postgres
+      const dupKey = iso ? `${iso}|${amt.toFixed(2)}` : ''
       out.push({
-        i, include: true, merchant: desc, category: categorise(desc),
-        amount: amt, spent_on: d, duplicate: existKeys.has(dupKey)
+        i, include: !!iso, badDate: !iso, rawDate,
+        merchant: desc, category: categorise(desc),
+        amount: amt, spent_on: iso || '',
+        duplicate: iso ? existKeys.has(dupKey) : false
       })
     })
     if (!out.length) { setErr('No expense (money-out) rows found with these columns. Check your mapping.'); return }
@@ -81,8 +82,8 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
   const setItem = (idx, patch) => setItems(items.map((it,k) => k===idx ? {...it, ...patch} : it))
 
   const doImport = async () => {
-    const chosen = items.filter(it => it.include)
-    if (!chosen.length) { setErr('Tick at least one row to import.'); return }
+    const chosen = items.filter(it => it.include && !it.badDate && it.spent_on)
+    if (!chosen.length) { setErr('Tick at least one row with a readable date to import.'); return }
     setBusy(true); setErr('')
     try {
       const payload = chosen.map(it => ({
@@ -148,6 +149,7 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
           <div style={{ fontSize:'13.5px', color:'var(--text2)', marginBottom:'14px' }}>
             {items.length} expense rows found. Untick anything you don't want, adjust categories, then import.
             {items.some(it=>it.duplicate) && <span style={{color:'var(--amber)'}}> Possible duplicates are flagged.</span>}
+            {items.some(it=>it.badDate) && <span style={{color:'var(--red)'}}> {items.filter(it=>it.badDate).length} row(s) have an unreadable date and can't be imported — fix the date in your CSV and re-import.</span>}
           </div>
           <div style={{ maxHeight:'380px', overflowY:'auto', border:'1px solid var(--border)', borderRadius:'10px' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -160,9 +162,14 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
                 {items.map((it,idx) => (
                   <tr key={idx} style={{ opacity: it.include?1:0.45 }}>
                     <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)'}}>
-                      <input type="checkbox" checked={it.include} onChange={e=>setItem(idx,{include:e.target.checked})} />
+                      <input type="checkbox" checked={it.include} disabled={it.badDate}
+                        title={it.badDate ? "This row's date couldn't be read — fix it in your CSV" : undefined}
+                        onChange={e=>setItem(idx,{include:e.target.checked})} />
                     </td>
-                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px', color:'var(--text3)', fontFamily:'Fira Code, monospace'}}>{it.spent_on}</td>
+                    <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px', color: it.badDate?'var(--red)':'var(--text3)', fontFamily:'Fira Code, monospace'}}>
+                      {it.badDate ? (it.rawDate || '—') : it.spent_on}
+                      {it.badDate && <span style={{ marginLeft:'8px', fontSize:'10.5px', color:'var(--red)', border:'1px solid rgba(239,68,68,.4)', borderRadius:'20px', padding:'1px 7px' }}>bad date</span>}
+                    </td>
                     <td style={{padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:'13px'}}>
                       {it.merchant}{it.duplicate && <span style={{ marginLeft:'8px', fontSize:'10.5px', color:'var(--amber)', border:'1px solid rgba(245,158,11,.4)', borderRadius:'20px', padding:'1px 7px' }}>dup?</span>}
                     </td>

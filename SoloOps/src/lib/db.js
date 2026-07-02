@@ -86,6 +86,12 @@ export async function loadClients() {
 export async function insertMileage(row) {
   return sb.from('soloops_mileage').insert(row)
 }
+export async function updateMileage(id, row) {
+  return sb.from('soloops_mileage').update(row).eq('id', id)
+}
+export async function deleteMileage(id) {
+  return sb.from('soloops_mileage').delete().eq('id', id)
+}
 
 // ---------- invoices ----------
 export async function insertInvoice(row) {
@@ -96,6 +102,11 @@ export async function updateInvoice(id, row) {
   return sb.from('soloops_invoices').update(row).eq('id', id)
 }
 export async function deleteInvoice(id) {
+  // Remove the invoice's line items first so they aren't orphaned. This keeps
+  // deletes clean even if the DB doesn't yet have the ON DELETE CASCADE from
+  // soloops_invoices (see migration); once the cascade exists this is a
+  // harmless no-op (the rows are already gone by the time the invoice drops).
+  await deleteInvoiceLines(id)
   return sb.from('soloops_invoices').delete().eq('id', id)
 }
 
@@ -122,6 +133,12 @@ export async function insertExpenses(rows) {
 }
 export async function updateExpenseReceipt(id, receipt_name) {
   return sb.from('soloops_expenses').update({ has_receipt: true, receipt_name }).eq('id', id)
+}
+export async function updateExpense(id, row) {
+  return sb.from('soloops_expenses').update(row).eq('id', id)
+}
+export async function deleteExpense(id) {
+  return sb.from('soloops_expenses').delete().eq('id', id)
 }
 
 // ---------- clients ----------
