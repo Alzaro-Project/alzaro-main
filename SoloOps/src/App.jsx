@@ -228,9 +228,9 @@ function Shell() {
 
   return (
    <TrialGuard memberId={member?.id}>
-    <div style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
+    <div className="solo-shell" style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
 
-      <aside style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
+      <aside className="solo-sidebar" style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
         <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
 
@@ -287,7 +287,7 @@ function Shell() {
           })()}
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
+        <div className="solo-nav" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
           {NAV.map(([k,label,,min]) => {
             const locked = !tierAllows(min)
             return (
