@@ -45,7 +45,8 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
     } catch (e) { setErr(e.message || 'Could not save client') }
     setBusy(false)
   }
-  const del = async (id) => {
+  const del = async (id, name) => {
+    if(!window.confirm(`Delete client ${name||''}? This cannot be undone.`)) return
     setBusy(true)
     try { await deleteClient(id); setSelected(null); onChange && onChange() }
     catch (e) { setErr(e.message||'Could not delete') }
@@ -142,7 +143,7 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
 
                   <div style={{ marginTop:'14px', display:'flex', gap:'8px' }}>
                     <button style={btnSec} onClick={(e)=>{e.stopPropagation(); open(c)}}>Edit</button>
-                    <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={(e)=>{e.stopPropagation(); del(c.id)}}>Delete</button>
+                    <button style={{ background:'none', border:'1px solid var(--red)', color:'var(--red)', borderRadius:'8px', padding:'9px 14px', cursor:'pointer', fontSize:'13px' }} onClick={(e)=>{e.stopPropagation(); del(c.id, c.name)}}>Delete</button>
                   </div>
                 </div>
               </td>

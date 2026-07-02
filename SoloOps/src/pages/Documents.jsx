@@ -52,7 +52,8 @@ export default function Documents({ uid, invoices, expenses }) {
     } catch (e) { setErr(e.message || 'Could not open preview') }
   }
 
-  const remove = async (id, path) => {
+  const remove = async (id, path, name) => {
+    if(!window.confirm(`Delete ${name||'this document'}? The file is permanently removed and cannot be undone.`)) return
     setBusy(true)
     try {
       await removeFiles([path])
@@ -95,7 +96,7 @@ export default function Documents({ uid, invoices, expenses }) {
             <Td right>
               <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>openPreview(d.storage_path, d.name)}>Preview</button>
               <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>download(d.storage_path, d.name)}>Download</button>
-              <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', fontSize:'13px' }} onClick={()=>remove(d.id, d.storage_path)}>✕</button>
+              <button style={{ background:'none', border:'1px solid var(--border)', color:'var(--text3)', borderRadius:'8px', padding:'6px 10px', cursor:'pointer', fontSize:'13px' }} onClick={()=>remove(d.id, d.storage_path, d.name)}>✕</button>
             </Td>
           </tr>))}</tbody>
       </table>}
