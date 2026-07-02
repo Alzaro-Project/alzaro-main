@@ -799,7 +799,23 @@ export function ReportsPage({ user }) {
 
 export function SettingsPage({ user }) {
   const isMobile = useIsMobile();
-  const [tab, setTab] = useState("organisation");
+  const validTabs = ["organisation", "notifications", "email", "vat", "subscription"];
+  const [tab, setTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.hash.replace("#", "");
+      if (validTabs.includes(h)) return h;
+    }
+    return "organisation";
+  });
+  // Open the right tab when arriving via a hash link (e.g. "View plans" → #subscription).
+  useEffect(() => {
+    const applyHash = () => {
+      const h = window.location.hash.replace("#", "");
+      if (validTabs.includes(h)) setTab(h);
+    };
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
   const [org, setOrg] = useState({ company_name: "", vat_number: "", address: "", city: "", postcode: "", phone: "", business_email: "", website: "", logo_url: "" });
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
@@ -1023,7 +1039,7 @@ export function SettingsPage({ user }) {
     try {
       const res = await fetch("/api/test-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: email.smtp_pass, fromName: email.smtp_from_name || org.company_name || "" }),
       });
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
