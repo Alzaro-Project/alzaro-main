@@ -42,8 +42,15 @@ function settingsPathFor(product) {
 async function customerIdForGarage(garageId) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!key) return null
+  // Match the auth-check fallback below: some deployments only set the VITE_
+  // prefixed URL. Without this fallback the lookup hits `undefined/rest/...`
+  // and every portal request wrongly reports "no Stripe customer on file".
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    'https://cxsaeftacozyphuejuxo.supabase.co'
   const url =
-    `${process.env.SUPABASE_URL}/rest/v1/product_members` +
+    `${supabaseUrl}/rest/v1/product_members` +
     `?id=eq.${encodeURIComponent(garageId)}&select=stripe_customer_id`
   const r = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
   if (!r.ok) return null
