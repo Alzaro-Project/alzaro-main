@@ -59,7 +59,9 @@ export function AuthScreen() {
     if (!DB_READY) return setMsg("Database not connected.");
     setBusy(true);
     const siteUrl = `${window.location.protocol}//${window.location.host}`;
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: `${siteUrl}/propertyops/login` });
+    // Lands on the dedicated reset screen (vercel.json already rewrites this
+    // route to the app). App.jsx detects the path and shows ResetPasswordScreen.
+    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: `${siteUrl}/propertyops/reset-password` });
     setBusy(false);
     if (error) setMsg(error.message);
     else setOk("Password reset link sent! Check your inbox (and spam folder).");
@@ -127,6 +129,110 @@ export function AuthScreen() {
                 <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center", fontFamily: "monospace", letterSpacing: 0.3 }}>No credit card · Cancel anytime · UK-based support</div>
               </div>
             )}
+          </>
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--txt-3)", fontFamily: "monospace", letterSpacing: 0.5 }}>Alzaro PropertyOps · Built for UK landlords · v1.0</div>
+    </div>
+  );
+}
+
+
+/* ===== RESET PASSWORD ===== */
+// Shown when the user arrives via the Supabase recovery link
+// (/propertyops/reset-password). The link itself signs them into a temporary
+// recovery session; this screen lets them set the new password, then signs
+// out and returns to login.
+export function ResetPasswordScreen() {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [done, setDone] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [linkOk, setLinkOk] = useState(false);
+
+  // A valid recovery link creates a session — no session means the link is
+  // invalid or expired. Give the token exchange a moment to complete first.
+  useEffect(() => {
+    let cancelled = false;
+    let settled = false;
+    const finish = (ok) => { if (cancelled || settled) return; settled = true; setLinkOk(ok); setChecked(true); };
+    const check = async () => {
+      const { data } = await db.auth.getSession();
+      if (data?.session) { finish(true); return; }
+      // Token may still be exchanging — listen briefly before giving up.
+      const { data: sub } = db.auth.onAuthStateChange((_e, s) => { if (s) finish(true); });
+      setTimeout(() => { sub.subscription.unsubscribe(); finish(false); }, 3000);
+    };
+    if (DB_READY) check(); else finish(false);
+    return () => { cancelled = true; };
+  }, []);
+
+  const doReset = async () => {
+    setMsg("");
+    if (!pw) return setMsg("Please enter a new password.");
+    if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
+    if (pw !== pw2) return setMsg("Passwords do not match.");
+    setBusy(true);
+    const { error } = await db.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) return setMsg(error.message || "Could not update your password.");
+    setDone(true);
+    // Sign out of the recovery session and return to a clean login.
+    setTimeout(async () => {
+      try { await db.auth.signOut(); } catch (e) {}
+      window.location.href = "/propertyops/login";
+    }, 2500);
+  };
+
+  const backToLogin = async () => {
+    try { await db.auth.signOut(); } catch (e) {}
+    window.location.href = "/propertyops/login";
+  };
+
+  const inp = { width: "100%", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 9, padding: "13px 16px", color: "var(--txt)", fontSize: 14, fontFamily: "Inter", outline: "none" };
+  const primaryBtn = { width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: 14, borderRadius: 9, border: "none", cursor: busy ? "default" : "pointer", fontFamily: "Inter", opacity: busy ? 0.7 : 1, boxShadow: "0 4px 16px rgba(139,127,232,.3)" };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 20 }}>
+      <div className="fade-in" style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "40px 36px", width: 440, maxWidth: "100%", boxShadow: "0 20px 48px rgba(0,0,0,0.4)" }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div className="brand" style={{ fontSize: 28, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
+          <div style={{ fontSize: 12, color: "var(--txt-3)", marginTop: 4 }}>Property Operations Infrastructure</div>
+        </div>
+
+        {!checked ? (
+          <div style={{ textAlign: "center", padding: "20px 0", color: "var(--txt-3)", fontSize: 13 }}>Verifying reset link…</div>
+        ) : done ? (
+          <div style={{ textAlign: "center", padding: "10px 0" }}>
+            <i className="ti ti-circle-check" style={{ fontSize: 40, color: "var(--green)" }} />
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 10, color: "var(--green)" }}>Password updated</div>
+            <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 6 }}>Taking you to the login screen…</div>
+          </div>
+        ) : !linkOk ? (
+          <div style={{ textAlign: "center", padding: "6px 0" }}>
+            <i className="ti ti-link-off" style={{ fontSize: 36, color: "var(--red)" }} />
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 10 }}>Invalid or expired link</div>
+            <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 6, lineHeight: 1.5 }}>Reset links only work once and expire after a short time. Request a new one from the login screen.</div>
+            <button onClick={backToLogin} style={{ ...primaryBtn, marginTop: 18 }}>← Back to login</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <i className="ti ti-key" style={{ fontSize: 34, color: "var(--brand)" }} />
+              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 8 }}>Choose a new password</div>
+              <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 4 }}>Enter your new password below to finish resetting it</div>
+            </div>
+            {msg && (
+              <div style={{ background: "var(--red-soft)", border: "1px solid var(--red)", borderRadius: 8, padding: "11px 14px", fontSize: 13, color: "var(--red)", marginBottom: 14, lineHeight: 1.4 }}>{msg}</div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input style={inp} type="password" placeholder="New password (min 6 characters)" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doReset()} autoFocus />
+              <input style={inp} type="password" placeholder="Confirm new password" value={pw2} onChange={(e) => setPw2(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doReset()} />
+              <button onClick={doReset} disabled={busy} style={primaryBtn}>{busy ? "Updating…" : "Update password"}</button>
+              <button onClick={backToLogin} disabled={busy} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "Inter" }}>Cancel — back to login</button>
+            </div>
           </>
         )}
       </div>
