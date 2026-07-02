@@ -239,7 +239,9 @@ function Shell() {
             clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'clients' }) })
             invoices.forEach(i => { if ((`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q)) hits.push({ type:'Invoice', label:`${i.number||'—'} · ${i.client_name||''}`, view:'income' }) })
             expenses.forEach(e => { if ((`${e.merchant||''} ${e.category||''}`).toLowerCase().includes(q)) hits.push({ type:'Expense', label:`${e.merchant} · ${gbp(e.amount)}`, view:'expenses' }) })
-            const top = hits.slice(0, 8)
+            // Never surface hits that lead to a tier-locked page (e.g. expense
+            // hits at Basic) — clicking would just bounce off the lock screen.
+            const top = hits.filter(h => tierAllows(navMin(h.view))).slice(0, 8)
             return (
               <div style={{ position:'absolute', left:'4px', right:'4px', top:'46px', zIndex:50, background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'12px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', overflow:'hidden', maxHeight:'340px', overflowY:'auto' }}>
                 {top.length === 0
