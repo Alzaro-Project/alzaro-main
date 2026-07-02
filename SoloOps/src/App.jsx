@@ -192,21 +192,18 @@ function Shell() {
   const uid = session.user.id
 
   // Subscription tier + gating. Source of truth: product_members (synced by the
-  // Stripe webhook). Fail closed to 'basic' if there's no row yet.
-  const rawTier = (member?.tier || 'basic').toLowerCase()
-  // Trials are sold with "full Gold access" (landing + register), but paid
-  // gating reads product_members.tier which may not be gold on a trial row.
-  // While the trial is genuinely live, grant an effective tier of gold. The
-  // live-trial test mirrors TrialGuard's exact midnight comparison so the tier
-  // grant and the expiry block can never disagree by a day. Everything else
-  // stays fail-closed on the real tier (unknown tier -> basic).
+  // Stripe webhook). Fail closed to 'basic' if there's no row yet. join_product
+  // already writes tier='gold' for new trial rows, so trials get full Gold
+  // access with no extra client-side grant needed.
+  const tier = (member?.tier || 'basic').toLowerCase()
+  // Detect a genuinely live trial purely to annotate the badge ("gold · trial")
+  // so it isn't mistaken for a paid plan. Mirrors TrialGuard's midnight compare.
   const onLiveTrial = (() => {
     if (member?.status !== 'trial' || !member?.trial_ends) return false
     const trialEnd = new Date(member.trial_ends); trialEnd.setHours(0, 0, 0, 0)
     const today = new Date(); today.setHours(0, 0, 0, 0)
     return today <= trialEnd
   })()
-  const tier = onLiveTrial ? 'gold' : rawTier
   const userTierIdx = Math.max(0, TIER_ORDER.indexOf(tier))
   const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || 'basic')
   const navMin = (k) => { const n = NAV.find(x => x[0] === k); return n ? n[3] : 'basic' }
