@@ -769,7 +769,7 @@ export function TenantsPage({ user, go, tier }) {
                 </tr>
                 {isOpen && (
                   <tr>
-                    <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                    <td colSpan={8} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 14 }}>
                         <DetailBox title="Contact" icon="ti-address-book">
                           <DetailRow main={t.email || "No email"} sub="Email" />
