@@ -8,11 +8,20 @@
   <link rel="icon" type="image/svg+xml" href="/PropertyOps/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <!-- Fonts load without blocking first paint; text shows immediately and swaps when ready. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" /></noscript>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" media="print" onload="this.media='all'" />
+  <noscript><link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" rel="stylesheet" /></noscript>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0b0e">
+      <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,.12);border-top-color:#8b7fe8;border-radius:50%;animation:sp 0.7s linear infinite"></div>
+    </div>
+    <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
+  </div>
   <script type="module" src="./src/main.jsx"></script>
 </body>
 </html>
