@@ -291,6 +291,10 @@ export function PropertiesPage({ user, go, tier }) {
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [], pays: [] });
   const blank = { address: "", area: "", type: "House", status: "Let", rent: "", invoice_day: "" };
   const [form, setForm] = useState(blank);
+  // Tracks whether the "Manual…" invoice-day mode is active, so the free-type
+  // number box shows even when the field is momentarily empty. Without this,
+  // selecting Manual set the value to "" and the input never appeared.
+  const [manualDay, setManualDay] = useState(false);
 
   // Property count limits by subscription tier. Infinity = unlimited.
   // Matches the plan cards: Basic 5, Bronze 15, Silver & Gold unlimited.
@@ -322,9 +326,9 @@ export function PropertiesPage({ user, go, tier }) {
       setErr(`Your ${(tier || "basic")} plan includes up to ${propCap} properties. Upgrade to add more.`);
       return;
     }
-    setForm(blank); setEditId(null); setAdding(!adding); setErr("");
+    setForm(blank); setEditId(null); setManualDay(false); setAdding(!adding); setErr("");
   };
-  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "", invoice_day: p.invoice_day || "" }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "", invoice_day: p.invoice_day || "" }); setManualDay(p.invoice_day != null && p.invoice_day !== "" && !["1", "15", "31"].includes(String(p.invoice_day))); setEditId(p.id); setAdding(true); setErr(""); };
   const save = async () => {
     if (!form.address.trim()) { setErr("Address is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys in supabase.js to save for real."); return; }
@@ -378,15 +382,15 @@ export function PropertiesPage({ user, go, tier }) {
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Invoice day
-              <select style={inp} value={["", "1", "15", "31"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual"} onChange={(e) => { const v = e.target.value; setForm({ ...form, invoice_day: v === "manual" ? (["", "1", "15", "31"].includes(String(form.invoice_day)) ? "" : form.invoice_day) : v }); }}>
+              <select style={inp} value={manualDay ? "manual" : (["", "1", "15", "31"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual")} onChange={(e) => { const v = e.target.value; if (v === "manual") { setManualDay(true); } else { setManualDay(false); setForm({ ...form, invoice_day: v }); } }}>
                 <option value="">— none —</option>
                 <option value="1">1st of month</option>
                 <option value="15">15th of month</option>
                 <option value="31">End of month</option>
                 <option value="manual">Manual…</option>
               </select>
-              {!["", "1", "15", "31"].includes(String(form.invoice_day)) && (
-                <input style={{ ...inp, marginTop: 6 }} type="number" min="1" max="31" placeholder="Day (1–31)" value={form.invoice_day} onChange={(e) => setForm({ ...form, invoice_day: e.target.value })} />
+              {manualDay && (
+                <input style={{ ...inp, marginTop: 6 }} type="number" min="1" max="31" placeholder="Day (1–31)" value={form.invoice_day} onChange={(e) => setForm({ ...form, invoice_day: e.target.value })} autoFocus />
               )}
               <span style={{ fontSize: 9.5, color: "var(--txt-3)" }}>Day each month rent is invoiced (31 = last day; shorter months adjust automatically)</span>
             </label>
