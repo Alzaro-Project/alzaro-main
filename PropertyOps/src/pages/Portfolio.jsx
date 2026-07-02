@@ -333,8 +333,17 @@ export function PropertiesPage({ user, go, tier }) {
       setErr(`Your ${(tier || "basic")} plan includes up to ${propCap} properties. Upgrade to add more.`);
       return;
     }
+    // Invoice day must be a whole number 1–28 (28 is safe for every month,
+    // including February). Warn instead of silently clamping bad input.
+    if (form.invoice_day !== "" && form.invoice_day !== null && form.invoice_day !== undefined) {
+      const day = Number(form.invoice_day);
+      if (!Number.isInteger(day) || day < 1 || day > 28) {
+        setErr("Invoice day needs to be a whole number between 1 and 28.");
+        return;
+      }
+    }
     setErr("");
-    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, invoice_day: form.invoice_day === "" ? null : Math.min(31, Math.max(1, +form.invoice_day)) };
+    const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, invoice_day: form.invoice_day === "" ? null : Number(form.invoice_day) };
     let error;
     if (editId) {
       ({ error } = await db.from("prop_properties").update(payload).eq("id", editId));
@@ -368,15 +377,15 @@ export function PropertiesPage({ user, go, tier }) {
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Invoice day
-              <select style={inp} value={["", "1", "15", "31"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual"} onChange={(e) => { const v = e.target.value; setForm({ ...form, invoice_day: v === "manual" ? (["", "1", "15", "31"].includes(String(form.invoice_day)) ? "" : form.invoice_day) : v }); }}>
+              <select style={inp} value={["", "1", "15", "28"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual"} onChange={(e) => { const v = e.target.value; setForm({ ...form, invoice_day: v === "manual" ? (["", "1", "15", "28"].includes(String(form.invoice_day)) ? "" : form.invoice_day) : v }); }}>
                 <option value="">— none —</option>
                 <option value="1">1st of month</option>
                 <option value="15">15th of month</option>
-                <option value="31">End of month</option>
+                <option value="28">28th of month</option>
                 <option value="manual">Manual…</option>
               </select>
-              {!["", "1", "15", "31"].includes(String(form.invoice_day)) && (
-                <input style={{ ...inp, marginTop: 6 }} type="number" min="1" max="31" placeholder="Day (1–31)" value={form.invoice_day} onChange={(e) => setForm({ ...form, invoice_day: e.target.value })} />
+              {!["", "1", "15", "28"].includes(String(form.invoice_day)) && (
+                <input style={{ ...inp, marginTop: 6 }} type="number" min="1" max="28" placeholder="Day (1–28)" value={form.invoice_day} onChange={(e) => setForm({ ...form, invoice_day: e.target.value })} />
               )}
               <span style={{ fontSize: 9.5, color: "var(--txt-3)" }}>Day each month rent is invoiced</span>
             </label>
