@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
+import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
@@ -17,6 +17,7 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
   }
   const save = async () => {
     if(!merchant||!amount) return setErr('Merchant and amount are required')
+    if(Number(amount) < 0) return setErr('Amount cannot be negative')
     setBusy(true); setErr('')
     if (edit) {
       // Edit is a plain update — no rule learning or client creation, which are
@@ -131,8 +132,12 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
 
   const save = async () => {
     if(!client) return setErr('Please select or add a client')
+    if(isNew && newEmail.trim() && !isEmailish(newEmail)) return setErr('Please enter a valid email address for the new client')
     const validLines = lines.filter(l=> l.description.trim() || Number(l.unit_price))
     if(!validLines.length) return setErr('Add at least one line item')
+    if(validLines.some(l=> Number(l.qty) < 0 || Number(l.unit_price) < 0)) return setErr('Line item quantity and price cannot be negative')
+    if(vatRegistered && !isFlat && Number(vatRate) < 0) return setErr('VAT rate cannot be negative')
+    if(dueDate && date && dueDate < date) return setErr('Due date cannot be before the issue date')
     const num = number.trim()
     const others = (invoices||[]).filter(i=> !edit || i.id!==edit.id)
     if(num && existingNumbers(others).has(num.toUpperCase())){

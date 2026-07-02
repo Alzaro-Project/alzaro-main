@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, Status, Modal, ErrBox } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, Status, Modal, ErrBox, isEmailish } from '../components/UI.jsx'
 import { insertClient, updateClient, deleteClient } from '../lib/db.js'
 
 const KIND_LABEL = { customer:'Customer', supplier:'Supplier', both:'Customer + Supplier' }
@@ -27,6 +27,7 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
   const open = (c) => { setEditing(c||'new'); setForm(c ? {...c} : blank); setErr('') }
   const save = async () => {
     if (!form.name.trim()) { setErr('Client name is required'); return }
+    if (form.email?.trim() && !isEmailish(form.email)) { setErr('Please enter a valid email address'); return }
     setBusy(true); setErr('')
     try {
       const payload = {

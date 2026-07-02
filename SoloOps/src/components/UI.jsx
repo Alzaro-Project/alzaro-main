@@ -91,6 +91,13 @@ export function parseDate(t) {
   return iso
 }
 
+// Lenient email sanity check: something, an @, a domain with a dot. Deliberately
+// permissive — catches obvious typos (missing @ / domain) without rejecting
+// unusual-but-valid addresses (plus tags, subdomains, long TLDs).
+export function isEmailish(s) {
+  return /^\S+@\S+\.\S+$/.test((s || '').trim())
+}
+
 export function DateField({ value, onChange, style }) {
   const toText = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return d&&m&&y ? `${d}/${m}/${y}` : iso }
   const [text, setText] = React.useState(toText(value))

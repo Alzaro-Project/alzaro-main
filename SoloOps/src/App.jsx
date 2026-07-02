@@ -568,7 +568,7 @@ function Shell() {
                     <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
                   </div>
                 </div>
-                <button style={btnSec} onClick={async()=>{ await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
+                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
                 <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
                 <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
                 <Check ok={invoices.length>0} t="Income recorded" />
