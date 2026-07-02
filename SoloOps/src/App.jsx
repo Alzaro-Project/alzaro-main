@@ -28,6 +28,11 @@ function Shell() {
   const navigate = useNavigate()
   const { view: routeView } = useParams()
   const view = VALID_VIEWS.includes(routeView) ? routeView : 'dashboard'
+  // An unknown view (/soloops/<garbage>) still renders the dashboard; correct
+  // the URL to match rather than leaving a stale/invalid path in the bar.
+  useEffect(() => {
+    if (routeView && !VALID_VIEWS.includes(routeView)) navigate('/dashboard', { replace: true })
+  }, [routeView, navigate])
   const setView = (v) => navigate(`/${v}`)
 
   const [session, setSession] = useState(undefined)
