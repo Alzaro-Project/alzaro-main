@@ -193,7 +193,20 @@ function Shell() {
 
   // Subscription tier + gating. Source of truth: product_members (synced by the
   // Stripe webhook). Fail closed to 'basic' if there's no row yet.
-  const tier = (member?.tier || 'basic').toLowerCase()
+  const rawTier = (member?.tier || 'basic').toLowerCase()
+  // Trials are sold with "full Gold access" (landing + register), but paid
+  // gating reads product_members.tier which may not be gold on a trial row.
+  // While the trial is genuinely live, grant an effective tier of gold. The
+  // live-trial test mirrors TrialGuard's exact midnight comparison so the tier
+  // grant and the expiry block can never disagree by a day. Everything else
+  // stays fail-closed on the real tier (unknown tier -> basic).
+  const onLiveTrial = (() => {
+    if (member?.status !== 'trial' || !member?.trial_ends) return false
+    const trialEnd = new Date(member.trial_ends); trialEnd.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return today <= trialEnd
+  })()
+  const tier = onLiveTrial ? 'gold' : rawTier
   const userTierIdx = Math.max(0, TIER_ORDER.indexOf(tier))
   const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || 'basic')
   const navMin = (k) => { const n = NAV.find(x => x[0] === k); return n ? n[3] : 'basic' }
@@ -220,7 +233,7 @@ function Shell() {
             <div style={{ padding:'0 12px 14px', borderBottom:'1px solid var(--border)', marginBottom:'12px', flexShrink:0 }}>
               <div style={{ fontSize:'14px', fontWeight:700, marginBottom:'7px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
               <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 9px', borderRadius:'20px', fontSize:'10px', fontWeight:700, fontFamily:'Fira Code, monospace', textTransform:'uppercase', letterSpacing:'0.5px', background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>
-                <span>{tm.icon}</span>{tier}
+                <span>{tm.icon}</span>{tier}{onLiveTrial && ' · trial'}
               </span>
             </div>
           )
