@@ -639,16 +639,18 @@ export function TenantsPage({ user, go, tier }) {
     if (form.tenancy_end) {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const end = new Date(form.tenancy_end); end.setHours(0, 0, 0, 0);
-      // Only reject a past end date when it's newly set or actually changed —
-      // otherwise you couldn't edit anything else on a tenant whose tenancy has
-      // already ended (a real, common case).
-      const original = editId ? (rows || []).find((t) => t.id === editId) : null;
-      const dateChanged = !original || (original.tenancy_end || "") !== form.tenancy_end;
-      if (dateChanged && end < today) { setErr("Tenancy end date can't be in the past. Pick today or a future date."); return; }
+      // 1) End-before-start is ALWAYS invalid — check it first and on its own,
+      //    independent of past/future, so the right message always shows.
       if (form.tenancy_start) {
         const start = new Date(form.tenancy_start); start.setHours(0, 0, 0, 0);
         if (end < start) { setErr("Tenancy end date can't be before the start date."); return; }
       }
+      // 2) A past end date is only rejected when it's newly set or actually
+      //    changed — otherwise you couldn't edit anything else on a tenant
+      //    whose tenancy has already ended (a real, common case).
+      const original = editId ? (rows || []).find((t) => t.id === editId) : null;
+      const dateChanged = !original || (original.tenancy_end || "") !== form.tenancy_end;
+      if (dateChanged && end < today) { setErr("Tenancy end date can't be in the past. Pick today or a future date."); return; }
     }
     // Per-property tenant limits.
     if (form.property_id) {
