@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
+  deleteExpense, deleteMileage,
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
@@ -46,6 +47,8 @@ function Shell() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [editInvoice, setEditInvoice] = useState(null)
+  const [editExpense, setEditExpense] = useState(null)
+  const [editMileage, setEditMileage] = useState(null)
   const [incFilter, setIncFilter] = useState('all')
   const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
@@ -139,6 +142,20 @@ function Shell() {
     const { error } = await updateInvoice(inv.id, { status:'paid' })
     if(error){ flash('Update failed'); return }
     loadAll(); flash('Marked as paid')
+  }
+  const onEditExpense = (e) => { setEditExpense(e); setModal('expense') }
+  const onDeleteExpense = async (e) => {
+    if(!window.confirm(`Delete expense ${e.merchant||''} (${gbp(e.amount)})? This cannot be undone.`)) return
+    const { error } = await deleteExpense(e.id)
+    if(error){ flash('Delete failed'); return }
+    loadAll(); flash('Expense deleted')
+  }
+  const onEditMileage = (m) => { setEditMileage(m); setModal('mileage') }
+  const onDeleteMileage = async (m) => {
+    if(!window.confirm(`Delete journey ${m.start_loc||''} → ${m.end_loc||''} (${m.miles} mi)? This cannot be undone.`)) return
+    const { error } = await deleteMileage(m.id)
+    if(error){ flash('Delete failed'); return }
+    loadAll(); flash('Journey deleted')
   }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
 
@@ -423,12 +440,18 @@ function Shell() {
             <div style={card}>
               {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
+                <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
                 <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
                     <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
+                    <Td right>
+                      <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                        <button style={actBtn} onClick={()=>onEditExpense(e)}>Edit</button>
+                        <button style={actBtnDanger} onClick={()=>onDeleteExpense(e)}>Delete</button>
+                      </div>
+                    </Td>
                   </tr>))}</tbody>
               </table>}
             </div>
@@ -494,12 +517,18 @@ function Shell() {
                 </div>
                 {fMileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
                 : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim']} /></thead>
+                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim','Actions']} /></thead>
                   <tbody>{fMileage.map(m => (
                     <tr key={m.id}>
                       <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
                       <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
+                      <Td right>
+                        <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                          <button style={actBtn} onClick={()=>onEditMileage(m)}>Edit</button>
+                          <button style={actBtnDanger} onClick={()=>onDeleteMileage(m)}>Delete</button>
+                        </div>
+                      </Td>
                     </tr>))}</tbody>
                 </table>}
               </div>
@@ -558,9 +587,9 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>setModal(null)} onSaved={(r)=>{setModal(null);loadAll();flash(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added')}} uid={uid} expenses={expenses} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
-      {modal==='mileage' && <MileageForm onClose={()=>setModal(null)} onSaved={()=>{setModal(null);loadAll();flash('Journey logged')}} uid={uid} mileage={mileage} />}
+      {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>

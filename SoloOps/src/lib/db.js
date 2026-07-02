@@ -86,6 +86,12 @@ export async function loadClients() {
 export async function insertMileage(row) {
   return sb.from('soloops_mileage').insert(row)
 }
+export async function updateMileage(id, row) {
+  return sb.from('soloops_mileage').update(row).eq('id', id)
+}
+export async function deleteMileage(id) {
+  return sb.from('soloops_mileage').delete().eq('id', id)
+}
 
 // ---------- invoices ----------
 export async function insertInvoice(row) {
@@ -127,6 +133,12 @@ export async function insertExpenses(rows) {
 }
 export async function updateExpenseReceipt(id, receipt_name) {
   return sb.from('soloops_expenses').update({ has_receipt: true, receipt_name }).eq('id', id)
+}
+export async function updateExpense(id, row) {
+  return sb.from('soloops_expenses').update(row).eq('id', id)
+}
+export async function deleteExpense(id) {
+  return sb.from('soloops_expenses').delete().eq('id', id)
 }
 
 // ---------- clients ----------

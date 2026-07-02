@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES } from '../UI.jsx'
-import { insertExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
+import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
-export function ExpenseForm({onClose,onSaved,uid,expenses}) {
-  const [merchant,setMerchant]=useState(''); const [category,setCategory]=useState('Other')
-  const [amount,setAmount]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10))
+export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
+  const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
+  const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
 
@@ -18,6 +18,15 @@ export function ExpenseForm({onClose,onSaved,uid,expenses}) {
   const save = async () => {
     if(!merchant||!amount) return setErr('Merchant and amount are required')
     setBusy(true); setErr('')
+    if (edit) {
+      // Edit is a plain update — no rule learning or client creation, which are
+      // onboarding side-effects meant for brand-new expenses.
+      const { error } = await updateExpense(edit.id, {
+        merchant:merchant.trim(), category, amount:Number(amount), spent_on:date
+      })
+      if(error){ setErr(error.message); setBusy(false); return }
+      onSaved(); return
+    }
     const { error } = await insertExpense({
       user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual'
     })
@@ -29,7 +38,7 @@ export function ExpenseForm({onClose,onSaved,uid,expenses}) {
     try { const r = await ensureClient(uid, merchant.trim(), 'supplier'); if(r.created) added=r.client?.name } catch(e){}
     onSaved(added ? { addedClient: added } : undefined)
   }
-  return <Modal title="Add expense" onClose={onClose}>
+  return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
     <input style={inp} list="past-merchants" placeholder="Supplier / merchant (e.g. Adobe UK)" value={merchant} onChange={e=>suggest(e.target.value)} />
     <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
@@ -38,7 +47,7 @@ export function ExpenseForm({onClose,onSaved,uid,expenses}) {
     </select>
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Amount (£)" value={amount} onChange={e=>setAmount(e.target.value)} />
     <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save expense'}</button>
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update expense':'Save expense')}</button>
   </Modal>
 }
 
@@ -260,13 +269,17 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
 // shape (journey_date, start_loc, end_loc, purpose, miles, claim).
 // HMRC AMAP: 45p/mile up to 10,000 miles, 25p after. Confirm this matches any
 // earlier version you had.
-export function MileageForm({onClose,onSaved,uid,mileage}) {
-  const [date,setDate]=useState(new Date().toISOString().slice(0,10))
-  const [from,setFrom]=useState(''); const [to,setTo]=useState('')
-  const [purpose,setPurpose]=useState(''); const [miles,setMiles]=useState('')
+export function MileageForm({onClose,onSaved,uid,mileage,edit}) {
+  const [date,setDate]=useState(edit?.journey_date || new Date().toISOString().slice(0,10))
+  const [from,setFrom]=useState(edit?.start_loc||''); const [to,setTo]=useState(edit?.end_loc||'')
+  const [purpose,setPurpose]=useState(edit?.purpose||''); const [miles,setMiles]=useState(edit?.miles!=null ? String(edit.miles) : '')
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
 
-  const priorMiles = (mileage||[]).reduce((s,m)=>s+(Number(m.miles)||0),0)
+  // Cumulative miles across the 10k AMAP threshold. When editing, exclude the
+  // row being edited so its own miles aren't double-counted in the split.
+  const priorMiles = (mileage||[])
+    .filter(m => !edit || m.id !== edit.id)
+    .reduce((s,m)=>s+(Number(m.miles)||0),0)
 
   const save = async () => {
     if(!from||!to||!miles) return setErr('From, to and miles are required')
@@ -278,20 +291,23 @@ export function MileageForm({onClose,onSaved,uid,mileage}) {
     const at45 = Math.min(m, remainingAt45)
     const at25 = m - at45
     const claim = at45 * 0.45 + at25 * 0.25
-    const { error } = await insertMileage({
-      user_id:uid, journey_date:date, start_loc:from.trim(), end_loc:to.trim(),
+    const row = {
+      journey_date:date, start_loc:from.trim(), end_loc:to.trim(),
       purpose:purpose.trim(), miles:m, claim:Number(claim.toFixed(2))
-    })
+    }
+    const { error } = edit
+      ? await updateMileage(edit.id, row)
+      : await insertMileage({ user_id:uid, ...row })
     if(error){ setErr(error.message); setBusy(false); return }
     onSaved()
   }
-  return <Modal title="Log journey" onClose={onClose}>
+  return <Modal title={edit?"Edit journey":"Log journey"} onClose={onClose}>
     {err && <ErrBox m={err} />}
     <DateField value={date} onChange={setDate} />
     <input style={{...inp, marginTop:'12px'}} placeholder="From" value={from} onChange={e=>setFrom(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} placeholder="To" value={to} onChange={e=>setTo(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} placeholder="Purpose (e.g. client visit)" value={purpose} onChange={e=>setPurpose(e.target.value)} />
     <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Miles" value={miles} onChange={e=>setMiles(e.target.value)} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':'Save journey'}</button>
+    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update journey':'Save journey')}</button>
   </Modal>
 }
