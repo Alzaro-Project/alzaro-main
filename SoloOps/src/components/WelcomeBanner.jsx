@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { grad } from './UI.jsx'
 
-export default function WelcomeBanner({ invoices, expenses, clients, bizName, setView, setModal, uid }) {
+export default function WelcomeBanner({ invoices, expenses, clients, bizName, setView, setModal, uid, canExpense = false }) {
   const SUCCESS = '#22c55e'
   const key = uid ? `solo_welcome_dismissed_${uid}` : 'solo_welcome_dismissed'
   const [dismissed, setDismissed] = useState(() => {
@@ -15,7 +15,9 @@ export default function WelcomeBanner({ invoices, expenses, clients, bizName, se
   const steps = [
     { id:'biz',     label:'Set up your business details', done: !!(bizName && bizName.trim()), action: () => setView('settings') },
     { id:'client',  label:'Add your first client',        done: (clients  || []).length > 0,    action: () => setView('clients') },
-    { id:'expense', label:'Log your first expense',       done: (expenses || []).length > 0,    action: () => setModal('expense') },
+    // Expenses are a Bronze feature — only surface the onboarding step (which
+    // opens the expense form) when the user's tier can actually reach it.
+    ...(canExpense ? [{ id:'expense', label:'Log your first expense', done: (expenses || []).length > 0, action: () => setModal('expense') }] : []),
     { id:'invoice', label:'Create your first invoice',    done: (invoices || []).length > 0,    action: () => setModal('invoice') },
   ]
 

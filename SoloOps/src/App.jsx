@@ -300,7 +300,7 @@ function Shell() {
               </div>
             )}
             {['dashboard','income','expenses'].includes(view) && <>
-              <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>
+              {tierAllows('bronze') && <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>}
               <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
             </>}
           </div>
@@ -319,23 +319,23 @@ function Shell() {
           ) : <>
 
           {view==='dashboard' && <>
-            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} />
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'16px', marginBottom:'16px' }}>
+            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} canExpense={tierAllows('bronze')} />
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
               <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
-              <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>
+              {tierAllows('bronze') && <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>}
               <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
               <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
             </div>
 
             <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
-              <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
+            <div style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
+              {tierAllows('bronze') && <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
                 {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
                   : <Donut rows={catRows} />}
-              </div>
+              </div>}
               <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
                   <div style={{fontWeight:700}}>Outstanding invoices</div>
