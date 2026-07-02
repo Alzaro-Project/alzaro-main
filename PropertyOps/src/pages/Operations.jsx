@@ -295,7 +295,7 @@ export function FinancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status: p.status || "Pending" }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); };
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
@@ -376,7 +376,7 @@ export function FinancePage({ user, go }) {
     const { error } = await db.from("prop_payments").insert([{
       tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
       amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
-      status: "sent", user_id: user.id,
+      status: "Sent", user_id: user.id,
     }]);
     setRaising(null);
     if (error) { setErr(error.message); return; }
@@ -386,13 +386,19 @@ export function FinancePage({ user, go }) {
   const remove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
 
 const data = rows || [];
-  const collected = data.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
-  const overdue = data.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const pending = data.filter((p) => p.status === "Pending" || p.status === "sent").reduce((s, p) => s + (p.amount || 0), 0);
+  // Stored statuses are inconsistent (older raised invoices saved lowercase
+  // "sent") — normalise for every comparison/display so nothing vanishes.
+  const normStatus = (s) => {
+    const x = String(s || "").toLowerCase();
+    return x === "paid" ? "Paid" : x === "overdue" ? "Overdue" : x === "sent" ? "Sent" : "Pending";
+  };
+  const collected = data.filter((p) => normStatus(p.status) === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
+  const overdue = data.filter((p) => normStatus(p.status) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = data.filter((p) => ["Pending", "Sent"].includes(normStatus(p.status))).reduce((s, p) => s + (p.amount || 0), 0);
   const expected = collected + overdue + pending;
   const rate = expected ? Math.round((collected / expected) * 100) : 0;
-  const paidCount = data.filter((p) => p.status === "Paid").length;
-  const overdueCount = data.filter((p) => p.status === "Overdue").length;
+  const paidCount = data.filter((p) => normStatus(p.status) === "Paid").length;
+  const overdueCount = data.filter((p) => normStatus(p.status) === "Overdue").length;
 
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
@@ -430,7 +436,7 @@ const data = rows || [];
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="auto-fills from rent — editable" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Billing date (optional)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
-            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
           <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
           <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update payment" : "Save payment"} primary /></span></div>
@@ -440,7 +446,7 @@ const data = rows || [];
      {/* Filter tabs */}
       {rows && (
         <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-          {["All", "Pending", "Paid", "Overdue", "Future"].map((f) => (
+          {["All", "Pending", "Sent", "Paid", "Overdue", "Future"].map((f) => (
             <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
           ))}
         </div>
@@ -471,7 +477,7 @@ const data = rows || [];
       ) : data.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
       ) : (() => {
-        const shown = filter === "All" ? data : data.filter((p) => p.status === filter);
+        const shown = filter === "All" ? data : data.filter((p) => normStatus(p.status) === filter);
         if (shown.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No {filter.toLowerCase()} payments.</div>;
         return (
         <Table cols={["", "Tenant", "Property", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
@@ -495,12 +501,12 @@ const data = rows || [];
                   <Td color="var(--txt-2)">{money(b.vat)}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
                   <Td color="var(--txt-2)">{ukDate(p.due_date || p.due)}</Td>
-                  <Td><Pill text={p.status} tone={p.status === "Paid" ? "green" : p.status === "Overdue" ? "red" : "amber"} /></Td>
+                  <Td><Pill text={normStatus(p.status)} tone={normStatus(p.status) === "Paid" ? "green" : normStatus(p.status) === "Overdue" ? "red" : normStatus(p.status) === "Sent" ? "blue" : "amber"} /></Td>
                   <Td>{p.id && DB_READY ? (
                     <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                       <ActionBtn icon="ti-send" title="Preview & send email" tone="brand" onClick={() => setEmailPayment(p)} />
                       <ActionBtn icon="ti-pencil" title="Edit" onClick={() => openEdit(p)} />
-                      {(p.status === "Pending" || p.status === "Overdue") && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
+                      {["Pending", "Sent", "Overdue"].includes(normStatus(p.status)) && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
                       <ActionBtn icon="ti-trash" title="Delete" tone="red" onClick={() => remove(p.id)} />
                     </div>
                   ) : null}</Td>
@@ -538,7 +544,13 @@ const data = rows || [];
           propName={propLabel(properties, emailPayment.property_id) || emailPayment.property || "—"}
           user={user}
           onClose={() => setEmailPayment(null)}
-          onSent={refresh}
+          onSent={async () => {
+            // Emailing the invoice moves it Pending -> Sent (Paid/Overdue stay as they are).
+            if (emailPayment.id && DB_READY && normStatus(emailPayment.status) === "Pending") {
+              await db.from("prop_payments").update({ status: "Sent" }).eq("id", emailPayment.id);
+            }
+            refresh();
+          }}
         />
       )}
     </div>
