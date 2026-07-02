@@ -97,7 +97,7 @@ export function usePropertyList() {
   const [props, setProps] = useState([]);
   useEffect(() => {
     if (!DB_READY) { setProps([]); return; }
-    db.from("prop_properties").select("id,address").order("created_at", { ascending: false })
+    db.from("prop_properties").select("id,address,type,rent,status").order("created_at", { ascending: false })
       .then(({ data }) => setProps(data || []));
   }, []);
   return props;
