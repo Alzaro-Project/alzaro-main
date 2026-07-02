@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db, DB_READY } from "../lib/supabase.js";
+import { db, DB_READY, REMEMBER_KEY } from "../lib/supabase.js";
 
 export function AuthScreen() {
   const wantsSignup = typeof window !== "undefined" && (
@@ -14,6 +14,13 @@ export function AuthScreen() {
   const [msg, setMsg] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
+  // "Keep me signed in" — defaults to the saved choice, or true for a first
+  // visit. Saved BEFORE sign-in so supabase.js reads it on the next page load
+  // and picks localStorage (persist) vs sessionStorage (log out on tab close).
+  const [remember, setRemember] = useState(() => {
+    try { const v = localStorage.getItem(REMEMBER_KEY); return v === null ? true : v === "1"; } catch (e) { return true; }
+  });
+  const saveRemember = (keep) => { try { localStorage.setItem(REMEMBER_KEY, keep ? "1" : "0"); } catch (e) {} };
 
   useEffect(() => {
     const applyHash = () => {
@@ -33,6 +40,7 @@ export function AuthScreen() {
     reset();
     if (!email.trim() || !pw.trim()) return setMsg("Please enter email and password.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
+    saveRemember(remember);
     setBusy(true);
     const { error } = await db.auth.signInWithPassword({ email, password: pw });
     setBusy(false);
@@ -115,6 +123,12 @@ export function AuthScreen() {
                 <input style={inp} type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doLogin()} />
                 <input style={inp} type="password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doLogin()} />
                 <button onClick={doLogin} disabled={busy} style={primaryBtn}>{busy ? "Signing in…" : "Sign in →"}</button>
+                <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", fontSize: 12.5, color: "var(--txt-2)", padding: "2px 2px", userSelect: "none" }}>
+                  <span onClick={() => { setRemember((v) => { const nv = !v; saveRemember(nv); return nv; }); }} style={{ width: 34, height: 20, borderRadius: 10, background: remember ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0, transition: "background .15s" }}>
+                    <span style={{ position: "absolute", top: 2, left: remember ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                  </span>
+                  <span onClick={() => { setRemember((v) => { const nv = !v; saveRemember(nv); return nv; }); }}>Keep me signed in</span>
+                </label>
                 <button onClick={() => { setForgot(true); reset(); }} style={{ background: "none", border: "none", color: "var(--txt-2)", fontSize: 12, cursor: "pointer", padding: 8, textAlign: "center", fontFamily: "Inter" }}>Forgot password?</button>
               </div>
             ) : (
