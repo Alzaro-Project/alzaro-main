@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, gbp, KPI, Th, Td, Empty, ErrBox, DateField } from '../components/UI.jsx'
+import { card, inp, btnPri, gbp, fmtDate, KPI, Th, Td, Empty, ErrBox, DateField } from '../components/UI.jsx'
 import { uploadFile, insertDocument, updateExpenseReceipt } from '../lib/db.js'
 
 export default function Receipts({ uid, expenses, onMatched }) {
@@ -132,7 +132,7 @@ export default function Receipts({ uid, expenses, onMatched }) {
           <thead><Th cols={['Date','Merchant','Category','Amount']} /></thead>
           <tbody>{withoutReceipt.slice(0,15).map(e => (
             <tr key={e.id}>
-              <Td muted mono>{e.spent_on}</Td><Td>{e.merchant}</Td>
+              <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant}</Td>
               <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
               <Td mono right>{gbp(e.amount)}</Td>
             </tr>))}</tbody>

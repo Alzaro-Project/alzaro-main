@@ -14,7 +14,15 @@ export const NAV = [
 export const TIER_ORDER = ['basic','bronze','silver','gold']
 
 // ---------- formatting ----------
-export const gbp = n => '£' + (Number(n)||0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+export const gbp = n => '£' + (Number(n)||0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+// Format an ISO date (YYYY-MM-DD, or a timestamp) as UK-style DD/MM/YYYY for
+// display. Returns '' for empty and passes anything non-ISO through unchanged.
+export const fmtDate = (iso) => {
+  if (!iso) return ''
+  const m = String(iso).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso)
+}
 
 // ---------- shared inline styles ----------
 export const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, Th, Td, Empty, ErrBox } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, fmtDate, Th, Td, Empty, ErrBox } from '../components/UI.jsx'
 import { loadDocuments, insertDocument, deleteDocument, uploadFile, signedUrl, removeFiles } from '../lib/db.js'
 
 export default function Documents({ uid, invoices, expenses }) {
@@ -91,7 +91,7 @@ export default function Documents({ uid, invoices, expenses }) {
           <tr key={d.id}>
             <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{d.type}</span></Td>
             <Td><span onClick={()=>openPreview(d.storage_path,d.name)} style={{cursor:'pointer'}}>{d.name}</span></Td>
-            <Td muted mono>{(d.uploaded_at||'').slice(0,10)}</Td>
+            <Td muted mono>{fmtDate(d.uploaded_at)}</Td>
             <Td muted mono>{kb(d.size_bytes)}</Td>
             <Td right>
               <button style={{...btnSec, padding:'6px 12px', marginRight:'6px'}} onClick={()=>openPreview(d.storage_path, d.name)}>Preview</button>

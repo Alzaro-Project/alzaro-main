@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, Status, Modal, ErrBox, isEmailish } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, gbp, fmtDate, Th, Td, Empty, Status, Modal, ErrBox, isEmailish } from '../components/UI.jsx'
 import { insertClient, updateClient, deleteClient } from '../lib/db.js'
 
 const KIND_LABEL = { customer:'Customer', supplier:'Supplier', both:'Customer + Supplier' }
@@ -127,7 +127,7 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
                   {inc.length===0 ? <div style={{fontSize:'13px',color:'var(--text3)', marginBottom:'12px'}}>No income from this client yet.</div>
                   : <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:'12px' }}>
                     <tbody>{inc.map(i => (
-                      <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
+                      <tr key={i.id}><Td mono>{i.number||'—'}</Td><Td muted>{fmtDate(i.issue_date)}</Td><Td mono right>{gbp(i.total)}</Td><Td right><Status s={i.status}/></Td></tr>
                     ))}</tbody>
                   </table>}
 
@@ -138,7 +138,7 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
                   {exp.length===0 ? <div style={{fontSize:'13px',color:'var(--text3)'}}>No expenses to this supplier yet.</div>
                   : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                     <tbody>{exp.map(e => (
-                      <tr key={e.id}><Td muted mono>{e.spent_on}</Td><Td>{e.category||'—'}</Td><Td mono right>{gbp(e.amount)}</Td></tr>
+                      <tr key={e.id}><Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.category||'—'}</Td><Td mono right>{gbp(e.amount)}</Td></tr>
                     ))}</tbody>
                   </table>}
 

@@ -7,7 +7,7 @@ import {
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
-import { NAV, TIER_ORDER, gbp, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
 import { MonthlyChart, Donut } from './components/Charts.jsx'
 import WelcomeBanner from './components/WelcomeBanner.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
@@ -420,7 +420,7 @@ function Shell() {
                   <tbody>{rows.map(i => (
                     <tr key={i.id}>
                       <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
-                      <Td muted>{i.issue_date}</Td><Td mono right>{gbp(i.total)}</Td>
+                      <Td muted>{fmtDate(i.issue_date)}</Td><Td mono right>{gbp(i.total)}</Td>
                       <Td><Status s={i.status}/></Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
@@ -448,7 +448,7 @@ function Shell() {
                 <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
                 <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
-                    <Td muted mono>{e.spent_on}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
+                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
                     <Td right>
@@ -525,7 +525,7 @@ function Shell() {
                   <thead><Th cols={['Date','From','To','Purpose','Miles','Claim','Actions']} /></thead>
                   <tbody>{fMileage.map(m => (
                     <tr key={m.id}>
-                      <Td muted mono>{m.journey_date}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
+                      <Td muted mono>{fmtDate(m.journey_date)}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
                       <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
                       <Td right>
