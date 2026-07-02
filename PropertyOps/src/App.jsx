@@ -8,7 +8,7 @@ import {
 import {
   MaintenancePage, FinancePage, DocumentsPage, ReportsPage, SettingsPage,
 } from "./pages/Operations.jsx";
-import { AuthScreen, JoinScreen } from "./pages/Auth.jsx";
+import { AuthScreen, JoinScreen, ResetPasswordScreen } from "./pages/Auth.jsx";
 
 const PAGES = {
   properties: PropertiesPage, compliance: CompliancePage, tenants: TenantsPage,
@@ -331,11 +331,21 @@ function Dashboard({ user, signOut }) {
 function App() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [member, setMember] = useState(undefined);   // undefined = checking, true/false
+  // Password-recovery mode: true when the user arrives via the Supabase reset
+  // link (/propertyops/reset-password, or a PASSWORD_RECOVERY auth event).
+  // While true, ONLY the reset screen renders — the recovery session must not
+  // drop the user onto the dashboard with their old password still set.
+  const [recovery, setRecovery] = useState(() => {
+    try { return /\/reset-password\/?$/.test(window.location.pathname); } catch (e) { return false; }
+  });
 
   useEffect(() => {
     if (!DB_READY) { setSession(null); return; }
     db.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = db.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = db.auth.onAuthStateChange((e, s) => {
+      if (e === "PASSWORD_RECOVERY") setRecovery(true);
+      setSession(s);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -369,6 +379,10 @@ function App() {
   }, [session]);
 
   const signOut = () => db.auth.signOut();
+
+  // Recovery link takes over the whole app until the password is updated
+  // (the screen signs out and redirects to /propertyops/login when done).
+  if (recovery) return <ResetPasswordScreen />;
 
   if (session === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
