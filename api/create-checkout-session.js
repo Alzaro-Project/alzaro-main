@@ -28,6 +28,37 @@ function appBaseUrl() {
   return 'https://www.alzaro.co.uk'
 }
 
+// Verify the given product_members row belongs to the caller. Reads user_id
+// with the service-role key (bypasses RLS). Returns null when ownership is
+// confirmed, or an { status, error } object to return to the client.
+//   - row not found            -> 404 (nothing to bill)
+//   - user_id mismatch         -> 403 (fail closed)
+//   - can't verify (no key /   -> 403 (fail closed rather than allow)
+//     no caller id / fetch err)
+async function verifyOwnership({ supabaseUrl, garageId, product, callerId }) {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!key || !callerId) {
+    console.error('Ownership check: missing service-role key or caller id; refusing')
+    return { status: 403, error: 'Unable to verify account ownership' }
+  }
+  try {
+    const url =
+      `${supabaseUrl}/rest/v1/product_members` +
+      `?id=eq.${encodeURIComponent(garageId)}` +
+      `&product=eq.${encodeURIComponent(product)}` +
+      `&select=user_id`
+    const r = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+    if (!r.ok) return { status: 403, error: 'Unable to verify account ownership' }
+    const rows = await r.json()
+    if (!rows?.length) return { status: 404, error: 'Account not found' }
+    if (rows[0].user_id !== callerId) return { status: 403, error: 'This account does not belong to you' }
+    return null
+  } catch (e) {
+    console.error('Ownership check failed:', e)
+    return { status: 403, error: 'Unable to verify account ownership' }
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -54,6 +85,9 @@ export default async function handler(req, res) {
     if (!authCheck.ok) {
       return res.status(401).json({ error: 'Invalid or expired session' })
     }
+    // Who is the caller? Needed to verify they own the garageId they passed.
+    let callerId = null
+    try { callerId = (await authCheck.json())?.id || null } catch (e) {}
     // --- End auth check ---
 
     const stripeKey = process.env.STRIPE_SECRET_KEY
@@ -65,6 +99,14 @@ export default async function handler(req, res) {
     if (!email || !garageId) {
       return res.status(400).json({ error: 'Missing required fields: email, garageId' })
     }
+
+    // --- Ownership check: the garageId must belong to the caller ---
+    // Without this, any logged-in user could start a checkout against another
+    // account's product_members row by guessing its id. Uses the service-role
+    // key to read the row's user_id (bypasses RLS). Fails closed on mismatch.
+    const ownerErr = await verifyOwnership({ supabaseUrl, garageId, product, callerId })
+    if (ownerErr) return res.status(ownerErr.status).json({ error: ownerErr.error })
+    // --- End ownership check ---
 
     // Fail closed: clamp the requested tier to a known paid tier for this
     // product. Unknown / missing tier -> lowest tier, never gold.
