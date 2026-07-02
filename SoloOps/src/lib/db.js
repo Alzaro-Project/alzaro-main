@@ -96,6 +96,11 @@ export async function updateInvoice(id, row) {
   return sb.from('soloops_invoices').update(row).eq('id', id)
 }
 export async function deleteInvoice(id) {
+  // Remove the invoice's line items first so they aren't orphaned. This keeps
+  // deletes clean even if the DB doesn't yet have the ON DELETE CASCADE from
+  // soloops_invoices (see migration); once the cascade exists this is a
+  // harmless no-op (the rows are already gone by the time the invoice drops).
+  await deleteInvoiceLines(id)
   return sb.from('soloops_invoices').delete().eq('id', id)
 }
 
