@@ -39,16 +39,49 @@ function settingsPathFor(product) {
 
 // Look up the stored Stripe customer id for a product_members row using the
 // service-role key (bypasses RLS). Returns null if none on file.
+// Resolve the Supabase REST base with the same fallbacks used elsewhere.
+function resolveSupabaseUrl() {
+  return (
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    'https://cxsaeftacozyphuejuxo.supabase.co'
+  )
+}
+
+// Verify the given product_members row belongs to the caller. Reads user_id
+// with the service-role key (bypasses RLS). Returns null on success or an
+// { status, error } to return. Fails closed (403) whenever it can't confirm.
+async function verifyOwnership({ garageId, product, callerId }) {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!key || !callerId) {
+    console.error('Ownership check: missing service-role key or caller id; refusing')
+    return { status: 403, error: 'Unable to verify account ownership' }
+  }
+  try {
+    const url =
+      `${resolveSupabaseUrl()}/rest/v1/product_members` +
+      `?id=eq.${encodeURIComponent(garageId)}` +
+      `&product=eq.${encodeURIComponent(product)}` +
+      `&select=user_id`
+    const r = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+    if (!r.ok) return { status: 403, error: 'Unable to verify account ownership' }
+    const rows = await r.json()
+    if (!rows?.length) return { status: 404, error: 'Account not found' }
+    if (rows[0].user_id !== callerId) return { status: 403, error: 'This account does not belong to you' }
+    return null
+  } catch (e) {
+    console.error('Ownership check failed:', e)
+    return { status: 403, error: 'Unable to verify account ownership' }
+  }
+}
+
 async function customerIdForGarage(garageId) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!key) return null
   // Match the auth-check fallback below: some deployments only set the VITE_
   // prefixed URL. Without this fallback the lookup hits `undefined/rest/...`
   // and every portal request wrongly reports "no Stripe customer on file".
-  const supabaseUrl =
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    'https://cxsaeftacozyphuejuxo.supabase.co'
+  const supabaseUrl = resolveSupabaseUrl()
   const url =
     `${supabaseUrl}/rest/v1/product_members` +
     `?id=eq.${encodeURIComponent(garageId)}&select=stripe_customer_id`
@@ -84,6 +117,8 @@ export default async function handler(req, res) {
     if (!authCheck.ok) {
       return res.status(401).json({ error: 'Invalid or expired session' })
     }
+    let callerId = null
+    try { callerId = (await authCheck.json())?.id || null } catch (e) {}
     // --- End auth check ---
 
     const stripeKey = process.env.STRIPE_SECRET_KEY
@@ -91,11 +126,20 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'STRIPE_SECRET_KEY not set on server' })
     }
 
-    const { stripeCustomerId, garageId, product = 'tyreops' } = req.body || {}
-    let customerId = stripeCustomerId || null
-    if (!customerId && garageId) {
-      customerId = await customerIdForGarage(garageId)
+    // Only accept garageId (a product_members row we can ownership-check).
+    // The old raw stripeCustomerId path is removed — it let a caller open any
+    // customer's portal by id, with nothing tying it to their account.
+    const { garageId, product = 'tyreops' } = req.body || {}
+    if (!garageId) {
+      return res.status(400).json({ error: 'Missing required field: garageId' })
     }
+
+    // --- Ownership check: the garageId must belong to the caller ---
+    const owner = await verifyOwnership({ garageId, product, callerId })
+    if (owner.error) return res.status(owner.status).json({ error: owner.error })
+    // --- End ownership check ---
+
+    let customerId = await customerIdForGarage(garageId)
     if (!customerId) {
       return res
         .status(400)
