@@ -435,7 +435,7 @@ function Shell() {
           )}
 
           {view==='reports' && (
-            <Reports invoices={invoices} expenses={expenses} mileage={mileage} />
+            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} />
           )}
 
           {view==='documents' && (
