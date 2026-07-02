@@ -746,6 +746,10 @@ export function ReportsPage({ user }) {
       ...data,
       pays: data.pays.filter((p) => inRange(p.due_date)),
       comp: data.comp.filter((c) => inRange(c.expiry_date)),
+      // Maintenance has no user-entered date, so scope by when the job was
+      // logged (created_at). Without this, period P&L / Tax-year summaries
+      // deducted all-time maintenance cost against a single month's rent.
+      maint: data.maint.filter((m) => inRange(m.created_at)),
     };
   };
 
