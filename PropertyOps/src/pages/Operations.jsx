@@ -305,14 +305,17 @@ export function FinancePage({ user, go }) {
   const propIdForTenant = (name) => { const t = related.tenants.find((x) => x.name === name); return t ? (t.property_id || "") : ""; };
   const tenantForProp = (pid) => { const t = related.tenants.find((x) => String(x.property_id) === String(pid)); return t ? t.name : ""; };
 
-  // Strict binding: pick a tenant → their property + rent. Amount always follows the property.
+  // Strict binding: pick a tenant → their property + rent. When a property is
+  // resolved, the amount ALWAYS follows that property's rent (even if 0/blank),
+  // so switching tenant/property never leaves a stale amount from the previous
+  // choice. Only keep the current amount when no property is resolved at all.
   const onPickTenant = (name) => {
     const pid = propIdForTenant(name);
-    setForm((f) => ({ ...f, tenant: name, property_id: pid || f.property_id, amount: pid ? (rentForProp(pid) || f.amount) : f.amount }));
+    setForm((f) => ({ ...f, tenant: name, property_id: pid || f.property_id, amount: pid ? rentForProp(pid) : f.amount }));
   };
-  // Pick a property → its tenant + rent. Amount always follows.
+  // Pick a property → its tenant + rent. Amount always follows the property.
   const onPickProperty = (pid) => {
-    setForm((f) => ({ ...f, property_id: pid, tenant: pid ? (tenantForProp(pid) || f.tenant) : f.tenant, amount: pid ? (rentForProp(pid) || f.amount) : f.amount }));
+    setForm((f) => ({ ...f, property_id: pid, tenant: pid ? (tenantForProp(pid) || f.tenant) : f.tenant, amount: pid ? rentForProp(pid) : f.amount }));
   };
 
   // Safety net: once rent data has loaded, fill amount if a property is chosen but amount is still blank.
