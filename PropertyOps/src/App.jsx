@@ -165,7 +165,7 @@ function Dashboard({ user, signOut }) {
           <i className="ti ti-lock" style={{ fontSize: 44, color: "var(--brand)", marginBottom: 14, display: "block" }} />
           <div style={{ fontSize: 21, fontWeight: 700, marginBottom: 8 }}>{activeNavItem ? activeNavItem.label : "This feature"} is a {tn.charAt(0).toUpperCase() + tn.slice(1)} feature</div>
           <div style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>Upgrade your plan to unlock this and other tools.</div>
-          <div onClick={() => navigate("settings")} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>View plans</div>
+          <div onClick={() => { navigate("settings"); if (typeof window !== "undefined") window.location.hash = "subscription"; }} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, padding: "12px 26px", borderRadius: 10, cursor: "pointer" }}>View plans</div>
         </div>
       </div>
     );
