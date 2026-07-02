@@ -111,15 +111,26 @@ function Dashboard({ user, signOut }) {
     return next;
   });
 
-  // load everything once for search + notifications
+  // Data behind global search + the notifications bell. These six tables don't
+  // depend on the active page, so load them ONCE on mount rather than on every
+  // navigation (the old [active] dep re-ran all six queries on each page
+  // switch). Refresh when the tab regains focus so edits made elsewhere — or in
+  // another tab — still surface without a full reload.
   useEffect(() => {
     if (!DB_READY) { setAllData({ props: [], comp: [], pays: [], maint: [], tenants: [], docs: [] }); return; }
-    Promise.all([
-      db.from("prop_properties").select("*"), db.from("prop_compliance").select("*"),
-      db.from("prop_payments").select("*"), db.from("prop_maintenance").select("*"),
-      db.from("prop_tenants").select("*"), db.from("prop_documents").select("*"),
-    ]).then(([p, c, pay, mt, tn, dc]) => setAllData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [], docs: dc.data || [] }));
-  }, [active]);
+    let cancelled = false;
+    const loadAll = () => {
+      Promise.all([
+        db.from("prop_properties").select("*"), db.from("prop_compliance").select("*"),
+        db.from("prop_payments").select("*"), db.from("prop_maintenance").select("*"),
+        db.from("prop_tenants").select("*"), db.from("prop_documents").select("*"),
+      ]).then(([p, c, pay, mt, tn, dc]) => { if (!cancelled) setAllData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [], docs: dc.data || [] }); });
+    };
+    loadAll();
+    const onFocus = () => { if (document.visibilityState === "visible") loadAll(); };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onFocus); };
+  }, []);
 
   // Tier gating — fail closed to basic if unknown. Defined BEFORE search and
   // notifications so both can hide features the plan is locked out of.
