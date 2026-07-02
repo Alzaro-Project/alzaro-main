@@ -63,18 +63,39 @@ export function Empty({msg}) {
   return <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--text3)', fontSize:'14px' }}>{msg}</div>
 }
 
+// Parse a UK-style date string to an ISO `YYYY-MM-DD`, or null if it can't be
+// parsed into a real calendar date. Never returns a malformed/invalid string —
+// callers rely on null to skip a row rather than send bad input to Postgres.
+//
+// Accepts (separators / - .):
+//   - DD/MM/YYYY  (UK day-first)
+//   - DD/MM/YY    (two-digit year → 2000+YY; bank exports are recent dates)
+//   - YYYY-MM-DD  (ISO / year-first)
+// The result is range-checked AND round-tripped through Date so impossible
+// dates (13 as a month, 31/02, US-order 05/13/2024, etc.) resolve to null.
+export function parseDate(t) {
+  if (t == null) return null
+  t = String(t).trim()
+  let y, mo, d, m
+  if ((m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/))) {
+    y = +m[1]; mo = +m[2]; d = +m[3]
+  } else if ((m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/))) {
+    d = +m[1]; mo = +m[2]; y = m[3].length === 2 ? 2000 + +m[3] : +m[3]
+  } else {
+    return null
+  }
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  const iso = `${String(y).padStart(4,'0')}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+  const chk = new Date(`${iso}T00:00:00Z`)
+  if (isNaN(chk.getTime()) || chk.getUTCMonth()+1 !== mo || chk.getUTCDate() !== d) return null
+  return iso
+}
+
 export function DateField({ value, onChange, style }) {
   const toText = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return d&&m&&y ? `${d}/${m}/${y}` : iso }
   const [text, setText] = React.useState(toText(value))
   React.useEffect(()=>{ setText(toText(value)) }, [value])
-  const parse = (t) => {
-    t = t.trim()
-    let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)
-    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`
-    m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)
-    if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`
-    return null
-  }
+  const parse = parseDate
   return (
     <div style={{ display:'flex', gap:'6px', ...style }}>
       <input style={{...inp, flex:1}} placeholder="DD/MM/YYYY" value={text}
