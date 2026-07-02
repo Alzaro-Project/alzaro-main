@@ -281,6 +281,7 @@ export function FinancePage({ user, go }) {
   const [filter, setFilter] = useState("All");
   const [fullProps, setFullProps] = useState([]);
   const [raising, setRaising] = useState(null);
+  const [raisedMsg, setRaisedMsg] = useState("");
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -352,7 +353,10 @@ export function FinancePage({ user, go }) {
     const raised = new Set((rows || []).map((r) => `${r.property_id}|${(r.due_date || "").slice(0, 7)}`));
     fullProps.filter((p) => p.status === "Let" && p.rent && p.invoice_day).forEach((p) => {
       const wantDay = Math.min(31, Math.max(1, +p.invoice_day));
-      for (let m = 0; m < 12; m++) {
+      // Project the next 3 months (the coming quarter). 12 months produced an
+      // overwhelming wall of invoices reaching into the next year; 3 is enough
+      // to plan ahead without that noise.
+      for (let m = 0; m < 3; m++) {
         const yr = now.getFullYear(), mo = now.getMonth() + m;
         const lastDay = new Date(yr, mo + 1, 0).getDate(); // last calendar day of this month
         const day = Math.min(wantDay, lastDay);            // 31 → 28/29/30 as appropriate
@@ -386,6 +390,11 @@ export function FinancePage({ user, go }) {
     }]);
     setRaising(null);
     if (error) { setErr(error.message); return; }
+    // Confirm it landed in the ledger — raising moves a projected invoice into
+    // the real payment list (visible under All / Sent), so the row leaving the
+    // Future tab is expected, not "nothing happening".
+    setRaisedMsg(`Invoice raised for ${proj.property}${proj.tenant ? " · " + proj.tenant : ""} (${ukDate(proj.due_date)}) — now in the ledger under Sent.`);
+    setTimeout(() => setRaisedMsg(""), 5000);
     refresh();
   };
 
@@ -468,6 +477,11 @@ const data = rows || [];
       )}
 
       {/* FUTURE — projected recurring invoices, not yet raised */}
+      {filter === "Future" && raisedMsg && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--green)", background: "var(--green-soft)", border: "0.5px solid var(--green)", padding: "10px 14px", borderRadius: 8, marginBottom: 12 }}>
+          <i className="ti ti-circle-check" style={{ fontSize: 15 }} />{raisedMsg}
+        </div>
+      )}
       {filter === "Future" && (() => {
         const proj = buildProjection();
         if (proj.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No upcoming invoices. Set a rent and invoice day on your Let properties to project recurring invoices here.</div>;
