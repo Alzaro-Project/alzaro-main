@@ -136,7 +136,7 @@ export default async function handler(req, res) {
 
     // --- Ownership check: the garageId must belong to the caller ---
     const owner = await verifyOwnership({ garageId, product, callerId })
-    if (owner.error) return res.status(owner.status).json({ error: owner.error })
+    if (owner) return res.status(owner.status).json({ error: owner.error })
     // --- End ownership check ---
 
     let customerId = await customerIdForGarage(garageId)
