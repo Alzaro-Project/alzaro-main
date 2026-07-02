@@ -435,7 +435,16 @@ const data = rows || [];
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => onPickTenant(e.target.value)}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
-            <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => onPickProperty(e.target.value)}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
+            <label style={fld}>Property{form.tenant && form.property_id ? (
+              // A tenant is chosen and linked to a property — lock the field to
+              // that property instead of listing every property in the system.
+              <div style={{ ...inp, display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", color: "var(--txt-2)" }}>
+                <i className="ti ti-lock" style={{ fontSize: 13, color: "var(--txt-3)" }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{propLabel(properties, form.property_id) || "—"}</span>
+              </div>
+            ) : (
+              <select style={inp} value={form.property_id} onChange={(e) => onPickProperty(e.target.value)}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select>
+            )}</label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="auto-fills from rent — editable" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
             <label style={fld}>Billing date (optional)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
