@@ -121,6 +121,16 @@ function Dashboard({ user, signOut }) {
     ]).then(([p, c, pay, mt, tn, dc]) => setAllData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [], docs: dc.data || [] }));
   }, [active]);
 
+  // Tier gating — fail closed to basic if unknown. Defined BEFORE search and
+  // notifications so both can hide features the plan is locked out of.
+  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
+  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
+  const navMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
+  // Can this plan open a given page? Used to tier-filter search + alerts so a
+  // Basic user never gets results that click through to a lock screen.
+  const canOpen = (page) => tierAllows(navMin(page));
+  const activeLocked = !tierAllows(navMin(active));
+
   // ---- global search ----
   const q = query.trim().toLowerCase();
   const results = [];
@@ -128,32 +138,26 @@ function Dashboard({ user, signOut }) {
     const has = (s) => (s || "").toLowerCase().includes(q);
     allData.props.forEach((p) => { if (has(p.address || p.addr) || has(p.area) || has(p.type)) results.push({ icon: "ti-building-estate", label: p.address || p.addr, sub: `Property · ${p.area || ""}`, page: "properties" }); });
     allData.tenants.forEach((t) => { if (has(t.name) || has(t.property)) results.push({ icon: "ti-user", label: t.name, sub: `Tenant · ${t.property || ""}`, page: "tenants" }); });
-    allData.comp.forEach((c) => { if (has(c.type) || has(c.property) || has(c.reference)) results.push({ icon: "ti-shield-check", label: c.type, sub: `Certificate · ${c.property || ""}`, page: "compliance" }); });
-    allData.maint.forEach((m) => { if (has(m.title) || has(m.property) || has(m.contractor)) results.push({ icon: "ti-tools", label: m.title, sub: `Maintenance · ${m.property || ""}`, page: "maintenance" }); });
-    allData.pays.forEach((p) => { if (has(p.tenant) || has(p.property)) results.push({ icon: "ti-coin", label: `${p.tenant} · ${gbp(p.amount || 0)}`, sub: `Payment · ${p.status}`, page: "finance" }); });
-    allData.docs.forEach((dd) => { if (has(dd.name) || has(dd.category)) results.push({ icon: "ti-file", label: dd.name, sub: `Document · ${dd.category}`, page: "documents" }); });
+    if (canOpen("compliance")) allData.comp.forEach((c) => { if (has(c.type) || has(c.property) || has(c.reference)) results.push({ icon: "ti-shield-check", label: c.type, sub: `Certificate · ${c.property || ""}`, page: "compliance" }); });
+    if (canOpen("maintenance")) allData.maint.forEach((m) => { if (has(m.title) || has(m.property) || has(m.contractor)) results.push({ icon: "ti-tools", label: m.title, sub: `Maintenance · ${m.property || ""}`, page: "maintenance" }); });
+    if (canOpen("finance")) allData.pays.forEach((p) => { if (has(p.tenant) || has(p.property)) results.push({ icon: "ti-coin", label: `${p.tenant} · ${gbp(p.amount || 0)}`, sub: `Payment · ${p.status}`, page: "finance" }); });
+    if (canOpen("documents")) allData.docs.forEach((dd) => { if (has(dd.name) || has(dd.category)) results.push({ icon: "ti-file", label: dd.name, sub: `Document · ${dd.category}`, page: "documents" }); });
   }
 
-  // ---- notifications: expiring certs + arrears ----
+  // ---- notifications: expiring certs + arrears (tier-filtered) ----
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const alerts = [];
   if (allData) {
-    allData.comp.forEach((c) => {
+    if (canOpen("compliance")) allData.comp.forEach((c) => {
       if (!c.expiry_date) return;
       const days = Math.round((new Date(c.expiry_date) - today) / 864e5);
       if (days <= 30) alerts.push({ tone: days <= 7 ? "red" : "amber", icon: "ti-shield-check", text: `${c.type}${c.property ? " · " + c.property : ""}`, sub: days < 0 ? `Expired ${-days} days ago` : `Expires in ${days} days`, page: "compliance", days });
     });
-    allData.pays.filter((p) => p.status === "Overdue").forEach((p) => {
+    if (canOpen("finance")) allData.pays.filter((p) => p.status === "Overdue").forEach((p) => {
       alerts.push({ tone: "red", icon: "ti-coin", text: `Rent overdue · ${p.tenant}`, sub: `${gbp(p.amount || 0)} outstanding`, page: "finance", days: -1 });
     });
   }
   alerts.sort((a, b) => a.days - b.days);
-
-  // Tier gating — fail closed to basic if unknown.
-  const userTierIdx = Math.max(0, TIER_ORDER.indexOf((biz.tier || "basic").toLowerCase()));
-  const tierAllows = (min) => userTierIdx >= TIER_ORDER.indexOf(min || "basic");
-  const navMin = (id) => { const n = NAV.find((x) => x.id === id); return n ? n.min : "basic"; };
-  const activeLocked = !tierAllows(navMin(active));
 
   let body;
   const activeNavItem = NAV.find((n) => n.id === active);
