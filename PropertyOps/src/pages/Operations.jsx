@@ -192,7 +192,10 @@ ${biz}`
       const { data: sess } = await db.auth.getSession();
       const token = sess?.session?.access_token;
       if (!token) { setStatus("error"); setMsg("You need to be signed in to send."); return; }
-      const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">${body.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>`;
+      // Escape &, <, > (order matters: & first) before turning newlines into
+      // <br>, so names like "Barker & Sons" don't become broken HTML entities.
+      const esc = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">${esc.replace(/\n/g, "<br>")}</div>`;
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
