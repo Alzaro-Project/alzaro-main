@@ -394,12 +394,22 @@ export function PropertiesPage({ user, go, tier }) {
           {list.map((p, i) => {
             const addr = (p.address || p.addr || "").toLowerCase();
             const match = (s) => (s || "").toLowerCase() === addr || (addr && (s || "").toLowerCase().includes(addr));
+            // Prefer matching linked records by property_id (reliable); fall
+            // back to the legacy address match for rows saved before ids.
+            const linked = (arr) => arr.filter((x) => (p.id && String(x.property_id) === String(p.id)) || (!x.property_id && match(x.property)));
             const isOpen = expandedId === (p.id || i);
-            const pT = related.tenants.filter((t) => match(t.property));
-            const pC = related.comp.filter((c) => match(c.property));
-            const pM = related.maint.filter((m) => match(m.property));
-            const pP = related.pays.filter((x) => match(x.property));
+            const pT = linked(related.tenants);
+            const pC = linked(related.comp);
+            const pM = linked(related.maint);
+            const pP = linked(related.pays);
             const today = new Date(); today.setHours(0, 0, 0, 0);
+            // Live compliance score for THIS property — % of its certificates
+            // with more than 30 days left (same rule as the Compliance page).
+            // The stored p.score is a stale insert-time value; ignore it.
+            const dated = pC.filter((c) => c.expiry_date);
+            const validCerts = dated.filter((c) => Math.round((new Date(c.expiry_date) - today) / 864e5) > 30).length;
+            const liveScore = dated.length ? Math.round((validCerts / dated.length) * 100) : null;
+            const scoreTone = liveScore === null ? "txt-3" : liveScore >= 90 ? "green" : liveScore >= 60 ? "amber" : "red";
             return (
               <React.Fragment key={p.id || i}>
                 <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (p.id || i))}>
@@ -409,7 +419,7 @@ export function PropertiesPage({ user, go, tier }) {
                   <Td color="var(--txt-2)">{p.type}</Td>
                   <Td><Pill text={p.status} tone={p.status === "Let" ? "green" : "amber"} /></Td>
                   <Td>{p.rent ? gbp(p.rent) : "—"}</Td>
-                  <Td><span style={{ color: `var(--${p.tone || (p.score >= 90 ? "green" : p.score >= 80 ? "amber" : "red")})`, fontWeight: 600 }}>{p.score}</span><span style={{ color: "var(--txt-3)" }}>/100</span></Td>
+                  <Td><span style={{ color: `var(--${scoreTone})`, fontWeight: 600 }}>{liveScore === null ? "—" : liveScore}</span>{liveScore !== null && <span style={{ color: "var(--txt-3)" }}>/100</span>}</Td>
                   <Td>{p.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(p)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(p.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
                 </tr>
                 {isOpen && (
