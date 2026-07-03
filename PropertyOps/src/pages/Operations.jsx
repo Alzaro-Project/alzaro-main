@@ -376,6 +376,11 @@ export function FinancePage({ user, go }) {
     const out = [];
     const now = new Date(); now.setHours(0, 0, 0, 0);
     const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    // Format a Date as YYYY-MM-DD from its LOCAL parts. Using toISOString() here
+    // shifts to UTC, so in British Summer Time (UTC+1) "1 July" was saved as
+    // "2026-06-30" — wrong invoice dates, and the dedupe month landed in the
+    // previous month, so the same month got offered again → duplicate invoices.
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     // months already raised, keyed property_id + YYYY-MM
     const raised = new Set((rows || []).map((r) => `${r.property_id}|${(r.due_date || "").slice(0, 7)}`));
     fullProps.filter((p) => p.status === "Let" && p.rent && p.invoice_day).forEach((p) => {
@@ -398,7 +403,7 @@ export function FinancePage({ user, go }) {
           tenant: tenant ? tenant.name : "",
           tenant_email: tenant ? tenant.email : "",
           amount: p.rent,
-          due_date: d.toISOString().slice(0, 10),
+          due_date: ymd(d),
           month: ym(d),
         });
       }
