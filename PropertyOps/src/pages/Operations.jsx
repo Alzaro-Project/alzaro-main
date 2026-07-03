@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Btn, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td } from "../components/UI.jsx";
 import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
@@ -11,6 +11,10 @@ export function MaintenancePage({ user, go }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const formRef = useRef(null);
+  // Bring the edit/add form into view — clicking Edit on a row far down the
+  // list renders the form at the top, which would otherwise be off-screen.
+  const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const properties = usePropertyList();
   const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
   const [form, setForm] = useState(blank);
@@ -27,7 +31,7 @@ export function MaintenancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); };
+  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); scrollToForm(); };
 
   const save = async () => {
     if (!form.title.trim()) { setErr("Job title is required."); return; }
@@ -72,7 +76,7 @@ export function MaintenancePage({ user, go }) {
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
       {adding && (
-        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+        <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New maintenance job"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 10 }}>
             <label style={fld}>Issue / job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
@@ -289,6 +293,9 @@ export function FinancePage({ user, go }) {
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const formRef = useRef(null);
+  // Bring the edit/add form into view when editing a row far down the list.
+  const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [] });
   const properties = usePropertyList();
@@ -316,7 +323,7 @@ export function FinancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); };
+  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
@@ -460,7 +467,7 @@ const data = rows || [];
       </div>
 
       {adding && (
-        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+        <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
             <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => onPickTenant(e.target.value)}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
