@@ -309,6 +309,9 @@ export function FinancePage({ user, go }) {
   const [fullProps, setFullProps] = useState([]);
   const [raising, setRaising] = useState(null);
   const [raisedMsg, setRaisedMsg] = useState("");
+  // Company VAT scheme drives how the ledger splits amounts (see vatBreakdown).
+  // Defaults to "exempt" (no VAT) until settings load — safer than assuming 20%.
+  const [vatScheme, setVatScheme] = useState("exempt");
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -318,6 +321,8 @@ export function FinancePage({ user, go }) {
       db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"),
     ]).then(([t, c, m]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [] }));
     db.from("prop_properties").select("*").then(({ data }) => setFullProps(data || []));
+    db.from("prop_settings").select("vat_scheme").eq("user_id", user.id)
+      .then(({ data }) => { if (data && data[0] && data[0].vat_scheme) setVatScheme(data[0].vat_scheme); });
   }, []);
 
   const refresh = async () => {
@@ -453,8 +458,20 @@ const data = rows || [];
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 
-  // Stored amount is treated as the gross total; VAT (20%) is worked backward from it.
-  const vatBreakdown = (total) => { const t = +total || 0; const sub = t / 1.2; return { sub, vat: t - sub, total: t }; };
+  // Split a stored gross amount into subtotal/VAT/total according to the
+  // company's VAT scheme:
+  //   • exempt / not VAT registered → no VAT (subtotal = total, VAT = 0).
+  //     Correct for residential rent, which is VAT-exempt.
+  //   • standard / flatrate → invoices show 20% VAT extracted from the gross.
+  //     (Flat-rate only affects what you owe HMRC, not what you charge, so the
+  //     customer-facing split is still 20%.)
+  const vatApplies = vatScheme === "standard" || vatScheme === "flatrate";
+  const vatBreakdown = (total) => {
+    const t = +total || 0;
+    if (!vatApplies) return { sub: t, vat: 0, total: t };
+    const sub = t / 1.2;
+    return { sub, vat: t - sub, total: t };
+  };
   const money = (n) => "£" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const ActionBtn = ({ icon, title, onClick, tone }) => {
     const bg = tone === "green" ? "var(--green-soft)" : tone === "red" ? "var(--red-soft)" : tone === "brand" ? "var(--brand-soft)" : "var(--panel-2)";
@@ -562,8 +579,8 @@ const data = rows || [];
                   <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
                   <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
                   <Td color="var(--txt-2)">{propName}</Td>
-                  <Td color="var(--txt-2)">{money(b.sub)}</Td>
-                  <Td color="var(--txt-2)">{money(b.vat)}</Td>
+                  <Td color="var(--txt-2)">{vatApplies ? money(b.sub) : money(b.total)}</Td>
+                  <Td color="var(--txt-2)">{vatApplies ? money(b.vat) : "—"}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
                   <Td color="var(--txt-2)">{ukDate(p.due_date || p.due)}</Td>
                   <Td><Pill text={normStatus(p.status)} tone={normStatus(p.status) === "Paid" ? "green" : normStatus(p.status) === "Overdue" ? "red" : normStatus(p.status) === "Sent" ? "blue" : "amber"} /></Td>
