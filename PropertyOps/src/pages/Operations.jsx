@@ -360,8 +360,9 @@ export function FinancePage({ user, go }) {
     setErr("");
     const invoiceNo = form.invoice_no || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
-    if (!payload.due_date) delete payload.due_date;
-    if (!payload.billing_date) delete payload.billing_date;
+    // Empty date → null (not delete), so clearing a date on edit actually clears it.
+    payload.due_date = form.due_date || null;
+    payload.billing_date = form.billing_date || null;
     let error;
     if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_payments").insert([{ ...payload, user_id: user.id }]));
