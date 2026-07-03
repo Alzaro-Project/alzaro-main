@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, DB_READY } from "./lib/supabase.js";
 import TrialGuard from "./components/TrialGuard.jsx";
-import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile, TIER_ORDER } from "./lib/helpers.js";
+import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile, TIER_ORDER, effectiveStatus } from "./lib/helpers.js";
 import {
   DashboardPage, PropertiesPage, CompliancePage, TenantsPage,
 } from "./pages/Portfolio.jsx";
@@ -164,7 +164,7 @@ function Dashboard({ user, signOut }) {
       const days = Math.round((new Date(c.expiry_date) - today) / 864e5);
       if (days <= 30) alerts.push({ tone: days <= 7 ? "red" : "amber", icon: "ti-shield-check", text: `${c.type}${c.property ? " · " + c.property : ""}`, sub: days < 0 ? `Expired ${-days} days ago` : `Expires in ${days} days`, page: "compliance", days });
     });
-    if (canOpen("finance")) allData.pays.filter((p) => p.status === "Overdue").forEach((p) => {
+    if (canOpen("finance")) allData.pays.filter((p) => effectiveStatus(p) === "Overdue").forEach((p) => {
       alerts.push({ tone: "red", icon: "ti-coin", text: `Rent overdue · ${p.tenant}`, sub: `${gbp(p.amount || 0)} outstanding`, page: "finance", days: -1 });
     });
   }
