@@ -71,6 +71,23 @@ export const REPORTS = [
 export const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
 export const gbp = (n) => "£" + n.toLocaleString("en-GB");
 
+// Effective payment status. An unpaid invoice (Pending/Sent) whose due date is
+// in the past is treated as Overdue everywhere — without needing anyone to
+// manually flip the row. Paid/already-Overdue statuses are returned as-is.
+// Case-insensitive: normalises stored values like "sent"/"paid" too.
+export const effectiveStatus = (p) => {
+  const s = String(p?.status || "").toLowerCase();
+  if (s === "paid") return "Paid";
+  if (s === "overdue") return "Overdue";
+  const base = s === "sent" ? "Sent" : "Pending";
+  if (p?.due_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const due = new Date(p.due_date); due.setHours(0, 0, 0, 0);
+    if (!isNaN(due) && due < today) return "Overdue";
+  }
+  return base;
+};
+
 // Format a stored date (ISO YYYY-MM-DD, or any parseable date) as UK DD/MM/YYYY.
 // Returns the dash placeholder for empty/invalid values so callers can drop their own "|| '—'".
 export const ukDate = (v) => {
@@ -125,7 +142,7 @@ export function buildReport(name, d) {
     case "Landlord statement":
       return { cols: ["Tenant", "Property", "Amount", "Due date", "Status"], rows: d.pays.map((p) => [p.tenant, p.property, gbpc(p.amount), ukDate(p.due_date), p.status]) };
     case "Arrears report":
-      return { cols: ["Tenant", "Property", "Amount", "Due date"], rows: d.pays.filter((p) => p.status === "Overdue").map((p) => [p.tenant, p.property, gbpc(p.amount), ukDate(p.due_date)]) };
+      return { cols: ["Tenant", "Property", "Amount", "Due date"], rows: d.pays.filter((p) => effectiveStatus(p) === "Overdue").map((p) => [p.tenant, p.property, gbpc(p.amount), ukDate(p.due_date)]) };
     case "Profit & loss":
     case "Tax-year summary": {
       const collected = d.pays.filter((p) => p.status === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
