@@ -157,6 +157,10 @@ function RentChart({ pays, go }) {
 export function DashboardPage({ range, go, user, tier }) {
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [emailDismissed, setEmailDismissed] = useState(() => {
+    try { return localStorage.getItem("propops_email_nudge_dismissed") === "1"; } catch (e) { return false; }
+  });
 
   // Which features this plan can open. Mirrors the nav gate so a dashboard card
   // never promises data from a page the user is locked out of.
@@ -176,6 +180,10 @@ export function DashboardPage({ range, go, user, tier }) {
       db.from("prop_maintenance").select("*"),
       db.from("prop_tenants").select("*"),
     ]).then(([p, c, pay, mt, tn]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
+    // Has this company set up their own sending email yet? Invoices require it
+    // (they must come from the company's address, not Alzaro's), so nudge if not.
+    db.from("prop_settings").select("smtp_host, smtp_user, smtp_pass").eq("user_id", user.id)
+      .then(({ data: s }) => { const r = s && s[0]; setNeedsEmail(!(r && r.smtp_host && r.smtp_user && r.smtp_pass)); });
   }, []);
 
   if (!data) return <div className="fade-in" style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading your portfolio…</div>;
@@ -223,6 +231,17 @@ export function DashboardPage({ range, go, user, tier }) {
   return (
     <div className="fade-in">
       <WelcomeBanner data={data} go={go} user={user} />
+      {needsEmail && !emailDismissed && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--amber-soft, rgba(214,158,46,.12))", border: "0.5px solid var(--amber)", borderRadius: 12, padding: "13px 16px", marginBottom: 16 }}>
+          <i className="ti ti-mail-cog" style={{ fontSize: 20, color: "var(--amber)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 1 }}>Set up your business email</div>
+            <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.4 }}>Connect your email so invoices send from your company's own address — not from Alzaro. Required before you can email invoices to tenants.</div>
+          </div>
+          <span onClick={() => go("settings")} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--brand)", padding: "8px 14px", borderRadius: 8, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>Set up now</span>
+          <i className="ti ti-x" onClick={() => { setEmailDismissed(true); try { localStorage.setItem("propops_email_nudge_dismissed", "1"); } catch (e) {} }} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer", flexShrink: 0 }} title="Dismiss" />
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <TiltCard index={0} onClick={() => go("compliance")} icon="ti-shield-check" locked={!canCompliance} lockTier={featureMin("compliance")} label="Compliance Score" color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"}
           value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>}
