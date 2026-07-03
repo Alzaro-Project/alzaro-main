@@ -68,6 +68,9 @@ function Dashboard({ user, signOut }) {
   // user_metadata.company_name → email prefix (last resort). Tier read from
   // settings/membership if a column exists, else defaults to Enterprise.
   const [biz, setBiz] = useState({ name: "", tier: "basic", loaded: false });
+  // Notification preferences from prop_settings (default on / 30-day lead).
+  // These drive which alerts the bell shows and how far ahead certs warn.
+  const [notifyPrefs, setNotifyPrefs] = useState({ compliance: true, rent: true, lead: 30 });
 
   useEffect(() => {
     if (!DB_READY) {
@@ -89,7 +92,16 @@ function Dashboard({ user, signOut }) {
       // the name; tier only falls back here if product_members had none.
       try {
         const { data: s } = await db.from("prop_settings").select("*").eq("user_id", user.id).maybeSingle();
-        if (s) { name = s.company_name || name; if (!tier) tier = s.tier || s.plan || ""; }
+        if (s) {
+          name = s.company_name || name; if (!tier) tier = s.tier || s.plan || "";
+          if (!cancelled) setNotifyPrefs({
+            compliance: s.notify_compliance !== false, // default on
+            rent: s.notify_rent !== false,             // default on
+            // reminder_lead is a descriptive string like "60 / 30 / 7 days
+            // before expiry"; the FIRST number is how far ahead alerts start.
+            lead: (() => { const m = String(s.reminder_lead || "").match(/\d+/); return m ? Number(m[0]) : 30; })(),
+          });
+        }
       } catch (e) {}
       // 3) auth metadata (always set at signup)
       if (!name) name = user.user_metadata?.company_name || "";
@@ -159,12 +171,12 @@ function Dashboard({ user, signOut }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const alerts = [];
   if (allData) {
-    if (canOpen("compliance")) allData.comp.forEach((c) => {
+    if (canOpen("compliance") && notifyPrefs.compliance) allData.comp.forEach((c) => {
       if (!c.expiry_date) return;
       const days = Math.round((new Date(c.expiry_date) - today) / 864e5);
-      if (days <= 30) alerts.push({ tone: days <= 7 ? "red" : "amber", icon: "ti-shield-check", text: `${c.type}${c.property ? " · " + c.property : ""}`, sub: days < 0 ? `Expired ${-days} days ago` : `Expires in ${days} days`, page: "compliance", days });
+      if (days <= notifyPrefs.lead) alerts.push({ tone: days <= 7 ? "red" : "amber", icon: "ti-shield-check", text: `${c.type}${c.property ? " · " + c.property : ""}`, sub: days < 0 ? `Expired ${-days} days ago` : `Expires in ${days} days`, page: "compliance", days });
     });
-    if (canOpen("finance")) allData.pays.filter((p) => effectiveStatus(p) === "Overdue").forEach((p) => {
+    if (canOpen("finance") && notifyPrefs.rent) allData.pays.filter((p) => effectiveStatus(p) === "Overdue").forEach((p) => {
       alerts.push({ tone: "red", icon: "ti-coin", text: `Rent overdue · ${p.tenant}`, sub: `${gbp(p.amount || 0)} outstanding`, page: "finance", days: -1 });
     });
   }
