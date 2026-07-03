@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Btn, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner } from "../components/UI.jsx";
+import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner, useConfirm } from "../components/UI.jsx";
 import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
@@ -380,13 +380,16 @@ export function PropertiesPage({ user, go, tier }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_properties").delete().eq("id", id); refresh(); } };
+  const confirm = useConfirm();
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_properties").delete().eq("id", id); refresh(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this property?", message: "This property will be permanently deleted. Related tenants, certificates and records are not deleted but will no longer be linked. This can't be undone.", onConfirm: () => doRemove(id) });
 
   const list = (rows || []).filter((p) => ((p.address || p.addr || "") + (p.area || "") + (p.type || "")).toLowerCase().includes(q.toLowerCase()));
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
 
   return (
     <div className="fade-in">
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Properties" sub={rows ? `${propCount}${propCap === Infinity ? "" : ` / ${propCap}`} ${DB_READY ? "" : "(demo) "}properties${atLimit && propCap !== Infinity ? " · limit reached" : ""}` : "Loading…"}
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : (atLimit ? "ti-lock" : "ti-plus")} label={adding ? "Cancel" : "Add property"} primary /></span>} />
 
@@ -535,7 +538,9 @@ export function CompliancePage({ user, go }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").delete().eq("id", id); refresh(); } };
+  const confirm = useConfirm();
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").delete().eq("id", id); refresh(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this certificate?", message: "This compliance certificate will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
   // compute days-to-expiry + status for each item
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -557,6 +562,7 @@ export function CompliancePage({ user, go }) {
 
   return (
     <div className="fade-in">
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Compliance" sub="Live tracking of every legal obligation across your portfolio."
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add certificate"} primary /></span>} />
 
@@ -728,13 +734,16 @@ export function TenantsPage({ user, go, tier }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_tenants").delete().eq("id", id); refresh(); } };
+  const confirm = useConfirm();
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_tenants").delete().eq("id", id); refresh(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this tenant?", message: "This tenant record will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
 
   return (
     <div className="fade-in">
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Tenants" sub={rows ? `${rows.length} ${DB_READY ? "" : "(demo) "}tenants` : "Loading…"}
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-user-plus"} label={adding ? "Cancel" : "Add tenant"} primary /></span>} />
 
