@@ -688,7 +688,7 @@ export function DocumentsPage({ user }) {
       const path = `${user.id}/${Date.now()}_${file.name}`;
       const { error: upErr } = await db.storage.from("documents").upload(path, file);
       if (upErr) throw upErr;
-      const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), property_id: pickProp || null, property: propLabel(properties, pickProp), user_id: user.id }]);
+      const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), property_id: pickProp || null, user_id: user.id }]);
       if (dbErr) throw dbErr;
       await refresh();
     } catch (e2) { setErr(e2.message || "Upload failed"); }
