@@ -533,6 +533,12 @@ export function CompliancePage({ user, go }) {
 
   const save = async () => {
     if (!form.expiry_date) { setErr("Expiry date is required — it's what we track."); return; }
+    // Expiry can't be before the issue/start date (only checked when both set).
+    if (form.start_date && form.expiry_date) {
+      const start = new Date(form.start_date); start.setHours(0, 0, 0, 0);
+      const exp = new Date(form.expiry_date); exp.setHours(0, 0, 0, 0);
+      if (exp < start) { setErr("Expiry date can't be before the issue / start date."); return; }
+    }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
