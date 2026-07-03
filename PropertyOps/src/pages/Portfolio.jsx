@@ -661,6 +661,7 @@ export function TenantsPage({ user, go, tier }) {
   const [editId, setEditId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
+  const prevPropertyIdRef = useRef(null); // property the tenant was on before an edit
   const properties = usePropertyList();
   const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending", co_tenant_name: "", co_tenant_email: "", co_tenant_phone: "" };
   const [form, setForm] = useState(blank);
@@ -686,12 +687,12 @@ export function TenantsPage({ user, go, tier }) {
     setRows(data || []);
   };
 
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
+  const openAdd = () => { prevPropertyIdRef.current = null; setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
   const formRef = useRef(null);
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
-  const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending", co_tenant_name: t.co_tenant_name || "", co_tenant_email: t.co_tenant_email || "", co_tenant_phone: t.co_tenant_phone || "" }); setEditId(t.id); setAdding(true); setErr(""); scrollToForm(); };
+  const openEdit = (t) => { prevPropertyIdRef.current = t.property_id || null; setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending", co_tenant_name: t.co_tenant_name || "", co_tenant_email: t.co_tenant_email || "", co_tenant_phone: t.co_tenant_phone || "" }); setEditId(t.id); setAdding(true); setErr(""); scrollToForm(); };
   const save = async () => {
     if (!form.name.trim()) { setErr("Tenant name is required."); return; }
     if (form.tenancy_end) {
@@ -747,13 +748,36 @@ export function TenantsPage({ user, go, tier }) {
         await db.from("prop_properties").update({ status: "Let" }).eq("id", form.property_id);
       }
     }
+    // If editing moved this tenant off a previous property, that old property
+    // may now be empty — revert it to Vacant.
+    if (editId && prevPropertyIdRef.current && prevPropertyIdRef.current !== form.property_id) {
+      await revertIfEmpty(prevPropertyIdRef.current);
+    }
     savingRef.current = false; setSaving(false);
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
   const confirm = useConfirm();
-  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_tenants").delete().eq("id", id); refresh(); } };
-  const remove = (id) => confirm.ask({ title: "Delete this tenant?", message: "This tenant record will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
+  // After a tenant leaves a property (deleted, or moved elsewhere), if no other
+  // tenant remains on that property, revert its status Let -> Vacant so
+  // occupancy and income figures don't drift. Only touches properties currently
+  // marked "Let" (never overrides a manual status like "Sale agreed").
+  const revertIfEmpty = async (propertyId) => {
+    if (!propertyId || !DB_READY) return;
+    const { data: remaining } = await db.from("prop_tenants").select("id").eq("property_id", propertyId).limit(1);
+    if (remaining && remaining.length) return; // still occupied
+    const { data: prop } = await db.from("prop_properties").select("status").eq("id", propertyId).maybeSingle();
+    if (prop && prop.status === "Let") {
+      await db.from("prop_properties").update({ status: "Vacant" }).eq("id", propertyId);
+    }
+  };
+  const doRemove = async (t) => {
+    if (!t?.id || !DB_READY) return;
+    await db.from("prop_tenants").delete().eq("id", t.id);
+    await revertIfEmpty(t.property_id); // free up the property if now empty
+    refresh();
+  };
+  const remove = (t) => confirm.ask({ title: "Delete this tenant?", message: "This tenant record will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(t) });
 
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
@@ -842,7 +866,7 @@ export function TenantsPage({ user, go, tier }) {
                   <Td color="var(--txt-2)">{ukDate(t.tenancy_end)}</Td>
                   <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
                   <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
-                  <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t.id)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
+                  <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
                 </tr>
                 {isOpen && (
                   <tr>
