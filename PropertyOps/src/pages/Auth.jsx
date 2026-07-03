@@ -10,7 +10,9 @@ export function AuthScreen() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [company, setCompany] = useState("");
-  const [forgot, setForgot] = useState(false);
+  const [forgot, setForgot] = useState(() => {
+    try { return window.location.hash === "#forgot" || /\/forgot-password\/?$/.test(window.location.pathname); } catch (e) { return false; }
+  });
   const [msg, setMsg] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,6 +30,7 @@ export function AuthScreen() {
       const p = window.location.pathname;
       if (h === "#signup" || h === "#register" || /\/register\/?$/.test(p)) setTab("register");
       else if (h === "#login" || /\/login\/?$/.test(p)) setTab("login");
+      if (h === "#forgot" || /\/forgot-password\/?$/.test(p)) setForgot(true);
     };
     applyHash();
     window.addEventListener("hashchange", applyHash);
