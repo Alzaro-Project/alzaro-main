@@ -1008,6 +1008,20 @@ export function SettingsPage({ user }) {
     sendgrid: { host: "smtp.sendgrid.net",     port: 587, secure: false },
   };
 
+  // Per-provider guidance for the Password field. Gmail/Outlook reject normal
+  // login passwords over SMTP — users must generate an "app password". This is
+  // the single most common setup mistake, so we spell it out with a link.
+  const PASS_HELP = {
+    gmail:    { text: "Gmail needs an App Password, not your normal password. Turn on 2-Step Verification first, then create one here:", url: "https://myaccount.google.com/apppasswords", label: "Google App Passwords" },
+    outlook:  { text: "Outlook/Hotmail needs an App Password (with 2-step verification on), not your normal password. Create one here:", url: "https://account.live.com/proofs/AppPassword", label: "Microsoft App Passwords" },
+    office365:{ text: "Microsoft 365 needs an App Password (with 2-step verification on), not your normal password. Create one here:", url: "https://account.microsoft.com/security", label: "Microsoft Security" },
+    zoho:     { text: "Zoho Mail needs an App-Specific Password, not your normal password. Create one here:", url: "https://accounts.zoho.eu/home#security/app_password", label: "Zoho App Passwords" },
+    resend:   { text: "Use your Resend API key as the password. Create one in your Resend dashboard:", url: "https://resend.com/api-keys", label: "Resend API Keys" },
+    sendgrid: { text: "Use an API key as the password (username is literally 'apikey'). Create one here:", url: "https://app.sendgrid.com/settings/api_keys", label: "SendGrid API Keys" },
+    ionos:    { text: "Use your normal IONOS mailbox password here. If it's rejected, check the mailbox is enabled for SMTP in your IONOS webmail settings.", url: "", label: "" },
+    custom:   { text: "For Gmail, Outlook and most providers, this is an “app password”, not your normal login password. Pick your provider above for a direct link.", url: "", label: "" },
+  };
+
   const TABS = [
     { key: "organisation", label: "Organisation", icon: "ti-building" },
     { key: "notifications", label: "Notifications", icon: "ti-bell" },
@@ -1292,6 +1306,12 @@ export function SettingsPage({ user }) {
                   <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="••••••••••••" />
                   <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
                 </div>
+                {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, fontSize: 11, color: "var(--txt-3)", lineHeight: 1.45 }}>
+                    <i className="ti ti-info-circle" style={{ fontSize: 12.5, marginTop: 1, flexShrink: 0, color: "var(--brand)" }} />
+                    <span>{h.text}{h.url && <> <a href={h.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--brand)", fontWeight: 600, textDecoration: "underline" }}>{h.label} ↗</a></>}</span>
+                  </div>
+                ); })()}
               </div>
             </div>
 
