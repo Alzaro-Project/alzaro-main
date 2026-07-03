@@ -159,7 +159,7 @@ export function DashboardPage({ range, go, user, tier }) {
   const [data, setData] = useState(null);
   const [needsEmail, setNeedsEmail] = useState(false);
   const [emailDismissed, setEmailDismissed] = useState(() => {
-    try { return localStorage.getItem("propops_email_nudge_dismissed") === "1"; } catch (e) { return false; }
+    try { return localStorage.getItem(`propops_email_nudge_dismissed_${user?.id || "anon"}`) === "1"; } catch (e) { return false; }
   });
 
   // Which features this plan can open. Mirrors the nav gate so a dashboard card
@@ -239,7 +239,7 @@ export function DashboardPage({ range, go, user, tier }) {
             <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.4 }}>Connect your email so invoices send from your company's own address — not from Alzaro. Required before you can email invoices to tenants.</div>
           </div>
           <span onClick={() => go("settings")} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--brand)", padding: "8px 14px", borderRadius: 8, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>Set up now</span>
-          <i className="ti ti-x" onClick={() => { setEmailDismissed(true); try { localStorage.setItem("propops_email_nudge_dismissed", "1"); } catch (e) {} }} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer", flexShrink: 0 }} title="Dismiss" />
+          <i className="ti ti-x" onClick={() => { setEmailDismissed(true); try { localStorage.setItem(`propops_email_nudge_dismissed_${user?.id || "anon"}`, "1"); } catch (e) {} }} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer", flexShrink: 0 }} title="Dismiss" />
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
@@ -292,7 +292,7 @@ export function DashboardPage({ range, go, user, tier }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
         <TiltCard index={4} onClick={() => go("maintenance")} icon="ti-tools" locked={!canMaint} lockTier={featureMin("maintenance")} label="Open Maintenance" value={openMaint} sub={`${highPri} high priority`} color="var(--amber)" />
         <TiltCard index={5} onClick={() => go("compliance")} icon="ti-alert-triangle" locked={!canCompliance} lockTier={featureMin("compliance")} label="Urgent Compliance" value={certs.filter((c) => c.days !== null && c.days <= 7).length} sub="Within 7 days" color="var(--red)" />
-        <TiltCard index={6} onClick={() => go("properties")} icon="ti-building-estate" label="Properties" value={totalProps} sub={score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} subColor={score >= 90 ? "var(--green)" : "var(--amber)"} color="var(--txt)" />
+        <TiltCard index={6} onClick={() => go("properties")} icon="ti-building-estate" label="Properties" value={totalProps} sub={!hasCerts ? "No certificates yet" : score >= 90 ? "Portfolio healthy ✓" : "Check compliance"} subColor={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : "var(--amber)"} color="var(--txt)" />
       </div>
     </div>
   );
@@ -408,7 +408,7 @@ export function PropertiesPage({ user, go, tier }) {
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" min="0" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Invoice day
               <select style={inp} value={manualDay ? "manual" : (["", "1", "15", "31"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual")} onChange={(e) => { const v = e.target.value; if (v === "manual") { setManualDay(true); } else { setManualDay(false); setForm({ ...form, invoice_day: v }); } }}>
                 <option value="">— none —</option>
@@ -587,7 +587,7 @@ export function CompliancePage({ user, go }) {
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-        <Metric label="Compliance Score" value={<>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>} sub={score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
+        <Metric label="Compliance Score" value={items.length ? <>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></> : "—"} sub={!items.length ? "No certificates yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!items.length ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Urgent (≤7 days)" value={urgent} sub="Act now" color="var(--red)" />
         <Metric label="Due Soon (≤30 days)" value={soon} sub="Schedule renewal" color="var(--amber)" />
         <Metric label="Tracked Items" value={items.length} sub="Certificates" color="var(--blue)" />
@@ -809,7 +809,7 @@ export function TenantsPage({ user, go, tier }) {
             <label style={fld}>Tenancy end date (DD/MM/YYYY)<input style={inp} type="date" value={form.tenancy_end} onChange={(e) => setForm({ ...form, tenancy_end: e.target.value })} /></label>
             <label style={fld}>Rent status<select style={inp} value={form.rent_status} onChange={(e) => setForm({ ...form, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Right to Rent<select style={inp} value={form.rtr_status} onChange={(e) => setForm({ ...form, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={fld}>Deposit received (£)<input style={inp} type="number" placeholder="e.g. 1500" value={form.deposit_amount} onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })} /></label>
+            <label style={fld}>Deposit received (£)<input style={inp} type="number" min="0" placeholder="e.g. 1500" value={form.deposit_amount} onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })} /></label>
             <label style={{ ...fld, justifyContent: "flex-end" }}>Protected under DPS
               <div onClick={() => setForm({ ...form, deposit_protected: !form.deposit_protected })} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
                 <span style={{ width: 38, height: 22, borderRadius: 11, background: form.deposit_protected ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0 }}>
