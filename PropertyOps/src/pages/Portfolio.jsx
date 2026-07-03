@@ -348,6 +348,8 @@ export function PropertiesPage({ user, go, tier }) {
     setForm(blank); setEditId(null); setManualDay(false); setAdding(!adding); setErr("");
   };
   const formRef = useRef(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const openEdit = (p) => { setForm({ address: p.address || "", area: p.area || "", type: p.type || "House", status: p.status || "Let", rent: p.rent || "", invoice_day: p.invoice_day || "" }); setManualDay(p.invoice_day != null && p.invoice_day !== "" && !["1", "15", "31"].includes(String(p.invoice_day))); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
   const save = async () => {
@@ -370,12 +372,14 @@ export function PropertiesPage({ user, go, tier }) {
     }
     setErr("");
     const payload = { ...form, rent: form.rent === "" ? 0 : +form.rent, invoice_day: form.invoice_day === "" ? null : Number(form.invoice_day) };
+    if (savingRef.current) return; savingRef.current = true; setSaving(true);
     let error;
     if (editId) {
       ({ error } = await db.from("prop_properties").update(payload).eq("id", editId));
     } else {
       ({ error } = await db.from("prop_properties").insert([{ ...payload, score: 100, user_id: user.id }]));
     }
+    savingRef.current = false; setSaving(false);
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -419,7 +423,7 @@ export function PropertiesPage({ user, go, tier }) {
               <span style={{ fontSize: 9.5, color: "var(--txt-3)" }}>Day each month rent is invoiced (31 = last day; shorter months adjust automatically)</span>
             </label>
             </div>
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update property" : "Save property"} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update property" : "Save property")} primary /></span></div>
         </div>
       )}
 
@@ -522,6 +526,8 @@ export function CompliancePage({ user, go }) {
   const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
   const formRef = useRef(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const openEdit = (c) => { setForm({ type: c.type || "Gas Safety", property_id: c.property_id || "", reference: c.reference || "", start_date: c.start_date || "", expiry_date: c.expiry_date || "" }); setEditId(c.id); setAdding(true); setErr(""); scrollToForm(); };
 
@@ -534,9 +540,11 @@ export function CompliancePage({ user, go }) {
     // instead of deleting the key means clearing the field on edit actually
     // clears it, rather than silently keeping the old value.
     payload.start_date = form.start_date || null;
+    if (savingRef.current) return; savingRef.current = true; setSaving(true);
     let error;
     if (editId) ({ error } = await db.from("prop_compliance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_compliance").insert([{ ...payload, user_id: user.id }]));
+    savingRef.current = false; setSaving(false);
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -589,7 +597,7 @@ export function CompliancePage({ user, go }) {
             <label style={fld}>Issued / start date (DD/MM/YYYY)<input style={inp} type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
             <label style={fld}>Expiry date (DD/MM/YYYY)<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
           </div>
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update certificate" : "Save certificate"} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update certificate" : "Save certificate")} primary /></span></div>
         </div>
       )}
 
@@ -680,6 +688,8 @@ export function TenantsPage({ user, go, tier }) {
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
   const formRef = useRef(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const openEdit = (t) => { setForm({ name: t.name || "", property_id: t.property_id || "", email: t.email || "", phone: t.phone || "", tenancy_start: t.tenancy_start || "", tenancy_end: t.tenancy_end || "", deposit_amount: t.deposit_amount || "", deposit_protected: !!t.deposit_protected, rent_status: t.rent_status || "Up to date", rtr_status: t.rtr_status || "Pending", co_tenant_name: t.co_tenant_name || "", co_tenant_email: t.co_tenant_email || "", co_tenant_phone: t.co_tenant_phone || "" }); setEditId(t.id); setAdding(true); setErr(""); scrollToForm(); };
   const save = async () => {
@@ -722,13 +732,14 @@ export function TenantsPage({ user, go, tier }) {
     // instead of silently reverting to the old value.
     payload.tenancy_end = form.tenancy_end || null;
     payload.tenancy_start = form.tenancy_start || null;
+    if (savingRef.current) return; savingRef.current = true; setSaving(true);
     let error;
     if (editId) {
       ({ error } = await db.from("prop_tenants").update(payload).eq("id", editId));
     } else {
       ({ error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]));
     }
-    if (error) { setErr(error.message); return; }
+    if (error) { savingRef.current = false; setSaving(false); setErr(error.message); return; }
     // If this tenant is assigned to a property that isn't already Let, mark it Let.
     if (form.property_id && DB_READY) {
       const { data: prop } = await db.from("prop_properties").select("status").eq("id", form.property_id).maybeSingle();
@@ -736,6 +747,7 @@ export function TenantsPage({ user, go, tier }) {
         await db.from("prop_properties").update({ status: "Let" }).eq("id", form.property_id);
       }
     }
+    savingRef.current = false; setSaving(false);
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
@@ -793,7 +805,7 @@ export function TenantsPage({ user, go, tier }) {
             <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--txt-3)" }}>{propTypeOf(form.property_id)} — add separate tenants individually (up to {hmoCap} on your {(tier || "basic")} plan).</div>
           )}
 
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update tenant" : "Save tenant"} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update tenant" : "Save tenant")} primary /></span></div>
         </div>
       )}
 
