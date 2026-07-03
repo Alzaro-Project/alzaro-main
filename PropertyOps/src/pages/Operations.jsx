@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
-import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
+import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 export function MaintenancePage({ user, go }) {
@@ -461,13 +461,13 @@ const data = rows || [];
     const x = String(s || "").toLowerCase();
     return x === "paid" ? "Paid" : x === "overdue" ? "Overdue" : x === "sent" ? "Sent" : "Pending";
   };
-  const collected = data.filter((p) => normStatus(p.status) === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
-  const overdue = data.filter((p) => normStatus(p.status) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const pending = data.filter((p) => ["Pending", "Sent"].includes(normStatus(p.status))).reduce((s, p) => s + (p.amount || 0), 0);
+  const collected = data.filter((p) => effectiveStatus(p) === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
+  const overdue = data.filter((p) => effectiveStatus(p) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = data.filter((p) => ["Pending", "Sent"].includes(effectiveStatus(p))).reduce((s, p) => s + (p.amount || 0), 0);
   const expected = collected + overdue + pending;
   const rate = expected ? Math.round((collected / expected) * 100) : 0;
-  const paidCount = data.filter((p) => normStatus(p.status) === "Paid").length;
-  const overdueCount = data.filter((p) => normStatus(p.status) === "Overdue").length;
+  const paidCount = data.filter((p) => effectiveStatus(p) === "Paid").length;
+  const overdueCount = data.filter((p) => effectiveStatus(p) === "Overdue").length;
 
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
   const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
@@ -573,7 +573,7 @@ const data = rows || [];
       ) : data.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
       ) : (() => {
-        const shown = filter === "All" ? data : data.filter((p) => normStatus(p.status) === filter);
+        const shown = filter === "All" ? data : data.filter((p) => effectiveStatus(p) === filter);
         if (shown.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No {filter.toLowerCase()} payments.</div>;
         return (
         <Table cols={["", "Tenant", "Property", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
@@ -597,12 +597,12 @@ const data = rows || [];
                   <Td color="var(--txt-2)">{vatApplies ? money(b.vat) : "—"}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
                   <Td color="var(--txt-2)">{ukDate(p.due_date || p.due)}</Td>
-                  <Td><Pill text={normStatus(p.status)} tone={normStatus(p.status) === "Paid" ? "green" : normStatus(p.status) === "Overdue" ? "red" : normStatus(p.status) === "Sent" ? "blue" : "amber"} /></Td>
+                  <Td><Pill text={effectiveStatus(p)} tone={effectiveStatus(p) === "Paid" ? "green" : effectiveStatus(p) === "Overdue" ? "red" : effectiveStatus(p) === "Sent" ? "blue" : "amber"} /></Td>
                   <Td>{p.id && DB_READY ? (
                     <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                       <ActionBtn icon="ti-send" title="Preview & send email" tone="brand" onClick={() => setEmailPayment(p)} />
                       <ActionBtn icon="ti-pencil" title="Edit" onClick={() => openEdit(p)} />
-                      {["Pending", "Sent", "Overdue"].includes(normStatus(p.status)) && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
+                      {["Pending", "Sent", "Overdue"].includes(effectiveStatus(p)) && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
                       <ActionBtn icon="ti-trash" title="Delete" tone="red" onClick={() => remove(p.id)} />
                     </div>
                   ) : null}</Td>
