@@ -17,11 +17,21 @@
 </head>
 <body>
   <div id="root">
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0b0e">
+    <div id="boot-splash" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0b0e">
       <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,.12);border-top-color:#8b7fe8;border-radius:50%;animation:sp 0.7s linear infinite"></div>
     </div>
     <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
   </div>
+  <script>
+    // Match the loading background to the saved theme so light-mode users don't
+    // get a dark flash before the app mounts.
+    try {
+      if (localStorage.getItem("propops_theme") === "light") {
+        var s = document.getElementById("boot-splash");
+        if (s) { s.style.background = "#f7f7fa"; s.firstElementChild.style.borderColor = "rgba(0,0,0,.10)"; s.firstElementChild.style.borderTopColor = "#8b7fe8"; }
+      }
+    } catch (e) {}
+  </script>
   <script type="module" src="./src/main.jsx"></script>
 </body>
 </html>
