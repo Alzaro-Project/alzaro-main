@@ -1,7 +1,18 @@
 // /api/send-email.js
-// Vercel serverless function — sends email via Resend API.
-// Requires RESEND_API_KEY set in Vercel environment variables (server-side, no VITE_ prefix).
-// SECURITY: requires a valid Supabase session token in the Authorization header.
+// Vercel serverless function — sends invoice/notification email.
+//
+// TWO SEND PATHS:
+//   1. User SMTP  — if the caller passes valid smtp{host,user,pass}, send via
+//      their own mail server (nodemailer) so the email genuinely comes FROM
+//      their address. This is what the Settings → Email tab configures.
+//   2. Resend     — otherwise fall back to Alzaro's Resend domain
+//      (invoices@alzaro.co.uk). Reliable default for users who haven't set up
+//      their own email. Existing callers (TyreOps/GarageOps) pass no smtp and
+//      are completely unaffected.
+//
+// Requires RESEND_API_KEY for path 2. SECURITY: requires a valid Supabase
+// session token in the Authorization header.
+import nodemailer from 'nodemailer'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,10 +50,68 @@ export default async function handler(req, res) {
     }
     // --- End auth check ---
 
-    const { to, subject, html, text, fromName, replyTo, attachments } = req.body || {}
+    const { to, subject, html, text, fromName, replyTo, attachments, smtp, requireSmtp } = req.body || {}
     if (!to || !subject || (!html && !text)) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, html/text' })
     }
+
+    // Multi-company guard: when the caller requires SMTP (e.g. PropertyOps
+    // invoices, where each company must send from its OWN address), refuse to
+    // fall back to Alzaro's shared Resend address. A company's invoice must
+    // never go out branded as invoices@alzaro.co.uk.
+    if (requireSmtp && !(smtp && smtp.host && smtp.user && smtp.pass)) {
+      return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+    }
+
+    // --- Path 1: user's own SMTP (send FROM their address) ---
+    // Only taken when host, user and pass are all present. Anything missing or
+    // a connection failure falls through to Resend below, so a send never
+    // silently fails just because SMTP was misconfigured.
+    if (smtp && smtp.host && smtp.user && smtp.pass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtp.host,
+          port: Number(smtp.port) || 587,
+          secure: smtp.secure === true || smtp.secure === 'true', // 465 = SSL, 587 = STARTTLS
+          auth: { user: smtp.user, pass: smtp.pass },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+        })
+        const fromEmail = smtp.fromEmail || smtp.user
+        const info = await transporter.sendMail({
+          from: `"${fromName || smtp.fromName || fromEmail}" <${fromEmail}>`,
+          to,
+          subject,
+          html: html || undefined,
+          text: text || undefined,
+          replyTo: replyTo || smtp.replyTo || undefined,
+          attachments: (Array.isArray(attachments) && attachments.length)
+            ? attachments.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64' }))
+            : undefined,
+        })
+        return res.status(200).json({ success: true, id: info.messageId, via: 'smtp' })
+      } catch (err) {
+        // Translate common SMTP failures; do NOT fall back to Resend here —
+        // the user explicitly configured their own email, so a silent switch to
+        // Alzaro's address would be misleading. Return a clear reason instead.
+        let reason = err.message || 'SMTP send failed'
+        const code = err.code || ''
+        const responseCode = err.responseCode
+        if (code === 'EAUTH' || responseCode === 535) {
+          reason = 'Your email login was rejected. Gmail and Outlook require an "app password" here, not your normal password. Check Settings → Email.'
+        } else if (code === 'EDNS' || code === 'ENOTFOUND') {
+          reason = `Could not find your mail server "${smtp.host}" — check the SMTP host in Settings → Email.`
+        } else if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION') {
+          reason = `Could not connect to ${smtp.host}:${smtp.port || 587} — check the port and security setting in Settings → Email.`
+        } else if (responseCode === 550 || responseCode === 553) {
+          reason = 'Your mail server refused the sender address — the "from" email must match the account you logged in with.'
+        }
+        console.error('send-email SMTP path failed:', code, responseCode, err.message)
+        return res.status(422).json({ error: reason, detail: err.message, via: 'smtp' })
+      }
+    }
+    // --- End Path 1 ---
+
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
       return res.status(500).json({ error: 'RESEND_API_KEY not set on server' })
