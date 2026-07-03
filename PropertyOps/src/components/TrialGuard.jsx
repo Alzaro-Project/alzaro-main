@@ -27,33 +27,58 @@ export default function TrialGuard({ user, children }) {
   const [changingTier, setChangingTier] = useState(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [err, setErr] = useState("");
+  // Fail closed: if we can NEVER read the account status, we must not render the
+  // app (a suspended/expired account would otherwise slip through on an error).
+  // verifyFailed is only set after retries AND only when we've never had a good
+  // read — a transient blip during the 30s poll keeps the last known status.
+  const [verifyFailed, setVerifyFailed] = useState(false);
+  const [everLoaded, setEverLoaded] = useState(false);
 
   useEffect(() => {
     if (!user?.id) { setLoading(false); return; }
+    let cancelled = false;
+
+    const readOnce = async () => {
+      const { data, error } = await db
+        .from("product_members")
+        .select("id, status, trial_ends")
+        .eq("user_id", user.id)
+        .eq("product", "propertyops")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    };
 
     const fetchStatus = async () => {
-      try {
-        const { data, error } = await db
-          .from("product_members")
-          .select("id, status, trial_ends")
-          .eq("user_id", user.id)
-          .eq("product", "propertyops")
-          .maybeSingle();
-        if (!error && data) {
+      // Retry a couple of times before giving up, to ride out brief network blips.
+      let data = null, lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try { data = await readOnce(); lastErr = null; break; }
+        catch (e) { lastErr = e; await new Promise((r) => setTimeout(r, 400 * (attempt + 1))); }
+      }
+      if (cancelled) return;
+      if (!lastErr) {
+        // A real (possibly empty) result. If a member row exists, apply it.
+        if (data) {
           setMemberId(data.id);
           setLiveStatus(data.status);
           setLiveTrialEnds(data.trial_ends);
         }
-      } catch (err2) {
-        console.error("Failed to fetch PropertyOps status:", err2);
+        setEverLoaded(true);
+        setVerifyFailed(false);
+      } else {
+        // All retries failed. Only wall the user if we've NEVER had a good read;
+        // otherwise keep the last known status and try again on the next poll.
+        console.error("Failed to fetch PropertyOps status:", lastErr);
+        if (!everLoaded) setVerifyFailed(true);
       }
       setLoading(false);
     };
 
     fetchStatus();
     const interval = setInterval(fetchStatus, 30000);
-    return () => clearInterval(interval);
-  }, [user?.id]);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user?.id, everLoaded]);
 
   const signOut = async () => {
     try { await db.auth.signOut(); } catch (e) { /* ignore */ }
@@ -125,6 +150,28 @@ export default function TrialGuard({ user, children }) {
 
   if (loading) {
     return <div style={{ ...wrap, color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+  }
+
+  // Fail closed: we couldn't verify the account status at all (and never have).
+  // Don't render the app — show a retry screen instead of risking full access
+  // for a suspended/expired account.
+  if (verifyFailed) {
+    return (
+      <div style={wrap}>
+        <div style={cardStyle}>
+          <div style={{ fontSize: 44, marginBottom: 14 }}>⚠️</div>
+          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Couldn't verify your account</div>
+          <div style={{ color: "var(--txt-2)", marginBottom: 20, lineHeight: 1.6, fontSize: 13.5 }}>
+            We couldn't reach our servers to confirm your subscription. Please check your connection and try again — your data is safe.
+          </div>
+          <div onClick={() => window.location.reload()} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "12px 22px", borderRadius: 8, cursor: "pointer" }}>
+            Try again
+          </div>
+          <div style={{ color: "var(--txt-3)", fontSize: 12.5, marginTop: 16 }}>Still stuck? support@alzaro.co.uk</div>
+          <button onClick={signOut} style={outBtn}>Sign Out</button>
+        </div>
+      </div>
+    );
   }
 
   if (liveStatus === "suspended") {
