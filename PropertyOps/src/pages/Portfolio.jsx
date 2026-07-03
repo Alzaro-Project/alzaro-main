@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner, useConfirm } from "../components/UI.jsx";
-import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
@@ -205,8 +205,8 @@ export function DashboardPage({ range, go, user, tier }) {
   const attention = certs.filter((c) => c.days !== null && c.days <= 30).length;
 
   // finance
-  const arrears = pays.filter((p) => p.status === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const arrearsCount = pays.filter((p) => p.status === "Overdue").length;
+  const arrears = pays.filter((p) => effectiveStatus(p) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
+  const arrearsCount = pays.filter((p) => effectiveStatus(p) === "Overdue").length;
 
   // maintenance
   const openMaint = maint.filter((m) => m.status !== "Completed").length;
@@ -478,7 +478,7 @@ export function PropertiesPage({ user, go, tier }) {
                           {pM.map((m, j) => <DetailRow key={j} main={m.title} sub={m.contractor || ""} pill={m.status} tone={m.status === "Completed" ? "green" : m.priority === "High" ? "red" : "amber"} />)}
                         </DetailBox>
                         <DetailBox title="Payments" icon="ti-coin" empty={pP.length === 0} emptyText="No payments logged." onClick={() => go && go("finance")}>
-                          {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                          {pP.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={effectiveStatus(x)} tone={effectiveStatus(x) === "Paid" ? "green" : effectiveStatus(x) === "Overdue" ? "red" : "amber"} />)}
                         </DetailBox>
                       </div>
                     </td>
@@ -855,7 +855,7 @@ export function TenantsPage({ user, go, tier }) {
                           {(t.deposit_amount || t.deposit_protected) && <DetailRow main={t.deposit_amount ? gbp(t.deposit_amount) : "—"} sub="Deposit" pill={t.deposit_protected ? "DPS protected" : "Not protected"} tone={t.deposit_protected ? "green" : "amber"} />}
                         </DetailBox>
                         <DetailBox title="Payments" icon="ti-coin" empty={tPays.length === 0} emptyText="No payments linked." onClick={() => go && go("finance")}>
-                          {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={x.status} tone={x.status === "Paid" ? "green" : x.status === "Overdue" ? "red" : "amber"} />)}
+                          {tPays.map((x, j) => <DetailRow key={j} main={gbp(x.amount || 0)} sub={x.due_date ? ukDate(x.due_date) : ""} pill={effectiveStatus(x)} tone={effectiveStatus(x) === "Paid" ? "green" : effectiveStatus(x) === "Overdue" ? "red" : "amber"} />)}
                         </DetailBox>
                         <DetailBox title="Property Compliance" icon="ti-shield-check" empty={tComp.length === 0} emptyText={pid ? "No certificates on this property." : "Link a property to see its certificates."} onClick={() => go && go("compliance")}>
                           {tComp.map((c, j) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; const tone = d === null ? "blue" : d <= 7 ? "red" : d <= 30 ? "amber" : "green"; return <DetailRow key={j} main={c.type} sub={c.expiry_date ? `expires ${ukDate(c.expiry_date)}` : ""} pill={d === null ? "—" : d < 0 ? "expired" : d + "d"} tone={tone} />; })}
