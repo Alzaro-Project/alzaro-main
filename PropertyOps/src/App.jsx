@@ -66,7 +66,7 @@ function Dashboard({ user, signOut }) {
   // ---- business identity for the sidebar (real DB data, not email) ----
   // Priority: prop_settings.company_name → product_members.company_name →
   // user_metadata.company_name → email prefix (last resort). Tier read from
-  // settings/membership if a column exists, else defaults to Enterprise.
+  // settings/membership if a column exists, else defaults to basic (fail closed).
   const [biz, setBiz] = useState({ name: "", tier: "basic", loaded: false });
   // Notification preferences from prop_settings (default on / 30-day lead).
   // These drive which alerts the bell shows and how far ahead certs warn.
