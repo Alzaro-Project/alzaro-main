@@ -151,6 +151,7 @@ function PaymentEmailModal({ payment, tenant, propName, user, onClose, onSent })
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [bizName, setBizName] = useState("Alzaro PropertyOps");
+  const [smtp, setSmtp] = useState(null); // user's own SMTP, or null = use Alzaro
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null); // null | 'sending' | 'success' | 'error'
   const [msg, setMsg] = useState("");
@@ -159,8 +160,15 @@ function PaymentEmailModal({ payment, tenant, propName, user, onClose, onSent })
     const build = async () => {
       let biz = "Alzaro PropertyOps";
       if (DB_READY) {
-        const { data: s } = await db.from("prop_settings").select("company_name").eq("user_id", user.id);
-        if (s && s.length && s[0].company_name) biz = s[0].company_name;
+        const { data: s } = await db.from("prop_settings").select("company_name, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, smtp_from_name, smtp_from_email, smtp_reply_to").eq("user_id", user.id);
+        if (s && s.length) {
+          if (s[0].company_name) biz = s[0].company_name;
+          // Only treat SMTP as usable when host + user + pass are all present.
+          const r = s[0];
+          if (r.smtp_host && r.smtp_user && r.smtp_pass) {
+            setSmtp({ host: r.smtp_host, port: r.smtp_port || 587, secure: !!r.smtp_secure, user: r.smtp_user, pass: r.smtp_pass, fromName: r.smtp_from_name || biz, fromEmail: r.smtp_from_email || r.smtp_user, replyTo: r.smtp_reply_to || "" });
+          }
+        }
       }
       setBizName(biz);
       const tName = tenant?.name || payment.tenant || "there";
@@ -186,6 +194,7 @@ ${biz}`
   }, []);
 
   const send = async () => {
+    if (!smtp) { setStatus("error"); setMsg("Set up your business email in Settings → Email before sending invoices. This keeps your invoices coming from your own company address."); return; }
     if (!to.trim()) { setStatus("error"); setMsg("Add a recipient email address first."); return; }
     setStatus("sending"); setMsg("");
     try {
@@ -199,7 +208,7 @@ ${biz}`
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName }),
+        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName, replyTo: smtp?.replyTo || undefined, smtp: smtp || undefined, requireSmtp: true }),
       });
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
@@ -241,6 +250,12 @@ ${biz}`
               <div style={labelTiny}>To</div>
               <input style={field} value={to} onChange={(e) => setTo(e.target.value)} placeholder="tenant@email.com" />
             </div>
+            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 7, fontSize: 11, color: "var(--txt-3)" }}>
+              <i className={smtp ? "ti ti-mail-check" : "ti ti-alert-triangle"} style={{ fontSize: 13, color: smtp ? "var(--green)" : "var(--amber)" }} />
+              {smtp
+                ? <span>Sending from <b style={{ color: "var(--txt-2)" }}>{smtp.fromEmail}</b> (your email). Replies go to you.</span>
+                : <span style={{ color: "var(--amber)" }}>Set up your business email in <b>Settings → Email</b> before sending, so invoices come from your company — not from Alzaro.</span>}
+            </div>
             <div style={{ marginBottom: 12 }}>
               <div style={labelTiny}>Subject</div>
               <input style={field} value={subject} onChange={(e) => setSubject(e.target.value)} />
@@ -255,9 +270,11 @@ ${biz}`
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span onClick={status === "sending" ? undefined : send}><Btn icon="ti-send" label={status === "sending" ? "Sending…" : "Send invoice"} primary /></span>
+              <span onClick={status === "sending" || !smtp ? undefined : send} style={{ opacity: smtp ? 1 : 0.5, cursor: smtp ? "pointer" : "not-allowed" }}><Btn icon="ti-send" label={status === "sending" ? "Sending…" : "Send invoice"} primary /></span>
               <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
-              <span style={{ fontSize: 10.5, color: "var(--txt-3)", marginLeft: "auto" }}>Sends via Alzaro (invoices@alzaro.co.uk)</span>
+              {smtp
+                ? <span style={{ fontSize: 10.5, color: "var(--txt-3)", marginLeft: "auto" }}>Sends from {smtp.fromEmail}</span>
+                : <span style={{ fontSize: 10.5, color: "var(--amber)", marginLeft: "auto" }}>Email setup required — Settings → Email</span>}
             </div>
           </>
         )}
