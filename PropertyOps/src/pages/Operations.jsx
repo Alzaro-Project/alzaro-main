@@ -12,6 +12,8 @@ export function MaintenancePage({ user, go }) {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
   const formRef = useRef(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   // Bring the edit/add form into view — clicking Edit on a row far down the
   // list renders the form at the top, which would otherwise be off-screen.
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
@@ -34,13 +36,16 @@ export function MaintenancePage({ user, go }) {
   const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); scrollToForm(); };
 
   const save = async () => {
+    if (savingRef.current) return; // guard against double-click double-insert
     if (!form.title.trim()) { setErr("Job title is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
+    savingRef.current = true; setSaving(true);
     const payload = { ...form, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     let error;
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]));
+    savingRef.current = false; setSaving(false);
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -89,7 +94,7 @@ export function MaintenancePage({ user, go }) {
             <label style={fld}>Cost (£)<input style={inp} type="number" step="0.01" placeholder="e.g. 120.00" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update job" : "Save job"} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update job" : "Save job")} primary /></span></div>
         </div>
       )}
 
@@ -308,6 +313,9 @@ export function FinancePage({ user, go }) {
   const [filter, setFilter] = useState("All");
   const [fullProps, setFullProps] = useState([]);
   const [raising, setRaising] = useState(null);
+  const raisingRef = useRef(false);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [raisedMsg, setRaisedMsg] = useState("");
   // Company VAT scheme drives how the ledger splits amounts (see vatBreakdown).
   // Defaults to "exempt" (no VAT) until settings load — safer than assuming 20%.
@@ -360,9 +368,11 @@ export function FinancePage({ user, go }) {
   }, [form.property_id, fullProps, adding]);
 
   const save = async () => {
+    if (savingRef.current) return; // guard against double-click double-insert
     if (!form.tenant.trim()) { setErr("Tenant is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
+    savingRef.current = true; setSaving(true);
     const invoiceNo = form.invoice_no || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
     // Empty date → null (not delete), so clearing a date on edit actually clears it.
@@ -371,6 +381,7 @@ export function FinancePage({ user, go }) {
     let error;
     if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_payments").insert([{ ...payload, user_id: user.id }]));
+    savingRef.current = false; setSaving(false);
     if (error) { setErr(error.message); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
@@ -419,6 +430,8 @@ export function FinancePage({ user, go }) {
 
   const raiseInvoice = async (proj) => {
     if (!DB_READY) return;
+    if (raisingRef.current) return; // guard against double-click duplicate raise
+    raisingRef.current = true;
     setRaising(proj.property_id + proj.month);
     const invoiceNo = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const { error } = await db.from("prop_payments").insert([{
@@ -426,6 +439,7 @@ export function FinancePage({ user, go }) {
       amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
       status: "Sent", user_id: user.id,
     }]);
+    raisingRef.current = false;
     setRaising(null);
     if (error) { setErr(error.message); return; }
     // Confirm it landed in the ledger — raising moves a projected invoice into
@@ -516,7 +530,7 @@ const data = rows || [];
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
           <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
-          <div style={{ marginTop: 12 }}><span onClick={save}><Btn icon="ti-device-floppy" label={editId ? "Update payment" : "Save payment"} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update payment" : "Save payment")} primary /></span></div>
         </div>
       )}
 
@@ -546,7 +560,7 @@ const data = rows || [];
                 <Td color="var(--txt-2)">{r.tenant || "—"}</Td>
                 <Td>{gbp(r.amount)}</Td>
                 <Td color="var(--txt-2)">{ukDate(r.due_date)}</Td>
-                <Td>{DB_READY ? <span onClick={() => raiseInvoice(r)}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
+                <Td>{DB_READY ? <span onClick={raising === r.property_id + r.month ? undefined : () => raiseInvoice(r)} style={{ opacity: raising === r.property_id + r.month ? 0.6 : 1 }}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
               </tr>
             ))}
           </Table>
