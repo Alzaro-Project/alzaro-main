@@ -530,7 +530,10 @@ export function CompliancePage({ user, go }) {
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     const payload = { ...form, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
-    if (!payload.start_date) delete payload.start_date;
+    // Empty date → null (Postgres rejects "" for date columns). Using null
+    // instead of deleting the key means clearing the field on edit actually
+    // clears it, rather than silently keeping the old value.
+    payload.start_date = form.start_date || null;
     let error;
     if (editId) ({ error } = await db.from("prop_compliance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_compliance").insert([{ ...payload, user_id: user.id }]));
@@ -715,8 +718,10 @@ export function TenantsPage({ user, go, tier }) {
     const payload = { ...form, deposit_amount: form.deposit_amount === "" ? null : +form.deposit_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     // Co-tenant only applies to a joint House/Flat tenancy — clear it on HMO/Block.
     if (multi) { payload.co_tenant_name = ""; payload.co_tenant_email = ""; payload.co_tenant_phone = ""; }
-    if (!payload.tenancy_end) delete payload.tenancy_end;
-    if (!payload.tenancy_start) delete payload.tenancy_start;
+    // Empty date → null (not delete), so clearing a tenancy date on edit sticks
+    // instead of silently reverting to the old value.
+    payload.tenancy_end = form.tenancy_end || null;
+    payload.tenancy_start = form.tenancy_start || null;
     let error;
     if (editId) {
       ({ error } = await db.from("prop_tenants").update(payload).eq("id", editId));
