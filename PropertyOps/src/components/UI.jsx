@@ -2,6 +2,44 @@ import { useState } from "react";
 import { downloadCSV, toneVar, useIsMobile } from "../lib/helpers.js";
 
 /* ===== SHARED UI COMPONENTS ===== */
+
+// Reusable confirmation dialog + hook. Use instead of window.confirm so
+// destructive actions (deletes) always ask first, with consistent styling on
+// desktop and mobile.
+//   const confirm = useConfirm();
+//   ...
+//   <ConfirmDialog {...confirm.props} />
+//   onClick={() => confirm.ask({ title, message, confirmLabel, onConfirm })}
+export function useConfirm() {
+  const [state, setState] = useState({ open: false, title: "", message: "", confirmLabel: "Delete", onConfirm: null });
+  const ask = ({ title, message, confirmLabel, onConfirm }) =>
+    setState({ open: true, title: title || "Are you sure?", message: message || "", confirmLabel: confirmLabel || "Delete", onConfirm });
+  const close = () => setState((s) => ({ ...s, open: false, onConfirm: null }));
+  const confirm = async () => { const fn = state.onConfirm; close(); if (fn) await fn(); };
+  return { props: { ...state, onCancel: close, onConfirm: confirm }, ask };
+}
+
+export function ConfirmDialog({ open, title, message, confirmLabel, onConfirm, onCancel }) {
+  if (!open) return null;
+  const overlay = { position: "fixed", inset: 0, background: "rgba(15,16,22,.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
+  const panel = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: "22px 22px 18px", width: 400, maxWidth: "95vw", boxShadow: "0 24px 60px rgba(0,0,0,.3)" };
+  const btn = { fontSize: 13, fontWeight: 600, padding: "9px 16px", borderRadius: 8, cursor: "pointer", border: "0.5px solid var(--line)" };
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div style={panel} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 20, color: "var(--red)" }} />
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{title}</div>
+        </div>
+        {message && <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.5, marginBottom: 18 }}>{message}</div>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <div onClick={onCancel} style={{ ...btn, background: "var(--panel-2)", color: "var(--txt)" }}>Cancel</div>
+          <div onClick={onConfirm} style={{ ...btn, background: "var(--red)", color: "#fff", border: "none" }}>{confirmLabel}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 export function PageHead({ title, sub, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
