@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Btn, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td } from "../components/UI.jsx";
+import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
 import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
@@ -45,7 +45,9 @@ export function MaintenancePage({ user, go }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_maintenance").delete().eq("id", id); refresh(); } };
+  const confirm = useConfirm();
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_maintenance").delete().eq("id", id); refresh(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this job?", message: "This maintenance job will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
   const move = async (j, dir) => {
     const idx = stages.indexOf(j.status);
@@ -69,6 +71,7 @@ export function MaintenancePage({ user, go }) {
 
   return (
     <div className="fade-in">
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Maintenance" sub={rows ? `${open} open job${open === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New job"} primary /></span>} />
 
@@ -422,7 +425,9 @@ export function FinancePage({ user, go }) {
     refresh();
   };
 
-  const remove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
+  const confirm = useConfirm();
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this invoice?", message: "This invoice/payment record will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
 const data = rows || [];
   // Stored statuses are inconsistent (older raised invoices saved lowercase
@@ -453,6 +458,7 @@ const data = rows || [];
 
   return (
     <div className="fade-in">
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Finance" sub={rows ? `${data.length} payment${data.length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add payment"} primary /></span>} />
 
@@ -670,12 +676,14 @@ export function DocumentsPage({ user }) {
     setPreview({ ...d, url: data.signedUrl, kind });
   };
 
-  const remove = async (d) => {
+  const confirm = useConfirm();
+  const doRemove = async (d) => {
     if (!d.id || !DB_READY) return;
     if (d.file_path) await db.storage.from("documents").remove([d.file_path]);
     await db.from("prop_documents").delete().eq("id", d.id);
     refresh();
   };
+  const remove = (d) => confirm.ask({ title: "Delete this document?", message: `"${d.name || "This document"}" will be permanently deleted, including the uploaded file. This can't be undone.`, onConfirm: () => doRemove(d) });
 
   const data = (rows || []).filter((d) => cat === "All" || d.category === cat);
   const fmtSize = (kb) => !kb ? "" : kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB";
@@ -683,6 +691,7 @@ export function DocumentsPage({ user }) {
   return (
     <div className="fade-in">
       <input ref={fileRef} type="file" style={{ display: "none" }} onChange={onPick} />
+      <ConfirmDialog {...confirm.props} />
       <PageHead title="Documents" sub="Secure legal document vault — private to your account." right={
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <select value={pickCat} onChange={(e) => setPickCat(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 10px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" }}>
