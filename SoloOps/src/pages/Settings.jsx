@@ -320,10 +320,10 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   // match the shared Stripe prices (api/_billing-config.js); the tier key is
   // sent straight to checkout.
   const tiers = [
-    { key:'basic',  name:'Basic',  price:'£12.99/mo', feats:'Dashboard, income & invoicing, client database' },
-    { key:'bronze', name:'Bronze', price:'£18.99/mo', feats:'Everything in Basic + expenses, recurring-expense detection, receipts' },
-    { key:'silver', name:'Silver', price:'£28.99/mo', feats:'Everything in Bronze + bank import, mileage, reports' },
-    { key:'gold',   name:'Gold',   price:'£39.99/mo', feats:'Everything in Silver + document store, tax tools, accountant export pack' },
+    { key:'basic',  name:'⚪ Basic',  price:'£12.99/mo', color:'#6b7280', features:['Dashboard', 'Income & invoicing', 'Client database'] },
+    { key:'bronze', name:'🥉 Bronze', price:'£18.99/mo', color:'#cd7f32', features:['Everything in Basic', 'Expenses', 'Recurring-expense detection', 'Receipts'] },
+    { key:'silver', name:'🥈 Silver', price:'£28.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Bank import', 'Mileage', 'Reports'] },
+    { key:'gold',   name:'🥇 Gold',   price:'£39.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Document store', 'Tax tools', 'Accountant export pack'] },
   ]
 
   const sectionTitle = { fontWeight:700, fontSize:'15px', marginBottom:'14px' }
@@ -516,21 +516,52 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         <>
           <div data-card style={card}>
             <div style={sectionTitle}>Billing &amp; plan</div>
-            <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'14px' }}>You're on <strong style={{color:'var(--orange-light)'}}>{(tiers.find(x=>x.key===currentTier)||tiers[0]).name}</strong>.</div>
-            {tiers.map((t, i) => {
-              const isCurrent = t.key === currentTier
-              const currentIdx = tiers.findIndex(x => x.key === currentTier)
-              return (
-              <div key={t.key} style={{ border:'1px solid '+(isCurrent?'var(--orange)':'var(--border)'), borderRadius:'12px', padding:'14px', marginBottom:'10px', background: isCurrent?'var(--orange-subtle)':'transparent' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div style={{ fontWeight:700 }}>{t.name} <span style={{ color:'var(--text3)', fontWeight:500, fontSize:'13px' }}>{t.price}</span></div>
-                  {isCurrent ? <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', border:'1px solid var(--orange)', borderRadius:'20px', padding:'2px 10px' }}>CURRENT</span>
-                    : <button style={{...btnSec, padding:'6px 12px', opacity:changingTier?0.7:1}} disabled={!!changingTier} onClick={()=>startCheckout(t.key)}>{changingTier===t.key ? 'Starting…' : (i > currentIdx ? 'Upgrade' : 'Switch')}</button>}
-                </div>
-                <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px' }}>{t.feats}</div>
-              </div>
-            )})}
-            <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', marginTop:'6px' }}>
+            <div style={{ fontSize:'13px', color:'var(--text2)', marginBottom:'16px' }}>You're on <strong style={{color:'var(--orange-light)'}}>{(tiers.find(x=>x.key===currentTier)||tiers[0]).name.replace(/^\S+\s/, '')}</strong>.</div>
+
+            {/* Mobile-friendly horizontal scroll */}
+            <div style={{ display:'flex', gap:'12px', overflowX:'auto', paddingBottom:'8px', paddingTop:'10px', WebkitOverflowScrolling:'touch', scrollSnapType:'x mandatory' }}>
+              {tiers.map((t) => {
+                const isCurrent = t.key === currentTier
+                const currentIdx = tiers.findIndex(x => x.key === currentTier)
+                const thisIdx = tiers.findIndex(x => x.key === t.key)
+                return (
+                  <div key={t.key} style={{
+                    background: isCurrent ? 'var(--surface2)' : 'var(--surface)',
+                    border: `2px solid ${isCurrent ? t.color : 'var(--border)'}`,
+                    borderRadius:'12px', padding:'20px', position:'relative', transition:'all .15s',
+                    minWidth:'220px', flex:'1 0 220px', scrollSnapAlign:'start',
+                  }}>
+                    {isCurrent && (
+                      <div style={{ position:'absolute', top:'-10px', right:'12px', background:t.color, color: t.key==='silver'||t.key==='basic' ? '#000':'#fff', fontSize:'10px', fontWeight:700, padding:'4px 10px', borderRadius:'20px' }}>CURRENT</div>
+                    )}
+
+                    <div style={{ fontWeight:800, fontSize:'18px', color:t.color, marginBottom:'4px' }}>{t.name}</div>
+                    <div style={{ fontSize:'24px', fontWeight:700, color:'var(--text)', marginBottom:'16px' }}>{t.price}</div>
+
+                    <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'16px' }}>
+                      {t.features.map(feat => (
+                        <div key={feat} style={{ fontSize:'12px', color:'var(--text2)', display:'flex', alignItems:'center', gap:'6px' }}>
+                          <span style={{ color:t.color, flexShrink:0 }}>✓</span>{feat}
+                        </div>
+                      ))}
+                    </div>
+
+                    {!isCurrent && (
+                      <button
+                        style={{ ...(thisIdx > currentIdx ? btnPri : btnSec), width:'100%', opacity:changingTier?0.7:1 }}
+                        disabled={!!changingTier}
+                        onClick={()=>startCheckout(t.key)}>
+                        {changingTier===t.key ? 'Starting…' : (thisIdx > currentIdx ? 'Upgrade' : 'Downgrade')}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ fontSize:'11px', color:'var(--text3)', marginTop:'12px', textAlign:'center' }}>← Swipe to see all plans →</div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap', marginTop:'16px' }}>
               <button style={{...btnSec, opacity:portalLoading?0.7:1}} disabled={portalLoading} onClick={openPortal}>{portalLoading ? 'Opening…' : 'Manage subscription'}</button>
               <span style={{ fontSize:'11.5px', color:'var(--text3)' }}>Update payment details or cancel anytime via the secure billing portal.</span>
             </div>
