@@ -561,6 +561,18 @@ export function CompliancePage({ user, go }) {
   };
 
   const confirm = useConfirm();
+  // ── Date presets ──────────────────────────────────────────────
+  // <input type="date"> needs YYYY-MM-DD. Build that from a Date safely
+  // (local time, no timezone drift).
+  const toISO = (d) => { const x = new Date(d); const y = x.getFullYear(); const m = String(x.getMonth() + 1).padStart(2, "0"); const day = String(x.getDate()).padStart(2, "0"); return `${y}-${m}-${day}`; };
+  const addMonths = (base, months) => { const d = new Date(base); d.setMonth(d.getMonth() + months); return d; };
+  const setStart = (offsetDays) => { const d = new Date(); d.setDate(d.getDate() + offsetDays); setForm((f) => ({ ...f, start_date: toISO(d) })); };
+  // Expiry is measured FROM the issue date (or today if none set yet), which
+  // is how renewal periods actually work (e.g. gas safety = issue + 1 year).
+  const setExpiryFromIssue = (months) => { const base = form.start_date ? new Date(form.start_date) : new Date(); setForm((f) => ({ ...f, expiry_date: toISO(addMonths(base, months)) })); };
+  const startPresets = [{ label: "Today", off: 0 }, { label: "Yesterday", off: -1 }];
+  const expiryPresets = [{ label: "+6 months", m: 6 }, { label: "1 year", m: 12 }, { label: "2 years", m: 24 }, { label: "3 years", m: 36 }, { label: "5 years", m: 60 }];
+  const chip = { fontSize: 10.5, fontWeight: 600, padding: "4px 9px", borderRadius: 6, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", color: "var(--txt-2)", whiteSpace: "nowrap" };
   // Soft-delete: move to the recycle bin (set deleted_at) instead of erasing,
   // so a certificate can be restored later.
   const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").update({ deleted_at: new Date().toISOString() }).eq("id", id); refresh(); if (showBin) refreshBin(); } };
@@ -653,8 +665,13 @@ export function CompliancePage({ user, go }) {
             <label style={fld}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.keys(TYPES).map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Reference / notes<input style={inp} placeholder="e.g. CP12 certificate" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></label>
-            <label style={fld}>Issued / start date (DD/MM/YYYY)<input style={inp} type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-            <label style={fld}>Expiry date (DD/MM/YYYY)<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} /></label>
+            <label style={fld}>Issued / start date (DD/MM/YYYY)<input style={inp} type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>{startPresets.map((p) => <span key={p.label} onClick={() => setStart(p.off)} style={chip}>{p.label}</span>)}</div>
+            </label>
+            <label style={fld}>Expiry date (DD/MM/YYYY)<input style={inp} type="date" value={form.expiry_date} onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>{expiryPresets.map((p) => <span key={p.label} onClick={() => setExpiryFromIssue(p.m)} style={chip}>{p.label}</span>)}</div>
+              <div style={{ fontSize: 9.5, color: "var(--txt-3)", marginTop: 4 }}>Counts from the issue date{form.start_date ? "" : " (today, until you set one)"}.</div>
+            </label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update certificate" : "Save certificate")} primary /></span></div>
         </div>
