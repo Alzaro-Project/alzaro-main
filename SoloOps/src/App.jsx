@@ -347,7 +347,7 @@ function Shell() {
                 <div style={{ fontSize:'40px', marginBottom:'10px' }}>🔒</div>
                 <div style={{ fontSize:'18px', fontWeight:800, marginBottom:'8px' }}>{NAV.find(n=>n[0]===view)[1]} is a {navMin(view).charAt(0).toUpperCase()+navMin(view).slice(1)} feature</div>
                 <div style={{ color:'var(--text2)', fontSize:'14px', marginBottom:'18px' }}>Upgrade your plan to unlock this and more.</div>
-                <button onClick={()=>setView('settings')} style={{...btnPri}}>View plans</button>
+                <button onClick={()=>navigate('/settings#billing')} style={{...btnPri}}>View plans</button>
               </div>
             </div>
           ) : <>
