@@ -88,14 +88,27 @@ export function Pill({ text, tone }) {
   return <span style={{ fontSize: 10.5, fontWeight: 600, color: t.color, background: t.soft, padding: "3px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>{text}</span>;
 }
 
-export function Table({ cols, children }) {
+export function Table({ cols, children, sort, onSort }) {
   const isMobile = useIsMobile();
   return (
     <div className="tbl-scroll" style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", overflow: "hidden", overflowX: "auto" }}>
       <table style={{ width: "100%", minWidth: isMobile ? 680 : undefined, borderCollapse: "collapse", fontSize: 12.5 }}>
         <thead>
           <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
-            {cols.map((c, i) => <th key={i} style={{ textAlign: i === 0 ? "left" : "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--txt-3)", fontWeight: 600 }}>{c}</th>)}
+            {cols.map((c, i) => {
+              // A column can be a plain string, or { label, sortKey } to make it
+              // clickable for sorting (needs onSort + sort passed to Table).
+              const label = typeof c === "string" ? c : c.label;
+              const sortKey = typeof c === "string" ? null : c.sortKey;
+              const active = sortKey && sort && sort.key === sortKey;
+              const clickable = sortKey && onSort;
+              return (
+                <th key={i} onClick={clickable ? () => onSort(sortKey) : undefined}
+                  style={{ textAlign: "left", padding: "11px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: active ? "var(--txt)" : "var(--txt-3)", fontWeight: 600, cursor: clickable ? "pointer" : "default", userSelect: "none", whiteSpace: "nowrap" }}>
+                  {label}{clickable && <i className={`ti ${active ? (sort.dir === "asc" ? "ti-arrow-narrow-up" : "ti-arrow-narrow-down") : "ti-arrows-sort"}`} style={{ fontSize: 12, marginLeft: 5, verticalAlign: "middle", color: active ? "var(--brand)" : "var(--txt-3)", opacity: active ? 1 : 0.5 }} />}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>{children}</tbody>
