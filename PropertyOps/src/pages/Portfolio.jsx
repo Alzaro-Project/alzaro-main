@@ -507,6 +507,8 @@ export function CompliancePage({ user, go }) {
   const [editId, setEditId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], maint: [] });
+  const [showBin, setShowBin] = useState(false);
+  const [binRows, setBinRows] = useState([]);
   const properties = usePropertyList();
   const blank = { type: "Gas Safety", property_id: "", reference: "", start_date: "", expiry_date: "" };
   const [form, setForm] = useState(blank);
@@ -517,13 +519,16 @@ export function CompliancePage({ user, go }) {
       setRows([]);
       return;
     }
-    db.from("prop_compliance").select("*")
+    // Only show live (not soft-deleted) certificates in the main timeline.
+    db.from("prop_compliance").select("*").is("deleted_at", null)
       .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
     Promise.all([db.from("prop_tenants").select("*"), db.from("prop_maintenance").select("*")])
       .then(([t, m]) => setRelated({ tenants: t.data || [], maint: m.data || [] }));
   }, []);
 
-  const refresh = async () => { const { data } = await db.from("prop_compliance").select("*"); setRows(data || []); };
+  const refresh = async () => { const { data } = await db.from("prop_compliance").select("*").is("deleted_at", null); setRows(data || []); };
+  // Recycle bin: soft-deleted certificates, most-recently-deleted first.
+  const refreshBin = async () => { const { data } = await db.from("prop_compliance").select("*").not("deleted_at", "is", null).order("deleted_at", { ascending: false }); setBinRows(data || []); };
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
   const formRef = useRef(null);
   const savingRef = useRef(false);
@@ -556,8 +561,19 @@ export function CompliancePage({ user, go }) {
   };
 
   const confirm = useConfirm();
-  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").delete().eq("id", id); refresh(); } };
-  const remove = (id) => confirm.ask({ title: "Delete this certificate?", message: "This compliance certificate will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
+  // Soft-delete: move to the recycle bin (set deleted_at) instead of erasing,
+  // so a certificate can be restored later.
+  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").update({ deleted_at: new Date().toISOString() }).eq("id", id); refresh(); if (showBin) refreshBin(); } };
+  const remove = (id) => confirm.ask({ title: "Delete this certificate?", message: "It will be moved to the recycle bin. You can restore it later from there.", onConfirm: () => doRemove(id) });
+  // Restore from bin back into the live timeline.
+  const restore = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").update({ deleted_at: null }).eq("id", id); await refreshBin(); refresh(); } };
+  // Permanently erase a single certificate (only from the bin).
+  const doPurge = async (id) => { if (id && DB_READY) { await db.from("prop_compliance").delete().eq("id", id); refreshBin(); } };
+  const purge = (id) => confirm.ask({ title: "Delete forever?", message: "This certificate will be permanently deleted and can't be recovered.", onConfirm: () => doPurge(id) });
+  // Empty the whole bin at once.
+  const doEmptyBin = async () => { if (!DB_READY) return; await db.from("prop_compliance").delete().not("deleted_at", "is", null); refreshBin(); };
+  const emptyBin = () => confirm.ask({ title: "Empty recycle bin?", message: "Every certificate in the bin will be permanently deleted and can't be recovered.", onConfirm: () => doEmptyBin() });
+  const toggleBin = () => { const next = !showBin; setShowBin(next); if (next) refreshBin(); };
 
   // compute days-to-expiry + status for each item
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -581,11 +597,48 @@ export function CompliancePage({ user, go }) {
     <div className="fade-in">
       <ConfirmDialog {...confirm.props} />
       <PageHead title="Compliance" sub="Live tracking of every legal obligation across your portfolio."
-        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add certificate"} primary /></span>} />
+        right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span onClick={toggleBin}><Btn icon={showBin ? "ti-arrow-back-up" : "ti-trash"} label={showBin ? "Back to certificates" : `Recycle bin${binRows.length ? ` (${binRows.length})` : ""}`} /></span>
+          {!showBin && <span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add certificate"} primary /></span>}
+        </div>} />
+      {showBin && binRows.length > 0 && DB_READY && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}><span onClick={emptyBin} style={{ fontSize: 11.5, color: "var(--red)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}><i className="ti ti-trash-x" style={{ fontSize: 14 }} />Empty bin</span></div>
+      )}
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
+      {showBin ? (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "6px 18px" }}>
+          <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", padding: "12px 0 6px" }}>Recycle bin — deleted certificates</div>
+          {binRows.length === 0 ? (
+            <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center" }}>The recycle bin is empty. Deleted certificates appear here and can be restored.</div>
+          ) : (
+            binRows.map((c, i) => {
+              const propName = propLabel(properties, c.property_id) || c.property || "—";
+              const delWhen = c.deleted_at ? new Date(c.deleted_at) : null;
+              return (
+                <div key={c.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: i < binRows.length - 1 ? "0.5px solid var(--line)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--panel)", color: "var(--txt-3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div>
+                      <div style={{ fontSize: 11, color: "var(--txt-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{propName}{c.reference ? " · " + c.reference : ""}{delWhen ? " · deleted " + ukDate(c.deleted_at) : ""}</div>
+                    </div>
+                  </div>
+                  {DB_READY && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                      <span onClick={() => restore(c.id)} title="Restore" style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer", color: "var(--green)", fontSize: 11.5, fontWeight: 600 }}><i className="ti ti-arrow-back-up" style={{ fontSize: 14 }} />Restore</span>
+                      <span onClick={() => purge(c.id)} title="Delete forever" style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer", color: "var(--red)", fontSize: 11.5, fontWeight: 600 }}><i className="ti ti-trash-x" style={{ fontSize: 14 }} />Delete</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
+      <>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
         <Metric label="Compliance Score" value={items.length ? <>{score}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></> : "—"} sub={!items.length ? "No certificates yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} color={!items.length ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"} />
         <Metric label="Urgent (≤7 days)" value={urgent} sub="Act now" color="var(--red)" />
@@ -653,6 +706,8 @@ export function CompliancePage({ user, go }) {
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );
