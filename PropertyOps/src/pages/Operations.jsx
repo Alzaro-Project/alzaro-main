@@ -311,7 +311,7 @@ export function FinancePage({ user, go }) {
   const [properties, setProperties] = useState([]);
   // Inline "quick add" forms so the user can create a tenant or property
   // without leaving Finance and losing the half-filled payment.
-  const tBlank = { name: "", property_id: "", email: "", phone: "" };
+  const tBlank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending", co_tenant_name: "", co_tenant_email: "", co_tenant_phone: "" };
   const pBlank = { address: "", area: "", type: "House", status: "Let", rent: "", invoice_day: "" };
   const [addTenant, setAddTenant] = useState(false);
   const [addProperty, setAddProperty] = useState(false);
@@ -374,7 +374,15 @@ export function FinancePage({ user, go }) {
     if (!tForm.name.trim()) { setTErr("Tenant name is required."); return; }
     if (!DB_READY) { setTErr("Add your Supabase keys to save for real."); return; }
     setTErr(""); tSavingRef.current = true; setTSaving(true);
-    const payload = { name: tForm.name.trim(), property_id: tForm.property_id || null, email: tForm.email || null, phone: tForm.phone || null, rent_status: "Up to date", rtr_status: "Pending" };
+    const payload = {
+      name: tForm.name.trim(), property_id: tForm.property_id || null,
+      email: tForm.email || null, phone: tForm.phone || null,
+      tenancy_start: tForm.tenancy_start || null, tenancy_end: tForm.tenancy_end || null,
+      deposit_amount: tForm.deposit_amount === "" ? null : +tForm.deposit_amount,
+      deposit_protected: !!tForm.deposit_protected,
+      rent_status: tForm.rent_status || "Up to date", rtr_status: tForm.rtr_status || "Pending",
+      co_tenant_name: tForm.co_tenant_name || null, co_tenant_email: tForm.co_tenant_email || null, co_tenant_phone: tForm.co_tenant_phone || null,
+    };
     const { error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]);
     // If linked to a vacant property, mark it Let to mirror the Tenants page.
     if (!error && tForm.property_id) {
@@ -622,9 +630,38 @@ const data = rows || [];
                 <label style={fld}>Property<select style={inp} value={tForm.property_id} onChange={(e) => setTForm({ ...tForm, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
                 <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={tForm.email} onChange={(e) => setTForm({ ...tForm, email: e.target.value })} /></label>
                 <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={tForm.phone} onChange={(e) => setTForm({ ...tForm, phone: e.target.value })} /></label>
+                <label style={fld}>Tenancy start date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_start} onChange={(e) => setTForm({ ...tForm, tenancy_start: e.target.value })} /></label>
+                <label style={fld}>Tenancy end date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_end} onChange={(e) => setTForm({ ...tForm, tenancy_end: e.target.value })} /></label>
+                <label style={fld}>Rent status<select style={inp} value={tForm.rent_status} onChange={(e) => setTForm({ ...tForm, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+                <label style={fld}>Right to Rent<select style={inp} value={tForm.rtr_status} onChange={(e) => setTForm({ ...tForm, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+                <label style={fld}>Deposit received (£)<input style={inp} type="number" min="0" placeholder="e.g. 1500" value={tForm.deposit_amount} onChange={(e) => setTForm({ ...tForm, deposit_amount: e.target.value })} /></label>
+                <label style={{ ...fld, justifyContent: "flex-end" }}>Protected under DPS
+                  <div onClick={() => setTForm({ ...tForm, deposit_protected: !tForm.deposit_protected })} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                    <span style={{ width: 38, height: 22, borderRadius: 11, background: tForm.deposit_protected ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0 }}>
+                      <span style={{ position: "absolute", top: 2, left: tForm.deposit_protected ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--txt)" }}>{tForm.deposit_protected ? "Protected" : "Not protected"}</span>
+                  </div>
+                </label>
               </div>
+              {(() => {
+                const tp = (properties.find((p) => String(p.id) === String(tForm.property_id)) || {}).type;
+                const multi = tp === "HMO" || tp === "Block";
+                if (tForm.property_id && !multi) return (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
+                    <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 4, fontWeight: 500 }}>Co-tenant (optional)</div>
+                    <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginBottom: 10, lineHeight: 1.5 }}>For a joint tenancy — e.g. a couple sharing one agreement. Counts as one tenancy.</div>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
+                      <label style={fld}>Co-tenant name<input style={inp} placeholder="e.g. James Connor" value={tForm.co_tenant_name} onChange={(e) => setTForm({ ...tForm, co_tenant_name: e.target.value })} /></label>
+                      <label style={fld}>Co-tenant email<input style={inp} type="email" placeholder="e.g. james@email.com" value={tForm.co_tenant_email} onChange={(e) => setTForm({ ...tForm, co_tenant_email: e.target.value })} /></label>
+                      <label style={fld}>Co-tenant phone<input style={inp} placeholder="e.g. 07700 900124" value={tForm.co_tenant_phone} onChange={(e) => setTForm({ ...tForm, co_tenant_phone: e.target.value })} /></label>
+                    </div>
+                  </div>
+                );
+                if (tForm.property_id && multi) return <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--txt-3)" }}>{tp} — add separate tenants individually.</div>;
+                return null;
+              })()}
               <div style={{ marginTop: 10 }}><span onClick={tSaving ? undefined : saveTenant} style={{ opacity: tSaving ? 0.6 : 1, cursor: tSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={tSaving ? "Saving…" : "Save tenant"} primary /></span></div>
-              <div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 8 }}>Just the essentials here. For deposit, tenancy dates and co-tenants, use the full Tenants page.</div>
             </div>
           )}
 
