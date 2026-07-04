@@ -117,7 +117,7 @@ export function DateField({ value, onChange, style }) {
         onChange={e=>{ setText(e.target.value); const iso=parse(e.target.value); if(iso) onChange(iso) }}
         onBlur={()=>{ const iso=parse(text); if(iso) onChange(iso); else setText(toText(value)) }} />
       <input type="date" value={value||''} onChange={e=>onChange(e.target.value)}
-        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 10px', color:'var(--text)', width:'52px', minWidth:'52px', cursor:'pointer', colorScheme:'inherit' }} title="Pick from calendar" />
+        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 8px', color:'var(--text)', width:'44px', minWidth:'44px', cursor:'pointer' }} title="Pick from calendar" />
     </div>
   )
 }
