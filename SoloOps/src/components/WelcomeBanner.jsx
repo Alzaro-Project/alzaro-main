@@ -31,7 +31,10 @@ export default function WelcomeBanner({ invoices, expenses, clients, bizName, se
       <button onClick={dismiss} title="Dismiss" style={{ position:'absolute', top:'14px', right:'16px', background:'transparent', border:'none', color:'var(--text3)', fontSize:'20px', cursor:'pointer', lineHeight:1 }}>×</button>
 
       <div style={{ marginBottom:'14px' }}>
-        <h3 style={{ fontSize:'19px', fontWeight:800, margin:'0 0 3px 0', background:grad, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>👋 Welcome to SoloOps</h3>
+        <h3 style={{ fontSize:'19px', fontWeight:800, margin:'0 0 3px 0', display:'flex', alignItems:'center', gap:'8px' }}>
+          <span style={{ WebkitTextFillColor:'initial' }}>👋</span>
+          <span style={{ background:grad, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>Welcome to SoloOps</span>
+        </h3>
         <div style={{ color:'var(--text2)', fontSize:'13px' }}>Let's get you set up — {completed} of {total} complete</div>
       </div>
 
