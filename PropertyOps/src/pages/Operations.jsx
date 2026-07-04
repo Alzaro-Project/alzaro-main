@@ -306,7 +306,23 @@ export function FinancePage({ user, go }) {
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ tenants: [], comp: [], maint: [] });
-  const properties = usePropertyList();
+  // Locally-managed, refreshable property list so inline "Add property" below
+  // updates the dropdown immediately (usePropertyList has no refresh).
+  const [properties, setProperties] = useState([]);
+  // Inline "quick add" forms so the user can create a tenant or property
+  // without leaving Finance and losing the half-filled payment.
+  const tBlank = { name: "", property_id: "", email: "", phone: "" };
+  const pBlank = { address: "", area: "", type: "House", status: "Let", rent: "", invoice_day: "" };
+  const [addTenant, setAddTenant] = useState(false);
+  const [addProperty, setAddProperty] = useState(false);
+  const [tForm, setTForm] = useState(tBlank);
+  const [pForm, setPForm] = useState(pBlank);
+  const [tErr, setTErr] = useState("");
+  const [pErr, setPErr] = useState("");
+  const tSavingRef = useRef(false);
+  const pSavingRef = useRef(false);
+  const [tSaving, setTSaving] = useState(false);
+  const [pSaving, setPSaving] = useState(false);
   const blank = { tenant: "", property_id: "", amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
@@ -328,7 +344,7 @@ export function FinancePage({ user, go }) {
     Promise.all([
       db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"),
     ]).then(([t, c, m]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [] }));
-    db.from("prop_properties").select("*").then(({ data }) => setFullProps(data || []));
+    db.from("prop_properties").select("*").then(({ data }) => { setFullProps(data || []); setProperties(data || []); });
     db.from("prop_settings").select("vat_scheme").eq("user_id", user.id)
       .then(({ data }) => { if (data && data[0] && data[0].vat_scheme) setVatScheme(data[0].vat_scheme); });
   }, []);
@@ -336,6 +352,63 @@ export function FinancePage({ user, go }) {
   const refresh = async () => {
     const { data } = await db.from("prop_payments").select("*").order("due_date", { ascending: false });
     setRows(data || []);
+  };
+
+  // Reload tenants + properties after an inline quick-add so the dropdowns
+  // reflect the new record straight away.
+  const refreshTenants = async () => {
+    const { data } = await db.from("prop_tenants").select("*");
+    setRelated((r) => ({ ...r, tenants: data || [] }));
+    return data || [];
+  };
+  const refreshProperties = async () => {
+    const { data } = await db.from("prop_properties").select("*");
+    setFullProps(data || []); setProperties(data || []);
+    return data || [];
+  };
+
+  // Quick-add a tenant from inside Finance, then auto-select them (and their
+  // property) on the payment form so the flow continues without a page change.
+  const saveTenant = async () => {
+    if (tSavingRef.current) return;
+    if (!tForm.name.trim()) { setTErr("Tenant name is required."); return; }
+    if (!DB_READY) { setTErr("Add your Supabase keys to save for real."); return; }
+    setTErr(""); tSavingRef.current = true; setTSaving(true);
+    const payload = { name: tForm.name.trim(), property_id: tForm.property_id || null, email: tForm.email || null, phone: tForm.phone || null, rent_status: "Up to date", rtr_status: "Pending" };
+    const { error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]);
+    // If linked to a vacant property, mark it Let to mirror the Tenants page.
+    if (!error && tForm.property_id) {
+      const { data: prop } = await db.from("prop_properties").select("status").eq("id", tForm.property_id).maybeSingle();
+      if (prop && prop.status === "Vacant") await db.from("prop_properties").update({ status: "Let" }).eq("id", tForm.property_id);
+    }
+    tSavingRef.current = false; setTSaving(false);
+    if (error) { setTErr(error.message); return; }
+    await refreshTenants(); await refreshProperties();
+    // Auto-select the new tenant on the payment form.
+    const pid = tForm.property_id || "";
+    setForm((f) => ({ ...f, tenant: tForm.name.trim(), property_id: pid || f.property_id, amount: pid ? rentForProp(pid) : f.amount }));
+    setTForm(tBlank); setAddTenant(false);
+  };
+
+  // Quick-add a property from inside Finance, then auto-select it.
+  const saveProperty = async () => {
+    if (pSavingRef.current) return;
+    if (!pForm.address.trim()) { setPErr("Address is required."); return; }
+    if (!DB_READY) { setPErr("Add your Supabase keys to save for real."); return; }
+    if (pForm.invoice_day !== "" && pForm.invoice_day != null) {
+      const day = Number(pForm.invoice_day);
+      if (!Number.isInteger(day) || day < 1 || day > 31) { setPErr("Invoice day needs to be a whole number between 1 and 31."); return; }
+    }
+    setPErr(""); pSavingRef.current = true; setPSaving(true);
+    const payload = { ...pForm, rent: pForm.rent === "" ? 0 : +pForm.rent, invoice_day: pForm.invoice_day === "" ? null : Number(pForm.invoice_day) };
+    const { data, error } = await db.from("prop_properties").insert([{ ...payload, score: 100, user_id: user.id }]).select();
+    pSavingRef.current = false; setPSaving(false);
+    if (error) { setPErr(error.message); return; }
+    await refreshProperties();
+    const newId = data && data[0] ? data[0].id : "";
+    // Auto-select the new property on the payment form and pull its rent.
+    setForm((f) => ({ ...f, property_id: newId || f.property_id, amount: newId ? (payload.rent || f.amount) : f.amount }));
+    setPForm(pBlank); setAddProperty(false);
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
@@ -513,8 +586,17 @@ const data = rows || [];
         <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
-            <label style={fld}>Tenant<select style={inp} value={form.tenant} onChange={(e) => onPickTenant(e.target.value)}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select></label>
-            <label style={fld}>Property{form.tenant && form.property_id ? (
+            <label style={fld}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>Tenant
+                <span onClick={() => { setAddTenant((v) => !v); setTErr(""); setTForm(tBlank); }} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer", color: "var(--brand)", fontSize: 10.5, fontWeight: 600 }}><i className={`ti ${addTenant ? "ti-x" : "ti-user-plus"}`} style={{ fontSize: 12 }} />{addTenant ? "Close" : "Add tenant"}</span>
+              </span>
+              <select style={inp} value={form.tenant} onChange={(e) => onPickTenant(e.target.value)}><option value="">— select tenant —</option>{related.tenants.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}</select>
+            </label>
+            <label style={fld}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>Property
+                <span onClick={() => { setAddProperty((v) => !v); setPErr(""); setPForm(pBlank); }} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer", color: "var(--brand)", fontSize: 10.5, fontWeight: 600 }}><i className={`ti ${addProperty ? "ti-x" : "ti-plus"}`} style={{ fontSize: 12 }} />{addProperty ? "Close" : "Add property"}</span>
+              </span>
+              {form.tenant && form.property_id ? (
               // A tenant is chosen and linked to a property — lock the field to
               // that property instead of listing every property in the system.
               <div style={{ ...inp, display: "flex", alignItems: "center", gap: 8, background: "var(--panel)", color: "var(--txt-2)" }}>
@@ -529,6 +611,40 @@ const data = rows || [];
             <label style={fld}>Due date (DD/MM/YYYY)<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
+
+          {/* Inline quick-add: TENANT — create without leaving Finance. */}
+          {addTenant && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
+              <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><i className="ti ti-user-plus" style={{ fontSize: 13, color: "var(--brand)" }} />New tenant</div>
+              {tErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 10 }}>{tErr}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
+                <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={tForm.name} onChange={(e) => setTForm({ ...tForm, name: e.target.value })} /></label>
+                <label style={fld}>Property<select style={inp} value={tForm.property_id} onChange={(e) => setTForm({ ...tForm, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
+                <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={tForm.email} onChange={(e) => setTForm({ ...tForm, email: e.target.value })} /></label>
+                <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={tForm.phone} onChange={(e) => setTForm({ ...tForm, phone: e.target.value })} /></label>
+              </div>
+              <div style={{ marginTop: 10 }}><span onClick={tSaving ? undefined : saveTenant} style={{ opacity: tSaving ? 0.6 : 1, cursor: tSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={tSaving ? "Saving…" : "Save tenant"} primary /></span></div>
+              <div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 8 }}>Just the essentials here. For deposit, tenancy dates and co-tenants, use the full Tenants page.</div>
+            </div>
+          )}
+
+          {/* Inline quick-add: PROPERTY — create without leaving Finance. */}
+          {addProperty && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
+              <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><i className="ti ti-home-plus" style={{ fontSize: 13, color: "var(--brand)" }} />New property</div>
+              {pErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 10 }}>{pErr}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
+                <label style={fld}>Address<input style={inp} placeholder="e.g. 12 Baker Street" value={pForm.address} onChange={(e) => setPForm({ ...pForm, address: e.target.value })} /></label>
+                <label style={fld}>Area / town<input style={inp} placeholder="e.g. Bradford" value={pForm.area} onChange={(e) => setPForm({ ...pForm, area: e.target.value })} /></label>
+                <label style={fld}>Type<select style={inp} value={pForm.type} onChange={(e) => setPForm({ ...pForm, type: e.target.value })}>{["House", "Flat", "Bungalow", "HMO", "Block", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
+                <label style={fld}>Status<select style={inp} value={pForm.status} onChange={(e) => setPForm({ ...pForm, status: e.target.value })}>{["Let", "Vacant", "Sale agreed"].map((x) => <option key={x}>{x}</option>)}</select></label>
+                <label style={fld}>Monthly rent (£)<input style={inp} type="number" min="0" placeholder="e.g. 1200" value={pForm.rent} onChange={(e) => setPForm({ ...pForm, rent: e.target.value })} /></label>
+                <label style={fld}>Invoice day (1–31, optional)<input style={inp} type="number" min="1" max="31" placeholder="e.g. 1" value={pForm.invoice_day} onChange={(e) => setPForm({ ...pForm, invoice_day: e.target.value })} /></label>
+              </div>
+              <div style={{ marginTop: 10 }}><span onClick={pSaving ? undefined : saveProperty} style={{ opacity: pSaving ? 0.6 : 1, cursor: pSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={pSaving ? "Saving…" : "Save property"} primary /></span></div>
+            </div>
+          )}
+
           <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
           <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update payment" : "Save payment")} primary /></span></div>
         </div>
