@@ -327,6 +327,10 @@ export function FinancePage({ user, go }) {
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
   const [filter, setFilter] = useState("All");
+  // Payment-ledger sort. Click a column header to sort; click again to flip
+  // direction. Default: due date, soonest first.
+  const [sort, setSort] = useState({ key: "due_date", dir: "asc" });
+  const onSort = (key) => setSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
   const [fullProps, setFullProps] = useState([]);
   const [raising, setRaising] = useState(null);
   const raisingRef = useRef(false);
@@ -726,10 +730,36 @@ const data = rows || [];
       ) : data.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No payments yet. Click "Add payment" to log your first one.</div>
       ) : (() => {
-        const shown = filter === "All" ? data : data.filter((p) => effectiveStatus(p) === filter);
-        if (shown.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No {filter.toLowerCase()} payments.</div>;
+        const base = filter === "All" ? data : data.filter((p) => effectiveStatus(p) === filter);
+        if (base.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No {filter.toLowerCase()} payments.</div>;
+        // Sort a copy so the underlying data order is untouched. Text sorts
+        // case-insensitively; numbers and dates sort numerically; blanks sink
+        // to the bottom regardless of direction.
+        const val = (p) => {
+          switch (sort.key) {
+            case "tenant": return (p.tenant || "").toLowerCase();
+            case "property": return (propLabel(properties, p.property_id) || p.property || p.prop || "").toLowerCase();
+            case "subtotal": return vatBreakdown(p.amount).sub;
+            case "vat": return vatBreakdown(p.amount).vat;
+            case "total": return vatBreakdown(p.amount).total;
+            case "due_date": return p.due_date || p.due || "";
+            case "status": return effectiveStatus(p);
+            default: return "";
+          }
+        };
+        const isNum = ["subtotal", "vat", "total"].includes(sort.key);
+        const shown = [...base].sort((a, b) => {
+          const av = val(a), bv = val(b);
+          const aEmpty = av === "" || av === null || av === undefined;
+          const bEmpty = bv === "" || bv === null || bv === undefined;
+          if (aEmpty && bEmpty) return 0;
+          if (aEmpty) return 1;   // blanks always last
+          if (bEmpty) return -1;
+          let cmp = isNum ? (av - bv) : String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
+          return sort.dir === "asc" ? cmp : -cmp;
+        });
         return (
-        <Table cols={["", "Tenant", "Property", "Subtotal", "VAT", "Total", "Due date", "Status", "Actions"]}>
+        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "tenant" }, { label: "Property", sortKey: "property" }, { label: "Subtotal", sortKey: "subtotal" }, { label: "VAT", sortKey: "vat" }, { label: "Total", sortKey: "total" }, { label: "Due date", sortKey: "due_date" }, { label: "Status", sortKey: "status" }, "Actions"]}>
           {shown.map((p, i) => {
             const isOpen = expandedId === (p.id || i);
             const pid = p.property_id;
