@@ -381,7 +381,7 @@ function Shell() {
 
           {view==='dashboard' && <>
             <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} canExpense={tierAllows('bronze')} />
-            <div style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
+            <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
               <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
               {tierAllows('bronze') && <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>}
               <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
@@ -390,7 +390,7 @@ function Shell() {
 
             <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
 
-            <div style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
+            <div className="solo-dash-cols" style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
               {tierAllows('bronze') && <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
                 <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
