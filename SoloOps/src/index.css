@@ -53,6 +53,14 @@ html.light{
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
 a{color:inherit;text-decoration:none;}
 
+/* Inputs: soft orange focus ring instead of a jarring browser outline */
+input, select, textarea{ transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+input:focus, select:focus, textarea:focus{
+  border-color: var(--orange) !important;
+  box-shadow: 0 0 0 3px var(--orange-subtle);
+}
+input::placeholder, textarea::placeholder{ color: var(--text3); }
+
 /* ---- interactive polish ---- */
 /* Cards lift with a subtle 3D tilt-in-depth feel on hover */
 .soloops-card, [data-card]{
