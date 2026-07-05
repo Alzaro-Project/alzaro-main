@@ -51,6 +51,18 @@
     .nav-center a{font-size:13.5px;font-weight:500;color:var(--text2);transition:color .2s}
     .nav-center a:hover,.nav-center a.active{color:var(--text)}
     .nav-right{display:flex;gap:10px;align-items:center}
+    /* Mobile hamburger — hidden on desktop, shown under 640px */
+    .nav-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:42px;height:42px;background:transparent;border:1px solid var(--line);border-radius:9px;cursor:pointer;padding:0;flex-shrink:0}
+    .nav-toggle span{display:block;width:20px;height:2px;background:var(--text);margin:0 auto;border-radius:2px;transition:transform .25s,opacity .2s}
+    .nav-toggle.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .nav-toggle.open span:nth-child(2){opacity:0}
+    .nav-toggle.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    .mobile-menu{display:none;flex-direction:column;gap:4px;padding:0 18px 18px;background:rgba(16,13,5,0.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--line)}
+    .mobile-menu.open{display:flex}
+    .mobile-menu a{font-size:16px;font-weight:500;color:var(--text2);padding:14px 4px;border-bottom:1px solid var(--line)}
+    .mobile-menu a:last-child{border-bottom:none}
+    .mobile-menu .mm-login{color:var(--text);font-weight:600}
+    .mobile-menu .mm-cta{margin-top:12px;color:#1a1400;text-align:center;justify-content:center;border-bottom:none}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-radius:8px;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
     .btn-gold{background:linear-gradient(135deg,var(--gold),#ca8a04);color:#1a1400;font-size:13.5px;padding:10px 20px;box-shadow:0 4px 18px var(--gold-glow)}
     .btn-gold:hover{transform:translateY(-1px);box-shadow:0 8px 26px var(--gold-glow)}
@@ -228,7 +240,8 @@
     }
     @media (max-width:640px){
       .nav-center{display:none}
-      .nav-right .btn-ghost{display:none}
+      .nav-right{display:none}
+      .nav-toggle{display:flex}
       .hero{padding-top:104px;padding-bottom:56px}
       section{padding:64px 0}
       .container{padding:0 18px}
@@ -263,6 +276,16 @@
       <a href="/propertyops/login" class="btn btn-ghost">Log in</a>
       <a href="/propertyops/register" class="btn btn-gold">Start free trial</a>
     </div>
+    <button id="navToggle" class="nav-toggle" aria-label="Menu" aria-expanded="false" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div id="mobileMenu" class="mobile-menu">
+    <a href="#features" onclick="closeMenu()">Features</a>
+    <a href="#how" onclick="closeMenu()">How it works</a>
+    <a href="#pricing" onclick="closeMenu()">Pricing</a>
+    <a href="/propertyops/login" class="mm-login">Log in</a>
+    <a href="/propertyops/register" class="btn btn-gold btn-lg mm-cta">Start your 14-day free trial →</a>
   </div>
 </nav>
 
@@ -617,7 +640,29 @@
     if (pageName === 'home') { history.pushState(null, '', window.location.pathname); }
     else { history.pushState(null, '', '#' + pageName); }
     const navCenter = document.querySelector('.nav-center');
-    if (navCenter) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
+    // Only reveal the desktop nav links on non-mobile; on mobile they live in
+    // the hamburger menu, so leave the CSS media query in charge (don't set an
+    // inline display that would override it and cause overflow).
+    if (navCenter) {
+      if (window.innerWidth > 640) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
+      else navCenter.style.display = '';
+    }
+  }
+
+  // Mobile hamburger menu open/close.
+  function toggleMenu() {
+    const menu = document.getElementById('mobileMenu');
+    const btn = document.getElementById('navToggle');
+    const open = menu.classList.toggle('open');
+    btn.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeMenu() {
+    const menu = document.getElementById('mobileMenu');
+    const btn = document.getElementById('navToggle');
+    menu.classList.remove('open');
+    btn.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
   }
 
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
