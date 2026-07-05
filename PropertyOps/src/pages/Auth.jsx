@@ -15,6 +15,7 @@ export function AuthScreen() {
   });
   const [msg, setMsg] = useState("");
   const [ok, setOk] = useState("");
+  const [exists, setExists] = useState(false);
   const [busy, setBusy] = useState(false);
   // "Keep me signed in" — defaults to the saved choice, or true for a first
   // visit. Saved BEFORE sign-in so supabase.js reads it on the next page load
@@ -37,7 +38,7 @@ export function AuthScreen() {
     return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
-  const reset = () => { setMsg(""); setOk(""); };
+  const reset = () => { setMsg(""); setOk(""); setExists(false); };
 
   const doLogin = async () => {
     reset();
@@ -57,9 +58,21 @@ export function AuthScreen() {
     if (pw.length < 6) return setMsg("Password must be at least 6 characters.");
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
-    const { error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=propertyops`, data: { company_name: company.trim(), product: "propertyops" } } });
+    const { data, error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=propertyops`, data: { company_name: company.trim(), product: "propertyops" } } });
     setBusy(false);
-    if (error) return setMsg(error.message);
+    if (error) {
+      // Supabase sometimes returns an explicit "already registered" error.
+      if (/already registered|already exists|already been registered/i.test(error.message)) {
+        return setExists(true);
+      }
+      return setMsg(error.message);
+    }
+    // Security default: for an existing email, Supabase returns no error but a
+    // user with an empty identities array (it won't reveal the account exists).
+    // Treat that as "already registered" too.
+    if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return setExists(true);
+    }
     setOk("Check your email to confirm your account, then log in.");
     setTab("login"); setCompany(""); setPw("");
   };
@@ -120,6 +133,16 @@ export function AuthScreen() {
 
             {msg && <Banner text={msg} />}
             {ok && <Banner text={ok} good />}
+            {exists && (
+              <div style={{ background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 8, padding: "13px 15px", marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--amber)", marginBottom: 3 }}>This account is already registered</div>
+                <div style={{ fontSize: 12.5, color: "var(--txt-2)", lineHeight: 1.4, marginBottom: 11 }}>An account with <strong style={{ color: "var(--txt)" }}>{email}</strong> already exists. Head to login to sign in — or reset your password if you've forgotten it.</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { setTab("login"); reset(); setPw(""); }} style={{ flex: 1, background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 13, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "Inter" }}>Go to login</button>
+                  <button onClick={() => { setForgot(true); reset(); }} style={{ background: "var(--panel-2)", color: "var(--txt-2)", fontWeight: 600, fontSize: 13, padding: "10px 14px", borderRadius: 8, border: "0.5px solid var(--line)", cursor: "pointer", fontFamily: "Inter" }}>Reset password</button>
+                </div>
+              </div>
+            )}
 
             {tab === "login" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
