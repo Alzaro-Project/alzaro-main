@@ -305,19 +305,23 @@ function Shell() {
         </div>
 
         <div className="solo-nav" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
-          {NAV.map(([k,label,,min]) => {
+          {NAV.map(([k,label,,min,icon]) => {
             const locked = !tierAllows(min)
+            const active = view===k
             return (
-            <div key={k} data-nav onClick={()=>{ setView(k); setMobileNav(false) }} style={{
+            <div key={k} data-nav className={"solo-nav-item"+(active?" active":"")} onClick={()=>{ setView(k); setMobileNav(false) }} style={{
               padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
               display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px',
-              color: view===k ? 'var(--text)' : 'var(--text2)',
-              background: view===k ? 'var(--surface3)' : 'transparent',
-              border: view===k ? '1px solid var(--border-light)' : '1px solid transparent',
+              color: active ? 'var(--text)' : 'var(--text2)',
+              background: active ? 'var(--surface3)' : 'transparent',
+              border: active ? '1px solid var(--border-light)' : '1px solid transparent',
               opacity: locked ? 0.55 : 1
             }}>
-              <span>{label}</span>
-              {locked && <span style={{ fontSize:'12px' }} title={`Upgrade to ${min.charAt(0).toUpperCase()+min.slice(1)}`}>🔒</span>}
+              <span style={{ display:'flex', alignItems:'center', gap:'11px', minWidth:0 }}>
+                <i className={`ti ${icon}`} style={{ fontSize:'18px', width:'20px', textAlign:'center', flexShrink:0, color: active ? 'var(--orange)' : 'var(--text3)' }} aria-hidden="true" />
+                <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{label}</span>
+              </span>
+              {locked && <span style={{ fontSize:'12px', flexShrink:0 }} title={`Upgrade to ${min.charAt(0).toUpperCase()+min.slice(1)}`}>🔒</span>}
             </div>
           )})}
         </div>
@@ -353,7 +357,7 @@ function Shell() {
                 <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)} title="To" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
               </div>
             )}
-            {['dashboard','income','expenses'].includes(view) && <>
+            {['income','expenses'].includes(view) && <>
               {tierAllows('bronze') && <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>}
               <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
             </>}
