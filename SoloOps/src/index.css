@@ -59,36 +59,60 @@ label[data-hover]{ transition: border-color .15s ease, background .15s ease; }
 label[data-hover]:hover{ border-color: var(--orange) !important; }
 
 /* ============================================================
-   Responsive / mobile (bug #8)
-   The app shell, sidebar and content grids are laid out with
-   inline styles in App.jsx. These breakpoints override the
-   layout only: the fixed 230px+1fr shell collapses, the sticky
-   full-height sidebar becomes a top bar with a horizontally
-   scrolling nav, multi-column KPI/card grids stack, and wide
-   tables scroll sideways instead of overflowing the viewport.
-   Grids are matched by their inline grid-template-columns value
-   (rendered verbatim by React); the shell/sidebar/nav use the
-   solo-shell / solo-sidebar / solo-nav class hooks.
+   Responsive / mobile
+   Desktop keeps the fixed 230px + 1fr shell. Below 860px the
+   sidebar becomes an off-canvas drawer opened by a hamburger in
+   a mobile top bar; a backdrop dims the page behind it. Grids
+   collapse, the page header wraps, action buttons go full-width,
+   and wide tables scroll sideways.
    ============================================================ */
+
+/* Mobile-only chrome is hidden on desktop */
+.solo-topbar{ display:none; }
+.solo-backdrop{ display:none; }
+
 @media (max-width: 860px){
-  /* Shell: single column, sidebar stacks above content */
+  /* Shell collapses to a single column; sidebar leaves the flow */
   .solo-shell{ grid-template-columns: 1fr !important; }
+
+  /* Mobile top bar with the hamburger */
+  .solo-topbar{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 18px; border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:120;
+    background:var(--surface);
+  }
+  .solo-burger{
+    display:flex; flex-direction:column; justify-content:center; gap:5px;
+    width:40px; height:40px; padding:9px; flex-shrink:0;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; cursor:pointer;
+  }
+  .solo-burger span{ display:block; height:2px; border-radius:2px; background:var(--text); }
+
+  /* Sidebar becomes an off-canvas drawer */
   .solo-sidebar{
-    position: static !important;
-    height: auto !important;
-    border-right: none !important;
-    border-bottom: 1px solid var(--border);
+    position:fixed !important; top:0; left:0; bottom:0;
+    width:270px; max-width:82vw; height:100% !important;
+    z-index:200;
+    transform:translateX(-100%);
+    transition:transform .24s ease;
+    border-right:1px solid var(--border-light);
+    box-shadow:0 0 40px rgba(0,0,0,.5);
+    overflow-y:auto;
   }
-  /* Nav: horizontal, swipeable strip instead of a tall vertical list.
-     Nav items already have flex-shrink:0, so they keep size and scroll. */
-  .solo-nav{
-    flex-direction: row !important;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 6px;
+  .solo-shell.nav-open .solo-sidebar{ transform:translateX(0); }
+
+  /* Backdrop */
+  .solo-backdrop{
+    display:block; position:fixed; inset:0; z-index:150;
+    background:rgba(0,0,0,.5); opacity:0; pointer-events:none;
+    transition:opacity .24s ease;
   }
-  .solo-nav [data-nav]{ white-space: nowrap; }
-  .solo-nav [data-nav]:hover{ padding-left: 14px !important; } /* cancel the desktop slide-in */
+  .solo-shell.nav-open .solo-backdrop{ opacity:1; pointer-events:auto; }
+
+  /* Page header: allow wrapping and lighter padding */
+  .solo-header{ padding:16px 18px !important; }
 
   /* KPI / dense grids: 4- and 3-up become 2-up on tablets */
   [style*="repeat(4,1fr)"],
@@ -105,6 +129,14 @@ label[data-hover]:hover{ border-color: var(--orange) !important; }
 
   /* Tighter page padding */
   .fade-in{ padding: 16px !important; }
+
+  /* Header actions span the full row and buttons fill width */
+  .solo-header-actions{ width:100%; }
+  .solo-header-actions > button{ flex:1 1 auto; }
+  .solo-header-actions > select{ flex:1 1 auto; }
+
+  /* Two-column form rows (e.g. issue/due date) stack on phones */
+  .solo-2col{ flex-direction: column !important; }
 
   /* Wide tables scroll horizontally rather than blowing out the layout */
   .fade-in table{
