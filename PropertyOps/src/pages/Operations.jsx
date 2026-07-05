@@ -9,14 +9,13 @@ import { DB_READY, db } from "../lib/supabase.js";
 function QuickAddModal({ title, icon, onClose, children }) {
   const isMobile = useIsMobile();
   useEffect(() => {
-    const y = window.scrollY;
-    const prev = { pos: document.body.style.position, top: document.body.style.top, width: document.body.style.width, overflow: document.body.style.overflow };
-    document.body.style.position = "fixed"; document.body.style.top = `-${y}px`; document.body.style.width = "100%"; document.body.style.overflow = "hidden";
-    return () => { document.body.style.position = prev.pos; document.body.style.top = prev.top; document.body.style.width = prev.width; document.body.style.overflow = prev.overflow; window.scrollTo(0, y); };
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => { document.documentElement.style.overflow = prev; };
   }, []);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? 0 : "40px 20px", zIndex: 70 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: isMobile ? "16px 16px 0 0" : 14, width: "100%", maxWidth: isMobile ? "100%" : 620, maxHeight: isMobile ? "92vh" : "85vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 14 : "40px 20px", zIndex: 3000 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: isMobile ? "100%" : 620, maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><i className={`ti ${icon}`} style={{ fontSize: 17, color: "var(--brand)" }} /><span style={{ fontSize: 15, fontWeight: 600 }}>{title}</span></div>
           <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
