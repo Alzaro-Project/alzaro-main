@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
 import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
@@ -13,7 +14,7 @@ function QuickAddModal({ title, icon, onClose, children }) {
     document.documentElement.style.overflow = "hidden";
     return () => { document.documentElement.style.overflow = prev; };
   }, []);
-  return (
+  return createPortal((
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 14 : "40px 20px", zIndex: 3000 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: isMobile ? "100%" : 620, maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
@@ -23,7 +24,7 @@ function QuickAddModal({ title, icon, onClose, children }) {
         <div style={{ padding: isMobile ? 16 : 20 }}>{children}</div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 export function MaintenancePage({ user, go }) {
