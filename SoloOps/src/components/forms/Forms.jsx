@@ -248,7 +248,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
       <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'6px', paddingTop:'6px', borderTop:'1px solid var(--border)' }}><span>Total</span><span style={{ color:'var(--orange-light)' }}>{fmt(total)}</span></div>
     </div>
 
-    <div style={{ display:'flex', gap:'10px', marginTop:'12px' }}>
+    <div className="solo-2col" style={{ display:'flex', gap:'10px', marginTop:'12px' }}>
       <div style={{ flex:1 }}>
         <div style={lblSm}>Issue date</div>
         <DateField value={date} onChange={setDate} />
