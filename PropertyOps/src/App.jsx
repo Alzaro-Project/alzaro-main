@@ -294,7 +294,7 @@ function Dashboard({ user, signOut }) {
           <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 13px" }}>
               <i className="ti ti-search" style={{ fontSize: 15, color: "var(--txt-3)" }} />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search properties, tenants, certificates…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter" }} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={isMobile ? "Search…" : "Search properties, tenants, certificates…"} style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--txt)", fontSize: isMobile ? 16 : 12.5, fontFamily: "Inter" }} />
               {query && <i className="ti ti-x" onClick={() => setQuery("")} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} />}
             </div>
             {q && (
@@ -311,7 +311,7 @@ function Dashboard({ user, signOut }) {
               </div>
             )}
           </div>
-          <div style={{ position: "relative" }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
             <div onClick={() => setShowNotif((v) => !v)} style={{ position: "relative", color: "var(--txt-2)", cursor: "pointer" }}>
               <i className="ti ti-bell" style={{ fontSize: 20 }} />
               {alerts.length > 0 && <span style={{ position: "absolute", top: -4, right: -5, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 8, background: "var(--red)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{alerts.length}</span>}
