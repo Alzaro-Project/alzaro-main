@@ -6,9 +6,9 @@ export const CATEGORIES = ['Fuel','Travel','Software','Marketing','Equipment','I
 export const CAT_COLORS = { Software:'#f97316', Fuel:'#f59e0b', Marketing:'#3b82f6', Equipment:'#22c55e', Travel:'#eab308', Insurance:'#a78bfa', Utilities:'#38bdf8', 'Professional Services':'#fb7185', 'Office Costs':'#94a3b8', Other:'#68635d' }
 
 export const NAV = [
-  ['dashboard','Dashboard','📊','basic'], ['income','Income','📄','basic'], ['clients','Clients','👥','basic'], ['expenses','Expenses','💷','bronze'],
-  ['banking','Banking','🏦','silver'], ['recurring','Recurring','🔁','bronze'], ['receipts','Receipts','🧾','bronze'], ['mileage','Mileage','🚗','silver'],
-  ['reports','Reports','📈','silver'], ['documents','Documents','📁','gold'], ['tax','Tax','📋','gold'], ['settings','Settings','🔧','basic']
+  ['dashboard','Dashboard','📊','basic','ti-layout-dashboard'], ['income','Income','📄','basic','ti-file-invoice'], ['clients','Clients','👥','basic','ti-users'], ['expenses','Expenses','💷','bronze','ti-receipt-2'],
+  ['banking','Banking','🏦','silver','ti-building-bank'], ['recurring','Recurring','🔁','bronze','ti-repeat'], ['receipts','Receipts','🧾','bronze','ti-receipt'], ['mileage','Mileage','🚗','silver','ti-car'],
+  ['reports','Reports','📈','silver','ti-chart-bar'], ['documents','Documents','📁','gold','ti-folder'], ['tax','Tax','📋','gold','ti-clipboard-list'], ['settings','Settings','🔧','basic','ti-settings']
 ]
 
 export const TIER_ORDER = ['basic','bronze','silver','gold']
