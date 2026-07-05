@@ -106,10 +106,27 @@ export default function Login() {
         return
       }
 
-      const { error: err } = await signUp(email, password, {
+      // A wrong password on an existing account also lands here. The signUp
+      // call below disambiguates a brand-new email from an existing one via
+      // the returned identities array, so we don't branch on signInErr.
+      const { data: signUpData, error: err } = await signUp(email, password, {
         emailRedirectTo: `${siteBase()}/soloops/login`,
         data: { business_name: businessName.trim(), product: 'soloops' },
       })
+
+      // Supabase obfuscates duplicate emails: signUp "succeeds" but returns a
+      // user with an empty identities array. Some configs return an explicit
+      // "already registered" error instead. Handle both.
+      const alreadyRegistered =
+        /already registered|already exists|user already/i.test(err?.message || '') ||
+        (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0)
+
+      if (alreadyRegistered) {
+        setError('That account is already registered — head to Login to sign in (or use “Forgot password” if you’ve lost it).')
+        setTab('login'); setPassword('')
+        setLoading(false); return
+      }
+
       if (err) throw err
       setSuccess('Check your email to confirm your account, then log in.')
       setTab('login'); setBusinessName(''); setPassword('')
