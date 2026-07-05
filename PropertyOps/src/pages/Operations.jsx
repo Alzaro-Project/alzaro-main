@@ -3,6 +3,30 @@ import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, Repor
 import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
+// Reusable centered popup for quick-add forms (tenant/property in Finance).
+// Locks the page scroll behind it and centres on desktop / bottom-sheet on
+// mobile so the form is always in view instead of pushing the page down.
+function QuickAddModal({ title, icon, onClose, children }) {
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    const y = window.scrollY;
+    const prev = { pos: document.body.style.position, top: document.body.style.top, width: document.body.style.width, overflow: document.body.style.overflow };
+    document.body.style.position = "fixed"; document.body.style.top = `-${y}px`; document.body.style.width = "100%"; document.body.style.overflow = "hidden";
+    return () => { document.body.style.position = prev.pos; document.body.style.top = prev.top; document.body.style.width = prev.width; document.body.style.overflow = prev.overflow; window.scrollTo(0, y); };
+  }, []);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? 0 : "40px 20px", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: isMobile ? "16px 16px 0 0" : 14, width: "100%", maxWidth: isMobile ? "100%" : 620, maxHeight: isMobile ? "92vh" : "85vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><i className={`ti ${icon}`} style={{ fontSize: 17, color: "var(--brand)" }} /><span style={{ fontSize: 15, fontWeight: 600 }}>{title}</span></div>
+          <i className="ti ti-x" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
+        </div>
+        <div style={{ padding: isMobile ? 16 : 20 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export function MaintenancePage({ user, go }) {
   const isMobile = useIsMobile();
   const stages = ["Reported", "Assigned", "In Progress", "Completed"];
@@ -98,6 +122,13 @@ export function MaintenancePage({ user, go }) {
         </div>
       )}
 
+      {rows && rows.length > 0 && DB_READY && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>
+          <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
+          <span>Hold and drag a card between columns to update its stage{isMobile ? ", or use the ← → arrows on each card" : ""}.</span>
+        </div>
+      )}
+
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading jobs…</div>
       ) : (
@@ -121,6 +152,12 @@ export function MaintenancePage({ user, go }) {
                       onDragStart={() => setDragId(j.id)}
                       onDragEnd={() => { setDragId(null); setDragOver(null); }}
                       style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 13px", cursor: j.id && DB_READY ? "grab" : "default", opacity: String(dragId) === String(j.id) ? 0.5 : 1 }}>
+                      {j.id && DB_READY && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8, color: "var(--txt-3)" }}>
+                          <i className="ti ti-grip-vertical" style={{ fontSize: 13 }} />
+                          <span style={{ fontSize: 9.5, letterSpacing: 0.3, textTransform: "uppercase", fontWeight: 600 }}>Hold to drag</span>
+                        </div>
+                      )}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 6 }}>
                         <span style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{j.title}</span>
                         <Pill text={j.priority} tone={toneFor[j.priority] || "blue"} />
@@ -281,7 +318,7 @@ ${biz}`
               <div style={{ marginBottom: 14, background: "var(--red-soft)", border: "0.5px solid var(--red)", borderRadius: 8, padding: "10px 14px", fontSize: 11.5, color: "var(--red)" }}>✗ {msg}</div>
             )}
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span onClick={status === "sending" || !smtp ? undefined : send} style={{ opacity: smtp ? 1 : 0.5, cursor: smtp ? "pointer" : "not-allowed" }}><Btn icon="ti-send" label={status === "sending" ? "Sending…" : "Send invoice"} primary /></span>
               <span onClick={onClose}><Btn icon="ti-x" label="Cancel" /></span>
               {smtp
@@ -624,68 +661,6 @@ const data = rows || [];
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
 
-          {/* Inline quick-add: TENANT — create without leaving Finance. */}
-          {addTenant && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
-              <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><i className="ti ti-user-plus" style={{ fontSize: 13, color: "var(--brand)" }} />New tenant</div>
-              {tErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 10 }}>{tErr}</div>}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
-                <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={tForm.name} onChange={(e) => setTForm({ ...tForm, name: e.target.value })} /></label>
-                <label style={fld}>Property<select style={inp} value={tForm.property_id} onChange={(e) => setTForm({ ...tForm, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
-                <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={tForm.email} onChange={(e) => setTForm({ ...tForm, email: e.target.value })} /></label>
-                <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={tForm.phone} onChange={(e) => setTForm({ ...tForm, phone: e.target.value })} /></label>
-                <label style={fld}>Tenancy start date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_start} onChange={(e) => setTForm({ ...tForm, tenancy_start: e.target.value })} /></label>
-                <label style={fld}>Tenancy end date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_end} onChange={(e) => setTForm({ ...tForm, tenancy_end: e.target.value })} /></label>
-                <label style={fld}>Rent status<select style={inp} value={tForm.rent_status} onChange={(e) => setTForm({ ...tForm, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
-                <label style={fld}>Right to Rent<select style={inp} value={tForm.rtr_status} onChange={(e) => setTForm({ ...tForm, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
-                <label style={fld}>Deposit received (£)<input style={inp} type="number" min="0" placeholder="e.g. 1500" value={tForm.deposit_amount} onChange={(e) => setTForm({ ...tForm, deposit_amount: e.target.value })} /></label>
-                <label style={{ ...fld, justifyContent: "flex-end" }}>Protected under DPS
-                  <div onClick={() => setTForm({ ...tForm, deposit_protected: !tForm.deposit_protected })} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
-                    <span style={{ width: 38, height: 22, borderRadius: 11, background: tForm.deposit_protected ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0 }}>
-                      <span style={{ position: "absolute", top: 2, left: tForm.deposit_protected ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
-                    </span>
-                    <span style={{ fontSize: 12, color: "var(--txt)" }}>{tForm.deposit_protected ? "Protected" : "Not protected"}</span>
-                  </div>
-                </label>
-              </div>
-              {(() => {
-                const tp = (properties.find((p) => String(p.id) === String(tForm.property_id)) || {}).type;
-                const multi = tp === "HMO" || tp === "Block";
-                if (tForm.property_id && !multi) return (
-                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
-                    <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 4, fontWeight: 500 }}>Co-tenant (optional)</div>
-                    <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginBottom: 10, lineHeight: 1.5 }}>For a joint tenancy — e.g. a couple sharing one agreement. Counts as one tenancy.</div>
-                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
-                      <label style={fld}>Co-tenant name<input style={inp} placeholder="e.g. James Connor" value={tForm.co_tenant_name} onChange={(e) => setTForm({ ...tForm, co_tenant_name: e.target.value })} /></label>
-                      <label style={fld}>Co-tenant email<input style={inp} type="email" placeholder="e.g. james@email.com" value={tForm.co_tenant_email} onChange={(e) => setTForm({ ...tForm, co_tenant_email: e.target.value })} /></label>
-                      <label style={fld}>Co-tenant phone<input style={inp} placeholder="e.g. 07700 900124" value={tForm.co_tenant_phone} onChange={(e) => setTForm({ ...tForm, co_tenant_phone: e.target.value })} /></label>
-                    </div>
-                  </div>
-                );
-                if (tForm.property_id && multi) return <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--txt-3)" }}>{tp} — add separate tenants individually.</div>;
-                return null;
-              })()}
-              <div style={{ marginTop: 10 }}><span onClick={tSaving ? undefined : saveTenant} style={{ opacity: tSaving ? 0.6 : 1, cursor: tSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={tSaving ? "Saving…" : "Save tenant"} primary /></span></div>
-            </div>
-          )}
-
-          {/* Inline quick-add: PROPERTY — create without leaving Finance. */}
-          {addProperty && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
-              <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><i className="ti ti-home-plus" style={{ fontSize: 13, color: "var(--brand)" }} />New property</div>
-              {pErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 10 }}>{pErr}</div>}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
-                <label style={fld}>Address<input style={inp} placeholder="e.g. 12 Baker Street" value={pForm.address} onChange={(e) => setPForm({ ...pForm, address: e.target.value })} /></label>
-                <label style={fld}>Area / town<input style={inp} placeholder="e.g. Bradford" value={pForm.area} onChange={(e) => setPForm({ ...pForm, area: e.target.value })} /></label>
-                <label style={fld}>Type<select style={inp} value={pForm.type} onChange={(e) => setPForm({ ...pForm, type: e.target.value })}>{["House", "Flat", "Bungalow", "HMO", "Block", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
-                <label style={fld}>Status<select style={inp} value={pForm.status} onChange={(e) => setPForm({ ...pForm, status: e.target.value })}>{["Let", "Vacant", "Sale agreed"].map((x) => <option key={x}>{x}</option>)}</select></label>
-                <label style={fld}>Monthly rent (£)<input style={inp} type="number" min="0" placeholder="e.g. 1200" value={pForm.rent} onChange={(e) => setPForm({ ...pForm, rent: e.target.value })} /></label>
-                <label style={fld}>Invoice day (1–31, optional)<input style={inp} type="number" min="1" max="31" placeholder="e.g. 1" value={pForm.invoice_day} onChange={(e) => setPForm({ ...pForm, invoice_day: e.target.value })} /></label>
-              </div>
-              <div style={{ marginTop: 10 }}><span onClick={pSaving ? undefined : saveProperty} style={{ opacity: pSaving ? 0.6 : 1, cursor: pSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={pSaving ? "Saving…" : "Save property"} primary /></span></div>
-            </div>
-          )}
-
           <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
           <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update payment" : "Save payment")} primary /></span></div>
         </div>
@@ -832,6 +807,72 @@ const data = rows || [];
           }}
         />
       )}
+
+      {/* Quick-add TENANT — popup so it doesn't push the payment form down. */}
+      {addTenant && (
+        <QuickAddModal title="New tenant" icon="ti-user-plus" onClose={() => { setAddTenant(false); setTErr(""); }}>
+          {tErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 12 }}>{tErr}</div>}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+            <label style={fld}>Tenant name<input style={inp} placeholder="e.g. Sarah Connor" value={tForm.name} onChange={(e) => setTForm({ ...tForm, name: e.target.value })} /></label>
+            <label style={fld}>Property<select style={inp} value={tForm.property_id} onChange={(e) => setTForm({ ...tForm, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
+            <label style={fld}>Email<input style={inp} type="email" placeholder="e.g. sarah@email.com" value={tForm.email} onChange={(e) => setTForm({ ...tForm, email: e.target.value })} /></label>
+            <label style={fld}>Phone<input style={inp} placeholder="e.g. 07700 900123" value={tForm.phone} onChange={(e) => setTForm({ ...tForm, phone: e.target.value })} /></label>
+            <label style={fld}>Tenancy start date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_start} onChange={(e) => setTForm({ ...tForm, tenancy_start: e.target.value })} /></label>
+            <label style={fld}>Tenancy end date (DD/MM/YYYY)<input style={inp} type="date" value={tForm.tenancy_end} onChange={(e) => setTForm({ ...tForm, tenancy_end: e.target.value })} /></label>
+            <label style={fld}>Rent status<select style={inp} value={tForm.rent_status} onChange={(e) => setTForm({ ...tForm, rent_status: e.target.value })}>{["Up to date", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Right to Rent<select style={inp} value={tForm.rtr_status} onChange={(e) => setTForm({ ...tForm, rtr_status: e.target.value })}>{["Verified", "Pending"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Deposit received (£)<input style={inp} type="number" min="0" placeholder="e.g. 1500" value={tForm.deposit_amount} onChange={(e) => setTForm({ ...tForm, deposit_amount: e.target.value })} /></label>
+            <label style={{ ...fld, justifyContent: "flex-end" }}>Protected under DPS
+              <div onClick={() => setTForm({ ...tForm, deposit_protected: !tForm.deposit_protected })} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ width: 38, height: 22, borderRadius: 11, background: tForm.deposit_protected ? "var(--brand)" : "var(--line-2)", position: "relative", flexShrink: 0 }}>
+                  <span style={{ position: "absolute", top: 2, left: tForm.deposit_protected ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                </span>
+                <span style={{ fontSize: 12, color: "var(--txt)" }}>{tForm.deposit_protected ? "Protected" : "Not protected"}</span>
+              </div>
+            </label>
+          </div>
+          {(() => {
+            const tp = (properties.find((p) => String(p.id) === String(tForm.property_id)) || {}).type;
+            const multi = tp === "HMO" || tp === "Block";
+            if (tForm.property_id && !multi) return (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "0.5px dashed var(--line)" }}>
+                <div style={{ fontSize: 11, color: "var(--txt-2)", marginBottom: 4, fontWeight: 500 }}>Co-tenant (optional)</div>
+                <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginBottom: 10, lineHeight: 1.5 }}>For a joint tenancy — e.g. a couple sharing one agreement. Counts as one tenancy.</div>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <label style={fld}>Co-tenant name<input style={inp} placeholder="e.g. James Connor" value={tForm.co_tenant_name} onChange={(e) => setTForm({ ...tForm, co_tenant_name: e.target.value })} /></label>
+                  <label style={fld}>Co-tenant email<input style={inp} type="email" placeholder="e.g. james@email.com" value={tForm.co_tenant_email} onChange={(e) => setTForm({ ...tForm, co_tenant_email: e.target.value })} /></label>
+                  <label style={fld}>Co-tenant phone<input style={inp} placeholder="e.g. 07700 900124" value={tForm.co_tenant_phone} onChange={(e) => setTForm({ ...tForm, co_tenant_phone: e.target.value })} /></label>
+                </div>
+              </div>
+            );
+            if (tForm.property_id && multi) return <div style={{ marginTop: 12, fontSize: 10.5, color: "var(--txt-3)" }}>{tp} — add separate tenants individually.</div>;
+            return null;
+          })()}
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <span onClick={tSaving ? undefined : saveTenant} style={{ opacity: tSaving ? 0.6 : 1, cursor: tSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={tSaving ? "Saving…" : "Save tenant"} primary /></span>
+            <span onClick={() => { setAddTenant(false); setTErr(""); }}><Btn icon="ti-x" label="Cancel" /></span>
+          </div>
+        </QuickAddModal>
+      )}
+
+      {/* Quick-add PROPERTY — popup so it doesn't push the payment form down. */}
+      {addProperty && (
+        <QuickAddModal title="New property" icon="ti-home-plus" onClose={() => { setAddProperty(false); setPErr(""); }}>
+          {pErr && <div style={{ fontSize: 11, color: "var(--red)", background: "var(--red-soft)", padding: "7px 11px", borderRadius: 8, marginBottom: 12 }}>{pErr}</div>}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+            <label style={fld}>Address<input style={inp} placeholder="e.g. 12 Baker Street" value={pForm.address} onChange={(e) => setPForm({ ...pForm, address: e.target.value })} /></label>
+            <label style={fld}>Area / town<input style={inp} placeholder="e.g. Bradford" value={pForm.area} onChange={(e) => setPForm({ ...pForm, area: e.target.value })} /></label>
+            <label style={fld}>Type<select style={inp} value={pForm.type} onChange={(e) => setPForm({ ...pForm, type: e.target.value })}>{["House", "Flat", "Bungalow", "HMO", "Block", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={pForm.status} onChange={(e) => setPForm({ ...pForm, status: e.target.value })}>{["Let", "Vacant", "Sale agreed"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Monthly rent (£)<input style={inp} type="number" min="0" placeholder="e.g. 1200" value={pForm.rent} onChange={(e) => setPForm({ ...pForm, rent: e.target.value })} /></label>
+            <label style={fld}>Invoice day (1–31, optional)<input style={inp} type="number" min="1" max="31" placeholder="e.g. 1" value={pForm.invoice_day} onChange={(e) => setPForm({ ...pForm, invoice_day: e.target.value })} /></label>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <span onClick={pSaving ? undefined : saveProperty} style={{ opacity: pSaving ? 0.6 : 1, cursor: pSaving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={pSaving ? "Saving…" : "Save property"} primary /></span>
+            <span onClick={() => { setAddProperty(false); setPErr(""); }}><Btn icon="ti-x" label="Cancel" /></span>
+          </div>
+        </QuickAddModal>
+      )}
     </div>
   );
 }
@@ -842,6 +883,8 @@ export function DocumentsPage({ user }) {
   const catIcon = { Agreements: "ti-file-text", Certificates: "ti-certificate", "Right to Rent": "ti-id", Notices: "ti-mail", Invoices: "ti-receipt", Other: "ti-file" };
   const catTone = { Agreements: "blue", Certificates: "red", "Right to Rent": "green", Notices: "blue", Invoices: "green", Other: "amber" };
   const [cat, setCat] = useState("All");
+  const [propFilter, setPropFilter] = useState("All");
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -905,7 +948,7 @@ export function DocumentsPage({ user }) {
   };
   const remove = (d) => confirm.ask({ title: "Delete this document?", message: `"${d.name || "This document"}" will be permanently deleted, including the uploaded file. This can't be undone.`, onConfirm: () => doRemove(d) });
 
-  const data = (rows || []).filter((d) => cat === "All" || d.category === cat);
+  const data = (rows || []).filter((d) => (cat === "All" || d.category === cat) && (propFilter === "All" || (propFilter === "none" ? !d.property_id : String(d.property_id) === String(propFilter))));
   const fmtSize = (kb) => !kb ? "" : kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB";
 
   return (
@@ -927,10 +970,18 @@ export function DocumentsPage({ user }) {
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-        {cats.map((c) => (
-          <span key={c} onClick={() => setCat(c)} style={{ cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, color: c === cat ? "var(--txt)" : "var(--txt-2)", background: c === cat ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (c === cat ? "var(--line)" : "transparent") }}>{c}</span>
-        ))}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {cats.map((c) => (
+            <span key={c} onClick={() => setCat(c)} style={{ cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, color: c === cat ? "var(--txt)" : "var(--txt-2)", background: c === cat ? "var(--panel-2)" : "transparent", border: "0.5px solid " + (c === cat ? "var(--line)" : "transparent") }}>{c}</span>
+          ))}
+        </div>
+        {/* Filter documents by which property they belong to. */}
+        <select value={propFilter} onChange={(e) => setPropFilter(e.target.value)} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: isMobile ? "9px 11px" : "7px 10px", color: "var(--txt)", fontSize: isMobile ? 16 : 12, fontFamily: "Inter", outline: "none", marginLeft: isMobile ? 0 : "auto", width: isMobile ? "100%" : "auto" }}>
+          <option value="All">All properties</option>
+          <option value="none">No property</option>
+          {properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}
+        </select>
       </div>
 
       {rows === null ? (
@@ -946,7 +997,16 @@ export function DocumentsPage({ user }) {
                 <span style={{ width: 38, height: 38, borderRadius: 9, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${catIcon[d.category] || "ti-file"}`} style={{ fontSize: 18 }} /></span>
                 <div onClick={() => d.file_path && DB_READY && openPreview(d)} style={{ minWidth: 0, flex: 1, cursor: d.file_path && DB_READY ? "pointer" : "default" }}>
                   <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}{(propLabel(properties, d.property_id) || d.property) ? " · " + (propLabel(properties, d.property_id) || d.property) : ""}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{d.category}{d.size_kb ? " · " + fmtSize(d.size_kb) : ""}</div>
+                  {(() => {
+                    const pname = propLabel(properties, d.property_id) || d.property;
+                    return (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, fontSize: 10.5, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: pname ? "var(--brand-soft, rgba(139,127,232,.14))" : "var(--panel)", color: pname ? "var(--brand)" : "var(--txt-3)", border: "0.5px solid var(--line)", maxWidth: "100%" }}>
+                        <i className={`ti ${pname ? "ti-home" : "ti-home-off"}`} style={{ fontSize: 12, flexShrink: 0 }} />
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pname || "No property"}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 {d.file_path && DB_READY && <i className="ti ti-eye" onClick={() => openPreview(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Preview" />}
                 {d.file_path && DB_READY && <i className="ti ti-download" onClick={() => download(d)} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer" }} title="Download" />}
@@ -961,7 +1021,7 @@ export function DocumentsPage({ user }) {
         <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 60 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 820, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)" }}>
-              <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{preview.name}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{preview.category}</div></div>
+              <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{preview.name}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{preview.category}{(propLabel(properties, preview.property_id) || preview.property) ? " · " + (propLabel(properties, preview.property_id) || preview.property) : ""}</div></div>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                 <i className="ti ti-download" onClick={() => download(preview)} style={{ fontSize: 17, color: "var(--txt-2)", cursor: "pointer" }} title="Download" />
                 <i className="ti ti-x" onClick={() => setPreview(null)} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
@@ -1100,6 +1160,10 @@ export function SettingsPage({ user }) {
   const validTabs = ["organisation", "notifications", "email", "vat", "subscription"];
   const [tab, setTab] = useState(() => {
     if (typeof window !== "undefined") {
+      // Returning from Stripe Checkout/Portal lands with ?billing=... — always
+      // reopen the Subscription tab, not the default Organisation tab.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("billing")) return "subscription";
       const h = window.location.hash.replace("#", "");
       if (validTabs.includes(h)) return h;
     }
@@ -1148,11 +1212,13 @@ export function SettingsPage({ user }) {
   }, [user]);
 
   // Tidy the ?billing= param after returning from Stripe Checkout (the effect
-  // above already re-reads the tier on this fresh page load).
+  // above already re-reads the tier on this fresh page load). Also make sure
+  // the Subscription tab is the one showing.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("billing")) {
-      window.history.replaceState({}, "", window.location.pathname);
+      setTab("subscription");
+      window.history.replaceState({}, "", window.location.pathname + "#subscription");
     }
   }, []);
 
@@ -1472,9 +1538,9 @@ export function SettingsPage({ user }) {
               <div><div style={{ fontSize: 12.5, color: "var(--txt)" }}>Rent overdue alerts</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>Alerts when a payment becomes overdue</div></div>
               <Toggle on={notif.notify_rent} onClick={() => setNotif({ ...notif, notify_rent: !notif.notify_rent })} />
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
-              <div style={{ fontSize: 12.5, color: "var(--txt)" }}>Reminder lead time</div>
-              <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "7px 10px", color: "var(--txt)", fontSize: 12, fontFamily: "Inter", outline: "none" }}>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? 7 : 12, padding: "10px 0" }}>
+              <div style={{ fontSize: 12.5, color: "var(--txt)", whiteSpace: "nowrap" }}>Reminder lead time</div>
+              <select value={notif.reminder_lead} onChange={(e) => setNotif({ ...notif, reminder_lead: e.target.value })} style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: isMobile ? "10px 12px" : "7px 10px", color: "var(--txt)", fontSize: isMobile ? 16 : 12, fontFamily: "Inter", outline: "none", width: isMobile ? "100%" : "auto" }}>
                 {["60 / 30 / 7 days before expiry", "30 / 7 days before expiry", "14 / 1 days before expiry", "7 days before expiry"].map((x) => <option key={x}>{x}</option>)}
               </select>
             </div>
