@@ -968,6 +968,10 @@ export function TenantsPage({ user, go, tier }) {
             const tMaint = related.maint.filter(sameProp);
             const tPays = related.pays.filter((x) => sameProp(x) || (t.name && (x.tenant || "").toLowerCase() === t.name.toLowerCase()));
             const today = new Date(); today.setHours(0, 0, 0, 0);
+            // Days until the tenancy ends, so we can flag ones ending soon.
+            const endDays = t.tenancy_end ? Math.round((new Date(t.tenancy_end) - today) / 864e5) : null;
+            const endTone = endDays === null ? null : endDays < 0 ? "red" : endDays <= 30 ? "red" : endDays <= 60 ? "amber" : null;
+            const endBadge = endDays === null ? null : endDays < 0 ? "ended" : endDays === 0 ? "today" : `${endDays}d`;
             return (
               <React.Fragment key={t.id || i}>
                 <tr style={{ cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (t.id || i))}>
@@ -983,7 +987,16 @@ export function TenantsPage({ user, go, tier }) {
                   </Td>
                   <Td color="var(--txt-2)">{propName}</Td>
                   <Td color="var(--txt-2)">{ukDate(t.tenancy_start)}</Td>
-                  <Td color="var(--txt-2)">{ukDate(t.tenancy_end)}</Td>
+                  <Td>
+                    {endTone ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ color: `var(--${endTone})`, fontWeight: 600 }}>{ukDate(t.tenancy_end)}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", color: `var(--${endTone})`, background: `var(--${endTone}-soft)`, padding: "2px 6px", borderRadius: 5, whiteSpace: "nowrap" }}>{endBadge}</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--txt-2)" }}>{ukDate(t.tenancy_end)}</span>
+                    )}
+                  </Td>
                   <Td><Pill text={t.rent_status || "—"} tone={t.rent_status === "Overdue" ? "red" : "green"} /></Td>
                   <Td><Pill text={t.rtr_status || "Pending"} tone={t.rtr_status === "Verified" ? "green" : "amber"} /></Td>
                   <Td>{t.id && DB_READY ? <span style={{ display: "flex", gap: 12 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(t)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null}</Td>
