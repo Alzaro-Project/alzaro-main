@@ -171,3 +171,27 @@ export function Modal({title,children,onClose,width}) {
 export function ErrBox({m}) {
   return <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)', marginBottom:'14px' }}>{m}</div>
 }
+
+// A labelled field wrapper — puts a small caption above its child input(s)
+// so a field stays identifiable once it's filled in.
+export function Field({ label, hint, children, style }) {
+  return (
+    <div style={{ marginBottom:'14px', ...style }}>
+      <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:'6px' }}>
+        <label style={{ fontSize:'12px', fontWeight:600, color:'var(--text2)', letterSpacing:'.2px' }}>{label}</label>
+        {hint && <span style={{ fontSize:'11px', color:'var(--text3)' }}>{hint}</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// A light section heading to break long forms into readable groups.
+export function FormSection({ children }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:'10px', margin:'22px 0 12px' }}>
+      <span style={{ fontSize:'11px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.7px', color:'var(--text3)' }}>{children}</span>
+      <span style={{ flex:1, height:'1px', background:'var(--border)' }} />
+    </div>
+  )
+}
