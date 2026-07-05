@@ -179,6 +179,13 @@ function Dashboard({ user, signOut }) {
     if (canOpen("finance") && notifyPrefs.rent) allData.pays.filter((p) => effectiveStatus(p) === "Overdue").forEach((p) => {
       alerts.push({ tone: "red", icon: "ti-coin", text: `Rent overdue · ${p.tenant}`, sub: `${gbp(p.amount || 0)} outstanding`, page: "finance", days: -1 });
     });
+    // Tenancies ending soon (within the same lead window as certificates, or
+    // already ended). Helps landlords chase renewals / notice periods in time.
+    if (canOpen("tenants")) (allData.tenants || []).forEach((t) => {
+      if (!t.tenancy_end) return;
+      const days = Math.round((new Date(t.tenancy_end) - today) / 864e5);
+      if (days <= 60) alerts.push({ tone: days <= 30 ? "red" : "amber", icon: "ti-calendar-event", text: `Tenancy ending · ${t.name || "Tenant"}`, sub: days < 0 ? `Ended ${-days} days ago` : days === 0 ? "Ends today" : `Ends in ${days} days`, page: "tenants", days });
+    });
   }
   alerts.sort((a, b) => a.days - b.days);
 
