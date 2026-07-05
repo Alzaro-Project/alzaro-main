@@ -238,7 +238,7 @@ export function DashboardPage({ range, go, user, tier }) {
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 1 }}>Set up your business email</div>
             <div style={{ fontSize: 11.5, color: "var(--txt-2)", lineHeight: 1.4 }}>Connect your email so invoices send from your company's own address — not from Alzaro. Required before you can email invoices to tenants.</div>
           </div>
-          <span onClick={() => go("settings")} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--brand)", padding: "8px 14px", borderRadius: 8, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>Set up now</span>
+          <span onClick={() => { go("settings"); if (typeof window !== "undefined") window.location.hash = "email"; }} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--brand)", padding: "8px 14px", borderRadius: 8, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>Set up now</span>
           <i className="ti ti-x" onClick={() => { setEmailDismissed(true); try { localStorage.setItem(`propops_email_nudge_dismissed_${user?.id || "anon"}`, "1"); } catch (e) {} }} style={{ fontSize: 16, color: "var(--txt-3)", cursor: "pointer", flexShrink: 0 }} title="Dismiss" />
         </div>
       )}
@@ -302,6 +302,9 @@ export function DashboardPage({ range, go, user, tier }) {
 export function PropertiesPage({ user, go, tier }) {
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
+  // Click-to-sort for the property table.
+  const [sort, setSort] = useState({ key: "address", dir: "asc" });
+  const onSort = (key) => setSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
   const [rows, setRows] = useState(null);   // null = loading
   const [err, setErr] = useState("");
   const [adding, setAdding] = useState(false);
@@ -388,7 +391,25 @@ export function PropertiesPage({ user, go, tier }) {
   const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_properties").delete().eq("id", id); refresh(); } };
   const remove = (id) => confirm.ask({ title: "Delete this property?", message: "This property will be permanently deleted. Related tenants, certificates and records are not deleted but will no longer be linked. This can't be undone.", onConfirm: () => doRemove(id) });
 
-  const list = (rows || []).filter((p) => ((p.address || p.addr || "") + (p.area || "") + (p.type || "")).toLowerCase().includes(q.toLowerCase()));
+  const filtered = (rows || []).filter((p) => ((p.address || p.addr || "") + (p.area || "") + (p.type || "")).toLowerCase().includes(q.toLowerCase()));
+  const sortVal = (p) => {
+    switch (sort.key) {
+      case "address": return (p.address || p.addr || "").toLowerCase();
+      case "area": return (p.area || "").toLowerCase();
+      case "type": return (p.type || "").toLowerCase();
+      case "status": return (p.status || "").toLowerCase();
+      case "rent": return Number(p.rent) || 0;
+      default: return "";
+    }
+  };
+  const list = [...filtered].sort((a, b) => {
+    const av = sortVal(a), bv = sortVal(b);
+    const aE = av === "" || av === 0, bE = bv === "" || bv === 0;
+    if (aE && bE) return 0; if (aE) return 1; if (bE) return -1;
+    const num = sort.key === "rent";
+    const cmp = num ? (av - bv) : String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
+    return sort.dir === "asc" ? cmp : -cmp;
+  });
   const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none" };
 
   return (
@@ -432,7 +453,7 @@ export function PropertiesPage({ user, go, tier }) {
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading properties…</div>
       ) : (
-        <Table cols={["", "Address", "Area", "Type", "Status", "Rent (pcm)", "Compliance", ""]}>
+        <Table sort={sort} onSort={onSort} cols={["", { label: "Address", sortKey: "address" }, { label: "Area", sortKey: "area" }, { label: "Type", sortKey: "type" }, { label: "Status", sortKey: "status" }, { label: "Rent (pcm)", sortKey: "rent" }, "Compliance", ""]}>
           {list.map((p, i) => {
             const addr = (p.address || p.addr || "").toLowerCase();
             const match = (s) => (s || "").toLowerCase() === addr || (addr && (s || "").toLowerCase().includes(addr));
@@ -694,14 +715,14 @@ export function CompliancePage({ user, go }) {
             const cM = related.maint.filter(same);
             return (
               <React.Fragment key={c.id || i}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: (isOpen || i < items.length - 1) ? "0.5px solid var(--line)" : "none", cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (c.id || i))}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 14, color: "var(--txt-3)" }} />
-                    <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center" }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
-                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{propName}{c.reference ? " · " + c.reference : ""}</div></div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 0", borderBottom: (isOpen || i < items.length - 1) ? "0.5px solid var(--line)" : "none", cursor: "pointer" }} onClick={() => setExpandedId(isOpen ? null : (c.id || i))}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+                    <i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 14, color: "var(--txt-3)", flexShrink: 0 }} />
+                    <span style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, color: t.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><i className={`ti ${TYPES[c.type] || "ti-shield-check"}`} style={{ fontSize: 16 }} /></span>
+                    <div style={{ minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.type}</div><div style={{ fontSize: 11, color: "var(--txt-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{propName}{c.reference ? " · " + c.reference : ""}</div></div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--txt-2)" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days} days ago` : `in ${c.days} days`}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--txt-2)", whiteSpace: "nowrap" }}>{c.days === null ? "—" : c.days < 0 ? `${-c.days}d ago` : `in ${c.days}d`}</span>
                     <Pill text={c.status} tone={c.tone} />
                     {c.id && DB_READY && <span style={{ display: "flex", gap: 10 }} onClick={(e) => e.stopPropagation()}><i className="ti ti-pencil" onClick={() => openEdit(c)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={() => remove(c.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span>}
                   </div>
@@ -739,6 +760,9 @@ export function TenantsPage({ user, go, tier }) {
   const [editId, setEditId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [related, setRelated] = useState({ comp: [], maint: [], pays: [] });
+  // Click-to-sort for the tenant table.
+  const [sort, setSort] = useState({ key: "name", dir: "asc" });
+  const onSort = (key) => setSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
   const prevPropertyIdRef = useRef(null); // property the tenant was on before an edit
   const properties = usePropertyList();
   const blank = { name: "", property_id: "", email: "", phone: "", tenancy_start: "", tenancy_end: "", deposit_amount: "", deposit_protected: false, rent_status: "Up to date", rtr_status: "Pending", co_tenant_name: "", co_tenant_email: "", co_tenant_phone: "" };
@@ -915,9 +939,27 @@ export function TenantsPage({ user, go, tier }) {
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading tenants…</div>
       ) : rows.length === 0 ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No tenants yet. Click "Add tenant" to create your first one.</div>
-      ) : (
-        <Table cols={["", "Tenant", "Property", "Tenancy starts", "Tenancy ends", "Rent status", "Right to Rent", ""]}>
-          {rows.map((t, i) => {
+      ) : (() => {
+        const tSortVal = (t) => {
+          switch (sort.key) {
+            case "name": return (t.name || "").toLowerCase();
+            case "property": return (propLabel(properties, t.property_id) || t.property || "").toLowerCase();
+            case "start": return t.tenancy_start || "";
+            case "end": return t.tenancy_end || "";
+            case "rent_status": return (t.rent_status || "").toLowerCase();
+            case "rtr_status": return (t.rtr_status || "").toLowerCase();
+            default: return "";
+          }
+        };
+        const sortedTenants = [...(rows || [])].sort((a, b) => {
+          const av = tSortVal(a), bv = tSortVal(b);
+          if (av === "" && bv === "") return 0; if (av === "") return 1; if (bv === "") return -1;
+          const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
+          return sort.dir === "asc" ? cmp : -cmp;
+        });
+        return (
+        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "name" }, { label: "Property", sortKey: "property" }, { label: "Tenancy starts", sortKey: "start" }, { label: "Tenancy ends", sortKey: "end" }, { label: "Rent status", sortKey: "rent_status" }, { label: "Right to Rent", sortKey: "rtr_status" }, ""]}>
+          {sortedTenants.map((t, i) => {
             const isOpen = expandedId === (t.id || i);
             const pid = t.property_id;
             const sameProp = (x) => pid && String(x.property_id) === String(pid);
@@ -973,7 +1015,8 @@ export function TenantsPage({ user, go, tier }) {
             );
           })}
         </Table>
-      )}
+        );
+      })()}
     </div>
   );
 }
