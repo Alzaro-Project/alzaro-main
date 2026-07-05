@@ -137,9 +137,9 @@ export function AuthScreen() {
               <div style={{ background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 8, padding: "13px 15px", marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--amber)", marginBottom: 3 }}>This account is already registered</div>
                 <div style={{ fontSize: 12.5, color: "var(--txt-2)", lineHeight: 1.4, marginBottom: 11 }}>An account with <strong style={{ color: "var(--txt)" }}>{email}</strong> already exists. Head to login to sign in — or reset your password if you've forgotten it.</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => { setTab("login"); reset(); setPw(""); }} style={{ flex: 1, background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 13, padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "Inter" }}>Go to login</button>
-                  <button onClick={() => { setForgot(true); reset(); }} style={{ background: "var(--panel-2)", color: "var(--txt-2)", fontWeight: 600, fontSize: 13, padding: "10px 14px", borderRadius: 8, border: "0.5px solid var(--line)", cursor: "pointer", fontFamily: "Inter" }}>Reset password</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button onClick={() => { setTab("login"); reset(); setPw(""); }} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 13, padding: "11px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "Inter", whiteSpace: "nowrap" }}>Go to login</button>
+                  <button onClick={() => { setForgot(true); reset(); }} style={{ width: "100%", background: "var(--panel-2)", color: "var(--txt-2)", fontWeight: 600, fontSize: 13, padding: "11px 14px", borderRadius: 8, border: "0.5px solid var(--line)", cursor: "pointer", fontFamily: "Inter", whiteSpace: "nowrap" }}>Reset password</button>
                 </div>
               </div>
             )}
