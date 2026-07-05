@@ -14,6 +14,11 @@
   <noscript><link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" rel="stylesheet" /></noscript>
 </head>
 <body>
+  <script>
+    // Apply the saved theme before React hydrates to avoid a flash of the
+    // wrong theme on refresh. Mirrors the class App.jsx sets on <html>.
+    try { if (localStorage.getItem('soloops-theme') === 'light') document.documentElement.classList.add('light'); } catch (e) {}
+  </script>
   <div id="root"></div>
   <script type="module" src="./src/main.jsx"></script>
 </body>
