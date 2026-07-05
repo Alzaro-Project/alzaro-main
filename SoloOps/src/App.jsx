@@ -58,6 +58,15 @@ function Shell() {
   const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState('dark')
+  const [mobileNav, setMobileNav] = useState(false)
+
+  // Close the mobile nav drawer whenever the view changes or on Escape.
+  useEffect(() => {
+    if (!mobileNav) return
+    const onKey = (e) => { if (e.key === 'Escape') setMobileNav(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileNav])
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light')
@@ -233,7 +242,10 @@ function Shell() {
 
   return (
    <TrialGuard memberId={member?.id}>
-    <div className="solo-shell" style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
+    <div className={"solo-shell" + (mobileNav ? " nav-open" : "")} style={{ display:'grid', gridTemplateColumns:'230px 1fr', minHeight:'100vh' }}>
+
+      {/* Backdrop shown behind the drawer on mobile */}
+      <div className="solo-backdrop" onClick={()=>setMobileNav(false)} />
 
       <aside className="solo-sidebar" style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
@@ -296,7 +308,7 @@ function Shell() {
           {NAV.map(([k,label,,min]) => {
             const locked = !tierAllows(min)
             return (
-            <div key={k} data-nav onClick={()=>setView(k)} style={{
+            <div key={k} data-nav onClick={()=>{ setView(k); setMobileNav(false) }} style={{
               padding:'11px 14px', borderRadius:'10px', fontSize:'14px', fontWeight:600, cursor:'pointer', flexShrink:0,
               display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px',
               color: view===k ? 'var(--text)' : 'var(--text2)',
@@ -318,9 +330,17 @@ function Shell() {
 
       <div style={{ minWidth:0 }}>
 
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
+        {/* Mobile top bar — hamburger + brand. Hidden on desktop via CSS. */}
+        <div className="solo-topbar">
+          <button className="solo-burger" aria-label="Open menu" onClick={()=>setMobileNav(true)}>
+            <span/><span/><span/>
+          </button>
+          <div style={{ fontSize:'17px', fontWeight:800, letterSpacing:'-0.5px' }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
+        </div>
+
+        <div className="solo-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
-          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+          <div className="solo-header-actions" style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
             {!['clients','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
