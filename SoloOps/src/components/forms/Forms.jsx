@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish } from '../UI.jsx'
+import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
@@ -41,14 +41,22 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
   }
   return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <input style={inp} list="past-merchants" placeholder="Supplier / merchant (e.g. Adobe UK)" value={merchant} onChange={e=>suggest(e.target.value)} />
-    <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
-    <select style={{...inp, marginTop:'12px'}} value={category} onChange={e=>setCategory(e.target.value)}>
-      {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-    </select>
-    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Amount (£)" value={amount} onChange={e=>setAmount(e.target.value)} />
-    <DateField style={{marginTop:'12px'}} value={date} onChange={setDate} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update expense':'Save expense')}</button>
+    <Field label="Supplier / merchant">
+      <input style={inp} list="past-merchants" placeholder="e.g. Adobe UK" value={merchant} onChange={e=>suggest(e.target.value)} />
+      <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
+    </Field>
+    <Field label="Category">
+      <select style={inp} value={category} onChange={e=>setCategory(e.target.value)}>
+        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+    </Field>
+    <Field label="Amount">
+      <input style={inp} type="number" placeholder="£0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+    </Field>
+    <Field label="Date" style={{ marginBottom:'4px' }}>
+      <DateField value={date} onChange={setDate} />
+    </Field>
+    <button style={{...btnPri, width:'100%', marginTop:'18px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update expense':'Save expense')}</button>
   </Modal>
 }
 
@@ -191,80 +199,91 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
     onSaved(added ? { addedClient: added } : undefined)
   }
 
-  const lblSm = { fontSize:'11px', color:'var(--text3)', marginBottom:'4px' }
-
   return <Modal title={edit?"Edit income":"Add income"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <select style={inp} value={pickId} onChange={e=>onPick(e.target.value)}>
-      <option value="">— Select a client —</option>
-      {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-      <option value="__new__">+ Add new client</option>
-    </select>
+
+    <FormSection>Client</FormSection>
+    <Field label="Who is this for?">
+      <select style={inp} value={pickId} onChange={e=>onPick(e.target.value)}>
+        <option value="">— Select a client —</option>
+        {savedClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        <option value="__new__">+ Add new client</option>
+      </select>
+    </Field>
     {picked && (
-      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginTop:'12px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
+      <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px 12px', marginTop:'-4px', marginBottom:'14px', fontSize:'12.5px', color:'var(--text2)', lineHeight:1.6 }}>
         {picked.email && <div>✉ {picked.email}</div>}
         {picked.phone && <div>☎ {picked.phone}</div>}
         {picked.address && <div>📍 {picked.address}</div>}
       </div>
     )}
     {isNew && (
-      <div style={{ marginTop:'12px', padding:'12px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px' }}>
-        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'8px' }}>New client — saved to Clients on save</div>
-        <input style={inp} placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setErr('')}} />
-        <input style={{...inp, marginTop:'8px'}} placeholder="Email (optional)" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
-        <input style={{...inp, marginTop:'8px'}} placeholder="Phone (optional)" value={newPhone} onChange={e=>setNewPhone(e.target.value)} />
+      <div style={{ marginBottom:'14px', padding:'14px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px' }}>
+        <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'10px' }}>New client — saved to Clients on save</div>
+        <Field label="Client name">
+          <input style={inp} placeholder="Customer / client name" value={client} onChange={e=>{setClient(e.target.value); setErr('')}} />
+        </Field>
+        <Field label="Email" hint="optional">
+          <input style={inp} placeholder="name@example.com" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
+        </Field>
+        <Field label="Phone" hint="optional" style={{ marginBottom:0 }}>
+          <input style={inp} placeholder="07…" value={newPhone} onChange={e=>setNewPhone(e.target.value)} />
+        </Field>
       </div>
     )}
 
-    <input style={{...inp, marginTop:'12px'}} placeholder="Invoice number (auto, editable)" value={number} onChange={e=>{setNumber(e.target.value); setErr('')}} />
+    <Field label="Invoice number" hint="auto, editable">
+      <input style={inp} placeholder="INV-001" value={number} onChange={e=>{setNumber(e.target.value); setErr('')}} />
+    </Field>
 
-    {/* Line items */}
-    <div style={{ marginTop:'16px', marginBottom:'4px', fontSize:'12px', fontWeight:700, color:'var(--text2)' }}>Line items</div>
+    <FormSection>Line items</FormSection>
     {lines.map((l,i)=>(
       <div key={i} style={{ display:'flex', gap:'6px', marginBottom:'6px', alignItems:'flex-start' }}>
         <input style={{...inp, flex:1}} placeholder="Description" value={l.description} onChange={e=>setLine(i,'description',e.target.value)} />
         <input style={{...inp, width:'52px', textAlign:'center'}} type="number" placeholder="Qty" value={l.qty} onChange={e=>setLine(i,'qty',e.target.value)} />
         <input style={{...inp, width:'82px'}} type="number" placeholder="£ each" value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)} />
-        <button onClick={()=>removeLine(i)} title="Remove" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text3)', width:'34px', cursor:'pointer', fontSize:'16px', lineHeight:'38px' }}>×</button>
+        <button onClick={()=>removeLine(i)} title="Remove" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text3)', width:'40px', minWidth:'40px', cursor:'pointer', fontSize:'16px', lineHeight:'38px' }}>×</button>
       </div>
     ))}
-    <button onClick={addLine} style={{ background:'transparent', border:'1px dashed var(--border-light)', borderRadius:'8px', color:'var(--text2)', padding:'8px', width:'100%', cursor:'pointer', fontSize:'13px', marginTop:'2px' }}>+ Add line</button>
+    <button onClick={addLine} style={{ background:'transparent', border:'1px dashed var(--border-light)', borderRadius:'8px', color:'var(--text2)', padding:'9px', width:'100%', cursor:'pointer', fontSize:'13px', marginTop:'2px' }}>+ Add line</button>
 
     {/* VAT (only if registered) */}
     {vatRegistered && !isFlat && (
-      <div style={{ marginTop:'12px' }}>
-        <div style={lblSm}>VAT rate %</div>
+      <Field label="VAT rate %" style={{ marginTop:'14px' }}>
         <input style={inp} type="number" value={vatRate} onChange={e=>setVatRate(e.target.value)} placeholder="20" />
-      </div>
+      </Field>
     )}
     {vatRegistered && isFlat && (
       <div style={{ marginTop:'12px', fontSize:'12px', color:'var(--text3)' }}>Flat Rate VAT @ {flatRate}% applied.</div>
     )}
 
     {/* Totals summary */}
-    <div style={{ marginTop:'14px', padding:'12px 14px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', fontSize:'13px' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-      {vatRegistered && <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)', marginTop:'4px' }}><span>VAT {isFlat?`(Flat ${flatRate}%)`:`(${Number(vatRate)||0}%)`}</span><span>{fmt(vat)}</span></div>}
-      <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'6px', paddingTop:'6px', borderTop:'1px solid var(--border)' }}><span>Total</span><span style={{ color:'var(--orange-light)' }}>{fmt(total)}</span></div>
+    <div style={{ marginTop:'16px', padding:'14px 16px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', fontSize:'13px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}><span>Subtotal</span><span className="mono">{fmt(subtotal)}</span></div>
+      {vatRegistered && <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)', marginTop:'6px' }}><span>VAT {isFlat?`(Flat ${flatRate}%)`:`(${Number(vatRate)||0}%)`}</span><span className="mono">{fmt(vat)}</span></div>}
+      <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--border)', fontSize:'15px' }}><span>Total</span><span className="mono" style={{ color:'var(--orange-light)' }}>{fmt(total)}</span></div>
     </div>
 
-    <div className="solo-2col" style={{ display:'flex', gap:'10px', marginTop:'12px' }}>
-      <div style={{ flex:1 }}>
-        <div style={lblSm}>Issue date</div>
+    <FormSection>Dates &amp; status</FormSection>
+    <div className="solo-2col" style={{ display:'flex', gap:'12px' }}>
+      <Field label="Issue date" style={{ flex:1 }}>
         <DateField value={date} onChange={setDate} />
-      </div>
-      <div style={{ flex:1 }}>
-        <div style={lblSm}>Due date</div>
+      </Field>
+      <Field label="Due date" style={{ flex:1 }}>
         <DateField value={dueDate} onChange={setDueDate} />
-      </div>
+      </Field>
     </div>
 
-    <select style={{...inp, marginTop:'12px'}} value={status} onChange={e=>setStatus(e.target.value)}>
-      <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
-    </select>
-    <textarea style={{...inp, marginTop:'12px', minHeight:'48px', resize:'vertical', fontFamily:'inherit'}} placeholder="Notes (optional, shown on invoice)" value={notes} onChange={e=>setNotes(e.target.value)} />
+    <Field label="Status">
+      <select style={inp} value={status} onChange={e=>setStatus(e.target.value)}>
+        <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
+      </select>
+    </Field>
+    <Field label="Notes" hint="optional, shown on invoice" style={{ marginBottom:0 }}>
+      <textarea style={{...inp, minHeight:'56px', resize:'vertical', fontFamily:'inherit'}} placeholder="Payment terms, thank-you note…" value={notes} onChange={e=>setNotes(e.target.value)} />
+    </Field>
 
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update income':'Save income')}</button>
+    <button style={{...btnPri, width:'100%', marginTop:'18px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update income':'Save income')}</button>
   </Modal>
 }
 
@@ -308,11 +327,23 @@ export function MileageForm({onClose,onSaved,uid,mileage,edit}) {
   }
   return <Modal title={edit?"Edit journey":"Log journey"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <DateField value={date} onChange={setDate} />
-    <input style={{...inp, marginTop:'12px'}} placeholder="From" value={from} onChange={e=>setFrom(e.target.value)} />
-    <input style={{...inp, marginTop:'12px'}} placeholder="To" value={to} onChange={e=>setTo(e.target.value)} />
-    <input style={{...inp, marginTop:'12px'}} placeholder="Purpose (e.g. client visit)" value={purpose} onChange={e=>setPurpose(e.target.value)} />
-    <input style={{...inp, marginTop:'12px'}} type="number" placeholder="Miles" value={miles} onChange={e=>setMiles(e.target.value)} />
-    <button style={{...btnPri, width:'100%', marginTop:'16px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update journey':'Save journey')}</button>
+    <Field label="Date">
+      <DateField value={date} onChange={setDate} />
+    </Field>
+    <div className="solo-2col" style={{ display:'flex', gap:'12px' }}>
+      <Field label="From" style={{ flex:1 }}>
+        <input style={inp} placeholder="e.g. Office" value={from} onChange={e=>setFrom(e.target.value)} />
+      </Field>
+      <Field label="To" style={{ flex:1 }}>
+        <input style={inp} placeholder="e.g. Client site" value={to} onChange={e=>setTo(e.target.value)} />
+      </Field>
+    </div>
+    <Field label="Purpose">
+      <input style={inp} placeholder="e.g. client visit" value={purpose} onChange={e=>setPurpose(e.target.value)} />
+    </Field>
+    <Field label="Miles" style={{ marginBottom:'4px' }}>
+      <input style={inp} type="number" placeholder="0" value={miles} onChange={e=>setMiles(e.target.value)} />
+    </Field>
+    <button style={{...btnPri, width:'100%', marginTop:'18px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update journey':'Save journey')}</button>
   </Modal>
 }
