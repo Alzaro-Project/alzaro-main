@@ -116,8 +116,10 @@ export function DateField({ value, onChange, style }) {
       <input style={{...inp, flex:1}} placeholder="DD/MM/YYYY" value={text}
         onChange={e=>{ setText(e.target.value); const iso=parse(e.target.value); if(iso) onChange(iso) }}
         onBlur={()=>{ const iso=parse(text); if(iso) onChange(iso); else setText(toText(value)) }} />
-      <input type="date" value={value||''} onChange={e=>onChange(e.target.value)}
-        style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'0 8px', color:'var(--text)', width:'44px', minWidth:'44px', cursor:'pointer' }} title="Pick from calendar" />
+      <label className="solo-datepick" title="Pick from calendar">
+        <span className="solo-datepick-icon" aria-hidden="true">📅</span>
+        <input type="date" value={value||''} onChange={e=>onChange(e.target.value)} aria-label="Pick from calendar" />
+      </label>
     </div>
   )
 }
