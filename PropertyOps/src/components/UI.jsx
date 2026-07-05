@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { downloadCSV, toneVar, useIsMobile } from "../lib/helpers.js";
 
 /* ===== SHARED UI COMPONENTS ===== */
@@ -54,18 +54,18 @@ export function PageHead({ title, sub, right }) {
 
 export function Btn({ icon, label, primary }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, fontSize: 12.5, fontWeight: 500, padding: "8px 14px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
       background: primary ? "var(--brand)" : "var(--panel-2)", color: primary ? "#fff" : "var(--txt)", border: "0.5px solid " + (primary ? "var(--brand)" : "var(--line)") }}>
-      {icon && <i className={`ti ${icon}`} style={{ fontSize: 15 }} />}{label}
+      {icon && <i className={`ti ${icon}`} style={{ fontSize: 15, flexShrink: 0 }} />}{label}
     </span>
   );
 }
 
 export function Metric({ label, value, sub, color, subColor }) {
   return (
-    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" }}>
+    <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px", minWidth: 0 }}>
       <div style={{ fontSize: 10, letterSpacing: 1, color: "var(--txt-3)", textTransform: "uppercase", marginBottom: 10 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 600, fontFamily: "Sora,sans-serif", color }}>{value}</div>
+      <div style={{ fontSize: "clamp(19px, 5.5vw, 26px)", fontWeight: 600, fontFamily: "Sora,sans-serif", color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
       <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)", marginTop: 5 }}>{sub}</div>
     </div>
   );
@@ -116,7 +116,7 @@ export function Table({ cols, children, sort, onSort }) {
     </div>
   );
 }
-export const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)" }}>{children}</td>;
+export const Td = ({ children, color }) => <td style={{ padding: "12px 16px", color: color || "var(--txt)", borderBottom: "0.5px solid var(--line)", whiteSpace: "nowrap" }}>{children}</td>;
 
 
 /* ===== WelcomeBanner ===== */
@@ -208,6 +208,23 @@ export function DetailRow({ main, sub, pill, tone }) {
 export function ReportPreview({ report, onClose }) {
   const isMobile = useIsMobile();
   const empty = report.rows.length === 0;
+  // Lock the page behind the modal so it can't scroll away underneath, and so
+  // the modal is always in view (fixes having to scroll up to see the preview).
+  useEffect(() => {
+    const y = window.scrollY;
+    const prev = { pos: document.body.style.position, top: document.body.style.top, width: document.body.style.width, overflow: document.body.style.overflow };
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${y}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.position = prev.pos;
+      document.body.style.top = prev.top;
+      document.body.style.width = prev.width;
+      document.body.style.overflow = prev.overflow;
+      window.scrollTo(0, y);
+    };
+  }, []);
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? "0" : "40px 20px", zIndex: 50 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: isMobile ? "16px 16px 0 0" : 14, width: "100%", maxWidth: isMobile ? "100%" : 640, maxHeight: isMobile ? "92vh" : "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
