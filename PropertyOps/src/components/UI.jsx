@@ -208,29 +208,20 @@ export function DetailRow({ main, sub, pill, tone }) {
 export function ReportPreview({ report, onClose }) {
   const isMobile = useIsMobile();
   const empty = report.rows.length === 0;
-  // Lock the page behind the modal so it can't scroll away underneath, and so
-  // the modal is always in view (fixes having to scroll up to see the preview).
+  // Simple, reliable scroll lock — just hide overflow on <html>. Avoids the
+  // body { position: fixed } trick, which on some mobile browsers collapses
+  // the viewport and pushes this fixed overlay off-screen.
   useEffect(() => {
-    const y = window.scrollY;
-    const prev = { pos: document.body.style.position, top: document.body.style.top, width: document.body.style.width, overflow: document.body.style.overflow };
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${y}px`;
-    document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.position = prev.pos;
-      document.body.style.top = prev.top;
-      document.body.style.width = prev.width;
-      document.body.style.overflow = prev.overflow;
-      window.scrollTo(0, y);
-    };
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => { document.documentElement.style.overflow = prev; };
   }, []);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", padding: isMobile ? "0" : "40px 20px", zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: isMobile ? "16px 16px 0 0" : 14, width: "100%", maxWidth: isMobile ? "100%" : 640, maxHeight: isMobile ? "92vh" : "82vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)" }}>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · ${report.period || "All time"} · your live data` : "Preview · coming soon"}</div></div>
-          <i className="ti ti-x tap-target" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer" }} />
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 14 : "40px 20px", zIndex: 3000 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: isMobile ? "100%" : 640, maxHeight: "85vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "0.5px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
+          <div style={{ minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{report.name}</div><div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>{report.wired ? `${report.rows.length} row${report.rows.length === 1 ? "" : "s"} · ${report.period || "All time"} · your live data` : "Preview · coming soon"}</div></div>
+          <i className="ti ti-x tap-target" onClick={onClose} style={{ fontSize: 19, color: "var(--txt-2)", cursor: "pointer", flexShrink: 0, marginLeft: 10 }} />
         </div>
         <div style={{ padding: isMobile ? 16 : 20 }}>
           <div style={{ fontSize: 12.5, color: "var(--txt-2)", marginBottom: 16, lineHeight: 1.6 }}>{report.desc}</div>
