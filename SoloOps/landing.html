@@ -215,9 +215,20 @@
     }
     @media (max-width:640px){
       .nav-center{display:none}
-      .hero{padding-top:118px}
+      nav{padding:12px 0}
+      .nav-right{gap:8px}
+      /* Compact auth buttons so they fit alongside the logo on phones */
+      .nav-right .btn{padding:9px 14px;font-size:13px}
+      .logo{font-size:18px}
+      .hero{padding-top:100px}
       .container{padding:0 20px}
       .flow-scene .sc-chip{display:none}
+    }
+    @media (max-width:380px){
+      .logo{font-size:16px}
+      .nav-right .btn-ghost{padding:9px 12px}
+      .nav-right .btn-orange{padding:9px 13px;font-size:12.5px}
+      .container{padding:0 16px}
     }
   </style>
 </head>
