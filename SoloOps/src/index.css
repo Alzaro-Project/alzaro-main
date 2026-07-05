@@ -156,6 +156,12 @@ label[data-hover]:hover{ border-color: var(--orange) !important; }
   /* Two-column form rows (e.g. issue/due date) stack on phones */
   .solo-2col{ flex-direction: column !important; }
 
+  /* Reports: single column, and each card stacks its label above buttons */
+  .solo-report-grid{ grid-template-columns: 1fr !important; }
+  .solo-report-card{ flex-direction: column !important; align-items: stretch !important; }
+  .solo-report-actions{ width: 100%; }
+  .solo-report-actions > button{ flex: 1 1 auto; }
+
   /* Wide tables scroll horizontally rather than blowing out the layout */
   .fade-in table{
     display: block;
