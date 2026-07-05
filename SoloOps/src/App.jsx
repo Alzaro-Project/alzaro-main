@@ -57,7 +57,9 @@ function Shell() {
   const [incFilter, setIncFilter] = useState('all')
   const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
-  const [theme, setTheme] = useState('dark')
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
+  })
   const [mobileNav, setMobileNav] = useState(false)
 
   // Close the mobile nav drawer whenever the view changes or on Escape.
@@ -70,6 +72,7 @@ function Shell() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light')
+    try { localStorage.setItem('soloops-theme', theme) } catch (e) { /* storage unavailable */ }
   }, [theme])
 
   useEffect(() => {
