@@ -48,33 +48,55 @@ html.light{
 ::-webkit-scrollbar{width:8px;height:8px;}
 ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
 a{color:inherit;text-decoration:none;}
-.fade-in{animation:fade .5s ease both;}
-@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 
 /* ---- interactive polish ---- */
-/* KPI / cards lift on hover */
-.soloops-card, [data-card]{ transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-[data-card]:hover{ transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,.35); border-color: var(--border-light) !important; }
+/* Cards lift with a subtle 3D tilt-in-depth feel on hover */
+.soloops-card, [data-card]{
+  transition: transform .22s cubic-bezier(.34,1.15,.5,1), box-shadow .22s ease, border-color .22s ease;
+  will-change: transform;
+}
+[data-card]:hover{
+  transform: translateY(-5px) scale(1.015);
+  box-shadow: 0 18px 42px rgba(0,0,0,.45), 0 2px 8px rgba(249,115,22,.06);
+  border-color: var(--orange) !important;
+}
+[data-card]:active{ transform: translateY(-2px) scale(1.005); }
+
 /* buttons */
 button{ transition: transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease; }
 button:hover:not(:disabled){ transform: translateY(-1px); }
 button:active:not(:disabled){ transform: translateY(0) scale(.98); }
-/* nav items slide slightly on hover */
-[data-nav]{ transition: background .15s ease, color .15s ease, padding-left .15s ease; }
-[data-nav]:hover{ padding-left: 18px !important; }
+
+/* nav items: icon nudges forward + soft tint on hover (no clunky reflow) */
+.solo-nav-item{ transition: background .16s ease, color .16s ease, transform .16s ease; }
+.solo-nav-item:hover{ background: var(--surface2) !important; color: var(--text) !important; }
+.solo-nav-item:hover .ti{ transform: translateX(2px); color: var(--orange) !important; }
+.solo-nav-item .ti{ transition: transform .16s ease, color .16s ease; }
+.solo-nav-item.active{ box-shadow: inset 3px 0 0 var(--orange); }
+
 /* table rows highlight */
 tbody tr{ transition: background .12s ease; }
 tbody tr:hover{ background: var(--surface2); }
+
 /* staggered entrance for grids of cards */
-@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.98);}to{opacity:1;transform:none;}}
-[data-pop]{ animation: pop .45s cubic-bezier(.34,1.3,.64,1) both; }
-/* chart bar grow */
-@keyframes grow{from{height:0;}}
-.bar-grow{ animation: grow .7s cubic-bezier(.4,0,.2,1) both; transition: opacity .15s ease; }
-.bar-grow:hover{ opacity:.8; }
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}
+[data-pop]{ animation: pop .5s cubic-bezier(.34,1.35,.5,1) both; }
+
+/* chart bars grow up from the baseline, springy and staggered per-bar via inline delay */
+@keyframes grow{from{height:0 !important;opacity:.4;}to{opacity:1;}}
+.bar-grow{ animation: grow .8s cubic-bezier(.22,1,.36,1) both; transition: opacity .15s ease, filter .15s ease; transform-origin:bottom; }
+.bar-grow:hover{ opacity:.85; filter:brightness(1.15); }
+
 /* link/file inputs */
 label[data-hover]{ transition: border-color .15s ease, background .15s ease; }
 label[data-hover]:hover{ border-color: var(--orange) !important; }
+
+/* fade-in for the welcome banner and page body */
+.fade-in{animation:fade .5s ease both;}
+@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
 
 /* ============================================================
    Responsive / mobile
