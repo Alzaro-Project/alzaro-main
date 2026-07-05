@@ -10,6 +10,10 @@
 }
 *{box-sizing:border-box; margin:0; padding:0;}
 html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased; transition: background .25s ease, color .25s ease;}
+html,body{ overflow-x:hidden; max-width:100%; }
+/* Nothing should push the page wider than the viewport */
+.solo-shell{ max-width:100vw; overflow-x:hidden; }
+.solo-shell > div{ min-width:0; }
 
 /* ---- light mode ---- */
 html.light{
@@ -154,13 +158,18 @@ label[data-hover]:hover{ border-color: var(--orange) !important; }
   /* Page header: allow wrapping and lighter padding */
   .solo-header{ padding:16px 18px !important; }
 
-  /* KPI / dense grids: 4- and 3-up become 2-up on tablets */
+  /* KPI / dense grids: 4- and 3-up become 2-up on tablets.
+     Class hooks are reliable; the [style*] matchers are a fallback for any
+     grids that don't yet carry a class. */
+  .solo-kpi-grid,
   [style*="repeat(4,1fr)"],
   [style*="repeat(3,1fr)"]{ grid-template-columns: repeat(2,1fr) !important; }
 }
 
 @media (max-width: 560px){
   /* Everything stacks to a single column on phones */
+  .solo-kpi-grid,
+  .solo-dash-cols,
   [style*="repeat(4,1fr)"],
   [style*="repeat(3,1fr)"],
   [style*="repeat(2,1fr)"],
