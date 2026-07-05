@@ -67,7 +67,7 @@ function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onC
             <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Upgrade to unlock</div>
           </>
         ) : (<>
-          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color }}>{value}</div>
+          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
           {sub && <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)" }}>{sub}</div>}
         </>)}
       </>)}
@@ -224,9 +224,6 @@ export function DashboardPage({ range, go, user, tier }) {
     .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
     .filter((t) => t.days <= 60);
   const expiringSoon = [...(canCompliance ? certItems : []), ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
-  const name = user ? user.email.split("@")[0] : "there";
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
     <div className="fade-in">
@@ -536,7 +533,6 @@ export function CompliancePage({ user, go }) {
 
   useEffect(() => {
     if (!DB_READY) {
-      const today = new Date();
       setRows([]);
       return;
     }
