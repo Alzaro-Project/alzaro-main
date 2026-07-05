@@ -1,9 +1,10 @@
 import React from 'react'
 import JSZip from 'jszip'
-import { card, btnPri, btnSec } from '../components/UI.jsx'
+import { card, btnPri, btnSec, Modal } from '../components/UI.jsx'
 
 export default function Reports({ invoices, expenses, mileage, canGold = false }) {
   const [msg, setMsg] = React.useState('')
+  const [preview, setPreview] = React.useState(null) // { name, filename, rows }
 
   const download = (filename, rows) => {
     const csv = rows.map(r => r.map(c => {
@@ -119,17 +120,62 @@ export default function Reports({ invoices, expenses, mileage, canGold = false }
       </div>
       <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets).{canGold && ' The accountant pack zips them all together.'}</div>
       {msg && <div style={{ background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--green)', marginBottom:'14px' }}>✓ {msg}</div>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px' }}>
+      <div className="solo-report-grid" style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px' }}>
         {visibleReports.map(r => (
-          <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'12px' }}>
-            <div>
+          <div key={r.id} className="solo-report-card" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', padding:'16px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'12px' }}>
+            <div style={{ minWidth:0 }}>
               <div style={{ fontWeight:700, fontSize:'14px' }}>{r.name}</div>
               <div style={{ fontSize:'12px', color:'var(--text3)' }}>{r.desc}</div>
             </div>
-            <button style={{...btnSec, whiteSpace:'nowrap'}} onClick={()=>{ const [fn,rows]=r.build(); download(fn,rows) }}>Download</button>
+            <div className="solo-report-actions" style={{ display:'flex', gap:'8px', flexShrink:0 }}>
+              <button style={{...btnSec, whiteSpace:'nowrap'}} onClick={()=>{ const [fn,rows]=r.build(); setPreview({ name:r.name, filename:fn, rows }) }}>Preview</button>
+              <button style={{...btnPri, whiteSpace:'nowrap'}} onClick={()=>{ const [fn,rows]=r.build(); download(fn,rows) }}>Download</button>
+            </div>
           </div>
         ))}
       </div>
+
+      {preview && (
+        <Modal title={preview.name} width="720px" onClose={()=>setPreview(null)}>
+          <div style={{ fontSize:'12.5px', color:'var(--text3)', marginBottom:'14px' }}>
+            Preview of <span className="mono">{preview.filename}</span> — {preview.rows.length} row{preview.rows.length===1?'':'s'}.
+          </div>
+          <div style={{ overflowX:'auto', border:'1px solid var(--border)', borderRadius:'10px', marginBottom:'18px' }}>
+            {preview.rows.length === 0
+              ? <div style={{ padding:'24px', textAlign:'center', color:'var(--text3)', fontSize:'13px' }}>No data yet for this report.</div>
+              : <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
+                  <tbody>
+                    {preview.rows.map((row, ri) => {
+                      const isHeader = ri === 0 || (row.length === 1 && row[0] && String(row[0]).length > 0 && preview.rows[ri+1] && preview.rows[ri+1].length > 1)
+                      const isBlank = row.length === 0 || (row.length === 1 && !row[0])
+                      if (isBlank) return <tr key={ri}><td colSpan={99} style={{ height:'8px' }} /></tr>
+                      return (
+                        <tr key={ri} style={{ borderBottom:'1px solid var(--border)', background: ri===0 ? 'var(--surface3)' : 'transparent' }}>
+                          {row.map((cell, ci) => {
+                            const looksNumeric = ci>0 && /^-?[\d,]+\.?\d*$/.test(String(cell).trim())
+                            return (
+                              <td key={ci} style={{
+                                padding:'9px 12px',
+                                fontWeight: ri===0 ? 700 : (isHeader && row.length===1 ? 700 : 500),
+                                color: ri===0 ? 'var(--text)' : 'var(--text2)',
+                                fontFamily: looksNumeric ? 'Fira Code, monospace' : 'inherit',
+                                textAlign: looksNumeric ? 'right' : 'left',
+                                whiteSpace:'nowrap'
+                              }}>{cell}</td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>}
+          </div>
+          <div style={{ display:'flex', gap:'10px', justifyContent:'flex-end', flexWrap:'wrap' }}>
+            <button style={btnSec} onClick={()=>setPreview(null)}>Close</button>
+            <button style={btnPri} onClick={()=>{ download(preview.filename, preview.rows); setPreview(null) }}>⬇ Download CSV</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
