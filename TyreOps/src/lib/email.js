@@ -455,6 +455,7 @@ export async function sendViaResend(toEmail, toName, subject, htmlContent) {
       toName,
       subject,
       html: htmlContent,
+      product: 'tyreops', // keeps the default From as "Alzaro TyreOps" server-side
     }),
   })
 
@@ -492,7 +493,7 @@ export async function sendCustomEmail({ to, subject, html, text, fromName, reply
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ to, subject, html, text, fromName, replyTo }),
+      body: JSON.stringify({ to, subject, html, text, fromName, replyTo, product: 'tyreops' }),
     })
 
     if (!response.ok) {

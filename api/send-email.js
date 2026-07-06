@@ -32,6 +32,16 @@ const SMTP_PRODUCTS = {
   propertyops: { table: 'prop_settings', secretRpc: 'prop_smtp_secret' },
 }
 
+// Default Resend "From" display name per product, used only when the caller
+// doesn't pass its own fromName. Neutral "Alzaro" for everyone except TyreOps,
+// which historically sent as "Alzaro TyreOps" (special-cased to preserve it).
+const PRODUCT_SENDER = {
+  tyreops: 'Alzaro TyreOps',
+}
+function defaultSender(product) {
+  return PRODUCT_SENDER[String(product || '')] || 'Alzaro'
+}
+
 const SMTP_COLS = 'smtp_host,smtp_port,smtp_secure,smtp_user,smtp_pass,smtp_from_name,smtp_from_email,smtp_reply_to'
 
 function resolveSupabaseUrl() {
@@ -246,7 +256,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${safeFromName || 'Alzaro'} <invoices@alzaro.co.uk>`,
+        from: `${safeFromName || defaultSender(product)} <invoices@alzaro.co.uk>`,
         to: [recipient],
         subject,
         html: html || undefined,
