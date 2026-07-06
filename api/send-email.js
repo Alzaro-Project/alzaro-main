@@ -2,17 +2,86 @@
 // Vercel serverless function — sends invoice/notification email.
 //
 // TWO SEND PATHS:
-//   1. User SMTP  — if the caller passes valid smtp{host,user,pass}, send via
-//      their own mail server (nodemailer) so the email genuinely comes FROM
-//      their address. This is what the Settings → Email tab configures.
-//   2. Resend     — otherwise fall back to Alzaro's Resend domain
-//      (invoices@alzaro.co.uk). Reliable default for users who haven't set up
-//      their own email. Existing callers (TyreOps/GarageOps) pass no smtp and
-//      are completely unaffected.
+//   1. Own-domain SMTP — taken when the caller passes `requireSmtp: true` with a
+//      `product` that has server-side SMTP wired up (currently PropertyOps). The
+//      SMTP credentials are resolved SERVER-SIDE from that product's settings
+//      table, keyed by the validated caller's user_id — they are NO LONGER
+//      accepted from the request body. This is how PropertyOps invoices go out
+//      FROM the company's own address.
+//   2. Resend — the shared fallback (invoices@alzaro.co.uk) used by TyreOps and
+//      ServiceOps. Guarded: the caller must be authenticated AND hold an active
+//      product_members row before we will send from the shared Alzaro domain.
 //
-// Requires RESEND_API_KEY for path 2. SECURITY: requires a valid Supabase
-// session token in the Authorization header.
+// SECURITY (see also api/_netguard.js):
+//   • Requires a valid Supabase session token.
+//   • Requires an active product_members row (no open relay from alzaro.co.uk).
+//   • `to` is validated; `fromName` is sanitised (no header injection).
+//   • SMTP host is SSRF-checked (no private/loopback/link-local targets) and we
+//     connect by validated IP with TLS servername pinned to the hostname.
+//   • Per-user rate limiting (best-effort, see _netguard.js note).
+//   • SMTP failures return ONE generic reason (no host-reachability oracle).
+//
+// Requires RESEND_API_KEY for path 2.
 import nodemailer from 'nodemailer'
+import { resolveSafeAddress, rateLimit, isValidEmail, sanitizeHeader } from './_netguard.js'
+
+// Products with server-side SMTP wired up: product -> { table, columns }.
+// Only PropertyOps sends its own-domain SMTP today. To add another vertical,
+// map it to its settings table here (its SMTP columns must match this shape).
+const SMTP_PRODUCTS = {
+  propertyops: { table: 'prop_settings', secretRpc: 'prop_smtp_secret' },
+}
+
+// Default Resend "From" display name per product, used only when the caller
+// doesn't pass its own fromName. Neutral "Alzaro" for everyone except TyreOps,
+// which historically sent as "Alzaro TyreOps" (special-cased to preserve it).
+const PRODUCT_SENDER = {
+  tyreops: 'Alzaro TyreOps',
+}
+function defaultSender(product) {
+  return PRODUCT_SENDER[String(product || '')] || 'Alzaro'
+}
+
+const SMTP_COLS = 'smtp_host,smtp_port,smtp_secure,smtp_user,smtp_pass,smtp_from_name,smtp_from_email,smtp_reply_to'
+
+function resolveSupabaseUrl() {
+  return (
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    'https://cxsaeftacozyphuejuxo.supabase.co'
+  )
+}
+
+// Read one row from a settings table scoped to the caller (their own token, so
+// RLS returns only their row — no service-role needed, ownership is inherent).
+async function readOwnSettings({ supabaseUrl, anonKey, token, table, userId, cols }) {
+  const url =
+    `${supabaseUrl}/rest/v1/${table}` +
+    `?user_id=eq.${encodeURIComponent(userId)}&select=${cols}&limit=1`
+  const r = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
+  if (!r.ok) return null
+  const rows = await r.json().catch(() => [])
+  return rows?.[0] || null
+}
+
+// Fetch the decrypted SMTP password via a SECURITY DEFINER RPC that returns only
+// the caller's own row (see PropertyOps/sql/03_encrypt_smtp_pass_at_rest.sql).
+// Returns null if the RPC isn't deployed yet — the caller then falls back to the
+// plaintext column, so this rollout has no downtime window.
+async function callSecretRpc({ supabaseUrl, anonKey, token, fn }) {
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    if (!r.ok) return null
+    const v = await r.json().catch(() => null)
+    return (typeof v === 'string' && v) ? v : null // RPC returns a scalar text
+  } catch {
+    return null
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,10 +96,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const supabaseUrl =
-      process.env.SUPABASE_URL ||
-      process.env.VITE_SUPABASE_URL ||
-      'https://cxsaeftacozyphuejuxo.supabase.co'
+    const supabaseUrl = resolveSupabaseUrl()
     const supabaseAnonKey =
       process.env.SUPABASE_ANON_KEY ||
       process.env.VITE_SUPABASE_ANON_KEY
@@ -48,70 +114,136 @@ export default async function handler(req, res) {
     if (!authCheck.ok) {
       return res.status(401).json({ error: 'Invalid or expired session' })
     }
+    let userId = null
+    try { userId = (await authCheck.json())?.id || null } catch (e) {}
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid or expired session' })
+    }
     // --- End auth check ---
 
-    const { to, subject, html, text, fromName, replyTo, attachments, smtp, requireSmtp } = req.body || {}
+    // --- Authorization: caller must hold an active product_members row ---
+    // Closes the open-relay: a valid-token-but-not-a-customer account (or a
+    // suspended one) can NOT send — least of all from the shared Alzaro domain.
+    // Read with the caller's own token; RLS returns only their membership rows.
+    let isMember = false
+    try {
+      const mUrl =
+        `${supabaseUrl}/rest/v1/product_members` +
+        `?user_id=eq.${encodeURIComponent(userId)}` +
+        `&status=in.(active,trial,trialing)&select=id&limit=1`
+      const mRes = await fetch(mUrl, { headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${token}` } })
+      if (mRes.ok) {
+        const rows = await mRes.json().catch(() => [])
+        isMember = Array.isArray(rows) && rows.length > 0
+      }
+    } catch (e) { /* fail closed below */ }
+    if (!isMember) {
+      return res.status(403).json({ error: 'Your account is not active. Email sending is disabled.' })
+    }
+    // --- End authorization ---
+
+    // --- Per-user rate limit ---
+    const rl = rateLimit(`send:${userId}`, { max: 30, windowMs: 10 * 60 * 1000 })
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(rl.retryAfter))
+      return res.status(429).json({ error: 'Too many emails sent recently — please wait a little and try again.' })
+    }
+    // --- End rate limit ---
+
+    const { to, subject, html, text, fromName, replyTo, attachments, product, requireSmtp } = req.body || {}
     if (!to || !subject || (!html && !text)) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, html/text' })
     }
-
-    // Multi-company guard: when the caller requires SMTP (e.g. PropertyOps
-    // invoices, where each company must send from its OWN address), refuse to
-    // fall back to Alzaro's shared Resend address. A company's invoice must
-    // never go out branded as invoices@alzaro.co.uk.
-    if (requireSmtp && !(smtp && smtp.host && smtp.user && smtp.pass)) {
-      return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+    // Never trust `to`/`fromName` blindly: validate the recipient and strip any
+    // header-injection characters from the display name.
+    if (!isValidEmail(to)) {
+      return res.status(400).json({ error: 'Recipient email address looks invalid.' })
     }
+    const recipient = String(to).trim()
+    const safeFromName = sanitizeHeader(fromName)
 
-    // --- Path 1: user's own SMTP (send FROM their address) ---
-    // Only taken when host, user and pass are all present. Anything missing or
-    // a connection failure falls through to Resend below, so a send never
-    // silently fails just because SMTP was misconfigured.
-    if (smtp && smtp.host && smtp.user && smtp.pass) {
+    // ========================================================================
+    // Path 1: own-domain SMTP (credentials resolved SERVER-SIDE, never trusted
+    // from the body). Taken when the caller asks for it via requireSmtp + a
+    // product that has server-side SMTP wired up.
+    // ========================================================================
+    if (requireSmtp) {
+      const map = product && SMTP_PRODUCTS[String(product)]
+      if (!map) {
+        // Fail closed: we will NOT fall back to the shared Alzaro address for a
+        // requireSmtp request — that's the whole point of requireSmtp.
+        return res.status(400).json({ error: 'Email sending is not configured for this product.' })
+      }
+      const cfg = await readOwnSettings({
+        supabaseUrl, anonKey: supabaseAnonKey, token,
+        table: map.table, userId, cols: SMTP_COLS,
+      })
+      if (!cfg || !cfg.smtp_host || !cfg.smtp_user) {
+        return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+      }
+      // Password: prefer the encrypted-at-rest value via the decrypt RPC; fall
+      // back to the plaintext column when the encryption migration isn't in place
+      // yet (keeps the rollout seamless). Never accepted from the request body.
+      let smtpPass = null
+      if (map.secretRpc) {
+        smtpPass = await callSecretRpc({ supabaseUrl, anonKey: supabaseAnonKey, token, fn: map.secretRpc })
+      }
+      if (!smtpPass) smtpPass = cfg.smtp_pass || null
+      if (!smtpPass) {
+        return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+      }
+
+      // SSRF guard: refuse private/loopback/link-local targets; connect by a
+      // validated public IP with TLS pinned to the real hostname.
+      let addr
+      try {
+        addr = await resolveSafeAddress(cfg.smtp_host)
+      } catch {
+        return res.status(422).json({ error: 'Could not send — check your email server settings in Settings → Email.' })
+      }
+
       try {
         const transporter = nodemailer.createTransport({
-          host: smtp.host,
-          port: Number(smtp.port) || 587,
-          secure: smtp.secure === true || smtp.secure === 'true', // 465 = SSL, 587 = STARTTLS
-          auth: { user: smtp.user, pass: smtp.pass },
+          host: addr.ip,
+          port: Number(cfg.smtp_port) || 587,
+          secure: cfg.smtp_secure === true || cfg.smtp_secure === 'true',
+          auth: { user: cfg.smtp_user, pass: smtpPass },
           connectionTimeout: 10000,
           greetingTimeout: 10000,
+          tls: addr.servername ? { servername: addr.servername } : undefined,
         })
-        const fromEmail = smtp.fromEmail || smtp.user
+        const fromEmail = cfg.smtp_from_email || cfg.smtp_user
+        const fromDisplay = safeFromName || sanitizeHeader(cfg.smtp_from_name) || fromEmail
         const info = await transporter.sendMail({
-          from: `"${fromName || smtp.fromName || fromEmail}" <${fromEmail}>`,
-          to,
+          from: `"${fromDisplay}" <${fromEmail}>`,
+          to: recipient,
           subject,
           html: html || undefined,
           text: text || undefined,
-          replyTo: replyTo || smtp.replyTo || undefined,
+          replyTo: (typeof replyTo === 'string' && isValidEmail(replyTo)) ? replyTo
+            : (cfg.smtp_reply_to && isValidEmail(cfg.smtp_reply_to)) ? cfg.smtp_reply_to
+            : undefined,
           attachments: (Array.isArray(attachments) && attachments.length)
             ? attachments.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64' }))
             : undefined,
         })
         return res.status(200).json({ success: true, id: info.messageId, via: 'smtp' })
       } catch (err) {
-        // Translate common SMTP failures; do NOT fall back to Resend here —
-        // the user explicitly configured their own email, so a silent switch to
-        // Alzaro's address would be misleading. Return a clear reason instead.
-        let reason = err.message || 'SMTP send failed'
-        const code = err.code || ''
-        const responseCode = err.responseCode
-        if (code === 'EAUTH' || responseCode === 535) {
-          reason = 'Your email login was rejected. Gmail and Outlook require an "app password" here, not your normal password. Check Settings → Email.'
-        } else if (code === 'EDNS' || code === 'ENOTFOUND') {
-          reason = `Could not find your mail server "${smtp.host}" — check the SMTP host in Settings → Email.`
-        } else if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION') {
-          reason = `Could not connect to ${smtp.host}:${smtp.port || 587} — check the port and security setting in Settings → Email.`
-        } else if (responseCode === 550 || responseCode === 553) {
-          reason = 'Your mail server refused the sender address — the "from" email must match the account you logged in with.'
-        }
-        console.error('send-email SMTP path failed:', code, responseCode, err.message)
-        return res.status(422).json({ error: reason, detail: err.message, via: 'smtp' })
+        // GENERIC reason only — do not differentiate EAUTH / ENOTFOUND /
+        // ETIMEDOUT etc., so this can't be used as a host-reachability oracle.
+        console.error('send-email SMTP path failed:', err.code, err.responseCode, err.message)
+        return res.status(422).json({
+          error: 'Could not send the email. Check your email server host, port, security setting, username and password in Settings → Email.',
+          via: 'smtp',
+        })
       }
     }
     // --- End Path 1 ---
 
+    // ========================================================================
+    // Path 2: Resend fallback (shared invoices@alzaro.co.uk). Reached only after
+    // the membership check above, so it is no longer an open relay.
+    // ========================================================================
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
       return res.status(500).json({ error: 'RESEND_API_KEY not set on server' })
@@ -124,21 +256,21 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName || 'Alzaro TyreOps'} <invoices@alzaro.co.uk>`,
-        to: [to],
+        from: `${safeFromName || defaultSender(product)} <invoices@alzaro.co.uk>`,
+        to: [recipient],
         subject,
         html: html || undefined,
         text: text || undefined,
-        reply_to: replyTo || undefined,
-        // Optional attachments: [{ filename, content }] where content is base64.
-        // Absent for all existing callers (TyreOps/GarageOps) — behaviour unchanged.
+        reply_to: (typeof replyTo === 'string' && isValidEmail(replyTo)) ? replyTo : undefined,
         attachments: (Array.isArray(attachments) && attachments.length) ? attachments : undefined,
       }),
     })
     const data = await response.json()
     if (!response.ok) {
       console.error('Resend error:', data)
-      // Translate common Resend failures into plain English so users see a real reason.
+      // Translate common Resend failures into plain English. (These concern
+      // Alzaro's own fixed Resend service, not an arbitrary user-supplied host,
+      // so they are not a reachability oracle.)
       const raw = data.message || data.error || 'Resend API error'
       const name = data.name || ''
       const lower = String(raw).toLowerCase()
@@ -146,7 +278,7 @@ export default async function handler(req, res) {
       if (name === 'validation_error' && lower.includes('domain')) {
         reason = 'Your sending domain (alzaro.co.uk) is not verified in Resend, or this address is not allowed yet. Check the domain is verified in the Resend dashboard.'
       } else if (name === 'validation_error' && (lower.includes('to') || lower.includes('recipient') || lower.includes('email'))) {
-        reason = `The recipient address looks invalid — check "${to}" for typos.`
+        reason = `The recipient address looks invalid — check "${recipient}" for typos.`
       } else if (response.status === 401 || name === 'unauthorized' || lower.includes('api key')) {
         reason = 'Email service rejected the API key. RESEND_API_KEY may be missing or wrong in the server settings.'
       } else if (response.status === 429 || name === 'rate_limit_exceeded' || lower.includes('rate limit')) {

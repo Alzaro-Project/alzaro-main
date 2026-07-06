@@ -67,7 +67,7 @@ function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onC
             <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Upgrade to unlock</div>
           </>
         ) : (<>
-          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color }}>{value}</div>
+          <div style={{ fontSize: 26, fontWeight: 600, marginTop: 8, marginBottom: 2, color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
           {sub && <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)" }}>{sub}</div>}
         </>)}
       </>)}
@@ -182,8 +182,10 @@ export function DashboardPage({ range, go, user, tier }) {
     ]).then(([p, c, pay, mt, tn]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
     // Has this company set up their own sending email yet? Invoices require it
     // (they must come from the company's address, not Alzaro's), so nudge if not.
-    db.from("prop_settings").select("smtp_host, smtp_user, smtp_pass").eq("user_id", user.id)
-      .then(({ data: s }) => { const r = s && s[0]; setNeedsEmail(!(r && r.smtp_host && r.smtp_user && r.smtp_pass)); });
+    // Presence check only — never pull smtp_pass into the browser. Host + user
+    // present means email is set up (the server holds/verifies the password).
+    db.from("prop_settings").select("smtp_host, smtp_user").eq("user_id", user.id)
+      .then(({ data: s }) => { const r = s && s[0]; setNeedsEmail(!(r && r.smtp_host && r.smtp_user)); });
   }, []);
 
   if (!data) return <div className="fade-in" style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading your portfolio…</div>;
@@ -224,9 +226,6 @@ export function DashboardPage({ range, go, user, tier }) {
     .map((t) => ({ kind: "tenancy", id: "t" + t.id, days: Math.round((new Date(t.tenancy_end) - today) / 864e5), label: "Tenancy ends · " + (t.name || "Tenant"), sub: t.property || "—", icon: "ti-calendar-event", page: "tenants" }))
     .filter((t) => t.days <= 60);
   const expiringSoon = [...(canCompliance ? certItems : []), ...tenancyItems].sort((a, b) => a.days - b.days).slice(0, 6);
-  const name = user ? user.email.split("@")[0] : "there";
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
     <div className="fade-in">
@@ -536,7 +535,6 @@ export function CompliancePage({ user, go }) {
 
   useEffect(() => {
     if (!DB_READY) {
-      const today = new Date();
       setRows([]);
       return;
     }
