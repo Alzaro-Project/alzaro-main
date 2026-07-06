@@ -180,3 +180,23 @@ export function buildReport(name, d) {
       return null; // not yet wired
   }
 }
+
+
+// ===== FRIENDLY ERRORS =====
+// Turns raw Supabase/Postgres error text into calm, human copy while keeping
+// the technical detail in the console for debugging. Falls back to a generic
+// line for anything unrecognised, so users never see raw schema/SQL text.
+export function friendlyError(err, context) {
+  const raw = (err && (err.message || err.error_description || err.msg)) || String(err || "");
+  try { console.error("[PropertyOps]" + (context ? " " + context : ""), err); } catch (e) {}
+  const m = raw.toLowerCase();
+  if (m.includes("duplicate key") || m.includes("already exists")) return "That already exists — it looks like a duplicate.";
+  if (m.includes("foreign key") || m.includes("violates foreign key")) return "This is linked to another record, so it can't be changed or removed yet.";
+  if (m.includes("not-null") || m.includes("null value")) return "Please fill in all the required fields.";
+  if (m.includes("row-level security") || m.includes("permission denied") || m.includes("rls")) return "You don't have permission to do that.";
+  if (m.includes("jwt") || m.includes("token") || m.includes("session")) return "Your session has expired — please sign in again.";
+  if (m.includes("failed to fetch") || m.includes("network") || m.includes("timeout")) return "Couldn't reach the server. Check your connection and try again.";
+  if (m.includes("invalid input") || m.includes("invalid text representation")) return "One of the values doesn't look right — please check and try again.";
+  // Unknown: keep it short and generic rather than leaking SQL/schema text.
+  return context ? `Something went wrong ${context}. Please try again.` : "Something went wrong. Please try again.";
+}
