@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner, useConfirm } from "../components/UI.jsx";
-import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus, friendlyError } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
@@ -329,7 +329,7 @@ export function PropertiesPage({ user, go, tier }) {
     if (!DB_READY) { setRows([]); return; }
     db.from("prop_properties").select("*").order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) { setErr(error.message); setRows([]); }
+        if (error) { setErr(friendlyError(error, "loading data")); setRows([]); }
         else setRows(data || []);
       });
     Promise.all([
@@ -383,7 +383,7 @@ export function PropertiesPage({ user, go, tier }) {
       ({ error } = await db.from("prop_properties").insert([{ ...payload, score: 100, user_id: user.id }]));
     }
     savingRef.current = false; setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
@@ -427,8 +427,8 @@ export function PropertiesPage({ user, go, tier }) {
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 10 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Address<input style={inp} placeholder="e.g. 14 Oak Street" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Area<input style={inp} placeholder="e.g. Manchester" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} /></label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "HMO", "Block"].map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Type<select style={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{["House", "Flat", "Bungalow", "HMO", "Block", "Commercial"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Let", "Vacant", "Sale agreed"].map((x) => <option key={x}>{x}</option>)}</select></label>
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Rent (£ pcm)<input style={inp} type="number" min="0" placeholder="e.g. 1250" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" }}>Invoice day
               <select style={inp} value={manualDay ? "manual" : (["", "1", "15", "31"].includes(String(form.invoice_day)) ? (String(form.invoice_day) || "") : "manual")} onChange={(e) => { const v = e.target.value; if (v === "manual") { setManualDay(true); } else { setManualDay(false); setForm({ ...form, invoice_day: v }); } }}>
@@ -542,7 +542,7 @@ export function CompliancePage({ user, go }) {
     }
     // Only show live (not soft-deleted) certificates in the main timeline.
     db.from("prop_compliance").select("*").is("deleted_at", null)
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+      .then(({ data, error }) => { if (error) { setErr(friendlyError(error, "loading data")); setRows([]); } else setRows(data); });
     Promise.all([db.from("prop_tenants").select("*"), db.from("prop_maintenance").select("*")])
       .then(([t, m]) => setRelated({ tenants: t.data || [], maint: m.data || [] }));
   }, []);
@@ -577,7 +577,7 @@ export function CompliancePage({ user, go }) {
     if (editId) ({ error } = await db.from("prop_compliance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_compliance").insert([{ ...payload, user_id: user.id }]));
     savingRef.current = false; setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
@@ -778,7 +778,7 @@ export function TenantsPage({ user, go, tier }) {
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
     db.from("prop_tenants").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+      .then(({ data, error }) => { if (error) { setErr(friendlyError(error, "loading data")); setRows([]); } else setRows(data); });
     Promise.all([
       db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"), db.from("prop_payments").select("*"),
     ]).then(([c, m, p]) => setRelated({ comp: c.data || [], maint: m.data || [], pays: p.data || [] }));
@@ -842,7 +842,7 @@ export function TenantsPage({ user, go, tier }) {
     } else {
       ({ error } = await db.from("prop_tenants").insert([{ ...payload, user_id: user.id }]));
     }
-    if (error) { savingRef.current = false; setSaving(false); setErr(error.message); return; }
+    if (error) { savingRef.current = false; setSaving(false); setErr(friendlyError(error)); return; }
     // If this tenant is assigned to a property that isn't already Let, mark it Let.
     if (form.property_id && DB_READY) {
       const { data: prop } = await db.from("prop_properties").select("status").eq("id", form.property_id).maybeSingle();
