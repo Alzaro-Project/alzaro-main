@@ -182,8 +182,10 @@ export function DashboardPage({ range, go, user, tier }) {
     ]).then(([p, c, pay, mt, tn]) => setData({ props: p.data || [], comp: c.data || [], pays: pay.data || [], maint: mt.data || [], tenants: tn.data || [] }));
     // Has this company set up their own sending email yet? Invoices require it
     // (they must come from the company's address, not Alzaro's), so nudge if not.
-    db.from("prop_settings").select("smtp_host, smtp_user, smtp_pass").eq("user_id", user.id)
-      .then(({ data: s }) => { const r = s && s[0]; setNeedsEmail(!(r && r.smtp_host && r.smtp_user && r.smtp_pass)); });
+    // Presence check only — never pull smtp_pass into the browser. Host + user
+    // present means email is set up (the server holds/verifies the password).
+    db.from("prop_settings").select("smtp_host, smtp_user").eq("user_id", user.id)
+      .then(({ data: s }) => { const r = s && s[0]; setNeedsEmail(!(r && r.smtp_host && r.smtp_user)); });
   }, []);
 
   if (!data) return <div className="fade-in" style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading your portfolio…</div>;

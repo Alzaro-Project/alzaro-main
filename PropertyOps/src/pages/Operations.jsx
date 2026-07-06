@@ -209,13 +209,18 @@ function PaymentEmailModal({ payment, tenant, propName, user, onClose, onSent })
     const build = async () => {
       let biz = "Alzaro PropertyOps";
       if (DB_READY) {
-        const { data: s } = await db.from("prop_settings").select("company_name, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, smtp_from_name, smtp_from_email, smtp_reply_to").eq("user_id", user.id);
+        // NOTE: we deliberately do NOT read smtp_pass into the browser. The
+        // password stays server-side; /api/send-email resolves it from
+        // prop_settings by the authenticated user_id. Here we only need the
+        // non-secret fields to know email is configured and to show the sender.
+        const { data: s } = await db.from("prop_settings").select("company_name, smtp_host, smtp_user, smtp_from_email, smtp_reply_to").eq("user_id", user.id);
         if (s && s.length) {
           if (s[0].company_name) biz = s[0].company_name;
-          // Only treat SMTP as usable when host + user + pass are all present.
+          // Treat SMTP as configured when host + user are present (the server
+          // verifies the stored password exists at send time).
           const r = s[0];
-          if (r.smtp_host && r.smtp_user && r.smtp_pass) {
-            setSmtp({ host: r.smtp_host, port: r.smtp_port || 587, secure: !!r.smtp_secure, user: r.smtp_user, pass: r.smtp_pass, fromName: r.smtp_from_name || biz, fromEmail: r.smtp_from_email || r.smtp_user, replyTo: r.smtp_reply_to || "" });
+          if (r.smtp_host && r.smtp_user) {
+            setSmtp({ user: r.smtp_user, fromEmail: r.smtp_from_email || r.smtp_user, replyTo: r.smtp_reply_to || "" });
           }
         }
       }
@@ -257,7 +262,9 @@ ${biz}`
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName, replyTo: smtp?.replyTo || undefined, smtp: smtp || undefined, requireSmtp: true }),
+        // No SMTP credentials in the body — the server resolves them from
+        // prop_settings by our authenticated user_id. product tells it which.
+        body: JSON.stringify({ to: to.trim(), subject, html, text: body, fromName: bizName, replyTo: smtp?.replyTo || undefined, product: "propertyops", requireSmtp: true }),
       });
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
@@ -1318,7 +1325,9 @@ export function SettingsPage({ user }) {
 
   useEffect(() => {
     if (!DB_READY) { setLoaded(true); return; }
-    db.from("prop_settings").select("*").eq("user_id", user.id)
+    // Explicit column list that OMITS smtp_pass — the SMTP password must never
+    // be sent back to the browser. It stays server-side (see /api/send-email).
+    db.from("prop_settings").select("company_name,vat_number,address,city,postcode,phone,business_email,website,logo_url,notify_compliance,notify_rent,reminder_lead,smtp_provider,smtp_host,smtp_port,smtp_secure,smtp_user,smtp_from_name,smtp_from_email,smtp_reply_to,vat_scheme,flat_rate").eq("user_id", user.id)
       .then(({ data, error }) => {
         const row = !error && data && data.length ? data[0] : null;
         if (row) {
@@ -1334,7 +1343,7 @@ export function SettingsPage({ user }) {
             smtp_port: row.smtp_port || 587,
             smtp_secure: row.smtp_secure === true,
             smtp_user: row.smtp_user || "",
-            smtp_pass: row.smtp_pass || "",
+            smtp_pass: "", // never loaded from the DB; blank = keep stored password
             smtp_from_name: row.smtp_from_name || "",
             smtp_from_email: row.smtp_from_email || "",
             smtp_reply_to: row.smtp_reply_to || "",
@@ -1363,10 +1372,14 @@ export function SettingsPage({ user }) {
       logo_url: org.logo_url,
       notify_compliance: notif.notify_compliance, notify_rent: notif.notify_rent, reminder_lead: notif.reminder_lead,
       smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_port: email.smtp_port, smtp_secure: email.smtp_secure,
-      smtp_user: email.smtp_user, smtp_pass: email.smtp_pass, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
+      smtp_user: email.smtp_user, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
       vat_scheme: vat.vat_scheme, flat_rate: vat.flat_rate,
       updated_at: new Date().toISOString(),
     };
+    // The password field is write-only: blank means "keep the stored password"
+    // (we never load it into the browser), so only write it when the user
+    // actually typed a new one — otherwise an omitted key preserves the old value.
+    if (email.smtp_pass) record.smtp_pass = email.smtp_pass;
     // upsert, then read back to confirm it actually persisted
     const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
     if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
@@ -1410,7 +1423,7 @@ export function SettingsPage({ user }) {
   // Tests the SMTP details for real against the shared /api/test-smtp endpoint
   const testSmtp = async () => {
     if (!email.smtp_host || !email.smtp_user || !email.smtp_pass) {
-      setSmtpTest("error"); setSmtpTestMsg("Fill in the SMTP host, username and password first.");
+      setSmtpTest("error"); setSmtpTestMsg("Enter the SMTP host, username and password to run a test. (For security the saved password isn't shown — re-enter it here to test.)");
       return;
     }
     setSmtpTest("testing"); setSmtpTestMsg("");
@@ -1589,7 +1602,7 @@ export function SettingsPage({ user }) {
               <div><label style={lbl}>Username / Email</label><input style={inp} value={email.smtp_user} onChange={(e) => setEmail({ ...email, smtp_user: e.target.value })} placeholder="you@yourdomain.com" /></div>
               <div><label style={lbl}>Password / API key</label>
                 <div style={{ position: "relative" }}>
-                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="••••••••••••" />
+                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Leave blank to keep current password" />
                   <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
                 </div>
                 {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
