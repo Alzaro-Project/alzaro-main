@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
-import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus } from "../lib/helpers.js";
+import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus, friendlyError } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // Reusable centered popup for quick-add forms (tenant/property in Finance).
@@ -48,7 +48,7 @@ export function MaintenancePage({ user, go }) {
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
     db.from("prop_maintenance").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+      .then(({ data, error }) => { if (error) { setErr(friendlyError(error, "loading data")); setRows([]); } else setRows(data); });
   }, []);
 
   const refresh = async () => {
@@ -70,7 +70,7 @@ export function MaintenancePage({ user, go }) {
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]));
     savingRef.current = false; setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
@@ -381,7 +381,7 @@ export function FinancePage({ user, go }) {
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
     db.from("prop_payments").select("*").order("due_date", { ascending: false })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+      .then(({ data, error }) => { if (error) { setErr(friendlyError(error, "loading data")); setRows([]); } else setRows(data); });
     Promise.all([
       db.from("prop_tenants").select("*"), db.from("prop_compliance").select("*"), db.from("prop_maintenance").select("*"),
     ]).then(([t, c, m]) => setRelated({ tenants: t.data || [], comp: c.data || [], maint: m.data || [] }));
@@ -504,7 +504,7 @@ export function FinancePage({ user, go }) {
     if (editId) ({ error } = await db.from("prop_payments").update(payload).eq("id", editId));
     else ({ error } = await db.from("prop_payments").insert([{ ...payload, user_id: user.id }]));
     savingRef.current = false; setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
@@ -563,7 +563,7 @@ export function FinancePage({ user, go }) {
     }]);
     raisingRef.current = false;
     setRaising(null);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     // Confirm it landed in the ledger — raising moves a projected invoice into
     // the real payment list (visible under All / Sent), so the row leaving the
     // Future tab is expected, not "nothing happening".
@@ -612,7 +612,8 @@ const data = rows || [];
   const ActionBtn = ({ icon, title, onClick, tone }) => {
     const bg = tone === "green" ? "var(--green-soft)" : tone === "red" ? "var(--red-soft)" : tone === "brand" ? "var(--brand-soft)" : "var(--panel-2)";
     const col = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : tone === "brand" ? "var(--brand)" : "var(--txt-3)";
-    return <span onClick={(e) => { e.stopPropagation(); onClick(); }} title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, cursor: "pointer", color: col, background: bg, border: "0.5px solid var(--line)" }}><i className={`ti ${icon}`} style={{ fontSize: 14 }} /></span>;
+    const sz = isMobile ? 36 : 28;
+    return <span onClick={(e) => { e.stopPropagation(); onClick(); }} title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: sz, height: sz, borderRadius: 6, cursor: "pointer", color: col, background: bg, border: "0.5px solid var(--line)" }}><i className={`ti ${icon}`} style={{ fontSize: isMobile ? 16 : 14 }} /></span>;
   };
 
   return (
@@ -897,7 +898,7 @@ export function DocumentsPage({ user }) {
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
     db.from("prop_documents").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => { if (error) { setErr(error.message); setRows([]); } else setRows(data); });
+      .then(({ data, error }) => { if (error) { setErr(friendlyError(error, "loading data")); setRows([]); } else setRows(data); });
   }, []);
 
   const refresh = async () => {
@@ -917,7 +918,7 @@ export function DocumentsPage({ user }) {
       const { error: dbErr } = await db.from("prop_documents").insert([{ name: file.name, category: pickCat, file_path: path, size_kb: Math.round(file.size / 1024), property_id: pickProp || null, user_id: user.id }]);
       if (dbErr) throw dbErr;
       await refresh();
-    } catch (e2) { setErr(e2.message || "Upload failed"); }
+    } catch (e2) { setErr(friendlyError(e2, "uploading the file")); }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -925,7 +926,7 @@ export function DocumentsPage({ user }) {
   const download = async (d) => {
     if (!d.file_path || !DB_READY) return;
     const { data, error } = await db.storage.from("documents").createSignedUrl(d.file_path, 60);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     window.open(data.signedUrl, "_blank");
   };
 
@@ -933,7 +934,7 @@ export function DocumentsPage({ user }) {
     if (!d.file_path || !DB_READY) { setErr("No file to preview."); return; }
     setErr("");
     const { data, error } = await db.storage.from("documents").createSignedUrl(d.file_path, 300);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(error)); return; }
     const ext = (d.name.split(".").pop() || "").toLowerCase();
     const kind = ["pdf"].includes(ext) ? "pdf" : ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext) ? "image" : "other";
     setPreview({ ...d, url: data.signedUrl, kind });
