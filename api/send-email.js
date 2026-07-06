@@ -29,7 +29,7 @@ import { resolveSafeAddress, rateLimit, isValidEmail, sanitizeHeader } from './_
 // Only PropertyOps sends its own-domain SMTP today. To add another vertical,
 // map it to its settings table here (its SMTP columns must match this shape).
 const SMTP_PRODUCTS = {
-  propertyops: { table: 'prop_settings' },
+  propertyops: { table: 'prop_settings', secretRpc: 'prop_smtp_secret' },
 }
 
 const SMTP_COLS = 'smtp_host,smtp_port,smtp_secure,smtp_user,smtp_pass,smtp_from_name,smtp_from_email,smtp_reply_to'
@@ -52,6 +52,25 @@ async function readOwnSettings({ supabaseUrl, anonKey, token, table, userId, col
   if (!r.ok) return null
   const rows = await r.json().catch(() => [])
   return rows?.[0] || null
+}
+
+// Fetch the decrypted SMTP password via a SECURITY DEFINER RPC that returns only
+// the caller's own row (see PropertyOps/sql/03_encrypt_smtp_pass_at_rest.sql).
+// Returns null if the RPC isn't deployed yet — the caller then falls back to the
+// plaintext column, so this rollout has no downtime window.
+async function callSecretRpc({ supabaseUrl, anonKey, token, fn }) {
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    if (!r.ok) return null
+    const v = await r.json().catch(() => null)
+    return (typeof v === 'string' && v) ? v : null // RPC returns a scalar text
+  } catch {
+    return null
+  }
 }
 
 export default async function handler(req, res) {
@@ -149,7 +168,18 @@ export default async function handler(req, res) {
         supabaseUrl, anonKey: supabaseAnonKey, token,
         table: map.table, userId, cols: SMTP_COLS,
       })
-      if (!cfg || !cfg.smtp_host || !cfg.smtp_user || !cfg.smtp_pass) {
+      if (!cfg || !cfg.smtp_host || !cfg.smtp_user) {
+        return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+      }
+      // Password: prefer the encrypted-at-rest value via the decrypt RPC; fall
+      // back to the plaintext column when the encryption migration isn't in place
+      // yet (keeps the rollout seamless). Never accepted from the request body.
+      let smtpPass = null
+      if (map.secretRpc) {
+        smtpPass = await callSecretRpc({ supabaseUrl, anonKey: supabaseAnonKey, token, fn: map.secretRpc })
+      }
+      if (!smtpPass) smtpPass = cfg.smtp_pass || null
+      if (!smtpPass) {
         return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
       }
 
@@ -167,7 +197,7 @@ export default async function handler(req, res) {
           host: addr.ip,
           port: Number(cfg.smtp_port) || 587,
           secure: cfg.smtp_secure === true || cfg.smtp_secure === 'true',
-          auth: { user: cfg.smtp_user, pass: cfg.smtp_pass },
+          auth: { user: cfg.smtp_user, pass: smtpPass },
           connectionTimeout: 10000,
           greetingTimeout: 10000,
           tls: addr.servername ? { servername: addr.servername } : undefined,
