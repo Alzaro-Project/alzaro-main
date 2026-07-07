@@ -1410,7 +1410,13 @@ export function SettingsPage({ user }) {
     // The password field is write-only: blank means "keep the stored password"
     // (we never load it into the browser), so only write it when the user
     // actually typed a new one — otherwise an omitted key preserves the old value.
-    if (email.smtp_pass) record.smtp_pass = email.smtp_pass;
+    // Normalise before saving: trim stray whitespace, and for Gmail strip ALL
+    // spaces — Google displays App Passwords as "xxxx xxxx xxxx xxxx" but the
+    // real password is the 16 characters only; saving the spaces makes Gmail
+    // reject the login (EAUTH 535) with no obvious reason why.
+    const typedPass = (email.smtp_pass || "").trim();
+    const cleanPass = email.smtp_provider === "gmail" ? typedPass.replace(/\s+/g, "") : typedPass;
+    if (cleanPass) record.smtp_pass = cleanPass;
     // upsert, then read back to confirm it actually persisted
     const { error: upErr } = await db.from("prop_settings").upsert(record, { onConflict: "user_id" });
     if (upErr) { setSaving(false); setErr("Couldn't save: " + upErr.message); return; }
@@ -1466,7 +1472,7 @@ export function SettingsPage({ user }) {
       const res = await fetch("/api/test-smtp", {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: email.smtp_pass, fromName: email.smtp_from_name || org.company_name || "" }),
+        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: (email.smtp_provider === "gmail" ? email.smtp_pass.replace(/\s+/g, "") : email.smtp_pass.trim()), fromName: email.smtp_from_name || org.company_name || "" }),
       });
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
