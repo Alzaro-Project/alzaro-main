@@ -192,6 +192,18 @@ export default async function handler(req, res) {
       if (!smtpPass) {
         return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
       }
+      // Gmail-only normalisation: Google displays App Passwords as
+      // "xxxx xxxx xxxx xxxx" and users paste them that way. Newer app builds
+      // strip the spaces on save, but rows saved by older builds may still hold
+      // them — Gmail then rejects the login (EAUTH 535). Stripping here makes
+      // those rows work without a re-save. Scoped to Google hosts only so a
+      // legitimately space-containing password on another provider is untouched.
+      {
+        const hostLc = String(cfg.smtp_host || '').trim().toLowerCase()
+        if (hostLc.endsWith('gmail.com') || hostLc.endsWith('googlemail.com')) {
+          smtpPass = String(smtpPass).replace(/\s+/g, '')
+        }
+      }
 
       // SSRF guard: refuse private/loopback/link-local targets; connect by a
       // validated public IP with TLS pinned to the real hostname.
