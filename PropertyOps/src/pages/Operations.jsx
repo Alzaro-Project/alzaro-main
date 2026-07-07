@@ -1324,36 +1324,51 @@ export function SettingsPage({ user }) {
     { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
   ];
 
+  // Apply a loaded settings row to the form state. Kept as a helper so both the
+  // strict-select and the resilient fallback path populate identically.
+  const applySettingsRow = (row) => {
+    setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "", address: row.address || "", city: row.city || "", postcode: row.postcode || "", phone: row.phone || "", business_email: row.business_email || "", website: row.website || "", logo_url: row.logo_url || "" });
+    setNotif({
+      notify_compliance: row.notify_compliance !== false,
+      notify_rent: row.notify_rent !== false,
+      reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
+    });
+    setEmail({
+      smtp_provider: row.smtp_provider || "custom",
+      smtp_host: row.smtp_host || "",
+      smtp_port: row.smtp_port || 587,
+      smtp_secure: row.smtp_secure === true,
+      smtp_user: row.smtp_user || "",
+      smtp_pass: "", // never surfaced in the form; blank = keep stored password
+      smtp_from_name: row.smtp_from_name || "",
+      smtp_from_email: row.smtp_from_email || "",
+      smtp_reply_to: row.smtp_reply_to || "",
+    });
+    setVat({
+      vat_scheme: row.vat_scheme || "standard",
+      vat_number: row.vat_number || "",
+      flat_rate: row.flat_rate != null ? row.flat_rate : 16.5,
+    });
+  };
+
   useEffect(() => {
     if (!DB_READY) { setLoaded(true); return; }
     // Explicit column list that OMITS smtp_pass — the SMTP password must never
     // be sent back to the browser. It stays server-side (see /api/send-email).
     db.from("prop_settings").select("company_name,vat_number,address,city,postcode,phone,business_email,website,logo_url,notify_compliance,notify_rent,reminder_lead,smtp_provider,smtp_host,smtp_port,smtp_secure,smtp_user,smtp_from_name,smtp_from_email,smtp_reply_to,vat_scheme,flat_rate").eq("user_id", user.id)
-      .then(({ data, error }) => {
-        const row = !error && data && data.length ? data[0] : null;
+      .then(async ({ data, error }) => {
+        let row = !error && data && data.length ? data[0] : null;
+        // Resilience: if the strict select failed (e.g. a column the app expects
+        // isn't in the table), don't blank the whole form — fall back to select
+        // all columns and populate from whatever exists. We drop smtp_pass so the
+        // password still never lives in the browser.
+        if (error) {
+          try { console.warn("[PropertyOps] settings strict select failed, falling back:", error.message); } catch (e) {}
+          const res = await db.from("prop_settings").select("*").eq("user_id", user.id);
+          if (!res.error && res.data && res.data.length) { row = res.data[0]; if (row) delete row.smtp_pass; }
+        }
         if (row) {
-          setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "", address: row.address || "", city: row.city || "", postcode: row.postcode || "", phone: row.phone || "", business_email: row.business_email || "", website: row.website || "", logo_url: row.logo_url || "" });
-          setNotif({
-            notify_compliance: row.notify_compliance !== false,
-            notify_rent: row.notify_rent !== false,
-            reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
-          });
-          setEmail({
-            smtp_provider: row.smtp_provider || "custom",
-            smtp_host: row.smtp_host || "",
-            smtp_port: row.smtp_port || 587,
-            smtp_secure: row.smtp_secure === true,
-            smtp_user: row.smtp_user || "",
-            smtp_pass: "", // never loaded from the DB; blank = keep stored password
-            smtp_from_name: row.smtp_from_name || "",
-            smtp_from_email: row.smtp_from_email || "",
-            smtp_reply_to: row.smtp_reply_to || "",
-          });
-          setVat({
-            vat_scheme: row.vat_scheme || "standard",
-            vat_number: row.vat_number || "",
-            flat_rate: row.flat_rate != null ? row.flat_rate : 16.5,
-          });
+          applySettingsRow(row);
         } else if (user.user_metadata && user.user_metadata.company_name) {
           setOrg((o) => ({ ...o, company_name: user.user_metadata.company_name }));
         }
