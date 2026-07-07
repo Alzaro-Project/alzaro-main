@@ -1643,7 +1643,12 @@ export function SettingsPage({ user }) {
               <div><label style={lbl}>Username / Email</label><input style={inp} value={email.smtp_user} onChange={(e) => setEmail({ ...email, smtp_user: e.target.value })} placeholder="you@yourdomain.com" autoComplete="off" name="alzaro-smtp-user" data-lpignore="true" data-1p-ignore="true" data-form-type="other" /></div>
               <div><label style={lbl}>Password / API key</label>
                 <div style={{ position: "relative" }}>
-                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Your SMTP password / App Password" autoComplete="new-password" name="alzaro-smtp-secret" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
+                  {/* Deliberately type="text" masked via CSS (-webkit-text-security), NOT
+                      type="password": Chrome force-autofills saved site passwords into
+                      password inputs (ignoring autocomplete hints), silently replacing
+                      the typed App Password with the user's login password. A masked
+                      text input gets no autofill and no "Update password?" prompts. */}
+                  <input style={{ ...inp, paddingRight: 38, WebkitTextSecurity: showPass ? "none" : "disc" }} type="text" spellCheck={false} autoCorrect="off" autoCapitalize="off" value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Your SMTP password / App Password" autoComplete="off" name="alzaro-smtp-secret" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
                   <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
                 </div>
                 {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
