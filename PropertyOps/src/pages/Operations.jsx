@@ -1193,7 +1193,6 @@ export function SettingsPage({ user }) {
   const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
   const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
   const [showPass, setShowPass] = useState(false);
-  const [hasStoredPass, setHasStoredPass] = useState(null); // null = unknown (RPC not answered/deployed), true/false once known
   const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
   const [smtpTestMsg, setSmtpTestMsg] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -1334,17 +1333,17 @@ export function SettingsPage({ user }) {
       notify_rent: row.notify_rent !== false,
       reminder_lead: row.reminder_lead || "30 / 7 days before expiry",
     });
-    setEmail({
+    setEmail((f) => ({
       smtp_provider: row.smtp_provider || "custom",
       smtp_host: row.smtp_host || "",
       smtp_port: row.smtp_port || 587,
       smtp_secure: row.smtp_secure === true,
       smtp_user: row.smtp_user || "",
-      smtp_pass: "", // never surfaced in the form; blank = keep stored password
+      smtp_pass: f.smtp_pass || "", // filled separately by the decrypt RPC (visible-password setting); preserve it whichever loads first
       smtp_from_name: row.smtp_from_name || "",
       smtp_from_email: row.smtp_from_email || "",
       smtp_reply_to: row.smtp_reply_to || "",
-    });
+    }));
     setVat({
       vat_scheme: row.vat_scheme || "standard",
       vat_number: row.vat_number || "",
@@ -1377,18 +1376,20 @@ export function SettingsPage({ user }) {
       });
   }, []);
 
-  // Ask the server whether an SMTP password is stored for this account. The RPC
-  // returns a BOOLEAN only — the password itself never comes to the browser.
-  // Drives the badge under the write-only password field so a blank field isn't
-  // mistaken for "not saved". If the RPC isn't deployed yet, the badge just
-  // doesn't render (hasStoredPass stays null), so this code is safe to ship first.
+  // Load the stored SMTP password into the form so it is VISIBLE in Settings
+  // (owner's choice — replaces the earlier write-only design). The decrypt RPC
+  // returns ONLY the calling user's own password (scoped to auth.uid()), so no
+  // other account's password can ever be read. It remains encrypted at rest;
+  // the field is masked by default with the eye icon to reveal.
   useEffect(() => {
     if (!DB_READY) return;
     try {
-      db.rpc("prop_smtp_has_pass")
-        .then(({ data, error }) => { if (!error && typeof data === "boolean") setHasStoredPass(data); })
+      db.rpc("prop_smtp_secret")
+        .then(({ data, error }) => {
+          if (!error && typeof data === "string" && data) setEmail((f) => ({ ...f, smtp_pass: f.smtp_pass || data }));
+        })
         .catch(() => {});
-    } catch (e) { /* stub client in demo mode has no rpc() */ }
+    } catch (e) { /* demo-mode stub has no rpc() */ }
   }, []);
 
   const saveOrg = async () => {
@@ -1426,10 +1427,9 @@ export function SettingsPage({ user }) {
     const row = check && check.length ? check[0] : null;
     if (!row) { setErr("Save didn't persist — this usually means the prop_settings table is missing the new columns. Re-run the settings SQL in Supabase."); return; }
     setOrg({ company_name: row.company_name || "", vat_number: row.vat_number || "", address: row.address || "", city: row.city || "", postcode: row.postcode || "", phone: row.phone || "", business_email: row.business_email || "", website: row.website || "", logo_url: row.logo_url || "" });
-    // A new SMTP password was just written (it's encrypted server-side on
-    // arrival): clear the write-only field — blank means "keep current" — and
-    // flip the badge so the user can SEE that a password is now stored.
-    if (record.smtp_pass) { setEmail((f) => ({ ...f, smtp_pass: "" })); setHasStoredPass(true); }
+    // Reflect the normalised (space-stripped) password back into the field so
+    // what the user sees is exactly what was stored.
+    if (record.smtp_pass) setEmail((f) => ({ ...f, smtp_pass: record.smtp_pass }));
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
 
@@ -1643,18 +1643,9 @@ export function SettingsPage({ user }) {
               <div><label style={lbl}>Username / Email</label><input style={inp} value={email.smtp_user} onChange={(e) => setEmail({ ...email, smtp_user: e.target.value })} placeholder="you@yourdomain.com" autoComplete="off" name="alzaro-smtp-user" data-lpignore="true" data-1p-ignore="true" data-form-type="other" /></div>
               <div><label style={lbl}>Password / API key</label>
                 <div style={{ position: "relative" }}>
-                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Leave blank to keep current password" autoComplete="new-password" name="alzaro-smtp-secret" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
+                  <input style={{ ...inp, paddingRight: 38 }} type={showPass ? "text" : "password"} value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Your SMTP password / App Password" autoComplete="new-password" name="alzaro-smtp-secret" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
                   <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
                 </div>
-                {/* Truthful stored-state badge: the field above is write-only (the
-                    password never returns to the browser), so without this a
-                    blank field is indistinguishable from "nothing saved". */}
-                {hasStoredPass !== null && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 11, fontWeight: 600, color: hasStoredPass ? "var(--green)" : "var(--amber)" }}>
-                    <i className={`ti ${hasStoredPass ? "ti-circle-check" : "ti-alert-triangle"}`} style={{ fontSize: 12.5, flexShrink: 0 }} />
-                    <span>{hasStoredPass ? "A password is saved for this account (hidden for security). Leave blank to keep it." : "No password saved yet — enter it and press Save changes."}</span>
-                  </div>
-                )}
                 {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, fontSize: 11, color: "var(--txt-3)", lineHeight: 1.45 }}>
                     <i className="ti ti-info-circle" style={{ fontSize: 12.5, marginTop: 1, flexShrink: 0, color: "var(--brand)" }} />
