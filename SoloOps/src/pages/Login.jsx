@@ -1,13 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { signIn, signUp, getAccessId, createAccess, resetPasswordForEmail, signOut } from '../lib/db.js'
-
-const inp = {
-  background: 'var(--surface2)', border: '1px solid var(--border)',
-  borderRadius: '8px', padding: '11px 14px', color: 'var(--text)',
-  fontSize: '14px', outline: 'none', width: '100%'
-}
-const grad = 'linear-gradient(135deg, var(--orange), var(--amber))'
+import { signIn, signUp, getAccess, createAccess, resetPasswordForEmail, signOut } from '../lib/db.js'
+import { inp, grad } from '../components/UI.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -38,7 +32,7 @@ export default function Login() {
       const { data, error: err } = await signIn(email, password)
       if (err) throw err
 
-      const access = await getAccessId(data.user.id)
+      const { data: access } = await getAccess(data.user.id)
       if (!access) {
         if (data.user.user_metadata?.product === 'soloops') {
           // Check the insert: if it fails, going to the dashboard just bounces
@@ -96,7 +90,7 @@ export default function Login() {
 
       if (!signInErr && signInData?.user) {
         const uid = signInData.user.id
-        const existing = await getAccessId(uid)
+        const { data: existing } = await getAccess(uid)
         if (existing) {
           await signOut()
           setSuccess('You already have SoloOps on this account \u2014 just log in.')

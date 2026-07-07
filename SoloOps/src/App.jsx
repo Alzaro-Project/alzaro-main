@@ -79,6 +79,14 @@ function Shell() {
     try { localStorage.setItem('soloops-theme', theme) } catch (e) { /* storage unavailable */ }
   }, [theme])
 
+  // Lock body scroll behind the mobile drawer or an open modal so the page
+  // underneath doesn't scroll away under the overlay.
+  useEffect(() => {
+    const locked = mobileNav || !!modal
+    document.body.style.overflow = locked ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileNav, modal])
+
   useEffect(() => {
     getSession().then((s) => setSession(s || null))
     const sub = onAuthChange((event, s) => {
@@ -559,7 +567,7 @@ function Shell() {
           )}
 
           {view==='documents' && (
-            <Documents uid={uid} invoices={invoices} expenses={expenses} />
+            <Documents uid={uid} />
           )}
 
           {view==='mileage' && (() => {
@@ -585,13 +593,16 @@ function Shell() {
             }
             const downloadReport = () => {
               const rows = [['Date','From','To','Purpose','Miles']]
-              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
+              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', m.purpose||'', m.miles||0]))
               rows.push([])
               rows.push(['Total miles', totalMiles])
               rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
               rows.push(['Over 10,000 miles @ 25p', (over*0.25).toFixed(2)])
               rows.push(['Total claim (GBP)', claim.toFixed(2)])
-              const csv = rows.map(r => r.join(',')).join('\n')
+              // Quote-escape every field so commas/quotes in a location or purpose
+              // can't shift columns.
+              const cell = (c) => { const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s }
+              const csv = rows.map(r => r.map(cell).join(',')).join('\n')
               const blob = new Blob([csv], { type:'text/csv' })
               const a = document.createElement('a')
               a.href = URL.createObjectURL(blob)
@@ -603,7 +614,7 @@ function Shell() {
               <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
                 <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
                 <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
-                <KPI label="Journeys" value={mileage.length} />
+                <KPI label="Journeys" value={fMileage.length} />
               </div>
               <div style={card}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'10px', flexWrap:'wrap' }}>
@@ -669,7 +680,7 @@ function Shell() {
                     <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
                   </div>
                 </div>
-                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
+                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } const { error } = await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash(error ? 'Could not save your rates — please try again' : 'Tax rates saved') }}>Save my rates</button>
                 <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
                 <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
                 <Check ok={invoices.length>0} t="Income recorded" />
@@ -692,7 +703,7 @@ function Shell() {
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
-      {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
+      {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', maxWidth:'calc(100vw - 48px)', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
    </TrialGuard>
   )

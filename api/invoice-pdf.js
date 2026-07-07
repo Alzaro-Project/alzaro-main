@@ -41,14 +41,16 @@ export default async function handler(req, res) {
     const { invoice_id } = req.body || {}
     if (!invoice_id) return res.status(400).json({ error: 'Missing invoice_id' })
 
-    // fetch invoice (RLS ensures it's the caller's)
-    const invoices = await sbSelect(token, anonKey, `soloops_invoices?id=eq.${invoice_id}&select=*`)
+    // fetch invoice (RLS ensures it's the caller's). Encode the id into the
+    // PostgREST filter (same as client_name below) so it can't alter the query.
+    const encInvoiceId = encodeURIComponent(invoice_id)
+    const invoices = await sbSelect(token, anonKey, `soloops_invoices?id=eq.${encInvoiceId}&select=*`)
     const invoice = invoices[0]
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
 
     // line items, settings, and matching client (by name)
     const [lines, settingsRows] = await Promise.all([
-      sbSelect(token, anonKey, `soloops_invoice_lines?invoice_id=eq.${invoice_id}&select=*&order=position.asc`),
+      sbSelect(token, anonKey, `soloops_invoice_lines?invoice_id=eq.${encInvoiceId}&select=*&order=position.asc`),
       sbSelect(token, anonKey, `soloops_settings?select=*&limit=1`),
     ])
     const biz = settingsRows[0] || {}

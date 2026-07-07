@@ -20,11 +20,6 @@ export async function getAccess(uid) {
   return sb
     .from('soloops_access').select('user_id, business_name').eq('user_id', uid).maybeSingle()
 }
-export async function getAccessId(uid) {
-  const { data } = await sb
-    .from('soloops_access').select('user_id').eq('user_id', uid).maybeSingle()
-  return data || null
-}
 export async function createAccess({ user_id, email, business_name }) {
   return sb.from('soloops_access').insert({ user_id, email, business_name })
 }

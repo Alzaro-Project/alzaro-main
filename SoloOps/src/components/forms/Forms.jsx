@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection } from '../UI.jsx'
+import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
 export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
@@ -136,7 +136,6 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
   const subtotal = lines.reduce((s,l)=> s + (Number(l.qty)||0)*(Number(l.unit_price)||0), 0)
   const vat = vatRegistered ? (isFlat ? subtotal*flatRate/100 : subtotal*(Number(vatRate)||0)/100) : 0
   const total = subtotal + vat
-  const fmt = n => '£' + (Number(n)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})
 
   const save = async () => {
     if(!client) return setErr('Please select or add a client')
@@ -263,9 +262,9 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
 
     {/* Totals summary */}
     <div style={{ marginTop:'16px', padding:'14px 16px', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', fontSize:'13px' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}><span>Subtotal</span><span className="mono">{fmt(subtotal)}</span></div>
-      {vatRegistered && <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)', marginTop:'6px' }}><span>VAT {isFlat?`(Flat ${flatRate}%)`:`(${Number(vatRate)||0}%)`}</span><span className="mono">{fmt(vat)}</span></div>}
-      <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--border)', fontSize:'15px' }}><span>Total</span><span className="mono" style={{ color:'var(--orange-light)' }}>{fmt(total)}</span></div>
+      <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}><span>Subtotal</span><span className="mono">{gbp(subtotal)}</span></div>
+      {vatRegistered && <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)', marginTop:'6px' }}><span>VAT {isFlat?`(Flat ${flatRate}%)`:`(${Number(vatRate)||0}%)`}</span><span className="mono">{gbp(vat)}</span></div>}
+      <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--border)', fontSize:'15px' }}><span>Total</span><span className="mono" style={{ color:'var(--orange-light)' }}>{gbp(total)}</span></div>
     </div>
 
     <FormSection>Dates &amp; status</FormSection>
@@ -291,12 +290,8 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
   </Modal>
 }
 
-// NOTE: MileageForm was referenced in the old Dashboard.jsx (modal==='mileage')
-// but never defined there — clicking "+ Log journey" would have thrown
-// "MileageForm is not defined". Reconstructed here to match the soloops_mileage
-// shape (journey_date, start_loc, end_loc, purpose, miles, claim).
-// HMRC AMAP: 45p/mile up to 10,000 miles, 25p after. Confirm this matches any
-// earlier version you had.
+// Logs a journey into soloops_mileage (journey_date, start_loc, end_loc,
+// purpose, miles, claim). HMRC AMAP: 45p/mile up to 10,000 miles, 25p after.
 export function MileageForm({onClose,onSaved,uid,mileage,edit}) {
   const [date,setDate]=useState(edit?.journey_date || new Date().toISOString().slice(0,10))
   const [from,setFrom]=useState(edit?.start_loc||''); const [to,setTo]=useState(edit?.end_loc||'')

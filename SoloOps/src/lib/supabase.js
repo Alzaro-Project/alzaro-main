@@ -11,8 +11,3 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // product_members RLS keys off this header (same as the other verticals).
   global: { headers: { 'x-product': 'soloops' } },
 })
-
-// Some legacy/co-located code still references window.sb — keep it available.
-if (typeof window !== 'undefined') window.sb = sb
-
-export default sb

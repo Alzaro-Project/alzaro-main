@@ -2,7 +2,7 @@ import React from 'react'
 import { card, inp, btnPri, btnSec, fmtDate, Th, Td, Empty, ErrBox } from '../components/UI.jsx'
 import { loadDocuments, insertDocument, deleteDocument, uploadFile, signedUrl, removeFiles } from '../lib/db.js'
 
-export default function Documents({ uid, invoices, expenses }) {
+export default function Documents({ uid }) {
   const [q, setQ] = React.useState('')
   const [files, setFiles] = React.useState([])
   const [loading, setLoading] = React.useState(true)
