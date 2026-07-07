@@ -121,7 +121,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
   useEffect(()=>{
     let alive=true
     if (edit?.id) {
-      loadInvoiceLines(edit.id).then(rows=>{
+      loadInvoiceLines(edit.id).then(({ data: rows })=>{
         if(!alive) return
         if (rows && rows.length) setLines(rows.map(r=>({ description:r.description||'', qty:String(r.qty??'1'), unit_price:String(r.unit_price??'') })))
       })
@@ -178,16 +178,20 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
       invId = data?.id
     }
 
-    // replace-all line items
+    // replace-all line items. supabase-js resolves with { error } rather than
+    // throwing, so these MUST be checked explicitly — otherwise a failed insert
+    // after a successful delete silently wipes the invoice's itemisation.
     if (invId) {
-      try {
-        if (edit) await deleteInvoiceLines(invId)
-        const rows = validLines.map((l,idx)=>({
-          invoice_id:invId, user_id:uid, description:l.description.trim(),
-          qty:Number(l.qty)||0, unit_price:Number(l.unit_price)||0, position:idx
-        }))
-        await insertInvoiceLines(rows)
-      } catch(e){ /* lines best-effort; invoice already saved */ }
+      const rows = validLines.map((l,idx)=>({
+        invoice_id:invId, user_id:uid, description:l.description.trim(),
+        qty:Number(l.qty)||0, unit_price:Number(l.unit_price)||0, position:idx
+      }))
+      if (edit) {
+        const { error: delErr } = await deleteInvoiceLines(invId)
+        if (delErr) { setErr('The income was saved, but its line items could not be updated ('+delErr.message+'). Open it and save again.'); setBusy(false); return }
+      }
+      const { error: insErr } = await insertInvoiceLines(rows)
+      if (insErr) { setErr('The income was saved, but its line items could not be saved ('+insErr.message+'). Open it and save again.'); setBusy(false); return }
     }
 
     let added=null
@@ -238,7 +242,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
 
     <FormSection>Line items</FormSection>
     {lines.map((l,i)=>(
-      <div key={i} style={{ display:'flex', gap:'6px', marginBottom:'6px', alignItems:'flex-start' }}>
+      <div key={i} className="solo-lineitem" style={{ display:'flex', gap:'6px', marginBottom:'6px', alignItems:'flex-start' }}>
         <input style={{...inp, flex:1}} placeholder="Description" value={l.description} onChange={e=>setLine(i,'description',e.target.value)} />
         <input style={{...inp, width:'52px', textAlign:'center'}} type="number" placeholder="Qty" value={l.qty} onChange={e=>setLine(i,'qty',e.target.value)} />
         <input style={{...inp, width:'82px'}} type="number" placeholder="£ each" value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)} />

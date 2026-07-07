@@ -69,9 +69,23 @@ export default async function handler(req, res) {
       } catch { /* ignore logo failures */ }
     }
 
+    // When an invoice has no stored line items, synthesise a single line from
+    // the stored total. invoice.total is VAT-INCLUSIVE, and the PDF builder
+    // re-applies VAT to the line subtotal — so feed it the NET (ex-VAT) amount,
+    // otherwise the fallback total is inflated by the VAT rate twice.
+    let fallbackLines = lines
+    if (!lines.length) {
+      const rate = biz.vat_registered
+        ? (biz.vat_scheme === 'flat_rate' ? Number(biz.flat_rate) || 0 : Number(invoice.vat_rate) || 0)
+        : 0
+      const gross = Number(invoice.total) || 0
+      const net = rate > 0 ? gross / (1 + rate / 100) : gross
+      fallbackLines = [{ description: invoice.client_name ? 'Services' : '', qty: 1, unit_price: net }]
+    }
+
     const pdfBytes = await buildInvoicePdf({
       invoice,
-      lines: lines.length ? lines : [{ description: invoice.client_name ? 'Services' : '', qty: 1, unit_price: invoice.total || 0 }],
+      lines: fallbackLines,
       client,
       biz,
       logoBytes,

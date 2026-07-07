@@ -52,10 +52,11 @@ export default function Receipts({ uid, expenses, onMatched }) {
         const { error: upErr } = await uploadFile(storagePath, fileObj)
         if (upErr) throw upErr
 
-        await insertDocument({
+        const { error: docErr } = await insertDocument({
           user_id: uid, type: 'Receipt', name: fileObj.name,
           storage_path: storagePath, size_bytes: fileObj.size, expense_id: expenseId
         })
+        if (docErr) throw docErr
       }
 
       const { error } = await updateExpenseReceipt(expenseId, fileName || 'receipt')
@@ -68,7 +69,7 @@ export default function Receipts({ uid, expenses, onMatched }) {
 
   return (
     <>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+      <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
         <KPI label="Expenses with receipt" value={withReceipt.length} color="var(--green)" />
         <KPI label="Missing a receipt" value={withoutReceipt.length} color="var(--amber)" />
         <KPI label="Total expenses" value={expenses.length} />

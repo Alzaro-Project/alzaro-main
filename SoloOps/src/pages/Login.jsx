@@ -41,8 +41,11 @@ export default function Login() {
       const access = await getAccessId(data.user.id)
       if (!access) {
         if (data.user.user_metadata?.product === 'soloops') {
-          await createAccess({ email: data.user.email, user_id: data.user.id,
+          // Check the insert: if it fails, going to the dashboard just bounces
+          // straight back here (loadAll finds no access row) with no message.
+          const { error: insErr } = await createAccess({ email: data.user.email, user_id: data.user.id,
             business_name: data.user.user_metadata?.business_name || null })
+          if (insErr) throw insErr
           goDash()
           return
         }

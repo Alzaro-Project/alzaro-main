@@ -69,21 +69,19 @@ export async function joinProduct(businessName) {
 }
 
 // ---------- core data loads ----------
+// Each returns { data, error }. A discarded error made a failed fetch look like
+// a legitimately empty account ("No income yet…"); the caller now checks error.
 export async function loadInvoices() {
-  const { data } = await sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false })
-  return data || []
+  return sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false })
 }
 export async function loadExpenses() {
-  const { data } = await sb.from('soloops_expenses').select('*').order('spent_on', { ascending: false })
-  return data || []
+  return sb.from('soloops_expenses').select('*').order('spent_on', { ascending: false })
 }
 export async function loadMileage() {
-  const { data } = await sb.from('soloops_mileage').select('*').order('journey_date', { ascending: false })
-  return data || []
+  return sb.from('soloops_mileage').select('*').order('journey_date', { ascending: false })
 }
 export async function loadClients() {
-  const { data } = await sb.from('soloops_clients').select('*').order('name', { ascending: true })
-  return data || []
+  return sb.from('soloops_clients').select('*').order('name', { ascending: true })
 }
 
 // ---------- mileage ----------
@@ -116,9 +114,8 @@ export async function deleteInvoice(id) {
 
 // ---------- invoice line items ----------
 export async function loadInvoiceLines(invoice_id) {
-  const { data } = await sb.from('soloops_invoice_lines')
+  return sb.from('soloops_invoice_lines')
     .select('*').eq('invoice_id', invoice_id).order('position', { ascending: true })
-  return data || []
 }
 export async function insertInvoiceLines(rows) {
   if (!rows || !rows.length) return { error: null }

@@ -2,22 +2,9 @@ import React from 'react'
 import { card, inp, btnPri, btnSec } from '../components/UI.jsx'
 import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession } from '../lib/db.js'
 
-// SMTP provider presets (inlined — SoloOps has no lib/email.js)
-const SMTP_PRESETS = {
-  custom:  { label: 'Custom / Other',        host: '',                       port: 587, secure: false },
-  outlook: { label: 'Outlook / Hotmail',     host: 'smtp-mail.outlook.com',  port: 587, secure: false },
-  gmail:   { label: 'Gmail / Google Workspace', host: 'smtp.gmail.com',      port: 587, secure: false },
-  office365: { label: 'Microsoft 365',       host: 'smtp.office365.com',     port: 587, secure: false },
-  zoho:    { label: 'Zoho Mail',             host: 'smtp.zoho.eu',           port: 587, secure: false },
-  ionos:   { label: 'IONOS',                 host: 'smtp.ionos.co.uk',       port: 587, secure: false },
-  resend:  { label: 'Resend',                host: 'smtp.resend.com',        port: 587, secure: false },
-  sendgrid:{ label: 'SendGrid',              host: 'smtp.sendgrid.net',      port: 587, secure: false },
-}
-
 const TABS = [
   { key: 'business', label: '🏢 Business' },
   { key: 'vat',      label: '📊 VAT' },
-  { key: 'email',    label: '📧 Email' },
   { key: 'payment',  label: '🏦 Payment' },
   { key: 'billing',  label: '💳 Billing' },
 ]
@@ -48,24 +35,12 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   const [vatScheme, setVatScheme] = React.useState('standard')
   const [flatRate, setFlatRate] = React.useState(16.5)
 
-  // Email / SMTP
-  const [smtpProvider, setSmtpProvider] = React.useState('custom')
-  const [smtpHost, setSmtpHost] = React.useState('')
-  const [smtpPort, setSmtpPort] = React.useState(587)
-  const [smtpSecure, setSmtpSecure] = React.useState(false)
-  const [smtpUser, setSmtpUser] = React.useState('')
-  const [smtpPass, setSmtpPass] = React.useState('')
-  const [smtpFromName, setSmtpFromName] = React.useState('')
-  const [smtpFromEmail, setSmtpFromEmail] = React.useState('')
-  const [emailFooter, setEmailFooter] = React.useState('')
   // Payment / bank (printed on invoices)
   const [bankName, setBankName] = React.useState('')
   const [bankAccountName, setBankAccountName] = React.useState('')
   const [bankSortCode, setBankSortCode] = React.useState('')
   const [bankAccountNumber, setBankAccountNumber] = React.useState('')
   const [paymentTerms, setPaymentTerms] = React.useState('')
-  const [smtpTest, setSmtpTest] = React.useState(null) // null | 'testing' | 'ok' | 'error'
-  const [smtpTestMsg, setSmtpTestMsg] = React.useState('')
 
   // Login email / password
   const [loginEmail, setLoginEmail] = React.useState(session.user.email || '')
@@ -97,15 +72,6 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         setVatNo((s?.vat_number ?? md.vat_number) || '')
         setVatScheme(s?.vat_scheme || 'standard')
         setFlatRate(s?.flat_rate ?? 16.5)
-        setSmtpProvider(s?.smtp_provider || 'custom')
-        setSmtpHost(s?.smtp_host || '')
-        setSmtpPort(s?.smtp_port || 587)
-        setSmtpSecure(s?.smtp_secure ?? false)
-        setSmtpUser(s?.smtp_user || '')
-        setSmtpPass(s?.smtp_pass || '')
-        setSmtpFromName(s?.smtp_from_name || '')
-        setSmtpFromEmail(s?.smtp_from_email || '')
-        setEmailFooter(s?.email_footer || '')
         setBankName(s?.bank_name || '')
         setBankAccountName(s?.bank_account_name || '')
         setBankSortCode(s?.bank_sort_code || '')
@@ -119,14 +85,6 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
     })()
     return () => { alive = false }
   }, [uid])
-
-  const applyProvider = (key) => {
-    setSmtpProvider(key)
-    const p = SMTP_PRESETS[key]
-    if (p && key !== 'custom') {
-      setSmtpHost(p.host); setSmtpPort(p.port); setSmtpSecure(p.secure)
-    }
-  }
 
   // ---- subscription / billing ----
   // The product_members row id is the webhook's PATCH key; its tier is the
@@ -228,15 +186,6 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       vat_number: vatNo.trim(),
       vat_scheme: vatScheme,
       flat_rate: Number(flatRate) || 0,
-      smtp_provider: smtpProvider,
-      smtp_host: smtpHost.trim(),
-      smtp_port: Number(smtpPort) || 587,
-      smtp_secure: smtpSecure,
-      smtp_user: smtpUser.trim(),
-      smtp_pass: smtpPass,
-      smtp_from_name: smtpFromName.trim(),
-      smtp_from_email: smtpFromEmail.trim(),
-      email_footer: emailFooter,
       bank_name: bankName.trim(),
       bank_account_name: bankAccountName.trim(),
       bank_sort_code: bankSortCode.trim(),
@@ -301,27 +250,6 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       setPw(''); setPw2(''); note('Password changed')
     } catch (e) { fail(e.message || 'Could not change password') }
     setBusy('')
-  }
-
-  const testSmtp = async () => {
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      setSmtpTest('error'); setSmtpTestMsg('Fill in the SMTP host, username and password first.')
-      return
-    }
-    setSmtpTest('testing'); setSmtpTestMsg('')
-    try {
-      const { data: { session: sess } } = await (await import('../lib/supabase.js')).sb.auth.getSession()
-      const res = await fetch('/api/test-smtp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess?.access_token || ''}` },
-        body: JSON.stringify({ host: smtpHost, port: smtpPort, secure: smtpSecure, user: smtpUser, pass: smtpPass, fromName: smtpFromName || name }),
-      })
-      const data = await res.json()
-      if (res.ok && data.success) { setSmtpTest('ok'); setSmtpTestMsg('Connected and sent a test email to ' + smtpUser) }
-      else { setSmtpTest('error'); setSmtpTestMsg(data.error || 'SMTP test failed') }
-    } catch (e) {
-      setSmtpTest('error'); setSmtpTestMsg('Could not reach /api/test-smtp — the function may not be deployed yet.')
-    }
   }
 
   // Standardised four-tier plan, consistent with the other verticals. Prices
@@ -428,71 +356,11 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         </div>
       )}
 
-      {/* EMAIL TAB */}
-      {tab === 'email' && (
-        <div data-card style={card}>
-          <div style={sectionTitle}>Email sending (SMTP)</div>
-          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Connect your own email so invoices send from your address.</div>
-          <div style={field}>
-            <div style={lbl}>Provider</div>
-            <select style={inp} value={smtpProvider} onChange={e=>applyProvider(e.target.value)}>
-              {Object.entries(SMTP_PRESETS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
-          <div style={field}>
-            <div style={lbl}>SMTP host</div>
-            <input style={inp} value={smtpHost} onChange={e=>setSmtpHost(e.target.value)} placeholder="smtp.yourprovider.com" />
-          </div>
-          <div style={{ display:'flex', gap:'10px' }}>
-            <div style={{...field, flex:1}}>
-              <div style={lbl}>Port</div>
-              <input style={inp} type="number" value={smtpPort} onChange={e=>setSmtpPort(e.target.value)} placeholder="587" />
-            </div>
-            <div style={{...field, flex:1}}>
-              <div style={lbl}>Security</div>
-              <select style={inp} value={smtpSecure?'ssl':'tls'} onChange={e=>setSmtpSecure(e.target.value==='ssl')}>
-                <option value="tls">STARTTLS (587)</option>
-                <option value="ssl">SSL (465)</option>
-              </select>
-            </div>
-          </div>
-          <div style={field}>
-            <div style={lbl}>Username</div>
-            <input style={inp} value={smtpUser} onChange={e=>setSmtpUser(e.target.value)} placeholder="you@yourbusiness.co.uk" />
-          </div>
-          <div style={field}>
-            <div style={lbl}>Password / app password</div>
-            <input style={inp} type="password" value={smtpPass} onChange={e=>setSmtpPass(e.target.value)} placeholder="••••••••" />
-            <div style={{ fontSize:'11px', color:'var(--text3)', marginTop:'5px' }}>Gmail and Outlook need an “app password”, not your normal login password.</div>
-          </div>
-          <div style={field}>
-            <div style={lbl}>From name</div>
-            <input style={inp} value={smtpFromName} onChange={e=>setSmtpFromName(e.target.value)} placeholder="Your business name" />
-          </div>
-          <div style={field}>
-            <div style={lbl}>Invoice footer (optional)</div>
-            <textarea style={{...inp, minHeight:'60px', resize:'vertical', fontFamily:'inherit'}} value={emailFooter} onChange={e=>setEmailFooter(e.target.value)} placeholder="Thanks for your business." />
-          </div>
-          {smtpTest && (
-            <div style={{ marginBottom:'12px', fontSize:'12.5px', padding:'10px 12px', borderRadius:'8px',
-              background: smtpTest==='ok'?'rgba(34,197,94,0.1)':smtpTest==='error'?'rgba(239,68,68,0.1)':'var(--surface3)',
-              color: smtpTest==='ok'?'var(--green)':smtpTest==='error'?'var(--red)':'var(--text2)',
-              border:'1px solid '+(smtpTest==='ok'?'rgba(34,197,94,.25)':smtpTest==='error'?'rgba(239,68,68,.25)':'var(--border)') }}>
-              {smtpTest==='testing'?'Testing connection…':smtpTestMsg}
-            </div>
-          )}
-          <div style={{ display:'flex', gap:'10px' }}>
-            <button style={{...btnSec, opacity:smtpTest==='testing'?.7:1}} disabled={smtpTest==='testing'} onClick={testSmtp}>{smtpTest==='testing'?'Testing…':'Test connection'}</button>
-            <button style={{...btnPri, opacity:busy==='email'?.7:1}} disabled={busy==='email'} onClick={()=>persist({}, 'email')}>{busy==='email'?'Saving…':'Save email settings'}</button>
-          </div>
-        </div>
-      )}
-
       {/* PAYMENT TAB */}
       {tab === 'payment' && (
         <div data-card style={card}>
           <div style={sectionTitle}>Payment details</div>
-          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown on invoices and in the “how to pay” section of invoice emails. Until online payments go live, customers pay by bank transfer using these details.</div>
+          <div style={{ fontSize:'11.5px', color:'var(--text3)', marginBottom:'14px' }}>Shown in the “how to pay” section of your invoices. Until online payments go live, customers pay by bank transfer using these details.</div>
           <div style={field}>
             <div style={lbl}>Account name</div>
             <input style={inp} value={bankAccountName} onChange={e=>setBankAccountName(e.target.value)} placeholder="Name on the account" />

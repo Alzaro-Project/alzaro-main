@@ -172,6 +172,19 @@ label[data-hover]:hover{ border-color: var(--orange) !important; }
   .solo-kpi-grid,
   [style*="repeat(4,1fr)"],
   [style*="repeat(3,1fr)"]{ grid-template-columns: repeat(2,1fr) !important; }
+
+  /* Wide tables scroll sideways from tablet down (not just phones) so they
+     don't clip in the 561–860px band. */
+  .fade-in table{
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* iOS Safari zooms the page when a control with font-size < 16px is focused.
+     Bump form controls to 16px on small screens to stop the zoom-and-reflow. */
+  input, select, textarea{ font-size: 16px !important; }
 }
 
 @media (max-width: 560px){
@@ -201,11 +214,12 @@ label[data-hover]:hover{ border-color: var(--orange) !important; }
   .solo-report-actions{ width: 100%; }
   .solo-report-actions > button{ flex: 1 1 auto; }
 
-  /* Wide tables scroll horizontally rather than blowing out the layout */
-  .fade-in table{
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* (Wide-table horizontal scroll now lives in the 860px block so the whole
+     tablet band is covered, not just phones.) */
+
+  /* Invoice line-item rows: at 320px the Description input is squeezed to a few
+     pixels. Let the row wrap so Description gets a full line and Qty/Price/×
+     drop below it. */
+  .solo-lineitem{ flex-wrap: wrap; }
+  .solo-lineitem > input:first-of-type{ flex: 1 1 100% !important; }
 }

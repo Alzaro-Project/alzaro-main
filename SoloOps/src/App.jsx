@@ -131,13 +131,18 @@ function Shell() {
       }
       setMember(mem || null)
     }
-    const [inv, exp, mil, cli] = await Promise.all([
+    const [invR, expR, milR, cliR] = await Promise.all([
       loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
     ])
-    setInvoices(inv || [])
-    setExpenses(exp || [])
-    setMileage(mil || [])
-    setClients(cli || [])
+    if (invR.error || expR.error || milR.error || cliR.error) {
+      // A failed load must not render as an empty account — surface a retry.
+      setLoadError(true); setLoading(false)
+      return
+    }
+    setInvoices(invR.data || [])
+    setExpenses(expR.data || [])
+    setMileage(milR.data || [])
+    setClients(cliR.data || [])
     setLoading(false)
   }
   // Reload only when the logged-in USER changes (real login/logout),
@@ -542,7 +547,7 @@ function Shell() {
           )}
 
           {view==='recurring' && (
-            <Recurring expenses={expenses} />
+            <Recurring expenses={fExpenses} />
           )}
 
           {view==='receipts' && (
@@ -550,7 +555,7 @@ function Shell() {
           )}
 
           {view==='reports' && (
-            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
+            <Reports invoices={fInvoices} expenses={fExpenses} mileage={fMileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
           )}
 
           {view==='documents' && (
@@ -562,6 +567,22 @@ function Shell() {
             const first = Math.min(totalMiles, 10000)
             const over = Math.max(0, totalMiles - 10000)
             const claim = first * 0.45 + over * 0.25
+            // Per-row claim recomputed from the cumulative 45p/25p split over the
+            // filtered period, so the column sums to the KPI. The stored m.claim
+            // freezes the all-time split at save time and goes stale when other
+            // journeys are edited or deleted.
+            const claimByRow = {}
+            {
+              let cum = 0
+              ;[...fMileage]
+                .sort((a,b)=>(a.journey_date||'').localeCompare(b.journey_date||''))
+                .forEach(m => {
+                  const mi = Number(m.miles)||0
+                  const at45 = Math.max(0, Math.min(mi, 10000 - cum))
+                  claimByRow[m.id] = at45*0.45 + (mi-at45)*0.25
+                  cum += mi
+                })
+            }
             const downloadReport = () => {
               const rows = [['Date','From','To','Purpose','Miles']]
               fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
@@ -579,18 +600,18 @@ function Shell() {
             }
             return (
             <>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+              <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
                 <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
                 <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
                 <KPI label="Journeys" value={mileage.length} />
               </div>
               <div style={card}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'10px', flexWrap:'wrap' }}>
                   <div>
                     <div style={{fontWeight:700}}>Mileage log</div>
                     <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
                   </div>
-                  <div style={{ display:'flex', gap:'10px' }}>
+                  <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
                     {fMileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
                     <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
                   </div>
@@ -602,7 +623,7 @@ function Shell() {
                     <tr key={m.id}>
                       <Td muted mono>{fmtDate(m.journey_date)}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
-                      <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
+                      <Td mono right style={{color:'var(--green)'}}>{gbp(claimByRow[m.id] ?? m.claim)}</Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
                           <button style={actBtn} onClick={()=>onEditMileage(m)}>Edit</button>

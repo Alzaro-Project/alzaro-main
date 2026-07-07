@@ -8,6 +8,20 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 const money = (n) =>
   '£' + Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// pdf-lib's standard Helvetica can only encode WinAnsi (≈ Latin-1). Any
+// character outside it — emoji, ₹, Cyrillic/Greek/CJK, smart quotes — makes
+// drawText throw and aborts the ENTIRE PDF. Map the common smart punctuation to
+// ASCII and replace anything else unencodable with '?', so one stray character
+// in a client name or note can never kill the invoice.
+const winAnsi = (s) =>
+  String(s ?? '')
+    .replace(/[‘’′]/g, "'")
+    .replace(/[“”″]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/…/g, '...')
+    .replace(/€/g, 'EUR')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '?')
+
 // data: {
 //   invoice: { number, issue_date, due_date, vat_rate, notes, status },
 //   lines:   [{ description, qty, unit_price }],
@@ -21,7 +35,8 @@ export async function buildInvoicePdf(data) {
   const { invoice = {}, lines = [], client = {}, biz = {}, logoBytes = null } = data
 
   const doc = await PDFDocument.create()
-  const page = doc.addPage([595.28, 841.89]) // A4
+  const A4 = [595.28, 841.89]
+  let page = doc.addPage(A4) // A4 (reassigned when we spill onto a new page)
   const { width, height } = page.getSize()
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
@@ -33,13 +48,22 @@ export async function buildInvoicePdf(data) {
   const LINE = rgb(0.85, 0.85, 0.85)
 
   const text = (s, x, y, { size = 10, f = font, color = DARK } = {}) =>
-    page.drawText(String(s), { x, y, size, font: f, color })
+    page.drawText(winAnsi(s), { x, y, size, font: f, color })
   const right = (s, xRight, y, { size = 10, f = font, color = DARK } = {}) => {
-    const w = f.widthOfTextAtSize(String(s), size)
-    page.drawText(String(s), { x: xRight - w, y, size, font: f, color })
+    const str = winAnsi(s)
+    const w = f.widthOfTextAtSize(str, size)
+    page.drawText(str, { x: xRight - w, y, size, font: f, color })
   }
 
   let y = height - M
+  // Start a fresh page and reset the cursor when content would spill below the
+  // bottom margin. Returns true if a page break happened.
+  const newPageIfNeeded = (needed) => {
+    if (y - needed >= M) return false
+    page = doc.addPage(A4)
+    y = height - M
+    return true
+  }
 
   // ---- Header: logo / business name (left), INVOICE (right) ----
   let headerLeftY = y
@@ -91,15 +115,22 @@ export async function buildInvoicePdf(data) {
   const colPrice = width - M - 110
   const colAmt = width - M
 
-  page.drawRectangle({ x: M, y: y - 6, width: width - 2 * M, height: 22, color: rgb(0.96, 0.96, 0.96) })
-  text('DESCRIPTION', colDesc + 6, y, { size: 8, f: bold, color: GREY })
-  right('QTY', colQty + 30, y, { size: 8, f: bold, color: GREY })
-  right('UNIT', colPrice + 30, y, { size: 8, f: bold, color: GREY })
-  right('AMOUNT', colAmt, y, { size: 8, f: bold, color: GREY })
-  y -= 24
+  const drawTableHeader = () => {
+    page.drawRectangle({ x: M, y: y - 6, width: width - 2 * M, height: 22, color: rgb(0.96, 0.96, 0.96) })
+    text('DESCRIPTION', colDesc + 6, y, { size: 8, f: bold, color: GREY })
+    right('QTY', colQty + 30, y, { size: 8, f: bold, color: GREY })
+    right('UNIT', colPrice + 30, y, { size: 8, f: bold, color: GREY })
+    right('AMOUNT', colAmt, y, { size: 8, f: bold, color: GREY })
+    y -= 24
+  }
+  drawTableHeader()
 
   let subtotal = 0
   for (const l of lines) {
+    // Spill onto a new page (re-drawing the column header) before a row would
+    // fall below the bottom margin — otherwise long invoices silently draw off
+    // the page.
+    if (newPageIfNeeded(26)) drawTableHeader()
     const amt = Number(l.qty || 0) * Number(l.unit_price || 0)
     subtotal += amt
     text(l.description || '', colDesc + 6, y, { size: 10 })
@@ -123,6 +154,8 @@ export async function buildInvoicePdf(data) {
   }
   const total = subtotal + vat
 
+  // Keep the totals block together on one page.
+  newPageIfNeeded(70)
   y -= 6
   right('Subtotal', colPrice + 30, y, { size: 10, color: GREY }); right(money(subtotal), colAmt, y, { size: 10 }); y -= 18
   if (vatRegistered) {
@@ -141,6 +174,7 @@ export async function buildInvoicePdf(data) {
   const hasBank = biz.bank_account_number || biz.bank_sort_code || biz.bank_name
   if (hasBank) {
     const boxH = 92
+    newPageIfNeeded(boxH + 18)
     page.drawRectangle({ x: M, y: y - boxH + 6, width: width - 2 * M, height: boxH, color: rgb(0.98, 0.98, 0.98), borderColor: LINE, borderWidth: 1 })
     let py = y - 6
     text('HOW TO PAY', M + 14, py, { size: 8, f: bold, color: GREY }); py -= 16
@@ -157,6 +191,7 @@ export async function buildInvoicePdf(data) {
 
   // ---- Notes ----
   if (invoice.notes) {
+    newPageIfNeeded(20)
     text('Notes: ' + invoice.notes, M, y, { size: 9, color: GREY })
   }
 
