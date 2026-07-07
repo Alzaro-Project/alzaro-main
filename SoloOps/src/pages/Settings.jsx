@@ -139,7 +139,7 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   React.useEffect(() => {
     let alive = true
     getMember(uid)
-      .then((m) => {
+      .then(({ data: m }) => {
         if (!alive || !m) return
         if (m.id) setMemberId(m.id)
         const t = (m.tier || 'basic').toLowerCase()

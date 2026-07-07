@@ -12,10 +12,13 @@ export function onAuthChange(cb) {
 export async function signOut() {
   await sb.auth.signOut()
 }
+// Returns { data, error }. `data` is null (with error null) when there is
+// genuinely no row; `error` is set only on a real query failure (network/5xx/
+// RLS). Callers MUST distinguish the two — treating an error as "no account"
+// and signing the user out destroys a live session on a transient blip.
 export async function getAccess(uid) {
-  const { data } = await sb
+  return sb
     .from('soloops_access').select('user_id, business_name').eq('user_id', uid).maybeSingle()
-  return data || null
 }
 export async function getAccessId(uid) {
   const { data } = await sb
@@ -45,12 +48,13 @@ export async function updateUser(payload) {
 // SoloOps' subscription tier + status now live in the shared product_members
 // table (product='soloops'), so the Stripe webhook can update them like the
 // other verticals. One row per user for this product.
+// Returns { data, error } (see getAccess). On a transient error the caller must
+// NOT fall back to 'basic' — that silently locks a paying user's paid pages.
 export async function getMember(uid) {
-  const { data } = await sb
+  return sb
     .from('product_members')
     .select('id, tier, status, trial_ends')
     .eq('user_id', uid).eq('product', 'soloops').maybeSingle()
-  return data || null
 }
 
 // Create the product_members row for this user (idempotent: the RPC returns

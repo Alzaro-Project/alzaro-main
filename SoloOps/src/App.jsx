@@ -50,6 +50,10 @@ function Shell() {
   const [member, setMember] = useState(undefined)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  // Set when a data load fails transiently (network/5xx). Distinct from "no
+  // account": we show a retry screen instead of signing the user out or
+  // silently downgrading their tier.
+  const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState(null)
   const [editInvoice, setEditInvoice] = useState(null)
   const [editExpense, setEditExpense] = useState(null)
@@ -87,12 +91,19 @@ function Shell() {
   }, [])
 
   const loadAll = async () => {
-    setLoading(true)
+    setLoading(true); setLoadError(false)
     const sess = await getSession()
     const uid = sess?.user?.id
     if (uid) {
-      const access = await getAccess(uid)
+      const { data: access, error: accessErr } = await getAccess(uid)
+      if (accessErr) {
+        // Transient failure (network/5xx/expired-mid-request) — do NOT sign out
+        // on a blip. Show a retry screen and keep the session intact.
+        setLoadError(true); setLoading(false)
+        return
+      }
       if (!access) {
+        // Genuinely no access row: this login isn't a SoloOps account.
         await dbSignOut()
         window.location.href = '/soloops/login'
         return
@@ -111,7 +122,14 @@ function Shell() {
       // subscription tier/status from it — the source of truth, kept in sync
       // by the Stripe webhook. Covers new, backfilled, and restored sessions.
       try { await joinProduct(nm) } catch (_) {}
-      try { setMember((await getMember(uid)) || null) } catch (_) { setMember(null) }
+      const { data: mem, error: memErr } = await getMember(uid)
+      if (memErr) {
+        // Don't downgrade a paying user to 'basic' (which locks their paid
+        // pages) just because this read failed transiently.
+        setLoadError(true); setLoading(false)
+        return
+      }
+      setMember(mem || null)
     }
     const [inv, exp, mil, cli] = await Promise.all([
       loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
@@ -180,6 +198,19 @@ function Shell() {
   const [nicRate, setNicRate] = useState(session?.user?.user_metadata?.nic_rate ?? 9)
   const [allowance, setAllowance] = useState(session?.user?.user_metadata?.tax_allowance ?? 12570)
 
+  // These three initialise from user_metadata, but on first mount `session` is
+  // still undefined (it resolves asynchronously below), so the initialisers
+  // above capture the 20/9/12570 defaults and useState never re-runs them.
+  // Sync from user_metadata once the user is known so a user's SAVED rates
+  // actually drive the Tax page and the dashboard "Est. tax" KPI after reload.
+  useEffect(() => {
+    const md = session?.user?.user_metadata
+    if (!md) return
+    if (md.tax_rate != null) setTaxRate(md.tax_rate)
+    if (md.nic_rate != null) setNicRate(md.nic_rate)
+    if (md.tax_allowance != null) setAllowance(md.tax_allowance)
+  }, [session?.user?.id])
+
   const yOf = d => (d||'').slice(0,4)
   const availableYears = [...new Set([
     ...invoices.map(i=>yOf(i.issue_date)),
@@ -217,6 +248,23 @@ function Shell() {
     window.location.href = '/soloops/login'
     return null
   }
+
+  // A load failed transiently — offer a retry rather than bouncing to login or
+  // rendering a wrongly-downgraded/empty account.
+  if (loadError)
+    return (
+      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+        <div style={{ ...card, maxWidth:'420px', textAlign:'center' }}>
+          <div style={{ fontSize:'40px', marginBottom:'10px' }}>⚠️</div>
+          <div style={{ fontSize:'18px', fontWeight:800, marginBottom:'8px' }}>Couldn’t load your account</div>
+          <div style={{ color:'var(--text2)', fontSize:'14px', marginBottom:'18px' }}>Something went wrong reaching the server — your session is still active. Check your connection and try again.</div>
+          <div style={{ display:'flex', gap:'10px', justifyContent:'center', flexWrap:'wrap' }}>
+            <button style={btnPri} onClick={()=>loadAll()}>Try again</button>
+            <button style={btnSec} onClick={signOut}>Sign out</button>
+          </div>
+        </div>
+      </div>
+    )
 
   // Wait for the membership row before rendering, so gating uses the real tier
   // rather than briefly showing 'basic' and locking pages.
