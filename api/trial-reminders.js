@@ -2,10 +2,17 @@
 // ============================================================
 // TRIAL-ENDING EMAIL REMINDERS — daily Vercel Cron job
 // ============================================================
-// Runs once a day (see the "crons" block in vercel.json). For every active
-// trial across all verticals that ends in exactly 7 or 1 days, sends one
-// reminder email and logs it to the trial_reminders ledger so it never
-// double-sends.
+// Runs once a day (see the "crons" block in vercel.json). For every trial
+// across all verticals that ends in exactly 7 or 1 days, sends one reminder
+// email and logs it to the trial_reminders ledger so it never double-sends.
+//
+// WHAT COUNTS AS A TRIAL: a row whose trial_ends matches the milestone date,
+// has NO stripe_subscription_id (i.e. never subscribed), and is not
+// suspended/disabled. We key off "no subscription" rather than the status
+// word because products disagree on it — SoloOps/TyreOps/GarageOps call a live
+// trial 'active', while ServiceOps/PropertyOps call it 'trial'. Filtering on
+// stripe_subscription_id IS NULL is correct for all five and never emails a
+// paying customer.
 //
 // REQUIRED Vercel environment variables (server-side, NO VITE_ prefix):
 //   SUPABASE_URL                 - https://cxsaeftacozyphuejuxo.supabase.co
@@ -151,7 +158,8 @@ export default async function handler(req, res) {
       const membersRes = await sb(
         `product_members?select=id,email,product,company_name,status,trial_ends` +
         `&trial_ends=eq.${targetDate}` +
-        `&status=in.(trial,trialing)`
+        `&stripe_subscription_id=is.null` +
+        `&status=not.in.(suspended,disabled)`
       )
       if (!membersRes.ok) {
         const t = await membersRes.text()
