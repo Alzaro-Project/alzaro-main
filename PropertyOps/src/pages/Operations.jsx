@@ -1398,29 +1398,49 @@ export function SettingsPage({ user }) {
   // Writes just this one field, reads it straight back to CONFIRM it landed in
   // the database (not just the form), and reports true success/failure.
   const savePasswordOnly = async () => {
-    if (!DB_READY) { setPassSaveState("error"); return; }
+    if (!DB_READY) { setPassSaveState("error"); setErr("Database not connected."); return; }
     const typed = (email.smtp_pass || "").trim();
     const clean = email.smtp_provider === "gmail" ? typed.replace(/\s+/g, "") : typed;
-    if (!clean) { setPassSaveState("error"); return; }
+    if (!clean) { setPassSaveState("error"); setErr("Enter the password first."); return; }
+    setErr("");
     setPassSaveState("saving");
-    const { error: upErr } = await db.from("prop_settings").upsert(
-      { user_id: user.id, smtp_pass: clean, smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_user: email.smtp_user, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
-    if (upErr) { setPassSaveState("error"); setErr("Couldn't save password: " + upErr.message); return; }
-    // Read the password back via the decrypt RPC and confirm it matches what we sent.
-    let confirmed = false;
-    try {
-      const { data, error } = await db.rpc("prop_smtp_secret");
-      if (!error && typeof data === "string") confirmed = data === clean;
-    } catch (e) { /* RPC missing — fall through, treat upsert success as good enough */ confirmed = true; }
-    if (confirmed) {
-      setEmail((f) => ({ ...f, smtp_pass: clean })); // reflect the stored (space-stripped) value
+    // Write ONLY the password column, scoped to this user's existing row, so we
+    // don't depend on upsert/onConflict or touch other fields. The BEFORE trigger
+    // encrypts smtp_pass into smtp_pass_enc and nulls the plaintext.
+    const { data: upData, error: upErr } = await db
+      .from("prop_settings")
+      .update({ smtp_pass: clean, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .select("user_id");
+    if (upErr) {
+      setPassSaveState("error");
+      setErr("Save failed: " + upErr.message + (upErr.hint ? " (" + upErr.hint + ")" : ""));
+      return;
+    }
+    if (!upData || upData.length === 0) {
+      // No existing row to update — create one, then the trigger encrypts it.
+      const { error: insErr } = await db.from("prop_settings").insert({
+        user_id: user.id, smtp_pass: clean,
+        smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_user: email.smtp_user,
+        updated_at: new Date().toISOString(),
+      });
+      if (insErr) { setPassSaveState("error"); setErr("Save failed (insert): " + insErr.message); return; }
+    }
+    // Verify the encrypted password now exists for this user (boolean check —
+    // tolerant of any decrypt/timing quirks in the exact-match approach).
+    const { data: chk, error: chkErr } = await db
+      .from("prop_settings")
+      .select("smtp_pass_enc")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (chkErr) { setPassSaveState("error"); setErr("Saved, but couldn't verify: " + chkErr.message); return; }
+    if (chk && chk.smtp_pass_enc) {
+      setEmail((f) => ({ ...f, smtp_pass: clean }));
       setPassSaveState("saved");
       setTimeout(() => setPassSaveState(null), 4000);
     } else {
       setPassSaveState("error");
-      setErr("The password didn't store correctly. Try again, or check that migration 03 (Vault encryption) has been run.");
+      setErr("The write succeeded but no encrypted password was stored — the encryption trigger (migration 03) may not be active on this database.");
     }
   };
 
@@ -1691,7 +1711,7 @@ export function SettingsPage({ user }) {
                     <i className="ti ti-device-floppy" style={{ fontSize: 13 }} />{passSaveState === "saving" ? "Saving…" : "Save email password"}
                   </button>
                   {passSaveState === "saved" && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--green)" }}><i className="ti ti-circle-check" style={{ fontSize: 13 }} />Password saved &amp; confirmed</span>}
-                  {passSaveState === "error" && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--red, #e5484d)" }}><i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />Not saved — enter the password and try again</span>}
+                  {passSaveState === "error" && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--red, #e5484d)" }}><i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />Not saved — see message above</span>}
                 </div>
                 {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, fontSize: 11, color: "var(--txt-3)", lineHeight: 1.45 }}>
