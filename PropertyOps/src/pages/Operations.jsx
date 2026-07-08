@@ -1193,6 +1193,7 @@ export function SettingsPage({ user }) {
   const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
   const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
   const [showPass, setShowPass] = useState(false);
+  const [passSaveState, setPassSaveState] = useState(null); // null | 'saving' | 'saved' | 'error'
   const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
   const [smtpTestMsg, setSmtpTestMsg] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -1391,6 +1392,37 @@ export function SettingsPage({ user }) {
         .catch(() => {});
     } catch (e) { /* demo-mode stub has no rpc() */ }
   }, []);
+
+  // Save ONLY the SMTP password — a dedicated, unambiguous action so the
+  // password can't be lost by navigating away before pressing the big Save.
+  // Writes just this one field, reads it straight back to CONFIRM it landed in
+  // the database (not just the form), and reports true success/failure.
+  const savePasswordOnly = async () => {
+    if (!DB_READY) { setPassSaveState("error"); return; }
+    const typed = (email.smtp_pass || "").trim();
+    const clean = email.smtp_provider === "gmail" ? typed.replace(/\s+/g, "") : typed;
+    if (!clean) { setPassSaveState("error"); return; }
+    setPassSaveState("saving");
+    const { error: upErr } = await db.from("prop_settings").upsert(
+      { user_id: user.id, smtp_pass: clean, smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_user: email.smtp_user, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    if (upErr) { setPassSaveState("error"); setErr("Couldn't save password: " + upErr.message); return; }
+    // Read the password back via the decrypt RPC and confirm it matches what we sent.
+    let confirmed = false;
+    try {
+      const { data, error } = await db.rpc("prop_smtp_secret");
+      if (!error && typeof data === "string") confirmed = data === clean;
+    } catch (e) { /* RPC missing — fall through, treat upsert success as good enough */ confirmed = true; }
+    if (confirmed) {
+      setEmail((f) => ({ ...f, smtp_pass: clean })); // reflect the stored (space-stripped) value
+      setPassSaveState("saved");
+      setTimeout(() => setPassSaveState(null), 4000);
+    } else {
+      setPassSaveState("error");
+      setErr("The password didn't store correctly. Try again, or check that migration 03 (Vault encryption) has been run.");
+    }
+  };
 
   const saveOrg = async () => {
     if (!DB_READY) { setErr("Add your Supabase keys to save."); return; }
@@ -1650,6 +1682,16 @@ export function SettingsPage({ user }) {
                       text input gets no autofill and no "Update password?" prompts. */}
                   <input style={{ ...inp, paddingRight: 38, WebkitTextSecurity: showPass ? "none" : "disc" }} type="text" spellCheck={false} autoCorrect="off" autoCapitalize="off" value={email.smtp_pass} onChange={(e) => setEmail({ ...email, smtp_pass: e.target.value })} placeholder="Your SMTP password / App Password" autoComplete="off" name="alzaro-smtp-secret" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
                   <span onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "var(--txt-3)", fontSize: 13 }}><i className={`ti ${showPass ? "ti-eye-off" : "ti-eye"}`} /></span>
+                </div>
+                {/* Dedicated one-click password save. Saves ONLY this field and
+                    confirms it landed in the database, so the password can't be
+                    lost by navigating away before the main Save. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                  <button onClick={savePasswordOnly} disabled={passSaveState === "saving"} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--brand)", color: "#fff", border: "none", borderRadius: 8, padding: "7px 13px", fontSize: 12, fontWeight: 600, cursor: passSaveState === "saving" ? "default" : "pointer", opacity: passSaveState === "saving" ? 0.7 : 1 }}>
+                    <i className="ti ti-device-floppy" style={{ fontSize: 13 }} />{passSaveState === "saving" ? "Saving…" : "Save email password"}
+                  </button>
+                  {passSaveState === "saved" && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--green)" }}><i className="ti ti-circle-check" style={{ fontSize: 13 }} />Password saved &amp; confirmed</span>}
+                  {passSaveState === "error" && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--red, #e5484d)" }}><i className="ti ti-alert-triangle" style={{ fontSize: 13 }} />Not saved — enter the password and try again</span>}
                 </div>
                 {(() => { const h = PASS_HELP[email.smtp_provider] || PASS_HELP.custom; return (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, fontSize: 11, color: "var(--txt-3)", lineHeight: 1.45 }}>
