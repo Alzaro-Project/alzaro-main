@@ -2,7 +2,7 @@ import React from 'react'
 import JSZip from 'jszip'
 import { card, btnPri, btnSec, Modal } from '../components/UI.jsx'
 
-export default function Reports({ invoices, expenses, mileage, canGold = false }) {
+export default function Reports({ invoices, expenses, mileage, canGold = false, taxRate = 20, nicRate = 9, allowance = 12570 }) {
   const [msg, setMsg] = React.useState('')
   const [preview, setPreview] = React.useState(null) // { name, filename, rows }
 
@@ -80,17 +80,27 @@ export default function Reports({ invoices, expenses, mileage, canGold = false }
       return ['soloops-income.csv', rows]
     }},
     { id:'tax', name:'Tax summary', desc:'Annual SA-ready summary (estimate)', build: () => {
+      // Mirror the in-app Tax page exactly (App.jsx): deduct the personal
+      // allowance first, then apply the user's own saved rates. Previously
+      // this hardcoded 20%/9% and applied income tax to the full profit with
+      // no allowance, so the CSV contradicted what the app showed the user.
+      const rate = Number(taxRate) || 0
+      const nRate = Number(nicRate) || 0
+      const allw = Number(allowance) || 0
       const profit = totalRev - totalExp
-      const incomeTax = Math.max(0, profit*0.20)
-      const nic = Math.max(0,(profit-12570)*0.09)
+      const taxable = Math.max(0, profit - allw)
+      const incomeTax = Math.max(0, taxable * (rate/100))
+      const nic = Math.max(0, taxable * (nRate/100))
       const rows = [['Tax Summary (ESTIMATE ONLY — not tax advice)'],
         ['Generated', new Date().toLocaleDateString('en-GB')],[],
         ['Revenue (paid)', totalRev.toFixed(2)],
         ['Allowable expenses', totalExp.toFixed(2)],
         ['Mileage claim', (sum(mileage,m=>m.claim)).toFixed(2)],
-        ['Taxable profit', profit.toFixed(2)],
-        ['Income tax (est. @20%)', incomeTax.toFixed(2)],
-        ['National Insurance (est.)', nic.toFixed(2)],
+        ['Profit', profit.toFixed(2)],
+        ['Personal allowance', allw.toFixed(2)],
+        ['Taxable profit', taxable.toFixed(2)],
+        [`Income tax (est. @${rate}%)`, incomeTax.toFixed(2)],
+        [`National Insurance (est. @${nRate}%)`, nic.toFixed(2)],
         ['Total estimated tax', (incomeTax+nic).toFixed(2)]]
       return ['soloops-tax-summary.csv', rows]
     }},
