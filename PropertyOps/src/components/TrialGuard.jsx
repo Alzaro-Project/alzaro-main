@@ -13,10 +13,10 @@ import { db } from "../lib/supabase.js";
 
 // Same tiers/prices as the Settings subscription tab and api/_billing-config.js.
 const TIERS = [
-  { key: "basic",  name: "Basic",  icon: "⚪", price: 12.99, best: "Getting started",   features: ["Up to 5 properties", "Tenant & rent records", "Dashboard overview"] },
-  { key: "bronze", name: "Bronze", icon: "🥉", price: 18.99, best: "Small portfolios",   features: ["Everything in Basic", "Up to 15 properties", "Maintenance tracking"] },
-  { key: "silver", name: "Silver", icon: "🥈", price: 28.99, best: "Growing portfolios", features: ["Everything in Bronze", "Unlimited properties", "Compliance & reports", "Finance tracking"] },
-  { key: "gold",   name: "Gold",   icon: "🥇", price: 39.99, best: "Full operation",     features: ["Everything in Silver", "Document vault", "Priority support"] },
+  { key: "basic",  name: "Basic",  icon: "⚪", price: 8.99, best: "Getting started",   features: ["Up to 5 properties", "Tenant & rent records", "Dashboard overview"] },
+  { key: "bronze", name: "Bronze", icon: "🥉", price: 14.99, best: "Small portfolios",   features: ["Everything in Basic", "Up to 15 properties", "Maintenance tracking"] },
+  { key: "silver", name: "Silver", icon: "🥈", price: 18.99, best: "Growing portfolios", features: ["Everything in Bronze", "Unlimited properties", "Compliance & reports", "Finance tracking"] },
+  { key: "gold",   name: "Gold",   icon: "🥇", price: 28.99, best: "Full operation",     features: ["Everything in Silver", "Document vault", "Priority support"] },
 ];
 
 export default function TrialGuard({ user, children }) {
