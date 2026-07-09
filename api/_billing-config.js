@@ -18,10 +18,8 @@ export const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
 
 export const LOWEST_TIER = 'basic'
 
-// Tiers are standardised across verticals, so every product currently maps to
-// the SAME set of Stripe TEST price IDs. If a vertical's pricing diverges
-// later, just give it its own price IDs here — the structure already supports
-// per-product mappings.
+// Standard tier pricing: £12.99 / £18.99 / £28.99 / £39.99.
+// Used by every vertical EXCEPT PropertyOps, which has its own pricing.
 const STANDARD_TIERS = {
   basic:  'price_1TmbnjRWazRh8KC4VPdWlQzb',
   bronze: 'price_1TmboIRWazRh8KC4bHUalyfW',
@@ -29,11 +27,29 @@ const STANDARD_TIERS = {
   gold:   'price_1TmbqBRWazRh8KC4qEjJu6T3',
 }
 
+// PropertyOps pricing: £8.99 / £14.99 / £18.99 / £28.99.
+//
+// NOTE: Silver (£18.99) and Gold (£28.99) share their amounts with STANDARD's
+// Bronze and Silver respectively. They MUST still be four distinct Stripe Price
+// objects created under the PropertyOps product — `tierForPriceId` does a
+// reverse lookup by Price ID, so reusing another vertical's Price ID would
+// resolve subscriptions to the wrong tier.
+//
+// TODO(zak): create these four prices in Stripe TEST mode and paste the IDs in.
+// Until then, PropertyOps checkout will fail loudly (priceIdFor -> null ->
+// 400 from create-checkout-session) rather than silently charging £12.99.
+const PROPERTYOPS_TIERS = {
+  basic:  '',  // £8.99/month
+  bronze: '',  // £14.99/month
+  silver: '',  // £18.99/month
+  gold:   '',  // £28.99/month
+}
+
 export const BILLING = {
   tyreops:     { ...STANDARD_TIERS },
   garageops:   { ...STANDARD_TIERS },
   serviceops:  { ...STANDARD_TIERS },
-  propertyops: { ...STANDARD_TIERS },
+  propertyops: { ...PROPERTYOPS_TIERS },
   soloops:     { ...STANDARD_TIERS },
   // stockops: not on product_members billing yet.
 }
@@ -53,7 +69,7 @@ export function tierForPriceId(product, priceId) {
   const tiers = BILLING[product]
   if (!tiers || !priceId) return null
   for (const [tier, id] of Object.entries(tiers)) {
-    if (id === priceId) return tier
+    if (id && id === priceId) return tier
   }
   return null
 }
