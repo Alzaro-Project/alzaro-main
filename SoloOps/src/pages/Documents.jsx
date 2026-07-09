@@ -2,7 +2,7 @@ import React from 'react'
 import { card, inp, btnPri, btnSec, fmtDate, Th, Td, Empty, ErrBox } from '../components/UI.jsx'
 import { loadDocuments, insertDocument, deleteDocument, uploadFile, signedUrl, removeFiles } from '../lib/db.js'
 
-export default function Documents({ uid, invoices, expenses }) {
+export default function Documents({ uid }) {
   const [q, setQ] = React.useState('')
   const [files, setFiles] = React.useState([])
   const [loading, setLoading] = React.useState(true)
@@ -13,7 +13,11 @@ export default function Documents({ uid, invoices, expenses }) {
 
   const load = () => {
     setLoading(true)
-    loadDocuments().then(({ data }) => { setFiles(data||[]); setLoading(false) })
+    loadDocuments().then(({ data, error }) => {
+      if (error) { setErr(error.message || 'Could not load your documents'); setFiles([]) }
+      else { setFiles(data||[]) }
+      setLoading(false)
+    })
   }
   React.useEffect(load, [])
 
@@ -25,9 +29,15 @@ export default function Documents({ uid, invoices, expenses }) {
       const path = `${uid}/${crypto.randomUUID()}-${safe}`
       const { error: upErr } = await uploadFile(path, f)
       if (upErr) throw upErr
-      await insertDocument({
+      const { error: docErr } = await insertDocument({
         user_id: uid, type: docType, name: f.name, storage_path: path, size_bytes: f.size
       })
+      if (docErr) {
+        // The file uploaded but its metadata row failed — remove the orphan so
+        // it doesn't linger in storage unreferenced.
+        try { await removeFiles([path]) } catch (_) {}
+        throw docErr
+      }
       load()
     } catch (e) { setErr(e.message || 'Upload failed') }
     setBusy(false)
@@ -56,8 +66,15 @@ export default function Documents({ uid, invoices, expenses }) {
     if(!window.confirm(`Delete ${name||'this document'}? The file is permanently removed and cannot be undone.`)) return
     setBusy(true)
     try {
-      await removeFiles([path])
-      await deleteDocument(id)
+      // Delete the DB row first so the list stays consistent. supabase-js
+      // resolves with { error } instead of throwing, so check it explicitly —
+      // previously a failed delete ran the success path.
+      const { error: delErr } = await deleteDocument(id)
+      if (delErr) throw delErr
+      // Row is gone; remove the stored file too. If this fails the file is
+      // orphaned in storage (invisible, minor) but the list is still correct.
+      const { error: rmErr } = await removeFiles([path])
+      if (rmErr) console.warn('Document row deleted but file removal failed:', rmErr.message)
       load()
     } catch (e) { setErr(e.message || 'Could not delete') }
     setBusy(false)
@@ -70,8 +87,8 @@ export default function Documents({ uid, invoices, expenses }) {
     <div style={card}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px', gap:'12px', flexWrap:'wrap' }}>
         <div style={{fontWeight:700}}>Documents</div>
-        <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-          <input style={{...inp, width:'180px', padding:'8px 12px'}} placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)} />
+        <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
+          <input style={{...inp, flex:'1 1 140px', minWidth:0, width:'180px', padding:'8px 12px'}} placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)} />
           <select style={{...inp, width:'auto', padding:'8px 10px'}} value={docType} onChange={e=>setDocType(e.target.value)}>
             <option>Statement</option><option>Invoice</option><option>Receipt</option><option>Report</option><option>Other</option>
           </select>

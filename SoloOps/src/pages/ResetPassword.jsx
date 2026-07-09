@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSession, onAuthChange, updateUser } from '../lib/db.js'
+import { inp, grad } from '../components/UI.jsx'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -11,9 +12,6 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
-  const inp = { background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'11px 14px', color:'var(--text)', fontSize:'14px', outline:'none', width:'100%' }
-  const grad = 'linear-gradient(135deg, var(--orange), var(--amber))'
 
   useEffect(() => {
     let sub

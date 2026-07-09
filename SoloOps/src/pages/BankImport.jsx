@@ -1,5 +1,4 @@
 import React from 'react'
-import Papa from 'papaparse'
 import { card, inp, btnPri, btnSec, gbp, ErrBox, CATEGORIES, parseDate } from '../components/UI.jsx'
 import { loadRules, insertExpenses, upsertRules } from '../lib/db.js'
 
@@ -7,7 +6,7 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
   const [stage, setStage] = React.useState('upload')
   const [rows, setRows] = React.useState([])
   const [headers, setHeaders] = React.useState([])
-  const [map, setMap] = React.useState({ date:'', desc:'', amount:'', debit:'', credit:'' })
+  const [map, setMap] = React.useState({ date:'', desc:'', amount:'', debit:'' })
   const [items, setItems] = React.useState([])
   const [rules, setRules] = React.useState([])
   const [busy, setBusy] = React.useState(false)
@@ -19,9 +18,12 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
 
   const guess = (cands, hs) => hs.find(h => cands.some(c => h.toLowerCase().includes(c))) || ''
 
-  const onFile = (e) => {
+  const onFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
     setErr('')
+    // Lazy-load papaparse only when a file is chosen — keeps it out of the
+    // main bundle that loads before login.
+    const { default: Papa } = await import('papaparse')
     Papa.parse(file, {
       header: true, skipEmptyLines: true,
       complete: (res) => {
@@ -34,7 +36,6 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
           desc:   guess(['description','desc','reference','memo','details','narrative','payee'], hs),
           amount: guess(['amount','value'], hs),
           debit:  guess(['debit','paid out','money out','withdraw','out'], hs),
-          credit: guess(['credit','paid in','money in','deposit','in'], hs),
         })
         setStage('map')
       },
@@ -126,8 +127,8 @@ export default function BankImport({ uid, existingExpenses, onImported }) {
       {stage==='map' && (
         <div>
           <div style={{ fontSize:'13.5px', color:'var(--text2)', marginBottom:'14px' }}>We detected these columns — fix any that look wrong, then continue. ({rows.length} rows found)</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px', marginBottom:'18px' }}>
-            {[['date','Date'],['desc','Description'],['amount','Amount (signed)'],['debit','Debit / money out'],['credit','Credit / money in']].map(([k,label]) => (
+          <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px', marginBottom:'18px' }}>
+            {[['date','Date'],['desc','Description'],['amount','Amount (signed)'],['debit','Debit / money out']].map(([k,label]) => (
               <div key={k}>
                 <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>{label}</div>
                 <select style={sel} value={map[k]} onChange={e=>setMap({...map,[k]:e.target.value})}>

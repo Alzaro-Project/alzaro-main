@@ -12,15 +12,13 @@ export function onAuthChange(cb) {
 export async function signOut() {
   await sb.auth.signOut()
 }
+// Returns { data, error }. `data` is null (with error null) when there is
+// genuinely no row; `error` is set only on a real query failure (network/5xx/
+// RLS). Callers MUST distinguish the two — treating an error as "no account"
+// and signing the user out destroys a live session on a transient blip.
 export async function getAccess(uid) {
-  const { data } = await sb
+  return sb
     .from('soloops_access').select('user_id, business_name').eq('user_id', uid).maybeSingle()
-  return data || null
-}
-export async function getAccessId(uid) {
-  const { data } = await sb
-    .from('soloops_access').select('user_id').eq('user_id', uid).maybeSingle()
-  return data || null
 }
 export async function createAccess({ user_id, email, business_name }) {
   return sb.from('soloops_access').insert({ user_id, email, business_name })
@@ -45,12 +43,13 @@ export async function updateUser(payload) {
 // SoloOps' subscription tier + status now live in the shared product_members
 // table (product='soloops'), so the Stripe webhook can update them like the
 // other verticals. One row per user for this product.
+// Returns { data, error } (see getAccess). On a transient error the caller must
+// NOT fall back to 'basic' — that silently locks a paying user's paid pages.
 export async function getMember(uid) {
-  const { data } = await sb
+  return sb
     .from('product_members')
     .select('id, tier, status, trial_ends')
     .eq('user_id', uid).eq('product', 'soloops').maybeSingle()
-  return data || null
 }
 
 // Create the product_members row for this user (idempotent: the RPC returns
@@ -65,21 +64,19 @@ export async function joinProduct(businessName) {
 }
 
 // ---------- core data loads ----------
+// Each returns { data, error }. A discarded error made a failed fetch look like
+// a legitimately empty account ("No income yet…"); the caller now checks error.
 export async function loadInvoices() {
-  const { data } = await sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false })
-  return data || []
+  return sb.from('soloops_invoices').select('*').order('issue_date', { ascending: false })
 }
 export async function loadExpenses() {
-  const { data } = await sb.from('soloops_expenses').select('*').order('spent_on', { ascending: false })
-  return data || []
+  return sb.from('soloops_expenses').select('*').order('spent_on', { ascending: false })
 }
 export async function loadMileage() {
-  const { data } = await sb.from('soloops_mileage').select('*').order('journey_date', { ascending: false })
-  return data || []
+  return sb.from('soloops_mileage').select('*').order('journey_date', { ascending: false })
 }
 export async function loadClients() {
-  const { data } = await sb.from('soloops_clients').select('*').order('name', { ascending: true })
-  return data || []
+  return sb.from('soloops_clients').select('*').order('name', { ascending: true })
 }
 
 // ---------- mileage ----------
@@ -112,9 +109,8 @@ export async function deleteInvoice(id) {
 
 // ---------- invoice line items ----------
 export async function loadInvoiceLines(invoice_id) {
-  const { data } = await sb.from('soloops_invoice_lines')
+  return sb.from('soloops_invoice_lines')
     .select('*').eq('invoice_id', invoice_id).order('position', { ascending: true })
-  return data || []
 }
 export async function insertInvoiceLines(rows) {
   if (!rows || !rows.length) return { error: null }

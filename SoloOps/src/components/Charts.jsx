@@ -3,11 +3,16 @@ import { card, gbp, CAT_COLORS, Empty } from './UI.jsx'
 
 export function MonthlyChart({ invoices, expenses }) {
   const ym = d => (d||'').slice(0,7)
+  // Build the YYYY-MM key from LOCAL year/month. Using toISOString() here would
+  // convert local midnight-on-the-1st to UTC, rolling the key back a month in
+  // any UTC+ offset (e.g. every month during British Summer Time), so the bars
+  // would show the previous month's data under the current month's label.
+  const mkey = (y,m) => `${y}-${String(m+1).padStart(2,'0')}`
   const now = new Date()
   const months = []
   for (let i=5; i>=0; i--) {
     const dt = new Date(now.getFullYear(), now.getMonth()-i, 1)
-    months.push({ key: dt.toISOString().slice(0,7), label: dt.toLocaleDateString('en-GB',{month:'short'}) })
+    months.push({ key: mkey(dt.getFullYear(), dt.getMonth()), label: dt.toLocaleDateString('en-GB',{month:'short'}) })
   }
   const rev = {}, exp = {}
   invoices.filter(i=>i.status==='paid').forEach(i => { const k=ym(i.issue_date); rev[k]=(rev[k]||0)+Number(i.total||0) })

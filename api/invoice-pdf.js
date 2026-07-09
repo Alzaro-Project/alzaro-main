@@ -41,14 +41,16 @@ export default async function handler(req, res) {
     const { invoice_id } = req.body || {}
     if (!invoice_id) return res.status(400).json({ error: 'Missing invoice_id' })
 
-    // fetch invoice (RLS ensures it's the caller's)
-    const invoices = await sbSelect(token, anonKey, `soloops_invoices?id=eq.${invoice_id}&select=*`)
+    // fetch invoice (RLS ensures it's the caller's). Encode the id into the
+    // PostgREST filter (same as client_name below) so it can't alter the query.
+    const encInvoiceId = encodeURIComponent(invoice_id)
+    const invoices = await sbSelect(token, anonKey, `soloops_invoices?id=eq.${encInvoiceId}&select=*`)
     const invoice = invoices[0]
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
 
     // line items, settings, and matching client (by name)
     const [lines, settingsRows] = await Promise.all([
-      sbSelect(token, anonKey, `soloops_invoice_lines?invoice_id=eq.${invoice_id}&select=*&order=position.asc`),
+      sbSelect(token, anonKey, `soloops_invoice_lines?invoice_id=eq.${encInvoiceId}&select=*&order=position.asc`),
       sbSelect(token, anonKey, `soloops_settings?select=*&limit=1`),
     ])
     const biz = settingsRows[0] || {}
@@ -69,9 +71,23 @@ export default async function handler(req, res) {
       } catch { /* ignore logo failures */ }
     }
 
+    // When an invoice has no stored line items, synthesise a single line from
+    // the stored total. invoice.total is VAT-INCLUSIVE, and the PDF builder
+    // re-applies VAT to the line subtotal — so feed it the NET (ex-VAT) amount,
+    // otherwise the fallback total is inflated by the VAT rate twice.
+    let fallbackLines = lines
+    if (!lines.length) {
+      const rate = biz.vat_registered
+        ? (biz.vat_scheme === 'flat_rate' ? Number(biz.flat_rate) || 0 : Number(invoice.vat_rate) || 0)
+        : 0
+      const gross = Number(invoice.total) || 0
+      const net = rate > 0 ? gross / (1 + rate / 100) : gross
+      fallbackLines = [{ description: invoice.client_name ? 'Services' : '', qty: 1, unit_price: net }]
+    }
+
     const pdfBytes = await buildInvoicePdf({
       invoice,
-      lines: lines.length ? lines : [{ description: invoice.client_name ? 'Services' : '', qty: 1, unit_price: invoice.total || 0 }],
+      lines: fallbackLines,
       client,
       biz,
       logoBytes,

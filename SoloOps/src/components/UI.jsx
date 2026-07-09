@@ -154,12 +154,32 @@ export function Check({ok,t}) {
 }
 
 export function Modal({title,children,onClose,width}) {
+  const ref = React.useRef(null)
+  React.useEffect(() => {
+    const el = ref.current
+    const prev = document.activeElement
+    el?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onClose?.(); return }
+      if (e.key === 'Tab' && el) {
+        const f = el.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')
+        if (!f.length) return
+        const first = f[0], last = f[f.length - 1]
+        // Trap focus inside the dialog so keyboard users can't tab out behind it.
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey); if (prev && prev.focus) prev.focus() }
+  }, [onClose])
   return createPortal(
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:'20px' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'18px', padding:'28px', width:width||'420px', maxWidth:'100%', maxHeight:'90vh', overflowY:'auto' }}>
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
+        onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'18px', padding:'28px', width:width||'420px', maxWidth:'100%', maxHeight:'90vh', overflowY:'auto', outline:'none' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px' }}>
           <div style={{ fontSize:'18px', fontWeight:800 }}>{title}</div>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text2)', fontSize:'20px', cursor:'pointer' }}>×</button>
+          <button onClick={onClose} aria-label="Close" style={{ background:'none', border:'none', color:'var(--text2)', fontSize:'20px', cursor:'pointer' }}>×</button>
         </div>
         {children}
       </div>

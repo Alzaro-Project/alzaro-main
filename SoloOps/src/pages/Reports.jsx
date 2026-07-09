@@ -1,5 +1,4 @@
 import React from 'react'
-import JSZip from 'jszip'
 import { card, btnPri, btnSec, Modal } from '../components/UI.jsx'
 
 export default function Reports({ invoices, expenses, mileage, canGold = false, taxRate = 20, nicRate = 9, allowance = 12570 }) {
@@ -117,6 +116,9 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
         <div style={{fontWeight:700}}>Reports</div>
         {canGold && <button style={btnPri} onClick={async () => {
           try {
+            // Lazy-load JSZip only when the pack is actually built — keeps it out
+            // of the main bundle every visitor downloads.
+            const { default: JSZip } = await import('jszip')
             const zip = new JSZip()
             visibleReports.forEach(r => { const [fn, rows] = r.build(); zip.file(fn, rows.map(row => row.map(c => {
               const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s

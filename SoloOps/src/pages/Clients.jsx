@@ -49,8 +49,11 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
   const del = async (id, name) => {
     if(!window.confirm(`Delete client ${name||''}? This cannot be undone.`)) return
     setBusy(true)
-    try { await deleteClient(id); setSelected(null); onChange && onChange() }
-    catch (e) { setErr(e.message||'Could not delete') }
+    // supabase-js resolves with { error } rather than throwing, so a failed
+    // delete (RLS/FK/network) previously ran the success path silently.
+    const { error } = await deleteClient(id)
+    if (error) { setErr(error.message || 'Could not delete client'); setBusy(false); return }
+    setSelected(null); onChange && onChange()
     setBusy(false)
   }
 

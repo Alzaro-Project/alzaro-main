@@ -23,12 +23,24 @@ export default function Recurring({ expenses }) {
       const amounts = g.items.map(i => Number(i.amount) || 0)
       const avg = amounts.reduce((a,b)=>a+b,0) / amounts.length
       const dates = g.items.map(i => i.spent_on).filter(Boolean).sort()
+      // Estimate how often the charge actually recurs from the average gap
+      // between occurrences, rather than treating every 2+ merchant as monthly
+      // (which overstated anything billed quarterly/annually). Clamp to a sane
+      // band (weekly … ~yearly) so a same-day pair can't blow the figure up.
+      let perMonth = 1
+      if (dates.length >= 2) {
+        const spanDays = Math.max(1, (new Date(dates[dates.length-1]) - new Date(dates[0])) / 86400000)
+        const intervalDays = spanDays / (dates.length - 1)
+        perMonth = 30.44 / intervalDays
+      }
+      perMonth = Math.min(4.35, Math.max(1/12, perMonth))
+      const monthly = avg * perMonth
       return {
         label: g.label,
         category: g.category,
         count: g.items.length,
-        monthly: avg,
-        annual: avg * 12,
+        monthly,
+        annual: monthly * 12,
         lastSeen: dates[dates.length - 1] || '—',
         confidence: g.items.length >= 3 ? 'Confirmed' : 'Possible',
       }
@@ -50,7 +62,7 @@ export default function Recurring({ expenses }) {
 
   return (
     <>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+      <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
         <KPI label="Subscriptions found" value={recurring.length} />
         <KPI label="Est. monthly cost" value={gbp(totalMonthly)} color="var(--orange-light)" />
         <KPI label="Est. annual cost" value={gbp(totalAnnual)} color="var(--amber)" />
