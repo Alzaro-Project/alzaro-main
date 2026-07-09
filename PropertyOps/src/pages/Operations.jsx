@@ -1540,10 +1540,10 @@ export function SettingsPage({ user }) {
   // match the shared Stripe prices (api/_billing-config.js): the tier key is
   // sent straight to checkout.
   const tiers = [
-    { key: "basic",  name: "Basic",  icon: "⚪", price: 12.99, sub: "per month", best: "Getting started",     features: ["Up to 5 properties", "Tenant & rent records", "Dashboard overview", "1 user"] },
-    { key: "bronze", name: "Bronze", icon: "🥉", price: 18.99, sub: "per month", best: "Small portfolios",     features: ["Everything in Basic", "Up to 15 properties", "Maintenance tracking", "Contractor jobs", "1 user"] },
-    { key: "silver", name: "Silver", icon: "🥈", price: 28.99, sub: "per month", best: "Growing portfolios",   features: ["Everything in Bronze", "Unlimited properties", "Compliance & certificates", "Reports & insights", "Finance tracking", "2 users"] },
-    { key: "gold",   name: "Gold",   icon: "🥇", price: 39.99, sub: "per month", best: "Full operation",       features: ["Everything in Silver", "Document vault", "Advanced reporting & export", "Priority support", "Unlimited users"] },
+    { key: "basic",  name: "Basic",  icon: "⚪", price: 8.99, sub: "per month", best: "Getting started",     features: ["Up to 5 properties", "Tenant & rent records", "Dashboard overview", "1 user"] },
+    { key: "bronze", name: "Bronze", icon: "🥉", price: 14.99, sub: "per month", best: "Small portfolios",     features: ["Everything in Basic", "Up to 15 properties", "Maintenance tracking", "Contractor jobs", "1 user"] },
+    { key: "silver", name: "Silver", icon: "🥈", price: 18.99, sub: "per month", best: "Growing portfolios",   features: ["Everything in Bronze", "Unlimited properties", "Compliance & certificates", "Reports & insights", "Finance tracking", "2 users"] },
+    { key: "gold",   name: "Gold",   icon: "🥇", price: 28.99, sub: "per month", best: "Full operation",       features: ["Everything in Silver", "Document vault", "Advanced reporting & export", "Priority support", "Unlimited users"] },
   ];
 
   const inp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
