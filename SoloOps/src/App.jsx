@@ -502,7 +502,7 @@ function Shell() {
           )}
 
           {view==='reports' && (
-            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} />
+            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
           )}
 
           {view==='documents' && (
