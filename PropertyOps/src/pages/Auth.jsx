@@ -52,6 +52,19 @@ export function AuthScreen() {
     // success -> App() listener swaps to dashboard
   };
 
+  // An email that already exists as an Alzaro auth account does NOT mean the
+  // user already has PropertyOps — they may only own ServiceOps, TyreOps, etc.
+  // Sending them to "go to login" dead-ends them (login then says they have no
+  // PropertyOps). Instead, sign them in with the password they just typed: the
+  // App gate sees no PropertyOps membership and shows the "Start PropertyOps
+  // Trial" screen. If the password doesn't match their existing Alzaro account,
+  // fall back to the sign-in prompt with an honest explanation.
+  const handleExistingAccount = async () => {
+    const { error } = await db.auth.signInWithPassword({ email, password: pw });
+    if (!error) return; // App() listener takes over → trial/join screen
+    setExists(true);
+  };
+
   const doRegister = async () => {
     reset();
     if (!company.trim() || !email.trim() || !pw.trim()) return setMsg("Please fill all fields.");
@@ -59,20 +72,25 @@ export function AuthScreen() {
     if (!DB_READY) return setMsg("Database not connected. Add your keys in supabase.js.");
     setBusy(true);
     const { data, error } = await db.auth.signUp({ email, password: pw, options: { emailRedirectTo: `${window.location.origin}/confirmed?product=propertyops`, data: { company_name: company.trim(), product: "propertyops" } } });
-    setBusy(false);
     if (error) {
       // Supabase sometimes returns an explicit "already registered" error.
       if (/already registered|already exists|already been registered/i.test(error.message)) {
-        return setExists(true);
+        await handleExistingAccount();
+        setBusy(false);
+        return;
       }
+      setBusy(false);
       return setMsg(error.message);
     }
     // Security default: for an existing email, Supabase returns no error but a
     // user with an empty identities array (it won't reveal the account exists).
     // Treat that as "already registered" too.
     if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      return setExists(true);
+      await handleExistingAccount();
+      setBusy(false);
+      return;
     }
+    setBusy(false);
     setOk("Check your email to confirm your account, then log in.");
     setTab("login"); setCompany(""); setPw("");
   };
@@ -135,8 +153,8 @@ export function AuthScreen() {
             {ok && <Banner text={ok} good />}
             {exists && (
               <div style={{ background: "var(--amber-soft)", border: "1px solid var(--amber)", borderRadius: 8, padding: "13px 15px", marginBottom: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--amber)", marginBottom: 3 }}>This account is already registered</div>
-                <div style={{ fontSize: 12.5, color: "var(--txt-2)", lineHeight: 1.4, marginBottom: 11 }}>An account with <strong style={{ color: "var(--txt)" }}>{email}</strong> already exists. Head to login to sign in — or reset your password if you've forgotten it.</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--amber)", marginBottom: 3 }}>You already have an Alzaro login</div>
+                <div style={{ fontSize: 12.5, color: "var(--txt-2)", lineHeight: 1.4, marginBottom: 11 }}><strong style={{ color: "var(--txt)" }}>{email}</strong> is already registered with Alzaro. Sign in with your existing password and you can add PropertyOps to it — or reset your password if you've forgotten it.</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button onClick={() => { setTab("login"); reset(); setPw(""); }} style={{ width: "100%", background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 13, padding: "11px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "Inter", whiteSpace: "nowrap" }}>Go to login</button>
                   <button onClick={() => { setForgot(true); reset(); }} style={{ width: "100%", background: "var(--panel-2)", color: "var(--txt-2)", fontWeight: 600, fontSize: 13, padding: "11px 14px", borderRadius: 8, border: "0.5px solid var(--line)", cursor: "pointer", fontFamily: "Inter", whiteSpace: "nowrap" }}>Reset password</button>
