@@ -835,10 +835,10 @@ function SettingsPage({ user }) {
   };
 
   const tiers = [
-    { name: "Basic", key: "basic", price: 12.99, sub: "per month", best: "Getting started", features: ["Customers & properties", "Quotes & invoices", "Email support", "1 user"] },
-    { name: "Bronze", key: "bronze", price: 18.99, sub: "per month", best: "Solo traders", features: ["Customers & properties", "Quotes & invoices", "Jobs management", "Email support"] },
-    { name: "Silver", key: "silver", price: 28.99, sub: "per month", best: "Growing firms", features: ["Everything in Bronze", "Engineer scheduling & diary", "Reports & insights", "Automated reminders", "Priority support"] },
-    { name: "Gold", key: "gold", price: 39.99, sub: "per month", best: "Full operation", features: ["Everything in Silver", "Certificate vault", "Document store", "Advanced reporting & export", "Dedicated support"] },
+    { name: "Basic", key: "basic", price: 8.99, sub: "per month", best: "Getting started", features: ["Customers & properties", "Quotes & invoices", "Email support", "1 user"] },
+    { name: "Bronze", key: "bronze", price: 14.99, sub: "per month", best: "Solo traders", features: ["Customers & properties", "Quotes & invoices", "Jobs management", "Email support"] },
+    { name: "Silver", key: "silver", price: 18.99, sub: "per month", best: "Growing firms", features: ["Everything in Bronze", "Engineer scheduling & diary", "Reports & insights", "Automated reminders", "Priority support"] },
+    { name: "Gold", key: "gold", price: 28.99, sub: "per month", best: "Full operation", features: ["Everything in Silver", "Certificate vault", "Document store", "Advanced reporting & export", "Dedicated support"] },
   ];
 
   const sInp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", width: "100%" };

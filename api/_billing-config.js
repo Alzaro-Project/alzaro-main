@@ -18,38 +18,22 @@ export const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
 
 export const LOWEST_TIER = 'basic'
 
-// Standard tier pricing: £12.99 / £18.99 / £28.99 / £39.99.
-// Used by every vertical EXCEPT PropertyOps, which has its own pricing.
+// Pricing (as of 2026-07-09): £8.99 / £14.99 / £18.99 / £28.99
+// Shared by all five verticals. The previous £12.99–£39.99
+// products are ARCHIVED in Stripe; archived prices cannot open a
+// new Checkout Session, so these MUST be the new active IDs.
 const STANDARD_TIERS = {
-  basic:  'price_1TmbnjRWazRh8KC4VPdWlQzb',
-  bronze: 'price_1TmboIRWazRh8KC4bHUalyfW',
-  silver: 'price_1TmbpZRWazRh8KC4pwSwVqUG',
-  gold:   'price_1TmbqBRWazRh8KC4qEjJu6T3',
-}
-
-// PropertyOps pricing: £8.99 / £14.99 / £18.99 / £28.99.
-//
-// NOTE: Silver (£18.99) and Gold (£28.99) share their amounts with STANDARD's
-// Bronze and Silver respectively. They MUST still be four distinct Stripe Price
-// objects created under the PropertyOps product — `tierForPriceId` does a
-// reverse lookup by Price ID, so reusing another vertical's Price ID would
-// resolve subscriptions to the wrong tier.
-//
-// TODO(zak): create these four prices in Stripe TEST mode and paste the IDs in.
-// Until then, PropertyOps checkout will fail loudly (priceIdFor -> null ->
-// 400 from create-checkout-session) rather than silently charging £12.99.
-const PROPERTYOPS_TIERS = {
-  basic:  '',  // £8.99/month
-  bronze: '',  // £14.99/month
-  silver: '',  // £18.99/month
-  gold:   '',  // £28.99/month
+  basic:  'price_1TrNLaRWazRh8KC4fNj4Os4Y',  // £8.99/month
+  bronze: 'price_1TrNJkRWazRh8KC4D3oJOx9G',  // £14.99/month
+  silver: 'price_1TrNJ8RWazRh8KC4T4cggvN2',  // £18.99/month
+  gold:   'price_1TrNIeRWazRh8KC4M13HPUPH',  // £28.99/month
 }
 
 export const BILLING = {
   tyreops:     { ...STANDARD_TIERS },
   garageops:   { ...STANDARD_TIERS },
   serviceops:  { ...STANDARD_TIERS },
-  propertyops: { ...PROPERTYOPS_TIERS },
+  propertyops: { ...STANDARD_TIERS },
   soloops:     { ...STANDARD_TIERS },
   // stockops: not on product_members billing yet.
 }
