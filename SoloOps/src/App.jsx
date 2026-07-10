@@ -7,11 +7,10 @@ import {
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
-import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
-import { MonthlyChart, Donut } from './components/Charts.jsx'
-import WelcomeBanner from './components/WelcomeBanner.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
 
+import Dashboard from './pages/Dashboard.jsx'
 import Clients from './pages/Clients.jsx'
 import BankImport from './pages/BankImport.jsx'
 import Recurring from './pages/Recurring.jsx'
@@ -248,11 +247,6 @@ function Shell() {
   const profit = revenue - totalExp
   const taxable = Math.max(0, profit - Number(allowance||0))
   const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
-  const outstanding = fInvoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
-
-  const byCat = {}
-  fExpenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
-  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
 
   if (session === undefined)
     return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
@@ -440,37 +434,14 @@ function Shell() {
             </div>
           ) : <>
 
-          {view==='dashboard' && <>
-            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} canExpense={tierAllows('bronze')} />
-            <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
-              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
-              {tierAllows('bronze') && <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>}
-              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
-              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
-            </div>
-
-            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
-
-            <div className="solo-dash-cols" style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
-              {tierAllows('bronze') && <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
-                <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
-                {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
-                  : <Donut rows={catRows} />}
-              </div>}
-              <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-                  <div style={{fontWeight:700}}>Outstanding invoices</div>
-                  <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
-                </div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Awaiting payment</div>
-                {fInvoices.filter(i=>i.status!=='paid').length===0 ? <Empty msg="No outstanding invoices." />
-                  : fInvoices.filter(i=>i.status!=='paid').slice(0,6).map(i => (
-                  <Row key={i.id} left={i.client_name||'—'} mid={i.number||''} right={gbp(i.total)} status={i.status} />
-                ))}
-              </div>
-            </div>
-          </>}
+          {view==='dashboard' && (
+            <Dashboard
+              invoices={invoices} expenses={expenses} clients={clients} mileage={mileage}
+              bizName={bizName} uid={uid}
+              setView={setView} setModal={setModal} tierAllows={tierAllows}
+              taxRate={taxRate} nicRate={nicRate} allowance={allowance}
+            />
+          )}
 
           {view==='income' && (() => {
             const TABS = ['all','draft','sent','paid','overdue']
