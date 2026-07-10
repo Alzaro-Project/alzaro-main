@@ -7,11 +7,10 @@ import {
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
-import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Row, Status, Line, Check } from './components/UI.jsx'
-import { MonthlyChart, Donut } from './components/Charts.jsx'
-import WelcomeBanner from './components/WelcomeBanner.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
 
+import Dashboard from './pages/Dashboard.jsx'
 import Clients from './pages/Clients.jsx'
 import BankImport from './pages/BankImport.jsx'
 import Recurring from './pages/Recurring.jsx'
@@ -50,10 +49,6 @@ function Shell() {
   const [member, setMember] = useState(undefined)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  // Set when a data load fails transiently (network/5xx). Distinct from "no
-  // account": we show a retry screen instead of signing the user out or
-  // silently downgrading their tier.
-  const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState(null)
   const [editInvoice, setEditInvoice] = useState(null)
   const [editExpense, setEditExpense] = useState(null)
@@ -79,14 +74,6 @@ function Shell() {
     try { localStorage.setItem('soloops-theme', theme) } catch (e) { /* storage unavailable */ }
   }, [theme])
 
-  // Lock body scroll behind the mobile drawer or an open modal so the page
-  // underneath doesn't scroll away under the overlay.
-  useEffect(() => {
-    const locked = mobileNav || !!modal
-    document.body.style.overflow = locked ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [mobileNav, modal])
-
   useEffect(() => {
     getSession().then((s) => setSession(s || null))
     const sub = onAuthChange((event, s) => {
@@ -99,19 +86,12 @@ function Shell() {
   }, [])
 
   const loadAll = async () => {
-    setLoading(true); setLoadError(false)
+    setLoading(true)
     const sess = await getSession()
     const uid = sess?.user?.id
     if (uid) {
-      const { data: access, error: accessErr } = await getAccess(uid)
-      if (accessErr) {
-        // Transient failure (network/5xx/expired-mid-request) — do NOT sign out
-        // on a blip. Show a retry screen and keep the session intact.
-        setLoadError(true); setLoading(false)
-        return
-      }
+      const access = await getAccess(uid)
       if (!access) {
-        // Genuinely no access row: this login isn't a SoloOps account.
         await dbSignOut()
         window.location.href = '/soloops/login'
         return
@@ -130,27 +110,15 @@ function Shell() {
       // subscription tier/status from it — the source of truth, kept in sync
       // by the Stripe webhook. Covers new, backfilled, and restored sessions.
       try { await joinProduct(nm) } catch (_) {}
-      const { data: mem, error: memErr } = await getMember(uid)
-      if (memErr) {
-        // Don't downgrade a paying user to 'basic' (which locks their paid
-        // pages) just because this read failed transiently.
-        setLoadError(true); setLoading(false)
-        return
-      }
-      setMember(mem || null)
+      try { setMember((await getMember(uid)) || null) } catch (_) { setMember(null) }
     }
-    const [invR, expR, milR, cliR] = await Promise.all([
+    const [inv, exp, mil, cli] = await Promise.all([
       loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
     ])
-    if (invR.error || expR.error || milR.error || cliR.error) {
-      // A failed load must not render as an empty account — surface a retry.
-      setLoadError(true); setLoading(false)
-      return
-    }
-    setInvoices(invR.data || [])
-    setExpenses(expR.data || [])
-    setMileage(milR.data || [])
-    setClients(cliR.data || [])
+    setInvoices(inv || [])
+    setExpenses(exp || [])
+    setMileage(mil || [])
+    setClients(cli || [])
     setLoading(false)
   }
   // Reload only when the logged-in USER changes (real login/logout),
@@ -211,19 +179,6 @@ function Shell() {
   const [nicRate, setNicRate] = useState(session?.user?.user_metadata?.nic_rate ?? 9)
   const [allowance, setAllowance] = useState(session?.user?.user_metadata?.tax_allowance ?? 12570)
 
-  // These three initialise from user_metadata, but on first mount `session` is
-  // still undefined (it resolves asynchronously below), so the initialisers
-  // above capture the 20/9/12570 defaults and useState never re-runs them.
-  // Sync from user_metadata once the user is known so a user's SAVED rates
-  // actually drive the Tax page and the dashboard "Est. tax" KPI after reload.
-  useEffect(() => {
-    const md = session?.user?.user_metadata
-    if (!md) return
-    if (md.tax_rate != null) setTaxRate(md.tax_rate)
-    if (md.nic_rate != null) setNicRate(md.nic_rate)
-    if (md.tax_allowance != null) setAllowance(md.tax_allowance)
-  }, [session?.user?.id])
-
   const yOf = d => (d||'').slice(0,4)
   const availableYears = [...new Set([
     ...invoices.map(i=>yOf(i.issue_date)),
@@ -248,11 +203,6 @@ function Shell() {
   const profit = revenue - totalExp
   const taxable = Math.max(0, profit - Number(allowance||0))
   const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
-  const outstanding = fInvoices.filter(i => i.status==='sent' || i.status==='overdue').reduce((s,i)=>s+Number(i.total||0),0)
-
-  const byCat = {}
-  fExpenses.forEach(e => { byCat[e.category] = (byCat[e.category]||0) + Number(e.amount||0) })
-  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
 
   if (session === undefined)
     return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
@@ -261,23 +211,6 @@ function Shell() {
     window.location.href = '/soloops/login'
     return null
   }
-
-  // A load failed transiently — offer a retry rather than bouncing to login or
-  // rendering a wrongly-downgraded/empty account.
-  if (loadError)
-    return (
-      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-        <div style={{ ...card, maxWidth:'420px', textAlign:'center' }}>
-          <div style={{ fontSize:'40px', marginBottom:'10px' }}>⚠️</div>
-          <div style={{ fontSize:'18px', fontWeight:800, marginBottom:'8px' }}>Couldn’t load your account</div>
-          <div style={{ color:'var(--text2)', fontSize:'14px', marginBottom:'18px' }}>Something went wrong reaching the server — your session is still active. Check your connection and try again.</div>
-          <div style={{ display:'flex', gap:'10px', justifyContent:'center', flexWrap:'wrap' }}>
-            <button style={btnPri} onClick={()=>loadAll()}>Try again</button>
-            <button style={btnSec} onClick={signOut}>Sign out</button>
-          </div>
-        </div>
-      </div>
-    )
 
   // Wait for the membership row before rendering, so gating uses the real tier
   // rather than briefly showing 'basic' and locking pages.
@@ -440,37 +373,14 @@ function Shell() {
             </div>
           ) : <>
 
-          {view==='dashboard' && <>
-            <WelcomeBanner invoices={invoices} expenses={expenses} clients={clients} bizName={bizName} setView={setView} setModal={setModal} uid={uid} canExpense={tierAllows('bronze')} />
-            <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:`repeat(${tierAllows('bronze')?4:3},1fr)`, gap:'16px', marginBottom:'16px' }}>
-              <div data-pop style={{animationDelay:'0ms'}}><KPI label="Revenue (paid)" value={gbp(revenue)} onClick={()=>setView('income')} /></div>
-              {tierAllows('bronze') && <div data-pop style={{animationDelay:'60ms'}}><KPI label="Expenses" value={gbp(totalExp)} onClick={()=>setView('expenses')} /></div>}
-              <div data-pop style={{animationDelay:'120ms'}}><KPI label="Profit" value={gbp(profit)} color={profit>=0?'var(--green)':'var(--red)'} onClick={()=>setView('reports')} /></div>
-              <div data-pop style={{animationDelay:'180ms'}}><KPI label="Est. tax" value={gbp(estTax)} color="var(--amber)" sub="estimate only" onClick={()=>setView('tax')} /></div>
-            </div>
-
-            <div onClick={()=>setView('reports')} style={{cursor:'pointer'}}><MonthlyChart invoices={fInvoices} expenses={fExpenses} /></div>
-
-            <div className="solo-dash-cols" style={{ display:'grid', gridTemplateColumns: tierAllows('bronze')?'1fr 1fr':'1fr', gap:'16px' }}>
-              {tierAllows('bronze') && <div data-card onClick={()=>setView('expenses')} style={{...card, cursor:'pointer'}}>
-                <div style={{fontWeight:700, marginBottom:'4px'}}>Expense breakdown</div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>By category</div>
-                {catRows.length===0 ? <Empty msg="No expenses yet — add your first one." />
-                  : <Donut rows={catRows} />}
-              </div>}
-              <div data-card onClick={()=>setView('income')} style={{...card, cursor:'pointer'}}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-                  <div style={{fontWeight:700}}>Outstanding invoices</div>
-                  <span className="mono" style={{ color:'var(--orange-light)', fontWeight:600 }}>{gbp(outstanding)}</span>
-                </div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Awaiting payment</div>
-                {fInvoices.filter(i=>i.status!=='paid').length===0 ? <Empty msg="No outstanding invoices." />
-                  : fInvoices.filter(i=>i.status!=='paid').slice(0,6).map(i => (
-                  <Row key={i.id} left={i.client_name||'—'} mid={i.number||''} right={gbp(i.total)} status={i.status} />
-                ))}
-              </div>
-            </div>
-          </>}
+          {view==='dashboard' && (
+            <Dashboard
+              invoices={invoices} expenses={expenses} clients={clients} mileage={mileage}
+              bizName={bizName} uid={uid}
+              setView={setView} setModal={setModal} tierAllows={tierAllows}
+              taxRate={taxRate} nicRate={nicRate} allowance={allowance}
+            />
+          )}
 
           {view==='income' && (() => {
             const TABS = ['all','draft','sent','paid','overdue']
@@ -555,7 +465,7 @@ function Shell() {
           )}
 
           {view==='recurring' && (
-            <Recurring expenses={fExpenses} />
+            <Recurring expenses={expenses} />
           )}
 
           {view==='receipts' && (
@@ -563,11 +473,11 @@ function Shell() {
           )}
 
           {view==='reports' && (
-            <Reports invoices={fInvoices} expenses={fExpenses} mileage={fMileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
+            <Reports invoices={invoices} expenses={expenses} mileage={mileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
           )}
 
           {view==='documents' && (
-            <Documents uid={uid} />
+            <Documents uid={uid} invoices={invoices} expenses={expenses} />
           )}
 
           {view==='mileage' && (() => {
@@ -575,34 +485,15 @@ function Shell() {
             const first = Math.min(totalMiles, 10000)
             const over = Math.max(0, totalMiles - 10000)
             const claim = first * 0.45 + over * 0.25
-            // Per-row claim recomputed from the cumulative 45p/25p split over the
-            // filtered period, so the column sums to the KPI. The stored m.claim
-            // freezes the all-time split at save time and goes stale when other
-            // journeys are edited or deleted.
-            const claimByRow = {}
-            {
-              let cum = 0
-              ;[...fMileage]
-                .sort((a,b)=>(a.journey_date||'').localeCompare(b.journey_date||''))
-                .forEach(m => {
-                  const mi = Number(m.miles)||0
-                  const at45 = Math.max(0, Math.min(mi, 10000 - cum))
-                  claimByRow[m.id] = at45*0.45 + (mi-at45)*0.25
-                  cum += mi
-                })
-            }
             const downloadReport = () => {
               const rows = [['Date','From','To','Purpose','Miles']]
-              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', m.purpose||'', m.miles||0]))
+              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', (m.purpose||'').replace(/,/g,' '), m.miles||0]))
               rows.push([])
               rows.push(['Total miles', totalMiles])
               rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
               rows.push(['Over 10,000 miles @ 25p', (over*0.25).toFixed(2)])
               rows.push(['Total claim (GBP)', claim.toFixed(2)])
-              // Quote-escape every field so commas/quotes in a location or purpose
-              // can't shift columns.
-              const cell = (c) => { const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s }
-              const csv = rows.map(r => r.map(cell).join(',')).join('\n')
+              const csv = rows.map(r => r.join(',')).join('\n')
               const blob = new Blob([csv], { type:'text/csv' })
               const a = document.createElement('a')
               a.href = URL.createObjectURL(blob)
@@ -611,18 +502,18 @@ function Shell() {
             }
             return (
             <>
-              <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
                 <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
                 <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
-                <KPI label="Journeys" value={fMileage.length} />
+                <KPI label="Journeys" value={mileage.length} />
               </div>
               <div style={card}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'10px', flexWrap:'wrap' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
                   <div>
                     <div style={{fontWeight:700}}>Mileage log</div>
                     <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
                   </div>
-                  <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', gap:'10px' }}>
                     {fMileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
                     <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
                   </div>
@@ -634,7 +525,7 @@ function Shell() {
                     <tr key={m.id}>
                       <Td muted mono>{fmtDate(m.journey_date)}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
                       <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
-                      <Td mono right style={{color:'var(--green)'}}>{gbp(claimByRow[m.id] ?? m.claim)}</Td>
+                      <Td mono right style={{color:'var(--green)'}}>{gbp(m.claim)}</Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
                           <button style={actBtn} onClick={()=>onEditMileage(m)}>Edit</button>
@@ -680,7 +571,7 @@ function Shell() {
                     <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
                   </div>
                 </div>
-                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } const { error } = await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash(error ? 'Could not save your rates — please try again' : 'Tax rates saved') }}>Save my rates</button>
+                <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash('Tax rates saved') }}>Save my rates</button>
                 <div style={{ borderTop:'1px solid var(--border)', margin:'16px 0' }} />
                 <div style={{fontWeight:700, marginBottom:'12px'}}>Self Assessment readiness</div>
                 <Check ok={invoices.length>0} t="Income recorded" />
@@ -703,7 +594,7 @@ function Shell() {
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
-      {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', maxWidth:'calc(100vw - 48px)', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
+      {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
    </TrialGuard>
   )
