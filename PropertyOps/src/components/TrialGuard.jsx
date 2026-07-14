@@ -175,20 +175,49 @@ export default function TrialGuard({ user, children }) {
   }
 
   if (liveStatus === "suspended") {
+    const isMobile = typeof window !== "undefined" && window.innerWidth <= 880;
     return (
-      <div style={wrap}>
-        <div style={cardStyle}>
-          <div style={{ fontSize: 44, marginBottom: 14 }}>🔒</div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Account Suspended</div>
-          <div style={{ color: "var(--txt-2)", marginBottom: 20, lineHeight: 1.6, fontSize: 13.5 }}>
-            Your subscription is no longer active. Update your payment details or restart your subscription below to restore access — your data is safe.
+      <div style={{ ...wrap, alignItems: "flex-start", paddingTop: 40, overflowY: "auto" }}>
+        <div style={{ width: "100%", maxWidth: 960 }}>
+          <div style={{ textAlign: "center", marginBottom: 22 }}>
+            <div style={{ fontSize: 44, marginBottom: 10 }}>🔒</div>
+            <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Account Suspended</div>
+            <div style={{ color: "var(--txt-2)", lineHeight: 1.6, fontSize: 13.5, maxWidth: 520, margin: "0 auto" }}>
+              Your subscription is no longer active — but your data is safe. If a payment failed, update your billing details to restore access. Otherwise, pick a plan below to start a fresh subscription.
+            </div>
+            <div onClick={portalLoading ? undefined : openPortal} style={{ display: "inline-block", background: "var(--panel)", border: "0.5px solid var(--line)", color: "var(--txt)", fontWeight: 600, fontSize: 13.5, padding: "11px 22px", borderRadius: 8, marginTop: 16, cursor: portalLoading ? "default" : "pointer", opacity: portalLoading ? 0.7 : 1 }}>
+              {portalLoading ? "Opening…" : "Update billing details"}
+            </div>
+            {errBox}
           </div>
-          <div onClick={portalLoading ? undefined : openPortal} style={{ display: "inline-block", background: "var(--brand)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "12px 22px", borderRadius: 8, cursor: portalLoading ? "default" : "pointer", opacity: portalLoading ? 0.7 : 1 }}>
-            {portalLoading ? "Opening…" : "Update billing"}
+
+          <div style={{ textAlign: "center", color: "var(--txt-3)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Or start a new subscription:</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 12 }}>
+            {TIERS.map((t) => (
+              <div key={t.key} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 14, padding: "18px 18px", display: "flex", flexDirection: "column" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.icon} {t.name}</div>
+                <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>{t.best}</div>
+                <div style={{ marginBottom: 14 }}><span style={{ fontSize: 24, fontWeight: 700 }}>£{t.price}</span><span style={{ fontSize: 12, color: "var(--txt-3)" }}> /month</span></div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16, flex: 1 }}>
+                  {t.features.map((f, k) => (
+                    <div key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, color: "var(--txt-2)" }}>
+                      <i className="ti ti-check" style={{ fontSize: 13, color: "var(--green)", marginTop: 1, flexShrink: 0 }} />{f}
+                    </div>
+                  ))}
+                </div>
+                <div onClick={() => { if (!changingTier) startCheckout(t.key); }}
+                  style={{ textAlign: "center", fontSize: 12.5, fontWeight: 600, color: "#fff", background: "var(--brand)", padding: "10px", borderRadius: 8, cursor: changingTier ? "default" : "pointer", opacity: changingTier && changingTier !== t.key ? 0.6 : 1 }}>
+                  {changingTier === t.key ? "Starting checkout…" : `Subscribe to ${t.name}`}
+                </div>
+              </div>
+            ))}
           </div>
-          {errBox}
-          <div style={{ color: "var(--txt-3)", fontSize: 12.5, marginTop: 16 }}>Need help? support@alzaro.co.uk</div>
-          <button onClick={signOut} style={outBtn}>Sign Out</button>
+
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <div style={{ color: "var(--txt-3)", fontSize: 12.5 }}>Secure checkout via Stripe · Cancel anytime · Questions? support@alzaro.co.uk</div>
+            <button onClick={signOut} style={{ ...outBtn, background: "none", border: "none", textDecoration: "underline", color: "var(--txt-3)", fontWeight: 500, fontSize: 12 }}>Sign out</button>
+          </div>
         </div>
       </div>
     );
