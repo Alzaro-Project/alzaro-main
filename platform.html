@@ -63,6 +63,8 @@ const VERTICALS = {
   propertyops: { label: 'PropertyOps', color: 'var(--green)' },
 }
 
+const gbp = n => (n === null || n === undefined) ? '—' : new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(n)
+const fmtNum = n => (n === null || n === undefined) ? '—' : n.toLocaleString('en-GB')
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'
 const fmtDateTime = d => d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'
 const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }
@@ -313,6 +315,14 @@ function Platform() {
                                 <div style={{ fontWeight:800, color:meta.color, marginBottom:'10px' }}>{meta.label}</div>
                                 <Row k="Company" v={m.company_name || '—'} />
                                 <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
+                                {m.usage && (
+                                  <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+                                    <Metric label="Customers" value={fmtNum(m.usage.customers)} />
+                                    {m.usage.inventory !== null && <Metric label="Inventory" value={fmtNum(m.usage.inventory)} />}
+                                    <Metric label="Invoices" value={fmtNum(m.usage.invoices)} />
+                                    {m.usage.revenue !== null && <Metric label="Revenue" value={gbp(m.usage.revenue)} color="var(--green)" />}
+                                  </div>
+                                )}
                                 <div style={{ marginTop:'10px', display:'grid', gap:'8px' }}>
                                   <PlanSelect label="Tier" value={m.tier || 'bronze'} options={['bronze','silver','gold']}
                                     disabled={planBusy===u.user_id+m.product}
@@ -346,6 +356,7 @@ function Center({children}) { return <div style={{minHeight:'100vh',display:'fle
 function Stat({label,value,color}) { return <div style={{...card, padding:'18px'}}><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.6px',fontWeight:600}}>{label}</div><div style={{fontSize:'24px',fontWeight:600,marginTop:'6px',letterSpacing:'-0.5px',color:color||'var(--orange-light)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
 function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600}}>{v}</span></div> }
+function Metric({label,value,color}) { return <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px'}}><div style={{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:700,marginBottom:'2px'}}>{label}</div><div style={{fontSize:'15px',fontWeight:700,color:color||'var(--text)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function PlanSelect({label,value,options,onChange,disabled}) {
   return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
