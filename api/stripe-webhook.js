@@ -121,6 +121,18 @@ export default async function handler(req, res) {
         if (stripeCustomerId) patch.stripe_customer_id = stripeCustomerId
         if (stripeSubscriptionId) patch.stripe_subscription_id = stripeSubscriptionId
 
+        // Persist the paid renewal date so the app can show "Plan renews on …"
+        // without a live Stripe call. current_period_end lives on the SUBSCRIPTION
+        // object (customer.subscription.updated), not the checkout session — so it
+        // is captured on the subscription event that fires right after checkout.
+        // Stripe gives it as a UNIX timestamp (seconds); store as an ISO date
+        // (YYYY-MM-DD) to match the existing date-only trial_ends column.
+        if (typeof obj.current_period_end === 'number') {
+          patch.current_period_end = new Date(obj.current_period_end * 1000)
+            .toISOString()
+            .slice(0, 10)
+        }
+
         // On a subscription update, if Stripe says it's no longer live
         // (past_due, canceled, unpaid, ...), fail closed: suspend.
         if (event.type === 'customer.subscription.updated') {
