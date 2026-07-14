@@ -1204,6 +1204,9 @@ export function SettingsPage({ user }) {
   const [currentTier, setCurrentTier] = useState("basic"); // billing key, from product_members (source of truth)
   const [changingTier, setChangingTier] = useState(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [subStatus, setSubStatus] = useState(null);   // 'trial' | 'active' | 'suspended' | null
+  const [trialEnds, setTrialEnds] = useState(null);   // YYYY-MM-DD, set while trialing
+  const [renewsOn, setRenewsOn] = useState(null);     // YYYY-MM-DD, set once paid (webhook)
 
   // product_members is the source of truth for the paid tier (kept in sync by
   // the Stripe webhook). Load the row id (the webhook's PATCH key) + tier.
@@ -1211,11 +1214,14 @@ export function SettingsPage({ user }) {
   // (basic/bronze/silver/gold), so the key goes straight to checkout.
   useEffect(() => {
     if (!DB_READY || !user) return;
-    db.from("product_members").select("id,tier").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
+    db.from("product_members").select("id,tier,status,trial_ends,current_period_end").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
       .then(({ data }) => {
         if (data?.id) setMemberId(data.id);
         const key = (data && (data.tier || data.plan) || "basic").toLowerCase();
         setCurrentTier(["basic", "bronze", "silver", "gold"].includes(key) ? key : "basic");
+        setSubStatus(data?.status || null);
+        setTrialEnds(data?.trial_ends || null);
+        setRenewsOn(data?.current_period_end || null);
       })
       .catch(() => {});
   }, [user]);
@@ -1620,13 +1626,66 @@ export function SettingsPage({ user }) {
           </div>
 
           <div style={card}>
-            {head("ti-users", "Team & roles")}
-            {[["You", user ? user.email : "—", "Admin"], ["Invite teammates", "Coming soon", ""]].map((r, j) => (
-              <div key={j} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: j === 0 ? "0.5px solid var(--line)" : "none", fontSize: 12.5 }}>
-                <span style={{ color: "var(--txt-2)" }}>{r[0]}{r[1] && r[1] !== "Coming soon" ? ` · ${r[1]}` : ""}{r[1] === "Coming soon" ? ` · ${r[1]}` : ""}</span><span style={{ fontWeight: 500, color: r[2] === "Admin" ? "var(--brand)" : "var(--txt)" }}>{r[2]}</span>
-              </div>
-            ))}
-            <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 8 }}>Multi-user teams arrive with the Silver and Gold plans.</div>
+            {head("ti-calendar-stats", "Subscription")}
+            {(() => {
+              // Format a YYYY-MM-DD (or ISO) date as "28 Jul 2026". Returns "—" if missing/bad.
+              const fmt = (d) => {
+                if (!d) return "—";
+                const dt = new Date(d);
+                if (isNaN(dt)) return "—";
+                return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              };
+              // Whole days from today until the given date (0 if past/missing).
+              const daysLeft = (d) => {
+                if (!d) return null;
+                const dt = new Date(d); if (isNaN(dt)) return null;
+                const today = new Date(); today.setHours(0, 0, 0, 0); dt.setHours(0, 0, 0, 0);
+                return Math.max(0, Math.round((dt - today) / 86400000));
+              };
+              const planName = (tiers.find((t) => t.key === currentTier) || {}).name || "Basic";
+              const row = (label, value, accent) => (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 12.5 }}>
+                  <span style={{ color: "var(--txt-2)" }}>{label}</span>
+                  <span style={{ fontWeight: 600, color: accent ? "var(--brand)" : "var(--txt)" }}>{value}</span>
+                </div>
+              );
+
+              // Trialing: show trial end + countdown.
+              if (subStatus === "trial") {
+                const dl = daysLeft(trialEnds);
+                return (
+                  <>
+                    {row("Status", "Free trial", true)}
+                    <div style={{ borderTop: "0.5px solid var(--line)" }} />
+                    {row("Trial ends", fmt(trialEnds))}
+                    {dl != null && (
+                      <div style={{ fontSize: 11, color: dl <= 3 ? "var(--red)" : "var(--txt-3)", marginTop: 2 }}>
+                        {dl === 0 ? "Ends today" : `${dl} day${dl === 1 ? "" : "s"} left`}
+                      </div>
+                    )}
+                  </>
+                );
+              }
+
+              // Paid/active: show plan + renewal date if we have it, else point to portal.
+              return (
+                <>
+                  {row("Current plan", planName, true)}
+                  <div style={{ borderTop: "0.5px solid var(--line)" }} />
+                  {renewsOn
+                    ? row("Renews on", fmt(renewsOn))
+                    : (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", fontSize: 12.5 }}>
+                        <span style={{ color: "var(--txt-2)" }}>Renewal date</span>
+                        <span onClick={portalLoading ? undefined : openPortal} style={{ fontWeight: 600, color: "var(--brand)", cursor: portalLoading ? "default" : "pointer", opacity: portalLoading ? 0.6 : 1 }}>
+                          {portalLoading ? "Opening…" : "View in portal →"}
+                        </span>
+                      </div>
+                    )}
+                  <div style={{ fontSize: 11, color: "var(--txt-3)", marginTop: 6 }}>Manage or cancel your plan anytime from the Subscription tab.</div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
