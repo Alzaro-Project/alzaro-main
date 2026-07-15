@@ -1615,7 +1615,6 @@ export function SettingsPage({ user }) {
                   {logoError && <span style={{ fontSize: 11.5, color: "var(--red)" }}>{logoError}</span>}
                   <span style={{ fontSize: 11, color: "var(--txt-3)" }}>PNG or JPG, under 2MB. Remember to Save changes.</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, paddingTop: 4 }}><span style={{ color: "var(--txt-2)" }}>Current plan</span><span style={{ fontWeight: 600, color: "var(--brand)" }}>{(tiers.find((t) => t.key === currentTier) || {}).name || "Basic"}</span></div>
                 {err && <div style={{ fontSize: 11.5, color: "var(--red)" }}>{err}</div>}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span onClick={saveOrg}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : "Save changes"} primary /></span>
@@ -1656,6 +1655,8 @@ export function SettingsPage({ user }) {
                 return (
                   <>
                     {row("Status", "Free trial", true)}
+                    <div style={{ borderTop: "0.5px solid var(--line)" }} />
+                    {row("Current plan", planName, true)}
                     <div style={{ borderTop: "0.5px solid var(--line)" }} />
                     {row("Trial ends", fmt(trialEnds))}
                     {dl != null && (
