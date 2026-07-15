@@ -37,9 +37,9 @@ const TABS = [
 ]
 
 const TIERS = [
-  { key: 'basic', label: 'Basic', icon: '⚪', price: '£8.99/mo', color: '#6b7280',
+  { key: 'basic', label: 'Basic', icon: '⚪', price: '£5.99/mo', color: '#6b7280',
     features: ['Invoicing', 'Bookings calendar', 'Customers & vehicles', 'Items & purchases', '1 user'] },
-  { key: 'bronze', label: 'Bronze', icon: '🥉', price: '£14.99/mo', color: '#cd7f32',
+  { key: 'bronze', label: 'Bronze', icon: '🥉', price: '£12.99/mo', color: '#cd7f32',
     features: ['50 invoices/month', 'Bookings calendar', 'Customers & vehicles', 'Purchases tracking', '1 user'] },
   { key: 'silver', label: 'Silver', icon: '🥈', price: '£18.99/mo', color: '#c0c0c0',
     features: ['Unlimited invoices', 'VAT & reports', 'MOT reminders', 'Invoice emails from your domain', '2 users'] },

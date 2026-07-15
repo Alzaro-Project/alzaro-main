@@ -7,8 +7,8 @@
 // Structure:  BILLING[product][tier] = stripePriceId
 // To add another vertical later, add a new top-level key mirroring `tyreops`.
 //
-// NOTE: these are Stripe TEST price IDs. Swap them for live price IDs when
-// going to production (ideally move them to env vars at that point).
+// NOTE: these are Stripe LIVE price IDs (production billing).
+// (Consider moving them to env vars at some point.)
 // ============================================================
 
 // Tier order, lowest -> highest. Shared concept with the TyreOps frontend
@@ -18,15 +18,15 @@ export const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
 
 export const LOWEST_TIER = 'basic'
 
-// Pricing (as of 2026-07-09): £8.99 / £14.99 / £18.99 / £28.99
-// Shared by all five verticals. The previous £12.99–£39.99
-// products are ARCHIVED in Stripe; archived prices cannot open a
-// new Checkout Session, so these MUST be the new active IDs.
+// Pricing (as of 2026-07-15): £5.99 / £12.99 / £18.99 / £28.99
+// Shared by all five verticals. These are the LIVE price IDs —
+// the old test-mode IDs (price_1TrN…) cannot be used with a live
+// Stripe key, so these MUST be the live active IDs.
 const STANDARD_TIERS = {
-  basic:  'price_1TrNLaRWazRh8KC4fNj4Os4Y',  // £8.99/month
-  bronze: 'price_1TrNJkRWazRh8KC4D3oJOx9G',  // £14.99/month
-  silver: 'price_1TrNJ8RWazRh8KC4T4cggvN2',  // £18.99/month
-  gold:   'price_1TrNIeRWazRh8KC4M13HPUPH',  // £28.99/month
+  basic:  'price_1TtWlpDYGO0hiVu7T1X7hGS9',  // £5.99/month
+  bronze: 'price_1TtWmJDYGO0hiVu75AIzxwmv',  // £12.99/month
+  silver: 'price_1TtWHDDYGO0hiVu7EKmyWwIF',  // £18.99/month
+  gold:   'price_1TtWH9DYGO0hiVu7fSTm5ISp',  // £28.99/month
 }
 
 export const BILLING = {

@@ -80,7 +80,7 @@ export default function TrialGuard({ user, children }) {
               Your free trial has ended. Subscribe to continue using Alzaro ServiceOps and access all your data.
             </div>
             <a href="/serviceops/settings" style={{ display: 'inline-block', background: 'var(--brand)', color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '12px 22px', borderRadius: 8, textDecoration: 'none' }}>View plans</a>
-            <div style={{ color: 'var(--txt-3)', fontSize: 12, marginTop: 10 }}>Starting from £8.99/month</div>
+            <div style={{ color: 'var(--txt-3)', fontSize: 12, marginTop: 10 }}>Starting from £5.99/month</div>
             <div style={{ borderTop: '0.5px solid var(--line)', marginTop: 20, paddingTop: 14, color: 'var(--txt-3)', fontSize: 12.5 }}>
               Questions? support@alzaro.co.uk
             </div>

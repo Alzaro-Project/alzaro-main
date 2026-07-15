@@ -7,7 +7,7 @@ import * as db from '../lib/db'
 // CONSTANTS
 // ============================================================
 const TIER_ORDER = ['basic', 'bronze', 'silver', 'gold']
-const TIER_PRICE = { basic: 8.99, bronze: 14.99, silver: 18.99, gold: 28.99 }
+const TIER_PRICE = { basic: 5.99, bronze: 12.99, silver: 18.99, gold: 28.99 }
 
 // ============================================================
 // TOAST NOTIFICATION HELPER

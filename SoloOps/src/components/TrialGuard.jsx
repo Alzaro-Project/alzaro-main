@@ -108,7 +108,7 @@ export default function TrialGuard({ memberId, children }) {
                 View plans
               </a>
               <div style={{ color: 'var(--text3)', fontSize: '12px' }}>
-                Starting from £8.99/month
+                Starting from £5.99/month
               </div>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '16px' }}>
