@@ -67,26 +67,30 @@ function Dashboard({ user, signOut }) {
   // Priority: prop_settings.company_name → product_members.company_name →
   // user_metadata.company_name → email prefix (last resort). Tier read from
   // settings/membership if a column exists, else defaults to basic (fail closed).
-  const [biz, setBiz] = useState({ name: "", tier: "basic", loaded: false });
+  const [biz, setBiz] = useState({ name: "", tier: "basic", status: "", trialEnds: null, loaded: false });
   // Notification preferences from prop_settings (default on / 30-day lead).
   // These drive which alerts the bell shows and how far ahead certs warn.
   const [notifyPrefs, setNotifyPrefs] = useState({ compliance: true, rent: true, lead: 30 });
 
   useEffect(() => {
     if (!DB_READY) {
-      setBiz({ name: "", tier: "", loaded: true });
+      setBiz({ name: "", tier: "", status: "", trialEnds: null, loaded: true });
       return;
     }
     let cancelled = false;
     const loadBiz = async () => {
-      let name = "", tier = "";
+      let name = "", tier = "", status = "", trialEnds = null;
       // 1) product_members is the SOURCE OF TRUTH for tier (kept in sync by the
       // Stripe webhook). Read it FIRST so a paid tier can't be overridden by the
       // prop_settings / user_metadata fallbacks below. select * so a missing
       // tier/plan column can't throw and swallow the company_name.
       try {
         const { data: m } = await db.from("product_members").select("*").eq("user_id", user.id).eq("product", "propertyops").maybeSingle();
-        if (m) { name = m.company_name || name; tier = m.tier || m.plan || tier; }
+        if (m) {
+          name = m.company_name || name; tier = m.tier || m.plan || tier;
+          // Trial state for the sidebar badge (TrialGuard owns the hard gating).
+          status = m.status || ""; trialEnds = m.trial_ends || null;
+        }
       } catch (e) {}
       // 2) prop_settings — company_name here is user-corrected, so let it win for
       // the name; tier only falls back here if product_members had none.
@@ -107,7 +111,7 @@ function Dashboard({ user, signOut }) {
       if (!name) name = user.user_metadata?.company_name || "";
       // 4) last resort — email prefix
       if (!name) name = (user.email || "").split("@")[0];
-      if (!cancelled) setBiz({ name, tier: tier || "basic", loaded: true });
+      if (!cancelled) setBiz({ name, tier: tier || "basic", status, trialEnds, loaded: true });
     };
     loadBiz();
     return () => { cancelled = true; };
@@ -217,6 +221,20 @@ function Dashboard({ user, signOut }) {
   const badge = tierBadge(biz.tier);
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "")) : "…";
 
+  // Trial suffix for the sidebar badge. Only shown while status === "trial";
+  // once the Stripe webhook flips status to active/paid, the badge is just the
+  // plain tier again. Expiry itself is enforced by TrialGuard, not here.
+  const trialInfo = (() => {
+    if (String(biz.status || "").toLowerCase() !== "trial" || !biz.trialEnds) return null;
+    const end = new Date(biz.trialEnds); if (isNaN(end)) return null;
+    const today = new Date();
+    end.setHours(0, 0, 0, 0); today.setHours(0, 0, 0, 0);
+    const days = Math.round((end - today) / 864e5);
+    if (days < 0) return { label: "TRIAL EXPIRED", expired: true };
+    if (days === 0) return { label: "TRIAL (ends today)", expired: false, urgent: true };
+    return { label: `TRIAL (${days} day${days === 1 ? "" : "s"} left)`, expired: false, urgent: days <= 3 };
+  })();
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 80 }} />}
@@ -240,10 +258,26 @@ function Dashboard({ user, signOut }) {
               gold:     { bg: "rgba(79,70,229,0.1)",   color: "#4f46e5", border: "rgba(79,70,229,0.25)" },
             };
             const ts = TIER_COL[(biz.tier || "basic").toLowerCase()] || TIER_COL.basic;
+            // Trial pill colours: red once expired / on the final days, amber otherwise.
+            const trialCol = !trialInfo ? null
+              : (trialInfo.expired || trialInfo.urgent)
+                ? { bg: "rgba(220,38,38,0.1)",  color: "#dc2626", border: "rgba(220,38,38,0.28)" }
+                : { bg: "rgba(217,119,6,0.1)",  color: "#b45309", border: "rgba(217,119,6,0.28)" };
             return (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20 }}>
-                <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
-              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: ts.color, background: ts.bg, border: `1px solid ${ts.border}`, padding: "3px 9px", borderRadius: 20 }}>
+                  <span style={{ fontSize: 11 }}>{badge.icon}</span>{badge.label}
+                </span>
+                {trialInfo && (
+                  <span
+                    onClick={() => { navigate("settings"); if (typeof window !== "undefined") window.location.hash = "subscription"; }}
+                    title="View plans"
+                    style={{ display: "inline-flex", alignItems: "center", fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", color: trialCol.color, background: trialCol.bg, border: `1px solid ${trialCol.border}`, padding: "3px 8px", borderRadius: 20, cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {trialInfo.label}
+                  </span>
+                )}
+              </div>
             );
           })()}
         </div>
