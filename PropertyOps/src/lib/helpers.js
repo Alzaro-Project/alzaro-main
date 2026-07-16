@@ -69,6 +69,35 @@ export const REPORTS = [
 ];
 
 export const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
+
+// Start/end dates (inclusive, midnight-normalised) for a Dashboard range tab.
+// Weeks run Monday–Sunday to match UK convention. Returns null for unknown
+// labels, which callers treat as "all time" (no filtering).
+export const dashRange = (label) => {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const y = now.getFullYear(), m = now.getMonth();
+  if (label === "Today") return [new Date(now), new Date(now)];
+  if (label === "This Week") {
+    const dow = (now.getDay() + 6) % 7; // Mon = 0
+    const start = new Date(now); start.setDate(now.getDate() - dow);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    return [start, end];
+  }
+  if (label === "This Month") return [new Date(y, m, 1), new Date(y, m + 1, 0)];
+  if (label === "Quarter") { const qm = Math.floor(m / 3) * 3; return [new Date(y, qm, 1), new Date(y, qm + 3, 0)]; }
+  if (label === "This Year") return [new Date(y, 0, 1), new Date(y, 11, 31)];
+  return null;
+};
+
+// True if dateStr falls inside [start, end]. Missing/invalid dates are excluded.
+export const inDashRange = (dateStr, range) => {
+  if (!range) return true;
+  if (!dateStr) return false;
+  const dt = new Date(dateStr); if (isNaN(dt)) return false;
+  dt.setHours(0, 0, 0, 0);
+  return dt >= range[0] && dt <= range[1];
+};
+
 export const gbp = (n) => "£" + n.toLocaleString("en-GB");
 
 // Effective payment status. An unpaid invoice (Pending/Sent) whose due date is
