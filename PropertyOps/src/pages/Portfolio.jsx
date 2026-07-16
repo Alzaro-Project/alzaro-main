@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner, useConfirm } from "../components/UI.jsx";
-import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus, friendlyError } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus, friendlyError, dashRange, inDashRange } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
@@ -193,26 +193,51 @@ export function DashboardPage({ range, go, user, tier }) {
   const { props, comp, pays, maint, tenants = [] } = data;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  // properties / occupancy
-  const totalProps = props.length;
-  const letProps = props.filter((p) => p.status === "Let").length;
-  const occupancy = totalProps ? Math.round((letProps / totalProps) * 1000) / 10 : 0;
-  const income = props.filter((p) => p.status === "Let").reduce((s, p) => s + (p.rent || 0), 0);
+  // Active range window from the tabs at the top. null = all time.
+  const win = dashRange(range);
+  const rangeLabel = win ? String(range).toLowerCase() : "all time";
 
-  // compliance
-  const certs = comp.map((c) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; return { ...c, days: d }; });
+  // properties / occupancy — a property counts as let if it has a tenancy
+  // overlapping the window. Falls back to its current status when the range
+  // is all-time or the property has no tenancy rows.
+  const tenanciesFor = (p) => (tenants || []).filter((t) => t.property_id === p.id || t.property === p.name || t.property === p.address);
+  const letInWindow = (p) => {
+    if (!win) return p.status === "Let";
+    const ts = tenanciesFor(p);
+    if (!ts.length) return p.status === "Let";
+    return ts.some((t) => {
+      const s = t.tenancy_start ? new Date(t.tenancy_start) : null;
+      const e = t.tenancy_end ? new Date(t.tenancy_end) : null;
+      if (s && !isNaN(s) && s > win[1]) return false;  // starts after window
+      if (e && !isNaN(e) && e < win[0]) return false;  // ended before window
+      return true;
+    });
+  };
+  const totalProps = props.length;
+  const letProps = props.filter(letInWindow).length;
+  const occupancy = totalProps ? Math.round((letProps / totalProps) * 1000) / 10 : 0;
+  const income = pays
+    .filter((p) => String(p.status || "").toLowerCase() === "paid" && inDashRange(p.due_date, win))
+    .reduce((s, p) => s + (p.amount || 0), 0);
+
+  // compliance — when a range is active, only score certificates expiring
+  // inside that window; otherwise score the whole portfolio.
+  const allCerts = comp.map((c) => { const d = c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null; return { ...c, days: d }; });
+  const certs = win ? allCerts.filter((c) => inDashRange(c.expiry_date, win)) : allCerts;
   const valid = certs.filter((c) => c.days !== null && c.days > 30).length;
   const hasCerts = certs.length > 0;
   const score = hasCerts ? Math.max(0, Math.round((valid / certs.length) * 100)) : null;
   const attention = certs.filter((c) => c.days !== null && c.days <= 30).length;
 
-  // finance
-  const arrears = pays.filter((p) => effectiveStatus(p) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const arrearsCount = pays.filter((p) => effectiveStatus(p) === "Overdue").length;
+  // finance — arrears from payments due inside the window.
+  const overdue = pays.filter((p) => effectiveStatus(p) === "Overdue" && inDashRange(p.due_date, win));
+  const arrears = overdue.reduce((s, p) => s + (p.amount || 0), 0);
+  const arrearsCount = overdue.length;
 
-  // maintenance
-  const openMaint = maint.filter((m) => m.status !== "Completed").length;
-  const highPri = maint.filter((m) => m.status !== "Completed" && m.priority === "High").length;
+  // maintenance — jobs logged inside the window.
+  const maintInRange = win ? maint.filter((m) => inDashRange(m.created_at, win)) : maint;
+  const openMaint = maintInRange.filter((m) => m.status !== "Completed").length;
+  const highPri = maintInRange.filter((m) => m.status !== "Completed" && m.priority === "High").length;
 
   const toneFor = { "Gas Safety": "ti-flame", "EICR": "ti-bolt", "EPC": "ti-leaf", "Smoke Alarm": "ti-bell-ringing", "Carbon Monoxide": "ti-cloud", "Legionella Risk": "ti-droplet", "PAT Testing": "ti-plug", "Buildings Insurance": "ti-umbrella", "HMO Licence": "ti-license", "Fire Risk Assessment": "ti-fire-extinguisher" };
   const certTone = (d) => d < 0 || d <= 7 ? "red" : d <= 30 ? "amber" : "blue";
@@ -244,10 +269,10 @@ export function DashboardPage({ range, go, user, tier }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
         <TiltCard index={0} onClick={() => go("compliance")} icon="ti-shield-check" locked={!canCompliance} lockTier={featureMin("compliance")} label="Compliance Score" color={!hasCerts ? "var(--txt-3)" : score >= 90 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--red)"}
           value={<>{hasCerts ? score : 0}<span style={{ fontSize: 13, color: "var(--txt-3)" }}>/100</span></>}
-          sub={!hasCerts ? "No certificates tracked yet" : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} />
-        <TiltCard index={1} onClick={() => go("finance")} icon="ti-coin" locked={!canFinance} lockTier={featureMin("finance")} label="Rent Arrears" color={arrears ? "var(--red)" : "var(--green)"} value={gbp(arrears)} sub={`${arrearsCount} overdue`} />
+          sub={!hasCerts ? (win ? `No certificates due ${rangeLabel}` : "No certificates tracked yet") : score >= 90 ? "Portfolio healthy" : score >= 60 ? "Needs attention" : "At risk"} />
+        <TiltCard index={1} onClick={() => go("finance")} icon="ti-coin" locked={!canFinance} lockTier={featureMin("finance")} label="Rent Arrears" color={arrears ? "var(--red)" : "var(--green)"} value={gbp(arrears)} sub={`${arrearsCount} overdue${win ? " · " + rangeLabel : ""}`} />
         <TiltCard index={2} onClick={() => go("properties")} icon="ti-home-check" label="Occupancy" color="var(--blue)" value={occupancy + "%"} sub={`${letProps} of ${totalProps} let`} />
-        <TiltCard index={3} onClick={() => go("finance")} icon="ti-cash" locked={!canFinance} lockTier={featureMin("finance")} label="Monthly Income" color="var(--brand)" value={gbp(income)} sub="From let properties" />
+        <TiltCard index={3} onClick={() => go("finance")} icon="ti-cash" locked={!canFinance} lockTier={featureMin("finance")} label="Income Collected" color="var(--brand)" value={gbp(income)} sub={win ? `Paid · ${rangeLabel}` : "Paid · all time"} />
       </div>
       {canFinance && (
         <div style={{ marginBottom: 12 }}>
@@ -278,7 +303,7 @@ export function DashboardPage({ range, go, user, tier }) {
               { label: "Let / Vacant", val: `${letProps} / ${totalProps - letProps}`, page: "properties", show: true },
               { label: "Certificates tracked", val: certs.length, page: "compliance", show: canCompliance },
               { label: "Open maintenance", val: openMaint, page: "maintenance", show: canMaint },
-              { label: "Payments logged", val: pays.length, page: "finance", show: canFinance },
+              { label: "Payments logged", val: pays.filter((p) => inDashRange(p.due_date, win)).length, page: "finance", show: canFinance },
             ].filter((r) => r.show).map((r, i) => (
               <div key={i} className="pdash-row" onClick={() => go(r.page)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "8px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer" }}>
                 <span style={{ color: "var(--txt-2)" }}>{r.label}</span>
