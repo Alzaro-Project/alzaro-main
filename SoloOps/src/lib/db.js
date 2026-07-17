@@ -212,9 +212,25 @@ export async function removeFiles(paths) {
 }
 
 // ---------- settings (soloops_settings: one row per user) ----------
+// Non-secret settings columns. Deliberately NOT `select('*')`: that would pull
+// smtp_pass_enc (and any residual plaintext smtp_pass) into the browser. The
+// password is write-only from the client's point of view — it goes in via
+// saveSettings and comes back out only server-side, inside /api/send-email via
+// the soloops_smtp_secret() RPC. smtp_host/smtp_user are enough for the UI to
+// show "email is configured"; the server verifies the password exists at send.
+const SETTINGS_COLS = [
+  'user_id', 'business_name', 'address', 'phone', 'email', 'logo_url',
+  'vat_registered', 'vat_number', 'vat_scheme', 'flat_rate',
+  'bank_name', 'bank_account_name', 'bank_sort_code', 'bank_account_number',
+  'payment_terms', 'email_footer',
+  'smtp_provider', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user',
+  'smtp_from_name', 'smtp_from_email', 'smtp_reply_to',
+  'updated_at',
+].join(',')
+
 export async function loadSettings(uid) {
   const { data } = await sb
-    .from('soloops_settings').select('*').eq('user_id', uid).maybeSingle()
+    .from('soloops_settings').select(SETTINGS_COLS).eq('user_id', uid).maybeSingle()
   return data || null
 }
 export async function saveSettings(record) {
