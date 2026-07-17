@@ -26,10 +26,16 @@ import nodemailer from 'nodemailer'
 import { resolveSafeAddress, rateLimit, isValidEmail, sanitizeHeader } from './_netguard.js'
 
 // Products with server-side SMTP wired up: product -> { table, columns }.
-// Only PropertyOps sends its own-domain SMTP today. To add another vertical,
-// map it to its settings table here (its SMTP columns must match this shape).
+// PropertyOps and SoloOps send their own-domain SMTP. To add another vertical,
+// map it to its settings table here (its SMTP columns must match this shape,
+// i.e. it must expose every column in SMTP_COLS below).
+//
+// SoloOps note: sole traders invoice their own clients, so they send FROM their
+// own address — SoloOps callers pass requireSmtp:true and never fall back to
+// the shared invoices@alzaro.co.uk Resend path.
 const SMTP_PRODUCTS = {
   propertyops: { table: 'prop_settings', secretRpc: 'prop_smtp_secret' },
+  soloops: { table: 'soloops_settings', secretRpc: 'soloops_smtp_secret' },
 }
 
 // Default Resend "From" display name per product, used only when the caller
