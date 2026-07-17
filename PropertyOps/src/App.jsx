@@ -28,6 +28,8 @@ function Dashboard({ user, signOut }) {
     } catch (e) { return "dashboard"; }
   });
   const [range, setRange] = useState("This Month");
+  // Dates for the "Custom" range tab (yyyy-mm-dd; blank side = open-ended).
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
   const [light, setLight] = useState(() => {
     try { return localStorage.getItem("propops_theme") === "light"; } catch (e) { return false; }
   });
@@ -212,7 +214,7 @@ function Dashboard({ user, signOut }) {
       </div>
     );
   }
-  else if (active === "dashboard") body = <DashboardPage range={range} go={navigate} user={user} tier={biz.tier} />;
+  else if (active === "dashboard") body = <DashboardPage range={range} customRange={customRange} go={navigate} user={user} tier={biz.tier} />;
   else { const P = PAGES[active]; body = <P user={user} go={navigate} tier={biz.tier} />; }
 
   const goTo = navigate;
@@ -383,8 +385,26 @@ function Dashboard({ user, signOut }) {
           </div>
         </div>
         {active === "dashboard" && (
-          <div style={{ display: "flex", gap: 5, marginBottom: 18, fontSize: 12, flexWrap: "wrap" }}>
-            {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", gap: 5, fontSize: 12, flexWrap: "wrap" }}>
+              {RANGES.map((r) => <span key={r} onClick={() => setRange(r)} style={{ cursor: "pointer", padding: "7px 13px", borderRadius: 7, color: r === range ? "var(--txt)" : "var(--txt-2)", background: r === range ? "var(--panel-2)" : "transparent" }}>{r}</span>)}
+            </div>
+            {range === "Custom" && (() => {
+              const dateInp = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 7, padding: "6px 9px", color: "var(--txt)", fontSize: 12, fontFamily: "Inter", outline: "none" };
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8, fontSize: 12, color: "var(--txt-3)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6 }}>From
+                    <input type="date" value={customRange.from} max={customRange.to || undefined} onChange={(e) => setCustomRange((c) => ({ ...c, from: e.target.value }))} style={dateInp} />
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6 }}>To
+                    <input type="date" value={customRange.to} min={customRange.from || undefined} onChange={(e) => setCustomRange((c) => ({ ...c, to: e.target.value }))} style={dateInp} />
+                  </label>
+                  {(customRange.from || customRange.to)
+                    ? <span onClick={() => setCustomRange({ from: "", to: "" })} style={{ cursor: "pointer", color: "var(--brand)", fontWeight: 500 }}>Clear</span>
+                    : <span>Pick dates to filter</span>}
+                </div>
+              );
+            })()}
           </div>
         )}
         {body}
