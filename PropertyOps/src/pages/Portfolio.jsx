@@ -154,7 +154,7 @@ function RentChart({ pays, go }) {
   );
 }
 
-export function DashboardPage({ range, go, user, tier }) {
+export function DashboardPage({ range, customRange, go, user, tier }) {
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
   const [needsEmail, setNeedsEmail] = useState(false);
@@ -194,8 +194,17 @@ export function DashboardPage({ range, go, user, tier }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   // Active range window from the tabs at the top. null = all time.
-  const win = dashRange(range);
-  const rangeLabel = win ? String(range).toLowerCase() : "all time";
+  const win = dashRange(range, customRange);
+  // Card sublabel for the window. Custom shows the real dates ("01/03/2026 –
+  // 31/03/2026", or "since X" / "up to X" when one side is open-ended).
+  const rangeLabel = (() => {
+    if (!win) return "all time";
+    if (range !== "Custom") return String(range).toLowerCase();
+    let { from = "", to = "" } = customRange || {};
+    if (from && to && from > to) { const t = from; from = to; to = t; } // mirror dashRange's swap
+    if (from && to) return `${ukDate(from)} – ${ukDate(to)}`;
+    return from ? `since ${ukDate(from)}` : `up to ${ukDate(to)}`;
+  })();
 
   // properties / occupancy — a property counts as let if it has a tenancy
   // overlapping the window. Falls back to its current status when the range

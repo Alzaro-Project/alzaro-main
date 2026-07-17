@@ -68,12 +68,14 @@ export const REPORTS = [
   ]},
 ];
 
-export const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year"];
+export const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year", "Custom"];
 
 // Start/end dates (inclusive, midnight-normalised) for a Dashboard range tab.
-// Weeks run Monday–Sunday to match UK convention. Returns null for unknown
-// labels, which callers treat as "all time" (no filtering).
-export const dashRange = (label) => {
+// Weeks run Monday–Sunday to match UK convention. "Custom" reads the picker's
+// { from, to } (yyyy-mm-dd strings) — either side may be blank for an
+// open-ended range. Returns null for unknown labels or an empty custom pick,
+// which callers treat as "all time" (no filtering).
+export const dashRange = (label, custom) => {
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const y = now.getFullYear(), m = now.getMonth();
   if (label === "Today") return [new Date(now), new Date(now)];
@@ -86,6 +88,16 @@ export const dashRange = (label) => {
   if (label === "This Month") return [new Date(y, m, 1), new Date(y, m + 1, 0)];
   if (label === "Quarter") { const qm = Math.floor(m / 3) * 3; return [new Date(y, qm, 1), new Date(y, qm + 3, 0)]; }
   if (label === "This Year") return [new Date(y, 0, 1), new Date(y, 11, 31)];
+  if (label === "Custom") {
+    const from = (custom && custom.from) || "", to = (custom && custom.to) || "";
+    if (!from && !to) return null;
+    // A blank side means open-ended: fall back to far-past / far-future sentinels.
+    let start = new Date(from || "1900-01-01"), end = new Date(to || "3000-01-01");
+    if (isNaN(start) || isNaN(end)) return null;
+    start.setHours(0, 0, 0, 0); end.setHours(0, 0, 0, 0);
+    if (start > end) { const t = start; start = end; end = t; } // reversed pick self-corrects
+    return [start, end];
+  }
   return null;
 };
 
