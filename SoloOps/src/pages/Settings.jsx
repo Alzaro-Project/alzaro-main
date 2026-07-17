@@ -1,13 +1,40 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
 import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession } from '../lib/db.js'
 
 const TABS = [
   { key: 'business', label: '🏢 Business' },
   { key: 'vat',      label: '📊 VAT' },
   { key: 'payment',  label: '🏦 Payment' },
+  { key: 'email',    label: '📧 Email' },
   { key: 'billing',  label: '💳 Billing' },
 ]
+
+// Host/port/security per provider — picking one fills the fields below.
+const SMTP_PRESETS = {
+  custom:    { host: '',                      port: 587, secure: false },
+  gmail:     { host: 'smtp.gmail.com',        port: 587, secure: false },
+  outlook:   { host: 'smtp-mail.outlook.com', port: 587, secure: false },
+  office365: { host: 'smtp.office365.com',    port: 587, secure: false },
+  zoho:      { host: 'smtp.zoho.eu',          port: 587, secure: false },
+  ionos:     { host: 'smtp.ionos.co.uk',      port: 587, secure: false },
+  resend:    { host: 'smtp.resend.com',       port: 587, secure: false },
+  sendgrid:  { host: 'smtp.sendgrid.net',     port: 587, secure: false },
+}
+
+// Per-provider guidance for the Password field. Gmail/Outlook reject normal
+// login passwords over SMTP — users must generate an "app password". This is
+// the single most common setup mistake, so we spell it out with a link.
+const PASS_HELP = {
+  gmail:     { text: 'Gmail needs an App Password, not your normal password. Turn on 2-Step Verification first, then create one here:', url: 'https://myaccount.google.com/apppasswords', label: 'Google App Passwords' },
+  outlook:   { text: 'Outlook/Hotmail needs an App Password (with 2-step verification on), not your normal password. Create one here:', url: 'https://account.live.com/proofs/AppPassword', label: 'Microsoft App Passwords' },
+  office365: { text: 'Microsoft 365 needs an App Password (with 2-step verification on), not your normal password. Create one here:', url: 'https://account.microsoft.com/security', label: 'Microsoft Security' },
+  zoho:      { text: 'Zoho Mail needs an App-Specific Password, not your normal password. Create one here:', url: 'https://accounts.zoho.eu/home#security/app_password', label: 'Zoho App Passwords' },
+  resend:    { text: 'Use your Resend API key as the password. Create one in your Resend dashboard:', url: 'https://resend.com/api-keys', label: 'Resend API Keys' },
+  sendgrid:  { text: "Use an API key as the password (username is literally 'apikey'). Create one here:", url: 'https://app.sendgrid.com/settings/api_keys', label: 'SendGrid API Keys' },
+  ionos:     { text: "Use your normal IONOS mailbox password here. If it's rejected, check the mailbox is enabled for SMTP in your IONOS webmail settings.", url: '', label: '' },
+  custom:    { text: 'For Gmail, Outlook and most providers, this is an "app password", not your normal login password. Pick your provider above for a direct link.', url: '', label: '' },
+}
 
 export default function Settings({ session, signOut, flash, onBizChange }) {
   const uid = session.user.id
@@ -41,6 +68,26 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   const [bankSortCode, setBankSortCode] = React.useState('')
   const [bankAccountNumber, setBankAccountNumber] = React.useState('')
   const [paymentTerms, setPaymentTerms] = React.useState('')
+
+  // Email / SMTP — invoices go out FROM the trader's own address, so these
+  // credentials are theirs, not Alzaro's. `smtpPass` is WRITE-ONLY: it is never
+  // loaded back from the database (see SETTINGS_COLS in db.js), so a blank field
+  // on an already-configured account means "keep the saved password".
+  const [smtpProvider, setSmtpProvider] = React.useState('custom')
+  const [smtpHost, setSmtpHost] = React.useState('')
+  const [smtpPort, setSmtpPort] = React.useState(587)
+  const [smtpSecure, setSmtpSecure] = React.useState(false)
+  const [smtpUser, setSmtpUser] = React.useState('')
+  const [smtpPass, setSmtpPass] = React.useState('')
+  const [smtpFromName, setSmtpFromName] = React.useState('')
+  const [smtpFromEmail, setSmtpFromEmail] = React.useState('')
+  const [smtpReplyTo, setSmtpReplyTo] = React.useState('')
+  const [emailFooter, setEmailFooter] = React.useState('')
+  // True when a password is already stored (host+user present on load) — drives
+  // the "leave blank to keep current" hint, since we can't read the value back.
+  const [smtpSaved, setSmtpSaved] = React.useState(false)
+  const [smtpTest, setSmtpTest] = React.useState(null)   // null | testing | success | error
+  const [smtpTestMsg, setSmtpTestMsg] = React.useState('')
 
   // Login email / password
   const [loginEmail, setLoginEmail] = React.useState(session.user.email || '')
@@ -77,6 +124,18 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
         setBankSortCode(s?.bank_sort_code || '')
         setBankAccountNumber(s?.bank_account_number || '')
         setPaymentTerms(s?.payment_terms || '')
+        // SMTP — note smtp_pass is intentionally absent from the payload.
+        setSmtpProvider(s?.smtp_provider || 'custom')
+        setSmtpHost(s?.smtp_host || '')
+        setSmtpPort(s?.smtp_port ?? 587)
+        setSmtpSecure(!!s?.smtp_secure)
+        setSmtpUser(s?.smtp_user || '')
+        setSmtpFromName(s?.smtp_from_name || '')
+        setSmtpFromEmail(s?.smtp_from_email || '')
+        setSmtpReplyTo(s?.smtp_reply_to || '')
+        setEmailFooter(s?.email_footer || '')
+        // Host + user present ⇒ the server has a password stored for this row.
+        setSmtpSaved(!!(s?.smtp_host && s?.smtp_user))
       } catch (e) {
         // first run, no row yet — defaults stand
       } finally {
@@ -191,6 +250,21 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       bank_sort_code: bankSortCode.trim(),
       bank_account_number: bankAccountNumber.trim(),
       payment_terms: paymentTerms.trim(),
+      // SMTP config travels with every save because this is a whole-row upsert —
+      // omitting these would null out a configured mail setup when the user saves
+      // an unrelated tab. `smtp_pass` is deliberately NOT here: it's only added
+      // by saveEmail() below when the user actually types a new one, so the
+      // BEFORE-write trigger's "null/'' means keep current ciphertext" rule
+      // preserves the stored password on every other save.
+      smtp_provider: smtpProvider,
+      smtp_host: smtpHost.trim(),
+      smtp_port: Number(smtpPort) || 587,
+      smtp_secure: !!smtpSecure,
+      smtp_user: smtpUser.trim(),
+      smtp_from_name: smtpFromName.trim(),
+      smtp_from_email: smtpFromEmail.trim(),
+      smtp_reply_to: smtpReplyTo.trim(),
+      email_footer: emailFooter,
       updated_at: new Date().toISOString(),
       ...extra,
     }
@@ -250,6 +324,79 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       setPw(''); setPw2(''); note('Password changed')
     } catch (e) { fail(e.message || 'Could not change password') }
     setBusy('')
+  }
+
+  // Picking a provider preset fills host/port/security.
+  const pickProvider = (p) => {
+    const preset = SMTP_PRESETS[p]
+    setSmtpProvider(p)
+    if (preset && p !== 'custom') {
+      setSmtpHost(preset.host); setSmtpPort(preset.port); setSmtpSecure(preset.secure)
+    }
+    setSmtpTest(null); setSmtpTestMsg('')
+  }
+
+  // Gmail shows App Passwords as "xxxx xxxx xxxx xxxx" and users paste them with
+  // the spaces; Gmail then rejects the login. Strip them on the way out (the
+  // server does this too, defensively, for rows saved by older builds).
+  const cleanPass = () =>
+    smtpProvider === 'gmail' ? smtpPass.replace(/\s+/g, '') : smtpPass.trim()
+
+  const saveEmail = async () => {
+    if (!smtpHost.trim() || !smtpUser.trim()) {
+      return fail('Enter at least the SMTP host and username.')
+    }
+    if (!smtpSaved && !smtpPass) {
+      return fail('Enter your email password to finish setting up sending.')
+    }
+    if (smtpFromEmail.trim() && !isEmailish(smtpFromEmail)) {
+      return fail('The "from" address looks invalid.')
+    }
+    if (smtpReplyTo.trim() && !isEmailish(smtpReplyTo)) {
+      return fail('The reply-to address looks invalid.')
+    }
+    // Only send smtp_pass when the user actually typed one. Blank ⇒ omit the key
+    // entirely ⇒ the DB trigger keeps the existing encrypted password.
+    const extra = smtpPass ? { smtp_pass: cleanPass() } : {}
+    await persist(extra, 'email')
+    setSmtpPass('')          // never keep the secret in component state
+    setSmtpSaved(true)
+  }
+
+  // Tests the details as typed, against the real mail server, BEFORE saving.
+  const testSmtp = async () => {
+    if (!smtpHost.trim() || !smtpUser.trim() || !smtpPass) {
+      setSmtpTest('error')
+      setSmtpTestMsg("Enter the host, username and password to run a test. (For security the saved password isn't shown — re-enter it here to test.)")
+      return
+    }
+    setSmtpTest('testing'); setSmtpTestMsg('')
+    try {
+      const res = await fetch('/api/test-smtp', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          host: smtpHost.trim(),
+          port: Number(smtpPort) || 587,
+          secure: !!smtpSecure,
+          user: smtpUser.trim(),
+          pass: cleanPass(),
+          fromName: smtpFromName.trim() || name.trim() || '',
+        }),
+      })
+      let data = {}
+      try { data = await res.json() } catch (e) { /* non-JSON */ }
+      if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`)
+      setSmtpTest('success'); setSmtpTestMsg('')
+      setTimeout(() => setSmtpTest(null), 8000)
+    } catch (e) {
+      setSmtpTest('error')
+      setSmtpTestMsg(
+        e.message === 'Failed to fetch'
+          ? 'Could not reach /api/test-smtp — the function may not be deployed yet.'
+          : e.message
+      )
+    }
   }
 
   // Standardised four-tier plan, consistent with the other verticals. Prices
@@ -384,6 +531,108 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
             <input style={inp} value={paymentTerms} onChange={e=>setPaymentTerms(e.target.value)} placeholder="e.g. Payment due within 14 days" />
           </div>
           <button style={{...btnPri, opacity:busy==='payment'?.7:1}} disabled={busy==='payment'} onClick={()=>persist({}, 'payment')}>{busy==='payment'?'Saving…':'Save payment details'}</button>
+        </div>
+      )}
+
+      {tab==='email' && (
+        <div style={{ ...card, display:'flex', flexDirection:'column', gap:'14px' }}>
+          <div>
+            <div style={{ fontSize:'15px', fontWeight:800, marginBottom:'4px' }}>Send invoices from your own email</div>
+            <div style={{ fontSize:'13px', color:'var(--text3)', lineHeight:1.5 }}>
+              Invoices go out from your address, not ours — so replies come straight back to you
+              and your clients see your name in their inbox. Your password is encrypted and is
+              never shown again once saved.
+            </div>
+          </div>
+
+          <div style={field}>
+            <div style={lbl}>Email provider</div>
+            <select style={inp} value={smtpProvider} onChange={e=>pickProvider(e.target.value)}>
+              <option value="custom">Other / custom</option>
+              <option value="gmail">Gmail</option>
+              <option value="outlook">Outlook / Hotmail</option>
+              <option value="office365">Microsoft 365</option>
+              <option value="zoho">Zoho Mail</option>
+              <option value="ionos">IONOS</option>
+              <option value="resend">Resend</option>
+              <option value="sendgrid">SendGrid</option>
+            </select>
+          </div>
+
+          <div style={{ display:'flex', gap:'10px' }}>
+            <div style={{...field, flex:2}}>
+              <div style={lbl}>SMTP host</div>
+              <input style={inp} value={smtpHost} onChange={e=>setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
+            </div>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>Port</div>
+              <input style={inp} value={smtpPort} onChange={e=>setSmtpPort(e.target.value)} placeholder="587" />
+            </div>
+          </div>
+
+          <label style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', color:'var(--text2)', cursor:'pointer' }}>
+            <input type="checkbox" checked={smtpSecure} onChange={e=>setSmtpSecure(e.target.checked)} />
+            Use SSL (tick for port 465 — leave off for 587)
+          </label>
+
+          <div style={field}>
+            <div style={lbl}>Username</div>
+            <input style={inp} value={smtpUser} onChange={e=>setSmtpUser(e.target.value)} placeholder="you@yourbusiness.co.uk" />
+          </div>
+
+          <div style={field}>
+            <div style={lbl}>Password {smtpSaved && <span style={{ fontWeight:500, color:'var(--text3)' }}>— leave blank to keep the saved one</span>}</div>
+            <input style={inp} type="password" value={smtpPass} onChange={e=>{setSmtpPass(e.target.value); setSmtpTest(null)}} placeholder={smtpSaved ? '••••••••  (saved)' : 'App password'} autoComplete="new-password" />
+            {PASS_HELP[smtpProvider] && (
+              <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px', lineHeight:1.5 }}>
+                {PASS_HELP[smtpProvider].text}
+                {PASS_HELP[smtpProvider].url && (
+                  <> <a href={PASS_HELP[smtpProvider].url} target="_blank" rel="noopener noreferrer" style={{ color:'var(--orange)', fontWeight:700 }}>{PASS_HELP[smtpProvider].label} ↗</a></>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display:'flex', gap:'10px' }}>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>From name</div>
+              <input style={inp} value={smtpFromName} onChange={e=>setSmtpFromName(e.target.value)} placeholder={name || 'Your business name'} />
+            </div>
+            <div style={{...field, flex:1}}>
+              <div style={lbl}>From address</div>
+              <input style={inp} value={smtpFromEmail} onChange={e=>setSmtpFromEmail(e.target.value)} placeholder="Defaults to your username" />
+            </div>
+          </div>
+
+          <div style={field}>
+            <div style={lbl}>Reply-to (optional)</div>
+            <input style={inp} value={smtpReplyTo} onChange={e=>setSmtpReplyTo(e.target.value)} placeholder="Where client replies should go" />
+          </div>
+
+          <div style={field}>
+            <div style={lbl}>Email footer (optional)</div>
+            <textarea style={{...inp, minHeight:'70px', resize:'vertical', fontFamily:'inherit'}} value={emailFooter} onChange={e=>setEmailFooter(e.target.value)} placeholder="e.g. Payment due within 14 days. Bank details on the invoice." />
+          </div>
+
+          {smtpTest==='success' && (
+            <div style={{ background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.3)', color:'#22c55e', borderRadius:'10px', padding:'11px 14px', fontSize:'13px', fontWeight:600 }}>
+              ✓ Connected and sent a test email to {smtpUser} — check your inbox.
+            </div>
+          )}
+          {smtpTest==='error' && (
+            <div style={{ background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', color:'#f87171', borderRadius:'10px', padding:'11px 14px', fontSize:'13px', lineHeight:1.5 }}>
+              {smtpTestMsg}
+            </div>
+          )}
+
+          <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+            <button style={{...btnPri, opacity:busy==='email'?.7:1}} disabled={busy==='email'} onClick={saveEmail}>
+              {busy==='email' ? 'Saving…' : 'Save email settings'}
+            </button>
+            <button style={{...btnSec, opacity:smtpTest==='testing'?.7:1}} disabled={smtpTest==='testing'} onClick={testSmtp}>
+              {smtpTest==='testing' ? 'Testing…' : 'Send test email'}
+            </button>
+          </div>
         </div>
       )}
 
