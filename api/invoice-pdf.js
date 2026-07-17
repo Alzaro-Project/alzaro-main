@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     })
     if (!authCheck.ok) return res.status(401).json({ error: 'Invalid or expired session' })
 
-    const { invoice_id } = req.body || {}
+    const { invoice_id, format } = req.body || {}
     if (!invoice_id) return res.status(400).json({ error: 'Missing invoice_id' })
 
     // fetch invoice (RLS ensures it's the caller's). Encode the id into the
@@ -94,6 +94,17 @@ export default async function handler(req, res) {
     })
 
     const filename = `${invoice.number || 'invoice'}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_')
+
+    // format:'base64' — same bytes, JSON-wrapped, so the browser can hand the
+    // PDF straight to /api/send-email as an attachment without a second
+    // generator or a round-trip through a Blob. Default stays binary download.
+    if (format === 'base64') {
+      return res.status(200).json({
+        filename,
+        content: Buffer.from(pdfBytes).toString('base64'),
+      })
+    }
+
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     return res.status(200).send(Buffer.from(pdfBytes))
