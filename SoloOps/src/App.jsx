@@ -7,6 +7,7 @@ import {
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
+import SendInvoice from './components/SendInvoice.jsx'
 import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
 
@@ -55,6 +56,7 @@ function Shell() {
   const [loadError, setLoadError] = useState(false)
   const [modal, setModal] = useState(null)
   const [editInvoice, setEditInvoice] = useState(null)
+  const [sendInvoice, setSendInvoice] = useState(null)
   const [editExpense, setEditExpense] = useState(null)
   const [editMileage, setEditMileage] = useState(null)
   const [incFilter, setIncFilter] = useState('all')
@@ -185,6 +187,21 @@ function Shell() {
       URL.revokeObjectURL(url)
     } catch(e){ flash('Could not generate PDF') }
   }
+  // Open the send modal for an invoice. The client record supplies the
+  // prefilled recipient; matched by name, same as the PDF endpoint does.
+  //
+  // Re-read settings first: `settings` is loaded once at login, but the user may
+  // have configured their email since (Settings only pushes the business NAME
+  // back up via onBizChange). Without this, a trader who sets up email and comes
+  // straight here would still be told to set up email.
+  const onSendInvoice = async (inv) => {
+    try {
+      const st = await loadSettings(uid)
+      if (st) setSettings(st)
+    } catch (_) { /* fall back to whatever we already have */ }
+    setSendInvoice(inv); setModal('send')
+  }
+
   const onMarkPaid = async (inv) => {
     const { error } = await updateInvoice(inv.id, { status:'paid' })
     if(error){ flash('Update failed'); return }
@@ -483,6 +500,7 @@ function Shell() {
                       <Td><Status s={i.status}/></Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                          <button style={actBtn} onClick={()=>onSendInvoice(i)}>Send</button>
                           <button style={actBtn} onClick={()=>onDownloadPdf(i)}>PDF</button>
                           <button style={actBtn} onClick={()=>onEditInvoice(i)}>Edit</button>
                           {i.status!=='paid' && <button style={actBtn} onClick={()=>onMarkPaid(i)}>Mark paid</button>}
@@ -671,6 +689,28 @@ function Shell() {
       </div>
 
       {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
+      {modal==='send' && sendInvoice && (
+        <SendInvoice
+          invoice={sendInvoice}
+          client={clients.find(c => (c.name||'').toLowerCase() === (sendInvoice.client_name||'').toLowerCase())}
+          settings={settings}
+          onClose={()=>{ setModal(null); setSendInvoice(null) }}
+          goToEmailSettings={()=>navigate('/settings#email')}
+          onSent={async ()=>{
+            const inv = sendInvoice
+            setModal(null); setSendInvoice(null)
+            // Only a draft becomes 'sent'. An invoice that's already paid (or
+            // overdue) must not be demoted just because a copy was re-sent.
+            if (inv.status === 'draft') {
+              const { error } = await updateInvoice(inv.id, { status: 'sent' })
+              if (error) { flash('Sent — but the status could not be updated'); loadAll(); return }
+            }
+            loadAll()
+            flash('Invoice sent')
+          }}
+        />
+      )}
+
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
