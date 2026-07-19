@@ -173,6 +173,7 @@ alter table public.soloops_settings add column if not exists smtp_user          
 alter table public.soloops_settings add column if not exists smtp_pass           text;                             -- confirmed
 alter table public.soloops_settings add column if not exists smtp_from_name      text;                             -- confirmed
 alter table public.soloops_settings add column if not exists smtp_from_email     text;                             -- confirmed
+alter table public.soloops_settings add column if not exists smtp_reply_to       text;                             -- confirmed (Settings.jsx persist / send-email SMTP_COLS)
 alter table public.soloops_settings add column if not exists email_footer        text;                             -- confirmed
 alter table public.soloops_settings add column if not exists bank_name           text;                             -- confirmed
 alter table public.soloops_settings add column if not exists bank_account_name   text;                             -- confirmed
