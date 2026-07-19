@@ -13,7 +13,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="robots" content="index, follow">
-  <meta name="theme-color" content="#FFFDF7">
+  <meta name="theme-color" content="#0A100C">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Alzaro">
   <meta property="og:title" content="Alzaro ServiceOps — Job Management for UK Tradespeople">
@@ -25,24 +25,24 @@
   <meta name="twitter:title" content="Alzaro ServiceOps — Job Management for UK Tradespeople">
   <meta name="twitter:description" content="Quotes, invoices, job scheduling & customer management for plumbers, electricians, builders and trades. Built in the UK. Start your 14-day free trial.">
   <meta name="twitter:image" content="https://alzaro.co.uk/favicon.svg">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/landing-assets/shared.css">
   <style>
     :root{
-      --bg:#FFFDF7; --bg-soft:#F7F4EA; --card:#FFFFFF;
-      --ink:#26244A; --ink-soft:#5B5980; --ink-faint:#9391AE;
-      --line:rgba(38,36,74,.11);
-      --indigo:#4F46E5; --violet:#8B5CF6;
-      --accent:#5B50E8; --accent-soft:#EDEBFC;
-      --cta:#FF6B5E; --cta-hover:#F0523F; --cta-ink:#FFF9F5;
-      --glass:rgba(255,253,247,.78); --glass-line:rgba(38,36,74,.08);
+      --bg:#0A100C; --bg-soft:#111814; --card:#161F19;
+      --ink:#F4FAF6; --ink-soft:#98A89E; --ink-faint:#586B60;
+      --line:rgba(255,255,255,.08);
+      --indigo:#16A34A; --violet:#4ADE80;
+      --accent:#22C55E; --accent-soft:rgba(34,197,94,.14);
+      --cta:#22C55E; --cta-hover:#4ADE80; --cta-ink:#05130A;
+      --glass:rgba(10,16,12,.72); --glass-line:rgba(255,255,255,.08);
       --radius:16px; --radius-lg:24px; --maxw:1160px;
-      --font-display:'Syne',system-ui,sans-serif;
+      --font-display:'Space Grotesk',system-ui,sans-serif;
       --font-body:'Plus Jakarta Sans',system-ui,sans-serif;
       --font-mono:'JetBrains Mono',monospace;
-      --shadow-s:0 2px 10px -4px rgba(79,70,229,.10);
-      --shadow-m:0 14px 34px -16px rgba(79,70,229,.20);
-      --shadow-l:0 30px 70px -28px rgba(79,70,229,.28);
+      --shadow-s:0 2px 12px -4px rgba(0,0,0,.5);
+      --shadow-m:0 14px 34px -14px rgba(0,0,0,.55), 0 0 30px -8px rgba(34,197,94,.25);
+      --shadow-l:0 30px 70px -24px rgba(0,0,0,.65), 0 0 60px -12px rgba(34,197,94,.28);
       --grad:linear-gradient(100deg,var(--indigo),var(--violet));
     }
     body{font-size:16.5px}
@@ -59,9 +59,9 @@
     /* ===== Hero (centred, airy, docs orbiting behind) ===== */
     .hero{position:relative;min-height:min(860px,100svh);display:flex;align-items:center;padding:160px 0 80px;overflow:hidden;
       background:
-        radial-gradient(1000px 600px at 50% -10%, rgba(139,92,246,.10), transparent 60%),
-        radial-gradient(700px 460px at 12% 80%, rgba(79,70,229,.06), transparent 60%),
-        radial-gradient(700px 460px at 88% 78%, rgba(255,107,94,.07), transparent 60%),
+        radial-gradient(1000px 600px at 50% -10%, rgba(34,197,94,.12), transparent 60%),
+        radial-gradient(700px 460px at 12% 80%, rgba(22,163,74,.07), transparent 60%),
+        radial-gradient(700px 460px at 88% 78%, rgba(245,158,11,.06), transparent 60%),
         var(--bg)}
     .hero .hero-3d{position:absolute;inset:0}
     .hero-inner{position:relative;z-index:1;text-align:center;width:100%}
@@ -87,7 +87,7 @@
     .pipe{display:grid;grid-template-columns:repeat(4,1fr) ;gap:14px;position:relative}
     .pipe-step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:26px;position:relative;box-shadow:var(--shadow-s)}
     .pipe-step .p-ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:16px}
-    .pipe-step:nth-child(4) .p-ic{background:#E9F8EF;color:#1B9E4B}
+    .pipe-step:nth-child(4) .p-ic{background:rgba(34,197,94,.16);color:#4ADE80}
     .pipe-step h3{font-size:19px;margin-bottom:8px}
     .pipe-step p{font-size:14px;color:var(--ink-soft)}
     .pipe-step .p-tag{position:absolute;top:24px;right:22px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.08em}
@@ -116,24 +116,24 @@
     .client-row small{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--ink-faint)}
 
     /* ===== Booting dashboard ===== */
-    .boot-wrap{background:linear-gradient(160deg,#28254E,#3B2F6E);border-radius:calc(var(--radius-lg) + 6px);padding:clamp(18px,3vw,34px);box-shadow:var(--shadow-l)}
-    .boot{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-lg);padding:20px;color:#E9E7FA}
+    .boot-wrap{background:linear-gradient(160deg,#14301E,#0D1B12);border:1px solid rgba(74,222,128,.2);border-radius:calc(var(--radius-lg) + 6px);padding:clamp(18px,3vw,34px);box-shadow:var(--shadow-l)}
+    .boot{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-lg);padding:20px;color:#E4F2E9}
     .boot .b-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
     .boot .b-bar i{width:9px;height:9px;border-radius:99px;background:rgba(255,255,255,.18)}
     .boot .b-bar i:first-child{background:var(--cta)}
-    .boot .b-bar span{margin-left:8px;font-family:var(--font-mono);font-size:11px;color:#B4AFE0;letter-spacing:.08em}
+    .boot .b-bar span{margin-left:8px;font-family:var(--font-mono);font-size:11px;color:#9DBFA9;letter-spacing:.08em}
     .b-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
     .b-kpi{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
-    .b-kpi span{font-size:11.5px;color:#B4AFE0}
+    .b-kpi span{font-size:11.5px;color:#9DBFA9}
     .b-kpi b{display:block;font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:#fff;margin-top:4px}
     .b-rows{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:8px 14px}
-    .b-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:#CBC7EC}
+    .b-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:#BCD5C4}
     .b-row:first-child{border-top:0}
     .b-row .mono{font-family:var(--font-mono);color:#fff}
     .b-pill{font-size:10.5px;padding:3px 9px;border-radius:99px;font-weight:600}
     .b-pill.paid{background:rgba(56,190,120,.2);color:#7FE0AC}
-    .b-pill.sent{background:rgba(139,92,246,.25);color:#C4B0F8}
-    .b-pill.due{background:rgba(255,107,94,.22);color:#FFA79E}
+    .b-pill.sent{background:rgba(74,222,128,.2);color:#86EFAC}
+    .b-pill.due{background:rgba(245,158,11,.22);color:#FCD34D}
     /* boot animation: elements slide in sequence when .is-in lands on the wrap */
     .boot [data-boot]{opacity:0;transform:translateY(14px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
     .reveal.is-in .boot [data-boot]{opacity:1;transform:none}
@@ -170,13 +170,13 @@
     .faq-wrap{max-width:760px;margin-inline:auto}
 
     /* ===== Final CTA ===== */
-    .final{background:var(--grad);border-radius:var(--radius-lg);padding:clamp(48px,7vw,88px) clamp(28px,6vw,80px);position:relative;overflow:hidden;text-align:center;color:#F4F2FF}
+    .final{background:linear-gradient(120deg,#14532D,#166534 55%,#15803D);border:1px solid rgba(74,222,128,.3);border-radius:var(--radius-lg);padding:clamp(48px,7vw,88px) clamp(28px,6vw,80px);position:relative;overflow:hidden;text-align:center;color:#F0FAF4}
     .final::before{content:"";position:absolute;inset:0;background:
       radial-gradient(640px 380px at 84% 0%, rgba(255,255,255,.14), transparent 60%),
-      radial-gradient(520px 340px at 10% 100%, rgba(255,107,94,.35), transparent 60%)}
+      radial-gradient(520px 340px at 10% 100%, rgba(245,158,11,.25), transparent 60%)}
     .final>*{position:relative}
     .final h2{color:#fff;font-size:clamp(30px,4.4vw,50px);max-width:20ch;margin:0 auto 16px}
-    .final p{color:rgba(244,242,255,.82);max-width:52ch;margin:0 auto 32px;font-size:17px}
+    .final p{color:rgba(240,250,244,.85);max-width:52ch;margin:0 auto 32px;font-size:17px}
     .final .btn-ghost{color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45)}
     .final .btn-ghost:hover{box-shadow:inset 0 0 0 1.5px #fff}
   </style>
@@ -223,26 +223,26 @@
         <div class="hero-poster">
           <svg width="88%" viewBox="0 0 900 500" fill="none" role="img" aria-label="Floating quote and invoice documents">
             <g transform="rotate(-8 150 210)">
-              <rect x="80" y="130" width="150" height="190" rx="12" fill="#fff" stroke="#E4E1F5"/>
-              <rect x="80" y="130" width="150" height="34" rx="12" fill="#4F46E5"/>
+              <rect x="80" y="130" width="150" height="190" rx="12" fill="#fff" stroke="#2C4234"/>
+              <rect x="80" y="130" width="150" height="34" rx="12" fill="#16A34A"/>
               <text x="96" y="152" font-family="monospace" font-size="14" fill="#fff">QUO-001</text>
-              <rect x="96" y="182" width="110" height="8" rx="4" fill="#E7E4F8"/>
-              <rect x="96" y="200" width="90" height="8" rx="4" fill="#EEECFA"/>
-              <rect x="96" y="228" width="118" height="8" rx="4" fill="#E7E4F8"/>
-              <rect x="96" y="284" width="70" height="10" rx="5" fill="#8B5CF6"/>
+              <rect x="96" y="182" width="110" height="8" rx="4" fill="#DCE9E0"/>
+              <rect x="96" y="200" width="90" height="8" rx="4" fill="#E8F0EA"/>
+              <rect x="96" y="228" width="118" height="8" rx="4" fill="#DCE9E0"/>
+              <rect x="96" y="284" width="70" height="10" rx="5" fill="#22C55E"/>
             </g>
             <g transform="rotate(7 760 260)">
-              <rect x="680" y="150" width="150" height="190" rx="12" fill="#fff" stroke="#E4E1F5"/>
-              <rect x="680" y="150" width="150" height="34" rx="12" fill="#8B5CF6"/>
+              <rect x="680" y="150" width="150" height="190" rx="12" fill="#fff" stroke="#2C4234"/>
+              <rect x="680" y="150" width="150" height="34" rx="12" fill="#22C55E"/>
               <text x="696" y="172" font-family="monospace" font-size="14" fill="#fff">INV-001</text>
-              <rect x="696" y="202" width="110" height="8" rx="4" fill="#E7E4F8"/>
-              <rect x="696" y="220" width="90" height="8" rx="4" fill="#EEECFA"/>
-              <rect x="696" y="248" width="118" height="8" rx="4" fill="#E7E4F8"/>
-              <rect x="696" y="304" width="70" height="10" rx="5" fill="#FF6B5E"/>
+              <rect x="696" y="202" width="110" height="8" rx="4" fill="#DCE9E0"/>
+              <rect x="696" y="220" width="90" height="8" rx="4" fill="#E8F0EA"/>
+              <rect x="696" y="248" width="118" height="8" rx="4" fill="#DCE9E0"/>
+              <rect x="696" y="304" width="70" height="10" rx="5" fill="#F59E0B"/>
             </g>
-            <circle cx="120" cy="80" r="6" fill="#8B5CF6" opacity=".5"/>
-            <circle cx="820" cy="90" r="5" fill="#FF6B5E" opacity=".6"/>
-            <circle cx="450" cy="470" r="7" fill="#4F46E5" opacity=".35"/>
+            <circle cx="120" cy="80" r="6" fill="#22C55E" opacity=".5"/>
+            <circle cx="820" cy="90" r="5" fill="#F59E0B" opacity=".6"/>
+            <circle cx="450" cy="470" r="7" fill="#22C55E" opacity=".4"/>
           </svg>
         </div>
       </div>
@@ -570,7 +570,10 @@
           fov: 40,
           cameraZ: 10.5,
           build: function (THREE, scene, camera, h) {
-            h.softLights(0xfdfbff, 0xd8d4e8, 0xffffff);
+            h.softLights(0x2c4234, 0x0a100c, 0xffffff);
+            var rim = new THREE.DirectionalLight(0x22c55e, 0.55);
+            rim.position.set(-5, 3, -4);
+            scene.add(rim);
 
             /* Draw a document face (header bar + label + body lines) to a texture */
             function docTexture(label, headColor, accent) {
@@ -582,7 +585,7 @@
               g.fillStyle = "#ffffff";
               g.font = "600 30px 'JetBrains Mono', monospace";
               g.fillText(label, 22, 42);
-              g.fillStyle = "#E7E4F8";
+              g.fillStyle = "#DCE9E0";
               for (var i = 0; i < 5; i++) g.fillRect(22, 96 + i * 34, i % 2 ? 150 : 200, 12);
               g.fillStyle = accent; g.fillRect(22, 286, 110, 16);
               var tex = new THREE.CanvasTexture(c);
@@ -592,7 +595,7 @@
             function makeDoc(label, headColor, accent) {
               var g = new THREE.Group();
               var face = new THREE.MeshStandardMaterial({ map: docTexture(label, headColor, accent), roughness: 0.65 });
-              var side = new THREE.MeshStandardMaterial({ color: 0xf0eefb, roughness: 0.7 });
+              var side = new THREE.MeshStandardMaterial({ color: 0xe8f0ea, roughness: 0.7 });
               var body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.55, 0.07),
                 [side, side, side, side, face, side]);
               g.add(body);
@@ -600,10 +603,10 @@
             }
 
             var docs = [
-              { m: makeDoc("INV-001", "#8B5CF6", "#FF6B5E"), home: [ 4.15, 0.25, 0], tilt: 0.16, delay: 0.0 },
-              { m: makeDoc("QUO-001", "#4F46E5", "#8B5CF6"), home: [-4.15, 0.15, 0], tilt: -0.16, delay: 0.25 },
-              { m: makeDoc("INV-002", "#6D5AEC", "#FF8A7E"), home: [ 4.9, -1.5, -2.4], tilt: 0.3, delay: 0.5 },
-              { m: makeDoc("QUO-002", "#7C4FF0", "#B49CFA"), home: [-4.9, -1.6, -2.6], tilt: -0.3, delay: 0.7 }
+              { m: makeDoc("INV-001", "#22C55E", "#F59E0B"), home: [ 5.1, 0.5, -1.0], tilt: 0.18, delay: 0.0 },
+              { m: makeDoc("QUO-001", "#16A34A", "#4ADE80"), home: [-5.1, 0.4, -1.0], tilt: -0.18, delay: 0.25 },
+              { m: makeDoc("INV-002", "#2FA35C", "#FBBF24"), home: [ 5.6, -1.9, -3.0], tilt: 0.3, delay: 0.5 },
+              { m: makeDoc("QUO-002", "#34D399", "#86EFAC"), home: [-5.6, -2.0, -3.2], tilt: -0.3, delay: 0.7 }
             ];
             /* deterministic start offsets */
             var seed = 719;
@@ -617,10 +620,10 @@
 
             /* accent shapes */
             var coral = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0),
-              new THREE.MeshStandardMaterial({ color: 0xff6b5e, roughness: 0.45 }));
+              new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4, emissive: 0x7a5502, emissiveIntensity: 0.4 }));
             coral.position.set(2.6, 2.6, -3);
             scene.add(coral);
-            var indigoRing = h.wire(new THREE.TorusGeometry(1.05, 0.015, 8, 64), 0x8b5cf6, 0.5);
+            var indigoRing = h.wire(new THREE.TorusGeometry(1.05, 0.015, 8, 64), 0x22c55e, 0.55);
             indigoRing.position.set(-2.9, 2.4, -3.4);
             scene.add(indigoRing);
 

@@ -26,28 +26,28 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- Extended head: theme colour + display/body type -->
-  <meta name="theme-color" content="#F6F8FA">
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#0A0D12">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/landing-assets/shared.css">
   <style>
     :root{
-      --bg:#F6F8FA; --bg-soft:#ECF0F4; --card:#FFFFFF;
-      --ink:#252E38; --ink-soft:#57626E; --ink-faint:#8B96A2;
-      --line:rgba(37,46,56,.12);
-      --accent:#EA5A0B; --accent-soft:#FCEAE0;
-      --slate:#38424E; --slate-deep:#2B333D;
-      --cta:#EA5A0B; --cta-hover:#CE4C05; --cta-ink:#FFF6F0;
-      --glass:rgba(246,248,250,.8); --glass-line:rgba(37,46,56,.08);
+      --bg:#0A0D12; --bg-soft:#12161F; --card:#161B26;
+      --ink:#F4F7FB; --ink-soft:#97A3B4; --ink-faint:#586575;
+      --line:rgba(255,255,255,.09);
+      --accent:#3B82F6; --accent-soft:rgba(59,130,246,.14);
+      --slate:#97A3B4; --slate-deep:#12161F;
+      --cta:#3B82F6; --cta-hover:#60A5FA; --cta-ink:#F4F9FF;
+      --glass:rgba(10,13,18,.72); --glass-line:rgba(255,255,255,.08);
       --radius:10px; --radius-lg:16px; --maxw:1200px;
-      --font-display:'Archivo',system-ui,sans-serif;
+      --font-display:'Space Grotesk',system-ui,sans-serif;
       --font-body:'Inter',system-ui,sans-serif;
       --font-mono:'JetBrains Mono',monospace;
-      --shadow-s:0 2px 10px -4px rgba(37,46,56,.12);
-      --shadow-m:0 14px 34px -16px rgba(37,46,56,.22);
-      --shadow-l:0 30px 70px -28px rgba(37,46,56,.3);
+      --shadow-s:0 2px 12px -4px rgba(0,0,0,.5);
+      --shadow-m:0 14px 34px -14px rgba(0,0,0,.55), 0 0 30px -8px rgba(59,130,246,.25);
+      --shadow-l:0 30px 70px -24px rgba(0,0,0,.65), 0 0 60px -12px rgba(59,130,246,.28);
     }
     body{font-size:16.5px}
-    h1,h2,h3{font-family:var(--font-display);font-weight:800;letter-spacing:-.025em;line-height:1.04;color:var(--ink);text-transform:none}
+    h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:-.025em;line-height:1.04;color:var(--ink);text-transform:none}
     .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
     .eyebrow::before{content:"";width:22px;height:8px;background:repeating-linear-gradient(-55deg,var(--accent) 0 3px,transparent 3px 6px)}
     .section-head{max-width:680px;margin-bottom:clamp(38px,5vw,58px)}
@@ -58,7 +58,7 @@
     /* ===== Hero ===== */
     .hero{position:relative;min-height:min(880px,100svh);display:flex;align-items:center;padding:150px 0 90px;overflow:hidden;
       background:
-        radial-gradient(900px 560px at 88% 30%, rgba(234,90,11,.08), transparent 60%),
+        radial-gradient(900px 560px at 88% 30%, rgba(59,130,246,.12), transparent 60%),
         linear-gradient(180deg, var(--bg) 70%, var(--bg-soft)),
         var(--bg)}
     .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
@@ -86,7 +86,7 @@
     /* ===== Oversized numerals stats ===== */
     .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(18px,3vw,40px)}
     .stat{padding-top:18px;border-top:2px solid var(--ink)}
-    .stat b{display:block;font-family:var(--font-display);font-weight:900;font-size:clamp(56px,8vw,116px);line-height:.9;color:var(--ink);letter-spacing:-.04em;white-space:nowrap}
+    .stat b{display:block;font-family:var(--font-display);font-weight:700;font-size:clamp(56px,8vw,116px);line-height:.9;color:var(--ink);letter-spacing:-.04em;white-space:nowrap}
     .stat b i{font-style:normal;color:var(--accent)}
     .stat b .unit{font-size:.32em;font-weight:700;letter-spacing:0;color:var(--ink-faint);margin-left:4px}
     .stat > span{display:block;margin-top:12px;color:var(--ink-soft);font-size:14.5px;max-width:22ch}
@@ -96,7 +96,7 @@
     .frows{display:grid}
     .frow{display:grid;grid-template-columns:110px 1.1fr 1fr;gap:clamp(18px,3vw,44px);align-items:center;padding:clamp(30px,4.5vw,54px) 0;border-top:1.5px solid var(--line)}
     .frow:last-child{border-bottom:1.5px solid var(--line)}
-    .frow .fnum{font-family:var(--font-display);font-weight:900;font-size:clamp(44px,5.5vw,84px);line-height:.9;color:transparent;-webkit-text-stroke:2px var(--accent);letter-spacing:-.03em}
+    .frow .fnum{font-family:var(--font-display);font-weight:700;font-size:clamp(44px,5.5vw,84px);line-height:.9;color:transparent;-webkit-text-stroke:2px var(--accent);letter-spacing:-.03em}
     .frow h3{font-size:clamp(22px,2.6vw,30px);margin-bottom:10px;text-transform:uppercase}
     .frow p{color:var(--ink-soft);font-size:15.5px;max-width:52ch}
     .frow .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
@@ -115,14 +115,14 @@
     .stock-row .qty{color:var(--accent);font-weight:600}
     .fit-row{display:flex;gap:10px;align-items:center;padding:9px 4px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-soft)}
     .fit-row .st{margin-left:auto;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;background:var(--accent-soft);color:var(--accent)}
-    .fit-row .st.done{background:#E5F5EB;color:#187A43}
+    .fit-row .st.done{background:rgba(34,197,94,.16);color:#4ADE80}
     .inv-line{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12.5px;padding:8px 4px;border-top:1px dashed var(--line);color:var(--ink-soft)}
     .inv-line.total{border-top:2px solid var(--ink);color:var(--ink);font-weight:600}
     .fu-row{display:flex;gap:10px;align-items:center;padding:9px 4px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-soft)}
     .fu-row .ic{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
 
     /* ===== FIFO / VAT split ===== */
-    .fifo-wrap{background:var(--slate-deep);color:#E8EDF2}
+    .fifo-wrap{background:var(--slate-deep);border-block:1px solid var(--line);color:#E8EDF2}
     .fifo-wrap .section-head h2{color:#fff}
     .fifo-wrap .section-head p{color:#A5B1BD}
     .fifo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
@@ -131,7 +131,7 @@
     .fifo-card p{color:#A5B1BD;font-size:14.5px;margin-bottom:18px}
     .fifo-line{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12.5px;padding:8px 2px;border-top:1px dashed rgba(255,255,255,.14);color:#C4CEd8}
     .fifo-line b{color:#fff}
-    .fifo-line .hl{color:#FF8A4C}
+    .fifo-line .hl{color:#60A5FA}
     @media (max-width:860px){.fifo-grid{grid-template-columns:1fr}}
 
     /* ===== Pricing ===== */
@@ -140,7 +140,7 @@
     .plan.is-featured{border-color:var(--accent);box-shadow:var(--shadow-m);position:relative}
     .plan .flag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 14px;border-radius:99px;white-space:nowrap}
     .plan h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
-    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:900;font-size:40px;color:var(--ink);letter-spacing:-.03em}
+    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:700;font-size:40px;color:var(--ink);letter-spacing:-.03em}
     .plan .price small{font-family:var(--font-body);font-size:14px;color:var(--ink-faint);font-weight:500}
     .plan .per{font-size:13px;color:var(--ink-faint);margin-bottom:18px}
     .plan ul{list-style:none;display:grid;gap:9px;margin-bottom:24px}
@@ -154,9 +154,9 @@
     .faq-wrap{max-width:760px;margin-inline:auto}
 
     /* ===== Final CTA ===== */
-    .final{background:var(--slate-deep);padding:clamp(64px,9vw,120px) 0;text-align:center;color:#E8EDF2;position:relative;overflow:hidden}
+    .final{background:var(--slate-deep);border-top:1px solid var(--line);padding:clamp(64px,9vw,120px) 0;text-align:center;color:#E8EDF2;position:relative;overflow:hidden}
     .final::before{content:"";position:absolute;inset:0;background:
-      repeating-linear-gradient(-55deg, rgba(234,90,11,.07) 0 14px, transparent 14px 42px)}
+      repeating-linear-gradient(-55deg, rgba(59,130,246,.08) 0 14px, transparent 14px 42px)}
     .final>*{position:relative}
     .final h2{color:#fff;font-size:clamp(32px,5vw,60px);max-width:20ch;margin:0 auto 16px;text-transform:uppercase}
     .final p{color:#A5B1BD;max-width:52ch;margin:0 auto 32px;font-size:17px}
@@ -172,7 +172,7 @@
     <div class="lcontainer lnav-inner">
       <a class="lnav-logo" href="/tyreops">
         <span class="lnav-mark" style="background:var(--slate-deep)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
         </span>
         <span>Alzaro <span style="color:var(--accent)">TyreOps</span></span>
       </a>
@@ -222,33 +222,33 @@
             <!-- Static poster: stacked tyres, shown on mobile / reduced motion / no WebGL -->
             <div class="hero-poster">
               <svg width="70%" viewBox="0 0 380 360" fill="none" role="img" aria-label="Illustration of stacked tyres">
-                <ellipse cx="190" cy="322" rx="140" ry="22" fill="#38424E" opacity=".1"/>
+                <ellipse cx="190" cy="322" rx="140" ry="22" fill="#3B82F6" opacity=".08"/>
                 <g>
-                  <ellipse cx="150" cy="280" rx="112" ry="40" fill="#2B333D"/>
-                  <ellipse cx="150" cy="266" rx="112" ry="40" fill="#38424E"/>
-                  <ellipse cx="150" cy="266" rx="58" ry="20" fill="#ECF0F4"/>
-                  <ellipse cx="150" cy="222" rx="112" ry="40" fill="#2B333D"/>
-                  <ellipse cx="150" cy="208" rx="112" ry="40" fill="#404B58"/>
-                  <ellipse cx="150" cy="208" rx="58" ry="20" fill="#ECF0F4"/>
-                  <ellipse cx="150" cy="164" rx="112" ry="40" fill="#2B333D"/>
-                  <ellipse cx="150" cy="150" rx="112" ry="40" fill="#38424E"/>
-                  <ellipse cx="150" cy="150" rx="58" ry="20" fill="#EA5A0B"/>
-                  <ellipse cx="150" cy="150" rx="34" ry="12" fill="#ECF0F4"/>
+                  <ellipse cx="150" cy="280" rx="112" ry="40" fill="#12161F"/>
+                  <ellipse cx="150" cy="266" rx="112" ry="40" fill="#1A2030"/>
+                  <ellipse cx="150" cy="266" rx="58" ry="20" fill="#3A465C"/>
+                  <ellipse cx="150" cy="222" rx="112" ry="40" fill="#12161F"/>
+                  <ellipse cx="150" cy="208" rx="112" ry="40" fill="#222B3D"/>
+                  <ellipse cx="150" cy="208" rx="58" ry="20" fill="#3A465C"/>
+                  <ellipse cx="150" cy="164" rx="112" ry="40" fill="#12161F"/>
+                  <ellipse cx="150" cy="150" rx="112" ry="40" fill="#1A2030"/>
+                  <ellipse cx="150" cy="150" rx="58" ry="20" fill="#3B82F6"/>
+                  <ellipse cx="150" cy="150" rx="34" ry="12" fill="#3A465C"/>
                 </g>
                 <g transform="rotate(14 300 190)">
-                  <circle cx="300" cy="150" r="64" fill="#2B333D"/>
-                  <circle cx="300" cy="150" r="40" fill="#404B58"/>
-                  <circle cx="300" cy="150" r="26" fill="#ECF0F4"/>
-                  <circle cx="300" cy="150" r="10" fill="#EA5A0B"/>
-                  <g fill="#1F262E">
+                  <circle cx="300" cy="150" r="64" fill="#12161F"/>
+                  <circle cx="300" cy="150" r="40" fill="#222B3D"/>
+                  <circle cx="300" cy="150" r="26" fill="#3A465C"/>
+                  <circle cx="300" cy="150" r="10" fill="#3B82F6"/>
+                  <g fill="#0A0D12">
                     <rect x="296" y="84" width="8" height="14" rx="2"/>
                     <rect x="296" y="202" width="8" height="14" rx="2"/>
                     <rect x="238" y="146" width="14" height="8" rx="2"/>
                     <rect x="348" y="146" width="14" height="8" rx="2"/>
                   </g>
                 </g>
-                <circle cx="66" cy="96" r="5" fill="#EA5A0B" opacity=".7"/>
-                <circle cx="342" cy="286" r="6" fill="#38424E" opacity=".4"/>
+                <circle cx="66" cy="96" r="5" fill="#60A5FA" opacity=".8"/>
+                <circle cx="342" cy="286" r="6" fill="#1A2030" opacity=".4"/>
               </svg>
             </div>
           </div>
@@ -368,7 +368,7 @@
     <section class="lsection fifo-wrap" id="stock">
       <div class="lcontainer">
         <div class="section-head reveal">
-          <span class="eyebrow" style="color:#FF8A4C">The stock engine</span>
+          <span class="eyebrow" style="color:#60A5FA">The stock engine</span>
           <h2>The clever bits, running quietly underneath</h2>
           <p>Two things tyre garages get wrong in spreadsheets — priced batches and part-worn VAT — handled properly, automatically.</p>
         </div>
@@ -513,7 +513,7 @@
         <div>
           <a class="lnav-logo" href="/tyreops">
             <span class="lnav-mark" style="background:var(--slate-deep)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
             </span>
             <span>Alzaro <span style="color:var(--accent)">TyreOps</span></span>
           </a>
@@ -567,15 +567,15 @@
           fov: 40,
           cameraZ: 8.2,
           build: function (THREE, scene, camera, h) {
-            h.softLights(0xf3f7fb, 0xc5ced8, 0xffffff);
-            var rim = new THREE.DirectionalLight(0xffb27d, 0.35);
+            h.softLights(0x2e3a52, 0x0a0d12, 0xffffff);
+            var rim = new THREE.DirectionalLight(0x3b82f6, 0.8);
             rim.position.set(-5, 2, -3);
             scene.add(rim);
 
-            var rubber = new THREE.MeshStandardMaterial({ color: 0x2b333d, roughness: 0.9, metalness: 0.05 });
-            var rubberLight = new THREE.MeshStandardMaterial({ color: 0x38424e, roughness: 0.9, metalness: 0.05 });
-            var orange = new THREE.MeshStandardMaterial({ color: 0xea5a0b, roughness: 0.5, metalness: 0.1 });
-            var steel = new THREE.MeshStandardMaterial({ color: 0xd4dae1, roughness: 0.3, metalness: 0.7 });
+            var rubber = new THREE.MeshStandardMaterial({ color: 0x141922, roughness: 0.9, metalness: 0.05 });
+            var rubberLight = new THREE.MeshStandardMaterial({ color: 0x1e2735, roughness: 0.9, metalness: 0.05 });
+            var orange = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4, metalness: 0.2, emissive: 0x123164, emissiveIntensity: 0.55 });
+            var steel = new THREE.MeshStandardMaterial({ color: 0xb9c2cf, roughness: 0.28, metalness: 0.8 });
 
             /* --- Macro tyre, front and centre --- */
             var macro = new THREE.Group();

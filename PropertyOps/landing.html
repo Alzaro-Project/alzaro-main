@@ -13,7 +13,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/favicon.svg">
   <meta name="robots" content="index, follow">
-  <meta name="theme-color" content="#FAF9F6">
+  <meta name="theme-color" content="#100D05">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Alzaro">
   <meta property="og:title" content="Alzaro PropertyOps — Property Management Software for UK Landlords">
@@ -25,27 +25,27 @@
   <meta name="twitter:title" content="Alzaro PropertyOps — Property Management Software for UK Landlords">
   <meta name="twitter:description" content="Tenant management, rent collection, maintenance tracking & compliance for UK landlords. Manage 1 property or 100. Start your 14-day free trial.">
   <meta name="twitter:image" content="https://alzaro.co.uk/favicon.svg">
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,480;9..144,560;9..144,640&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/landing-assets/shared.css">
   <style>
     :root{
-      --bg:#FAF9F6; --bg-soft:#F1EEE5; --card:#FFFFFF;
-      --ink:#1C2B23; --ink-soft:#51645A; --ink-faint:#8C9B91;
-      --line:rgba(28,43,35,.11);
-      --accent:#2E5943; --accent-soft:#E8EFE4;
-      --sage:#9DB79A; --sage-deep:#7A9977; --forest:#1E4635;
-      --cta:#C25E3A; --cta-hover:#AA4C2A; --cta-ink:#FFF7F1;
-      --glass:rgba(250,249,246,.78); --glass-line:rgba(28,43,35,.08);
+      --bg:#100D05; --bg-soft:#161107; --card:#1B1509;
+      --ink:#FBF9F1; --ink-soft:#A89F87; --ink-faint:#6B614B;
+      --line:rgba(255,255,255,.08);
+      --accent:#EAB308; --accent-soft:rgba(234,179,8,.13);
+      --sage:#FACC15; --sage-deep:#EAB308; --forest:#EAB308;
+      --cta:#EAB308; --cta-hover:#FACC15; --cta-ink:#171204;
+      --glass:rgba(16,13,5,.72); --glass-line:rgba(255,255,255,.08);
       --radius:18px; --radius-lg:26px; --maxw:1180px;
-      --font-display:'Fraunces',Georgia,serif;
+      --font-display:'Space Grotesk',system-ui,sans-serif;
       --font-body:'Inter',system-ui,sans-serif;
       --font-mono:'JetBrains Mono',monospace;
-      --shadow-s:0 2px 10px -4px rgba(30,70,53,.12);
-      --shadow-m:0 14px 34px -16px rgba(30,70,53,.22);
-      --shadow-l:0 30px 70px -28px rgba(30,70,53,.32);
+      --shadow-s:0 2px 12px -4px rgba(0,0,0,.5);
+      --shadow-m:0 14px 34px -14px rgba(0,0,0,.55), 0 0 30px -8px rgba(234,179,8,.22);
+      --shadow-l:0 30px 70px -24px rgba(0,0,0,.65), 0 0 60px -12px rgba(234,179,8,.25);
     }
     body{font-size:16.5px}
-    h1,h2,h3{font-family:var(--font-display);font-weight:560;letter-spacing:-.015em;line-height:1.12;color:var(--ink)}
+    h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:-.025em;line-height:1.1;color:var(--ink)}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
     .eyebrow::before{content:"";width:26px;height:1.5px;background:var(--sage-deep)}
     .section-head{max-width:640px;margin-bottom:clamp(40px,5vw,64px)}
@@ -55,12 +55,12 @@
     /* ===== Hero ===== */
     .hero{position:relative;min-height:min(920px,100svh);display:flex;align-items:center;padding:150px 0 90px;
       background:
-        radial-gradient(1000px 620px at 88% 18%, rgba(157,183,154,.20), transparent 62%),
-        radial-gradient(760px 520px at 8% 92%, rgba(194,94,58,.07), transparent 60%),
+        radial-gradient(1000px 620px at 88% 18%, rgba(234,179,8,.10), transparent 62%),
+        radial-gradient(760px 520px at 8% 92%, rgba(234,179,8,.05), transparent 60%),
         var(--bg)}
     .hero-grid{display:grid;grid-template-columns:minmax(0,560px) 1fr;gap:40px;align-items:center;width:100%}
     .hero h1{font-size:clamp(40px,5.6vw,68px);margin:22px 0 24px}
-    .hero h1 em{font-style:italic;color:var(--accent)}
+    .hero h1 em{font-style:normal;color:var(--accent)}
     .hero-sub{font-size:clamp(17px,1.9vw,20px);color:var(--ink-soft);max-width:47ch;margin-bottom:34px}
     .hero-ctas{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
     .hero-note{margin-top:20px;font-size:14px;color:var(--ink-faint);display:flex;gap:18px;flex-wrap:wrap}
@@ -83,7 +83,7 @@
     /* ===== Editorial stats ===== */
     .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(24px,4vw,56px)}
     .stat{border-left:1px solid var(--line);padding-left:clamp(16px,2vw,28px)}
-    .stat b{display:block;font-family:var(--font-display);font-weight:560;font-size:clamp(38px,4.6vw,58px);line-height:1;color:var(--forest)}
+    .stat b{display:block;font-family:var(--font-display);font-weight:700;font-size:clamp(38px,4.6vw,58px);line-height:1;color:var(--ink)}
     .stat b sup{font-size:.45em;top:-.7em;color:var(--cta)}
     .stat > span{display:block;margin-top:10px;color:var(--ink-soft);font-size:15px;max-width:20ch}
     @media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr);row-gap:36px}}
@@ -94,7 +94,7 @@
     .cell h3{font-size:clamp(20px,2.1vw,24px);margin-bottom:10px}
     .cell p{color:var(--ink-soft);font-size:15px;max-width:44ch}
     .cell-icon{width:44px;height:44px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:18px;flex:none}
-    .cell-big{grid-column:span 4;grid-row:span 2;background:linear-gradient(160deg,#FFFFFF 30%,#F4F7F0)}
+    .cell-big{grid-column:span 4;grid-row:span 2;background:linear-gradient(160deg,var(--card) 30%,#231C0B)}
     .cell-tall{grid-column:span 2;grid-row:span 2}
     .cell-half{grid-column:span 2}
     .cell-wide{grid-column:span 4}
@@ -111,7 +111,7 @@
     .mock-row small{color:var(--ink-faint);display:block;font-size:12px}
     .pill{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:99px;white-space:nowrap}
     .pill.ok{background:var(--accent-soft);color:var(--accent)}
-    .pill.due{background:#FCEDE5;color:var(--cta)}
+    .pill.due{background:rgba(250,204,21,.15);color:#FACC15}
     /* projection bars */
     .bars{display:flex;align-items:flex-end;gap:8px;height:110px}
     .bars i{flex:1;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,var(--sage) 0%,var(--sage-deep));opacity:.9;min-height:12%}
@@ -157,7 +157,7 @@
     .plan.is-featured{border-color:var(--accent);box-shadow:var(--shadow-m);position:relative}
     .plan .flag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#F3F7F0;font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 14px;border-radius:99px;white-space:nowrap}
     .plan h3{font-size:19px}
-    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:560;font-size:40px;color:var(--forest)}
+    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:700;font-size:40px;color:var(--ink)}
     .plan .price small{font-family:var(--font-body);font-size:14px;color:var(--ink-faint);font-weight:500}
     .plan .per{font-size:13px;color:var(--ink-faint);margin-bottom:18px}
     .plan ul{list-style:none;display:grid;gap:9px;margin-bottom:24px}
@@ -172,10 +172,10 @@
     .faq-wrap{max-width:760px;margin-inline:auto}
 
     /* ===== Final CTA ===== */
-    .final{background:var(--forest);border-radius:var(--radius-lg);padding:clamp(48px,7vw,88px) clamp(28px,6vw,80px);position:relative;overflow:hidden;text-align:center;color:#F2F6EE}
+    .final{background:linear-gradient(160deg,#1C1608,#0E0B04);border:1px solid rgba(234,179,8,.25);border-radius:var(--radius-lg);padding:clamp(48px,7vw,88px) clamp(28px,6vw,80px);position:relative;overflow:hidden;text-align:center;color:#F2F6EE}
     .final::before{content:"";position:absolute;inset:0;background:
-      radial-gradient(640px 380px at 82% 0%, rgba(157,183,154,.28), transparent 62%),
-      radial-gradient(520px 340px at 12% 100%, rgba(194,94,58,.25), transparent 60%)}
+      radial-gradient(640px 380px at 82% 0%, rgba(234,179,8,.16), transparent 62%),
+      radial-gradient(520px 340px at 12% 100%, rgba(250,204,21,.08), transparent 60%)}
     .final>*{position:relative}
     .final h2{color:#F7FAF3;font-size:clamp(30px,4.4vw,50px);max-width:18ch;margin:0 auto 16px}
     .final p{color:rgba(242,246,238,.78);max-width:52ch;margin:0 auto 32px;font-size:17px}
@@ -190,8 +190,8 @@
   <header class="lnav" aria-label="Primary">
     <div class="lcontainer lnav-inner">
       <a class="lnav-logo" href="/propertyops">
-        <span class="lnav-mark" style="background:var(--forest)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2F6EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+        <span class="lnav-mark" style="background:var(--accent)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#171204" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
         </span>
         <span>Alzaro <span style="color:var(--accent)">PropertyOps</span></span>
       </a>
@@ -241,20 +241,20 @@
             <!-- Static poster: isometric block, shown on mobile / reduced motion / no WebGL -->
             <div class="hero-poster">
               <svg width="78%" viewBox="0 0 420 360" fill="none" role="img" aria-label="Illustration of an apartment building">
-                <ellipse cx="210" cy="318" rx="150" ry="26" fill="#1E4635" opacity=".08"/>
+                <ellipse cx="210" cy="318" rx="150" ry="26" fill="#EAB308" opacity=".07"/>
                 <g>
-                  <path d="M120 150 210 105l90 45v130l-90 45-90-45z" fill="#F3EFE3"/>
-                  <path d="M210 105l90 45v130l-90 45V195z" fill="#E4DECB"/>
-                  <path d="M120 150l90 45v130l-90-45z" fill="#EFEADA"/>
-                  <path d="M120 150 210 105l90 45-90 45z" fill="#C25E3A"/>
-                  <path d="M120 150l90 45 90-45-14-7-76 38-76-38z" fill="#A84D2B"/>
-                  <g fill="#2E5943" opacity=".85">
+                  <path d="M120 150 210 105l90 45v130l-90 45-90-45z" fill="#2A2210"/>
+                  <path d="M210 105l90 45v130l-90 45V195z" fill="#201A0C"/>
+                  <path d="M120 150l90 45v130l-90-45z" fill="#251E0E"/>
+                  <path d="M120 150 210 105l90 45-90 45z" fill="#EAB308"/>
+                  <path d="M120 150l90 45 90-45-14-7-76 38-76-38z" fill="#B38A06"/>
+                  <g fill="#FACC15" opacity=".9">
                     <rect x="138" y="140" width="18" height="24" rx="2"/>
                     <rect x="166" y="154" width="18" height="24" rx="2"/>
                     <rect x="138" y="176" width="18" height="24" rx="2"/>
                     <rect x="166" y="190" width="18" height="24" rx="2"/>
                   </g>
-                  <g fill="#9DB79A">
+                  <g fill="#EAB308" opacity=".75">
                     <rect x="236" y="154" width="18" height="24" rx="2"/>
                     <rect x="264" y="140" width="18" height="24" rx="2"/>
                     <rect x="236" y="190" width="18" height="24" rx="2"/>
@@ -262,18 +262,18 @@
                   </g>
                 </g>
                 <g>
-                  <path d="M78 236l30-15 30 15v44l-30 15-30-15z" fill="#9DB79A"/>
-                  <path d="M108 221l30 15-30 15-30-15z" fill="#7A9977"/>
-                  <path d="M108 251v44l30-15v-44z" fill="#87A584"/>
+                  <path d="M78 236l30-15 30 15v44l-30 15-30-15z" fill="#251E0E"/>
+                  <path d="M108 221l30 15-30 15-30-15z" fill="#EAB308"/>
+                  <path d="M108 251v44l30-15v-44z" fill="#1D170A"/>
                 </g>
                 <g>
-                  <path d="M282 250l28-14 28 14v36l-28 14-28-14z" fill="#F3EFE3"/>
-                  <path d="M310 236l28 14-28 14-28-14z" fill="#C25E3A"/>
-                  <path d="M310 264v36l28-14v-36z" fill="#E4DECB"/>
+                  <path d="M282 250l28-14 28 14v36l-28 14-28-14z" fill="#2A2210"/>
+                  <path d="M310 236l28 14-28 14-28-14z" fill="#FACC15"/>
+                  <path d="M310 264v36l28-14v-36z" fill="#1D170A"/>
                 </g>
-                <circle cx="86" cy="176" r="4" fill="#C25E3A" opacity=".7"/>
-                <circle cx="352" cy="150" r="5" fill="#9DB79A" opacity=".8"/>
-                <circle cx="330" cy="96" r="3" fill="#2E5943" opacity=".5"/>
+                <circle cx="86" cy="176" r="4" fill="#FACC15" opacity=".8"/>
+                <circle cx="352" cy="150" r="5" fill="#EAB308" opacity=".6"/>
+                <circle cx="330" cy="96" r="3" fill="#FACC15" opacity=".5"/>
               </svg>
             </div>
           </div>
@@ -566,8 +566,8 @@
       <div class="lfooter-grid">
         <div>
           <a class="lnav-logo" href="/propertyops">
-            <span class="lnav-mark" style="background:var(--forest)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2F6EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+            <span class="lnav-mark" style="background:var(--accent)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#171204" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
             </span>
             <span>Alzaro <span style="color:var(--accent)">PropertyOps</span></span>
           </a>
@@ -623,10 +623,14 @@
           cameraY: 1.1,
           build: function (THREE, scene, camera, h) {
             var PAL = {
-              cream: 0xefe8d5, creamDark: 0xddd3b8, sage: 0x8fae8b,
-              sageDeep: 0x6d8f6a, forest: 0x2e5943, terra: 0xc25e3a
+              dark: 0x2a2210, darker: 0x201a0c, gold: 0xeab308,
+              goldDeep: 0xb38a06, treeCrown: 0x33351a, terra: 0xeab308
             };
-            h.softLights(0xfdfbf3, 0xcfd8c4, 0xfff4e0);
+            /* night lighting: dim warm ambient + gold key + amber rim */
+            h.softLights(0x4a4430, 0x0d0a04, 0xffd980);
+            var rimL = new THREE.DirectionalLight(0xffb300, 0.4);
+            rimL.position.set(-6, 3, -4);
+            scene.add(rimL);
 
             var world = new THREE.Group();
             var building = new THREE.Group();
@@ -657,23 +661,26 @@
             for (var f = 0; f < floors; f++) {
               for (var c = 0; c < cols; c++) {
                 for (var z = 0; z < depth; z++) {
-                  var k = (f + c + z) % 3;
-                  var colr = k === 0 ? PAL.sage : (k === 1 ? PAL.cream : PAL.creamDark);
-                  addPart(h.solid(box, colr), (c - 1) * 1.2, f * 1.2 + 0.6, (z - 0.5) * 1.2, d * 0.055);
+                  var k = (f * 7 + c * 3 + z) % 5;
+                  /* scattered lit windows glowing gold in the night */
+                  var m = k === 0
+                    ? h.solid(box, PAL.gold, { emissive: 0x8a6805, emissiveIntensity: 0.75, roughness: 0.4 })
+                    : h.solid(box, k % 2 ? PAL.dark : PAL.darker);
+                  addPart(m, (c - 1) * 1.2, f * 1.2 + 0.6, (z - 0.5) * 1.2, d * 0.055);
                   d++;
                 }
               }
             }
             /* Terracotta roof, door, low-poly trees */
-            var roof = h.solid(new THREE.ConeGeometry(2.35, 1.25, 4), PAL.terra);
+            var roof = h.solid(new THREE.ConeGeometry(2.35, 1.25, 4), PAL.gold, { emissive: 0x6b5204, emissiveIntensity: 0.35, roughness: 0.45 });
             roof.rotation.y = Math.PI / 4;
             addPart(roof, 0, floors * 1.2 + 0.62, 0, d * 0.055 + 0.15);
-            addPart(h.solid(new THREE.BoxGeometry(0.6, 0.95, 0.12), PAL.forest), 0, 0.48, 1.26, 0.2);
+            addPart(h.solid(new THREE.BoxGeometry(0.6, 0.95, 0.12), PAL.gold, { emissive: 0x8a6805, emissiveIntensity: 0.6 }), 0, 0.48, 1.26, 0.2);
             function tree(x, z, s, delay) {
               var g = new THREE.Group();
-              var trunk = h.solid(new THREE.CylinderGeometry(0.09, 0.12, 0.5, 6), 0x8a6a4f);
+              var trunk = h.solid(new THREE.CylinderGeometry(0.09, 0.12, 0.5, 6), 0x3a2d1c);
               trunk.position.y = 0.25;
-              var crown = h.solid(new THREE.ConeGeometry(0.5 * s, 1.05 * s, 7), PAL.sageDeep);
+              var crown = h.solid(new THREE.ConeGeometry(0.5 * s, 1.05 * s, 7), PAL.treeCrown);
               crown.position.y = 0.5 + 0.5 * s;
               g.add(trunk); g.add(crown);
               addPart(g, x, 0, z, delay);
@@ -681,15 +688,15 @@
             tree(-3.1, 0.9, 1.0, 0.9); tree(3.0, -0.4, 0.8, 1.05); tree(2.6, 1.4, 1.15, 1.2);
 
             /* Drifting accents */
-            var orb1 = h.solid(new THREE.IcosahedronGeometry(0.34, 0), PAL.terra, { roughness: 0.4 });
+            var orb1 = h.solid(new THREE.IcosahedronGeometry(0.34, 0), PAL.gold, { roughness: 0.35, emissive: 0x6b5204, emissiveIntensity: 0.5 });
             orb1.position.set(-3.4, 6.4, -1.5); building.add(orb1);
-            var orb2 = h.solid(new THREE.IcosahedronGeometry(0.22, 0), PAL.sage, { roughness: 0.4 });
+            var orb2 = h.solid(new THREE.IcosahedronGeometry(0.22, 0), 0xffb300, { roughness: 0.35, emissive: 0x7a5502, emissiveIntensity: 0.5 });
             orb2.position.set(3.6, 7.4, 0.8); building.add(orb2);
 
             /* Soft ground disc for grounding */
             var ground = new THREE.Mesh(
               new THREE.CircleGeometry(4.6, 48),
-              new THREE.MeshBasicMaterial({ color: 0x2e5943, transparent: true, opacity: 0.07 }));
+              new THREE.MeshBasicMaterial({ color: 0xeab308, transparent: true, opacity: 0.06 }));
             ground.rotation.x = -Math.PI / 2;
             ground.position.y = 0.01;
             building.add(ground);
