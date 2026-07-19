@@ -87,7 +87,10 @@ export default async function handler(req, res) {
 
     let client = { name: invoice.client_name || '' }
     if (invoice.client_name) {
-      const enc = encodeURIComponent(invoice.client_name)
+      // ilike is used for case-insensitive EXACT match, so escape LIKE
+      // wildcards — a client name containing % or _ must not pattern-match a
+      // different client's details onto the invoice.
+      const enc = encodeURIComponent(invoice.client_name.replace(/([\\%_])/g, '\\$1'))
       const clientRows = await sbSelect(token, anonKey, `soloops_clients?name=ilike.${enc}&select=name,email,address&limit=1`)
       if (clientRows[0]) client = clientRows[0]
     }

@@ -147,8 +147,10 @@ export async function insertClient(row) {
 export async function ensureClient(uid, name, kind, details) {
   const clean = (name||'').trim()
   if (!clean) return { created:false, client:null }
+  // ilike here means case-insensitive EXACT match — escape LIKE wildcards so a
+  // name containing % or _ can't pattern-match a different client.
   const { data: existing } = await sb.from('soloops_clients')
-    .select('*').ilike('name', clean).limit(1)
+    .select('*').ilike('name', clean.replace(/([\\%_])/g, '\\$1')).limit(1)
   const found = (existing||[])[0]
   if (found) {
     const patch = {}
