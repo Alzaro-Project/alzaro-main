@@ -37,6 +37,28 @@ export default async function handler(req, res) {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
     })
     if (!authCheck.ok) return res.status(401).json({ error: 'Invalid or expired session' })
+    let userId = null
+    try { userId = (await authCheck.json())?.id || null } catch (e) {}
+    if (!userId) return res.status(401).json({ error: 'Invalid or expired session' })
+
+    // Authorization: an active product_members row, same gate as send-email /
+    // test-smtp — a suspended or cancelled account must not keep using the PDF
+    // generator. Read with the caller's own token; RLS returns only their rows.
+    let isMember = false
+    try {
+      const mUrl =
+        `${SUPABASE_URL}/rest/v1/product_members` +
+        `?user_id=eq.${encodeURIComponent(userId)}` +
+        `&status=in.(active,trial,trialing)&select=id&limit=1`
+      const mRes = await fetch(mUrl, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
+      if (mRes.ok) {
+        const rows = await mRes.json().catch(() => [])
+        isMember = Array.isArray(rows) && rows.length > 0
+      }
+    } catch (e) { /* fail closed below */ }
+    if (!isMember) {
+      return res.status(403).json({ error: 'Your account is not active.' })
+    }
 
     const { invoice_id, format } = req.body || {}
     if (!invoice_id) return res.status(400).json({ error: 'Missing invoice_id' })
