@@ -84,9 +84,13 @@ export default async function handler(req, res) {
       if (clientRows[0]) client = clientRows[0]
     }
 
-    // logo (optional) — fetch bytes server-side if a URL is set
+    // logo (optional) — fetch bytes server-side, but ONLY from this project's
+    // own Supabase storage (the only place the Settings logo upload ever
+    // writes). logo_url is a user-writable settings column, so fetching an
+    // arbitrary value would let a caller aim this server at internal or
+    // metadata endpoints (SSRF).
     let logoBytes = null
-    if (biz.logo_url) {
+    if (typeof biz.logo_url === 'string' && biz.logo_url.startsWith(`${SUPABASE_URL}/storage/`)) {
       try {
         const r = await fetch(biz.logo_url)
         if (r.ok) logoBytes = new Uint8Array(await r.arrayBuffer())
