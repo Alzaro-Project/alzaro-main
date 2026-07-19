@@ -70,17 +70,25 @@ export default async function handler(req, res) {
     const invoice = invoices[0]
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
 
-    // line items, settings, and matching client (by name)
+    // line items, settings, and matching client (by name). Settings columns are
+    // listed explicitly — the PDF only needs business/bank fields, and select=*
+    // would drag smtp_pass / smtp_pass_enc into this handler for no reason.
+    const BIZ_COLS = [
+      'business_name', 'address', 'phone', 'email', 'logo_url',
+      'vat_registered', 'vat_number', 'vat_scheme', 'flat_rate',
+      'bank_name', 'bank_account_name', 'bank_sort_code', 'bank_account_number',
+      'payment_terms',
+    ].join(',')
     const [lines, settingsRows] = await Promise.all([
       sbSelect(token, anonKey, `soloops_invoice_lines?invoice_id=eq.${encInvoiceId}&select=*&order=position.asc`),
-      sbSelect(token, anonKey, `soloops_settings?select=*&limit=1`),
+      sbSelect(token, anonKey, `soloops_settings?select=${BIZ_COLS}&limit=1`),
     ])
     const biz = settingsRows[0] || {}
 
     let client = { name: invoice.client_name || '' }
     if (invoice.client_name) {
       const enc = encodeURIComponent(invoice.client_name)
-      const clientRows = await sbSelect(token, anonKey, `soloops_clients?name=ilike.${enc}&select=*&limit=1`)
+      const clientRows = await sbSelect(token, anonKey, `soloops_clients?name=ilike.${enc}&select=name,email,address&limit=1`)
       if (clientRows[0]) client = clientRows[0]
     }
 
