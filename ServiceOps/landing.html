@@ -8,848 +8,653 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Extended head: canonical, icons, social cards, brand type -->
+  <link rel="canonical" href="https://alzaro.co.uk/serviceops">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/favicon.svg">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#FFFDF7">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Alzaro">
+  <meta property="og:title" content="Alzaro ServiceOps — Job Management for UK Tradespeople">
+  <meta property="og:description" content="Quotes, invoices, job scheduling & customer management for plumbers, electricians, builders and trades. Built in the UK. Start your 14-day free trial.">
+  <meta property="og:url" content="https://alzaro.co.uk/serviceops">
+  <meta property="og:image" content="https://alzaro.co.uk/favicon.svg">
+  <meta property="og:locale" content="en_GB">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Alzaro ServiceOps — Job Management for UK Tradespeople">
+  <meta name="twitter:description" content="Quotes, invoices, job scheduling & customer management for plumbers, electricians, builders and trades. Built in the UK. Start your 14-day free trial.">
+  <meta name="twitter:image" content="https://alzaro.co.uk/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing-assets/shared.css">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#0a100c;
-      --bg2:#0d130f;
-      --surface:#111814;
-      --surface2:#19231d;
-      --line:rgba(255,255,255,0.06);
-      --line2:rgba(255,255,255,0.12);
-      --text:#f4faf6;
-      --text2:#98a89e;
-      --text3:#586b60;
-      --green:#22c55e;
-      --green-light:#4ade80;
-      --green-subtle:rgba(34,197,94,0.08);
-      --green-glow:rgba(34,197,94,0.35);
-      --amber:#f59e0b;
-      --blue:#38bdf8;
-      --mono:'JetBrains Mono',monospace;
+      --bg:#FFFDF7; --bg-soft:#F7F4EA; --card:#FFFFFF;
+      --ink:#26244A; --ink-soft:#5B5980; --ink-faint:#9391AE;
+      --line:rgba(38,36,74,.11);
+      --indigo:#4F46E5; --violet:#8B5CF6;
+      --accent:#5B50E8; --accent-soft:#EDEBFC;
+      --cta:#FF6B5E; --cta-hover:#F0523F; --cta-ink:#FFF9F5;
+      --glass:rgba(255,253,247,.78); --glass-line:rgba(38,36,74,.08);
+      --radius:16px; --radius-lg:24px; --maxw:1160px;
+      --font-display:'Syne',system-ui,sans-serif;
+      --font-body:'Plus Jakarta Sans',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+      --shadow-s:0 2px 10px -4px rgba(79,70,229,.10);
+      --shadow-m:0 14px 34px -16px rgba(79,70,229,.20);
+      --shadow-l:0 30px 70px -28px rgba(79,70,229,.28);
+      --grad:linear-gradient(100deg,var(--indigo),var(--violet));
     }
-    html{scroll-behavior:smooth}
-    @media (prefers-reduced-motion:reduce){
-      html{scroll-behavior:auto}
-      *,*::before,*::after{animation-duration:0.001s!important;transition-duration:0.001s!important}
-    }
-    body{font-family:'Space Grotesk',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
-    a{color:inherit;text-decoration:none}
-    .container{max-width:1180px;margin:0 auto;padding:0 28px}
-    .mono{font-family:var(--mono)}
-    .page{display:none}
-    .page.active{display:block}
+    body{font-size:16.5px}
+    h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:-.02em;line-height:1.08;color:var(--ink)}
+    .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+    .eyebrow::before,.eyebrow.center::after{content:"";width:22px;height:2px;border-radius:2px;background:var(--grad)}
+    .section-head{max-width:660px;margin-bottom:clamp(38px,5vw,60px)}
+    .section-head.center{margin-inline:auto;text-align:center}
+    .section-head.center .eyebrow{justify-content:center}
+    .section-head h2{font-size:clamp(30px,4.2vw,46px);margin:14px 0 16px}
+    .section-head p{color:var(--ink-soft);font-size:17.5px}
 
-    nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:16px 0;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
-    nav.scrolled{background:rgba(10,16,12,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom-color:var(--line)}
-    nav .container{display:flex;align-items:center;justify-content:space-between}
-    .logo{font-size:20px;font-weight:700;letter-spacing:-0.01em}
-    .logo span{color:var(--green)}
-    .nav-center{display:flex;gap:26px}
-    .nav-center a{font-size:13.5px;font-weight:500;color:var(--text2);transition:color .2s}
-    .nav-center a:hover,.nav-center a.active{color:var(--text)}
-    .nav-right{display:flex;gap:10px;align-items:center}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-radius:8px;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
-    .btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#04130a;font-size:13.5px;padding:10px 20px;box-shadow:0 4px 18px var(--green-glow)}
-    .btn-green:hover{transform:translateY(-1px);box-shadow:0 8px 26px var(--green-glow)}
-    .btn-ghost{border:1px solid var(--line2);color:var(--text2);font-size:13.5px;padding:10px 20px}
-    .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.28)}
-    .btn-lg{font-size:15px;padding:15px 28px;border-radius:10px}
+    /* ===== Hero (centred, airy, docs orbiting behind) ===== */
+    .hero{position:relative;min-height:min(860px,100svh);display:flex;align-items:center;padding:160px 0 80px;overflow:hidden;
+      background:
+        radial-gradient(1000px 600px at 50% -10%, rgba(139,92,246,.10), transparent 60%),
+        radial-gradient(700px 460px at 12% 80%, rgba(79,70,229,.06), transparent 60%),
+        radial-gradient(700px 460px at 88% 78%, rgba(255,107,94,.07), transparent 60%),
+        var(--bg)}
+    .hero .hero-3d{position:absolute;inset:0}
+    .hero-inner{position:relative;z-index:1;text-align:center;width:100%}
+    .hero h1{font-size:clamp(40px,5.8vw,74px);margin:22px auto 20px;max-width:16ch}
+    .hero-sub{font-size:clamp(17px,1.9vw,20px);color:var(--ink-soft);max-width:52ch;margin:0 auto 34px}
+    .hero-ctas{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center}
+    .hero-note{margin-top:22px;font-size:14px;color:var(--ink-faint);display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+    .hero-note span{display:inline-flex;align-items:center;gap:7px}
+    .hero-note svg{color:var(--accent)}
+    /* poster documents (mobile / reduced motion) float behind the copy.
+       Top-anchored (not centred) so the artwork never recentres while the
+       hero's text is still streaming in — keeps CLS at zero. */
+    .hero .hero-poster{opacity:.55;place-items:start center;padding-top:clamp(90px,16vh,150px)}
+    @media (max-width:960px){.hero{padding-top:130px;min-height:0}}
 
-    .hero{padding:150px 0 80px;position:relative;overflow:hidden}
-    .hero-glow{position:absolute;inset:0;pointer-events:none;background:
-      radial-gradient(ellipse 800px 500px at 75% 20%,rgba(34,197,94,0.10) 0%,transparent 65%),
-      radial-gradient(ellipse 600px 400px at 10% 90%,rgba(34,197,94,0.05) 0%,transparent 60%)}
-    .webgl-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.45}
-    .hero .container{display:grid;grid-template-columns:1.02fr 0.98fr;gap:54px;align-items:center;position:relative;z-index:1}
-    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--green-light);background:var(--green-subtle);border:1px solid rgba(34,197,94,0.25);border-radius:4px;padding:6px 13px;margin-bottom:26px}
-    .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);animation:blink 2.4s ease infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-    h1{font-size:clamp(38px,5.2vw,64px);font-weight:700;line-height:1.06;letter-spacing:-0.03em;margin-bottom:22px}
-    h1 .green{color:var(--green)}
-    .hero-sub{font-size:16.5px;color:var(--text2);max-width:480px;line-height:1.75;margin-bottom:34px}
-    .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
-    .hero-note{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.05em}
-    .hero-note b{color:var(--text2)}
+    /* ===== Trades marquee ===== */
+    .band{padding:30px 0;border-block:1px solid var(--line);background:var(--card)}
+    .band-label{text-align:center;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:18px}
+    .band .chip{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink-soft);white-space:nowrap}
+    .band .chip i{width:8px;height:8px;border-radius:99px;background:var(--grad);flex:none}
 
-    /* SIGNATURE: auto-rotating workflow cube */
-    .flow-scene{perspective:1500px;position:relative}
-    .flow-scene .sc-chip{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;border-radius:7px;padding:9px 13px;border:1px solid var(--line2);background:var(--surface2);box-shadow:0 14px 36px rgba(0,0,0,0.5);display:flex;align-items:center;gap:8px;color:var(--text2);z-index:5}
-    .flow-scene .sc-chip .dot{width:7px;height:7px;border-radius:50%}
-    .chip-1{top:-16px;right:6%}
-    .chip-1 .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
-    .chip-2{bottom:-14px;left:5%}
-    .chip-2 .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
-    .cube{position:relative;width:100%;height:380px;transform-style:preserve-3d;transition:transform 1.1s cubic-bezier(.6,.05,.2,1);transform:translateZ(-190px) rotateY(0deg)}
-    .face{position:absolute;inset:0;border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(34,197,94,0.05);overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden}
-    .face-front{transform:rotateY(0deg) translateZ(190px)}
-    .face-right{transform:rotateY(120deg) translateZ(190px)}
-    .face-back{transform:rotateY(240deg) translateZ(190px)}
-    .fc-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);background:rgba(0,0,0,0.22)}
-    .fc-title{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
-    .fc-title b{color:var(--text);font-weight:600}
-    .fc-badge{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;border-radius:4px;padding:4px 9px;color:var(--green);border:1px solid rgba(34,197,94,0.35);background:rgba(34,197,94,0.08)}
-    .fc-badge.amber{color:var(--amber);border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.08)}
-    .fc-body{padding:20px}
-    .fc-cust{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-    .fc-cust .name{font-size:14.5px;font-weight:600}
-    .fc-cust .meta{font-family:var(--mono);font-size:10.5px;color:var(--text2);background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:3px 9px}
-    .fc-lines{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
-    .fc-line{display:flex;justify-content:space-between;padding:10px 14px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
-    .fc-line:last-child{border-bottom:none}
-    .fc-line .amt{font-family:var(--mono);color:var(--text)}
-    .fc-total{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:9px;background:var(--green-subtle);border:1px solid rgba(34,197,94,0.25)}
-    .fc-total .label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--green-light)}
-    .fc-total .val{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)}
-    /* schedule face */
-    .sched{display:flex;flex-direction:column;gap:9px}
-    .sched-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:11px 14px;background:rgba(255,255,255,0.015)}
-    .sched-row .time{font-family:var(--mono);font-size:11px;color:var(--green-light);width:54px;flex-shrink:0}
-    .sched-row .job{font-size:13px;color:var(--text);font-weight:500}
-    .sched-row .who{font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto}
-    .sched-row.dim{opacity:0.5}
-    .sched-row .bar{width:3px;align-self:stretch;border-radius:3px;background:var(--green)}
-    .sched-row.b2 .bar{background:var(--blue)}
-    .sched-row.b3 .bar{background:var(--amber)}
+    /* ===== Pipeline ===== */
+    .pipe{display:grid;grid-template-columns:repeat(4,1fr) ;gap:14px;position:relative}
+    .pipe-step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:26px;position:relative;box-shadow:var(--shadow-s)}
+    .pipe-step .p-ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:16px}
+    .pipe-step:nth-child(4) .p-ic{background:#E9F8EF;color:#1B9E4B}
+    .pipe-step h3{font-size:19px;margin-bottom:8px}
+    .pipe-step p{font-size:14px;color:var(--ink-soft)}
+    .pipe-step .p-tag{position:absolute;top:24px;right:22px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.08em}
+    .pipe-step:not(:last-child)::after{content:"";position:absolute;top:50%;right:-14px;width:14px;height:2px;background:linear-gradient(90deg,var(--violet),transparent);z-index:1}
+    @media (max-width:900px){.pipe{grid-template-columns:1fr 1fr}}
+    @media (max-width:540px){.pipe{grid-template-columns:1fr}}
 
-    .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);padding:26px 0}
-    .strip .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-    .st{text-align:center}
-    .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:var(--green-light)}
-    .st span{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
+    /* ===== Feature cards ===== */
+    .feats{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+    .feat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:32px;box-shadow:var(--shadow-s);position:relative;overflow:hidden}
+    .feat::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad);opacity:0;transition:opacity .3s ease}
+    .feat:hover::before{opacity:1}
+    .feat .f-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:18px}
+    .feat h3{font-size:21px;margin-bottom:10px}
+    .feat p{font-size:15px;color:var(--ink-soft);max-width:48ch}
+    .feat .f-art{margin-top:22px}
+    @media (max-width:860px){.feats{grid-template-columns:1fr}}
+    .numchip{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12.5px;font-weight:600;background:var(--bg-soft);border:1px solid var(--line);border-radius:9px;padding:7px 11px;color:var(--ink-soft);margin-right:8px}
+    .numchip b{color:var(--accent)}
+    .date-row{display:flex;gap:8px;flex-wrap:wrap}
+    .date-chip{font-size:12.5px;border:1px solid var(--line);border-radius:99px;padding:6px 12px;color:var(--ink-soft)}
+    .date-chip.on{background:var(--grad);color:#fff;border-color:transparent}
+    .client-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px dashed var(--line);font-size:13.5px;color:var(--ink-soft)}
+    .client-row .av{width:30px;height:30px;border-radius:99px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;background:var(--grad);flex:none}
+    .client-row b{color:var(--ink)}
+    .client-row small{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--ink-faint)}
 
-    section{padding:90px 0}
-    .sec-head{max-width:620px;margin-bottom:52px}
-    .kicker{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--green-light);margin-bottom:14px;display:flex;align-items:center;gap:10px}
-    .kicker::before{content:'';width:22px;height:1px;background:var(--green)}
-    h2{font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-0.025em;line-height:1.12;margin-bottom:14px}
-    .sec-sub{font-size:15.5px;color:var(--text2);line-height:1.75}
+    /* ===== Booting dashboard ===== */
+    .boot-wrap{background:linear-gradient(160deg,#28254E,#3B2F6E);border-radius:calc(var(--radius-lg) + 6px);padding:clamp(18px,3vw,34px);box-shadow:var(--shadow-l)}
+    .boot{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-lg);padding:20px;color:#E9E7FA}
+    .boot .b-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+    .boot .b-bar i{width:9px;height:9px;border-radius:99px;background:rgba(255,255,255,.18)}
+    .boot .b-bar i:first-child{background:var(--cta)}
+    .boot .b-bar span{margin-left:8px;font-family:var(--font-mono);font-size:11px;color:#B4AFE0;letter-spacing:.08em}
+    .b-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+    .b-kpi{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+    .b-kpi span{font-size:11.5px;color:#B4AFE0}
+    .b-kpi b{display:block;font-family:var(--font-mono);font-size:clamp(16px,2vw,22px);color:#fff;margin-top:4px}
+    .b-rows{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:8px 14px}
+    .b-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:#CBC7EC}
+    .b-row:first-child{border-top:0}
+    .b-row .mono{font-family:var(--font-mono);color:#fff}
+    .b-pill{font-size:10.5px;padding:3px 9px;border-radius:99px;font-weight:600}
+    .b-pill.paid{background:rgba(56,190,120,.2);color:#7FE0AC}
+    .b-pill.sent{background:rgba(139,92,246,.25);color:#C4B0F8}
+    .b-pill.due{background:rgba(255,107,94,.22);color:#FFA79E}
+    /* boot animation: elements slide in sequence when .is-in lands on the wrap */
+    .boot [data-boot]{opacity:0;transform:translateY(14px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
+    .reveal.is-in .boot [data-boot]{opacity:1;transform:none}
+    .reveal.is-in .boot [data-boot="1"]{transition-delay:.15s}
+    .reveal.is-in .boot [data-boot="2"]{transition-delay:.35s}
+    .reveal.is-in .boot [data-boot="3"]{transition-delay:.55s}
+    .reveal.is-in .boot [data-boot="4"]{transition-delay:.75s}
+    @media (prefers-reduced-motion:reduce){.boot [data-boot]{opacity:1!important;transform:none!important}}
+    .split{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(30px,5vw,64px);align-items:center}
+    .split-copy ul{list-style:none;display:grid;gap:12px;margin-top:20px}
+    .split-copy li{display:flex;gap:11px;font-size:15px;color:var(--ink-soft)}
+    .split-copy li svg{color:var(--accent);flex:none;margin-top:3px}
+    @media (max-width:900px){.split{grid-template-columns:1fr}}
 
-    .bigfeat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
-    .bf{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:28px;position:relative;transition:border-color .25s,transform .2s;overflow:hidden}
-    .bf::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),transparent 70%);opacity:0;transition:opacity .25s}
-    .bf:hover{border-color:rgba(34,197,94,0.35);transform:translateY(-3px)}
-    .bf:hover::before{opacity:1}
-    .bf-num{font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;color:var(--text3);margin-bottom:18px}
-    .bf-icon{width:44px;height:44px;border-radius:10px;border:1px solid rgba(34,197,94,0.3);background:var(--green-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-    .bf-icon svg{width:21px;height:21px;stroke:var(--green-light);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .bf h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em}
-    .bf p{font-size:14px;color:var(--text2);line-height:1.8}
-
-    .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-    .mini{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:22px}
-    .mini-num{font-family:var(--mono);font-size:10px;letter-spacing:0.16em;color:var(--text3);margin-bottom:14px}
-    .mini h4{font-size:15.5px;font-weight:600;margin-bottom:8px}
-    .mini p{font-size:13px;color:var(--text2);line-height:1.7}
-
-    .tl{position:relative;max-width:760px;margin:0 auto;padding-left:32px}
-    .tl::before{content:'';position:absolute;left:7px;top:6px;bottom:6px;width:1px;background:linear-gradient(180deg,var(--green),var(--line) 90%)}
-    .tl-item{position:relative;padding:0 0 34px 24px}
-    .tl-item:last-child{padding-bottom:0}
-    .tl-item::before{content:'';position:absolute;left:-29px;top:5px;width:13px;height:13px;border-radius:50%;background:var(--bg2);border:2px solid var(--green)}
-    .tl-step{font-family:var(--mono);font-size:11.5px;letter-spacing:0.1em;color:var(--green-light);margin-bottom:5px}
-    .tl-item h3{font-size:16.5px;font-weight:600;margin-bottom:7px}
-    .tl-item p{font-size:14px;color:var(--text2);line-height:1.75;max-width:560px}
-
+    /* ===== Pricing ===== */
     .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch}
-    @media(max-width:1000px){.plans{grid-template-columns:repeat(2,1fr)}}
-    .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
-    .plan:hover{transform:translateY(-3px)}
-    .plan.popular{border-color:rgba(34,197,94,0.45);background:linear-gradient(180deg,rgba(34,197,94,0.06),var(--surface) 40%)}
-    .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--green);color:#04130a;border-radius:5px;padding:4px 12px}
-    .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
-    .tier-dot{width:9px;height:9px;border-radius:50%}
-    .basic .tier-dot{background:#6b7280}
-    .bronze .tier-dot{background:#cd7f32}
-    .silver .tier-dot{background:#c0c0c0}
-    .gold .tier-dot{background:var(--amber)}
-    .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
-    .plan-price b{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-0.02em}
-    .plan-price span{font-size:13px;color:var(--text3)}
-    .plan-desc{font-size:13px;color:var(--text2);margin-bottom:22px;min-height:20px}
-    .plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px;flex:1}
-    .plan li{font-size:13.5px;color:var(--text2);display:flex;gap:10px;align-items:flex-start;line-height:1.5}
-    .plan li::before{content:'✓';color:var(--green-light);font-weight:700;flex-shrink:0}
-    .plan li.off{color:var(--text3);opacity:0.6}
-    .plan li.off::before{content:'—';color:var(--text3)}
-    .plan .btn{width:100%}
-    .pricing-note{text-align:center;margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.04em}
+    .plan{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:28px 24px;display:flex;flex-direction:column;box-shadow:var(--shadow-s)}
+    .plan.is-featured{border:2px solid transparent;background:
+      linear-gradient(var(--card),var(--card)) padding-box,
+      var(--grad) border-box;box-shadow:var(--shadow-m);position:relative}
+    .plan .flag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--grad);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 14px;border-radius:99px;white-space:nowrap}
+    .plan h3{font-size:18px}
+    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:700;font-size:38px;color:var(--ink)}
+    .plan .price small{font-family:var(--font-body);font-size:14px;color:var(--ink-faint);font-weight:500}
+    .plan .per{font-size:13px;color:var(--ink-faint);margin-bottom:18px}
+    .plan ul{list-style:none;display:grid;gap:9px;margin-bottom:24px}
+    .plan li{display:flex;gap:9px;font-size:13.8px;color:var(--ink-soft)}
+    .plan li svg{color:var(--accent);flex:none;margin-top:3px}
+    .plan .btn{margin-top:auto;width:100%}
+    .plans-note{text-align:center;color:var(--ink-faint);font-size:14px;margin-top:26px}
+    @media (max-width:1020px){.plans{grid-template-columns:1fr 1fr}}
+    @media (max-width:560px){.plans{grid-template-columns:1fr}}
 
-    .cta{text-align:center;padding:110px 0;position:relative;overflow:hidden}
-    .cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 380px at 50% 50%,rgba(34,197,94,0.10),transparent 70%);pointer-events:none}
-    .cta .container{position:relative}
-    .cta h2{margin-bottom:16px}
-    .cta p{font-size:15.5px;color:var(--text2);max-width:460px;margin:0 auto 32px}
-    .cta .hero-btns{justify-content:center;margin-bottom:18px}
+    .faq-wrap{max-width:760px;margin-inline:auto}
 
-    footer{border-top:1px solid var(--line);padding:42px 0 34px;background:var(--bg2)}
-    .foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
-    .foot-links{display:flex;gap:22px;flex-wrap:wrap}
-    .foot-links a{font-size:13px;color:var(--text2);transition:color .2s}
-    .foot-links a:hover{color:var(--text)}
-    .foot-copy{font-family:var(--mono);font-size:10.5px;color:var(--text3);letter-spacing:0.05em;width:100%;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-
-    .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
-    .reveal.in{opacity:1;transform:none}
-    a:focus-visible,button:focus-visible{outline:2px solid var(--green-light);outline-offset:3px;border-radius:6px}
-
-    .legal-page{padding:140px 0 90px;min-height:100vh}
-    .legal-container{max-width:760px;margin:0 auto;padding:0 28px}
-    .back-link{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text2);margin-bottom:34px;transition:color .2s}
-    .back-link:hover{color:var(--green-light)}
-    .legal-header h1{font-size:clamp(30px,4vw,44px);margin-bottom:8px}
-    .legal-meta{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.06em;margin-bottom:38px}
-    .legal-box{border:1px solid rgba(34,197,94,0.3);background:var(--green-subtle);border-radius:10px;padding:18px 20px;margin-bottom:34px;font-size:14px;color:var(--text2);line-height:1.7}
-    .legal-content h2{font-size:21px;margin:36px 0 12px;letter-spacing:-0.015em}
-    .legal-content h3{font-size:15.5px;font-weight:600;margin:22px 0 8px;color:var(--text)}
-    .legal-content p{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:12px}
-    .legal-content ul{margin:0 0 14px 20px}
-    .legal-content li{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:5px}
-    .legal-content a{color:var(--green-light);text-decoration:underline;text-underline-offset:3px}
-    .legal-content strong{color:var(--text)}
-
-    @media (max-width:960px){
-      .hero .container{grid-template-columns:1fr;gap:48px}
-      .bigfeat{grid-template-columns:1fr}
-      .minis{grid-template-columns:repeat(2,1fr)}
-      .plans{grid-template-columns:1fr}
-      .strip .container{grid-template-columns:repeat(2,1fr);gap:24px}
-    }
-    @media (max-width:640px){
-      .nav-center{display:none}
-      .hero{padding-top:118px}
-      .minis{grid-template-columns:1fr}
-      .container{padding:0 20px}
-      .flow-scene .sc-chip{display:none}
-    }
+    /* ===== Final CTA ===== */
+    .final{background:var(--grad);border-radius:var(--radius-lg);padding:clamp(48px,7vw,88px) clamp(28px,6vw,80px);position:relative;overflow:hidden;text-align:center;color:#F4F2FF}
+    .final::before{content:"";position:absolute;inset:0;background:
+      radial-gradient(640px 380px at 84% 0%, rgba(255,255,255,.14), transparent 60%),
+      radial-gradient(520px 340px at 10% 100%, rgba(255,107,94,.35), transparent 60%)}
+    .final>*{position:relative}
+    .final h2{color:#fff;font-size:clamp(30px,4.4vw,50px);max-width:20ch;margin:0 auto 16px}
+    .final p{color:rgba(244,242,255,.82);max-width:52ch;margin:0 auto 32px;font-size:17px}
+    .final .btn-ghost{color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45)}
+    .final .btn-ghost:hover{box-shadow:inset 0 0 0 1.5px #fff}
   </style>
 </head>
 <body>
 
-<nav id="nav">
-  <div class="container">
-    <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>ServiceOps</span></a>
-    <div class="nav-center">
-      <a href="#features">Features</a>
-      <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
-    </div>
-    <div class="nav-right">
-      <a href="/serviceops/login" class="btn btn-ghost">Log in</a>
-      <a href="/serviceops/register" class="btn btn-green">Start free trial</a>
-    </div>
-  </div>
-</nav>
+  <a class="sr-only" href="#main">Skip to content</a>
 
-<!-- ================= HOME ================= -->
-<div id="page-home" class="page active">
-
-<section class="hero">
-  <div class="hero-glow" aria-hidden="true"></div>
-  <div class="container">
-    <div>
-      <div class="eyebrow">Built for UK trades · Live</div>
-      <h1>Run your trade<br><span class="green">business smarter.</span></h1>
-      <p class="hero-sub">Quotes, invoices, job scheduling and customer management — built specifically for plumbers, electricians, builders and every trade in between. Quote it, book it, do it, get paid.</p>
-      <div class="hero-btns">
-        <a href="/serviceops/register" class="btn btn-green btn-lg">Start your 14-day free trial →</a>
-        <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
-      </div>
-      <p class="hero-note"><b>No card required</b> // full features // cancel any time</p>
-    </div>
-
-    <!-- signature: quote -> schedule -> invoice cube -->
-    <div class="flow-scene">
-      <div class="sc-chip chip-1"><span class="dot"></span>Quote → Schedule → Invoice</div>
-      <div class="cube" id="cube" aria-label="ServiceOps workflow panel">
-
-        <!-- FACE 1: Quote -->
-        <div class="face face-front">
-          <div class="fc-head"><span class="fc-title">QUOTE <b>· #Q-184</b></span><span class="fc-badge">SENT</span></div>
-          <div class="fc-body">
-            <div class="fc-cust"><span class="name">J. Whitaker — Boiler install</span><span class="meta">LS12 4BX</span></div>
-            <div class="fc-lines">
-              <div class="fc-line"><span>Worcester Bosch 30kW</span><span class="amt">£1,180</span></div>
-              <div class="fc-line"><span>Labour · 2 days</span><span class="amt">£640</span></div>
-              <div class="fc-line"><span>Sundries &amp; fittings</span><span class="amt">£145</span></div>
-            </div>
-            <div class="fc-total"><span class="label">Quote total inc. VAT</span><span class="val">£2,358.00</span></div>
-          </div>
-        </div>
-
-        <!-- FACE 2: Schedule -->
-        <div class="face face-right">
-          <div class="fc-head"><span class="fc-title">DIARY <b>· THIS WEEK</b></span><span class="fc-badge">4 JOBS</span></div>
-          <div class="fc-body">
-            <div class="sched">
-              <div class="sched-row"><span class="bar"></span><span class="time">Mon 8:00</span><span class="job">Boiler install — Whitaker</span><span class="who">You</span></div>
-              <div class="sched-row b2"><span class="bar"></span><span class="time">Wed 10:00</span><span class="job">Radiator swap — Khan</span><span class="who">You</span></div>
-              <div class="sched-row b3"><span class="bar"></span><span class="time">Thu 13:30</span><span class="job">Leak callout — Doyle</span><span class="who">Sam</span></div>
-              <div class="sched-row dim"><span class="bar"></span><span class="time">Fri 9:00</span><span class="job">Bathroom 1st fix — Reid</span><span class="who">You</span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- FACE 3: Invoice -->
-        <div class="face face-back">
-          <div class="fc-head"><span class="fc-title">INVOICE <b>· #INV-209</b></span><span class="fc-badge">PAID</span></div>
-          <div class="fc-body">
-            <div class="fc-cust"><span class="name">J. Whitaker — Boiler install</span><span class="meta">Card</span></div>
-            <div class="fc-lines">
-              <div class="fc-line"><span>From quote #Q-184</span><span class="amt">£2,358.00</span></div>
-              <div class="fc-line"><span>VAT (20%)</span><span class="amt">incl.</span></div>
-              <div class="fc-line"><span>Paid online · 14 Jun</span><span class="amt">£2,358.00</span></div>
-            </div>
-            <div class="fc-total"><span class="label">Settled in full</span><span class="val">£2,358.00</span></div>
-          </div>
-        </div>
-
-      </div>
-      <div class="sc-chip chip-2"><span class="dot"></span>One click: quote → invoice</div>
-    </div>
-  </div>
-</section>
-
-<div class="strip">
-  <div class="container">
-    <div class="st"><b>Minutes</b><span>To send a quote</span></div>
-    <div class="st"><b>1 click</b><span>Quote to invoice</span></div>
-    <div class="st"><b>14 days</b><span>Free trial, full access</span></div>
-    <div class="st"><b>UK</b><span>VAT ready</span></div>
-  </div>
-</div>
-
-<section id="features">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">The core</div>
-      <h2>Quote it. Book it.<br>Get paid for it.</h2>
-      <p class="sec-sub">The three things that actually move money in a trade business — done from the van or the office.</p>
-    </div>
-    <div class="bigfeat">
-      <div class="bf reveal">
-        <div class="bf-num">CORE 01</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
-        <h3>Professional Quotes in Minutes</h3>
-        <p>Create detailed, professional quotes on-site or back at the office. Add materials, labour and your markup. Send to customers instantly via email or SMS.</p>
-      </div>
-      <div class="bf reveal">
-        <div class="bf-num">CORE 02</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
-        <h3>Job Scheduling That Works</h3>
-        <p>See your week at a glance. Drag and drop to reschedule. Get reminders before each job. Never double-book or miss an appointment again.</p>
-      </div>
-      <div class="bf reveal">
-        <div class="bf-num">CORE 03</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-        <h3>Get Paid Faster</h3>
-        <p>Send invoices the moment you finish a job. Track who's paid, who hasn't, and send automatic reminders. Accept card payments online.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="more" style="padding-top:0">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">Everything else</div>
-      <h2>The rest of the toolkit.</h2>
-    </div>
-    <div class="minis">
-      <div class="mini reveal"><div class="mini-num">01</div><h4>Customer Database</h4><p>All your customers, their properties and job history in one searchable place.</p></div>
-      <div class="mini reveal"><div class="mini-num">02</div><h4>Business Reports</h4><p>See your revenue, best customers and busiest periods at a glance.</p></div>
-      <div class="mini reveal"><div class="mini-num">03</div><h4>Works on Mobile</h4><p>Full access from your phone. Create quotes and invoices on-site.</p></div>
-      <div class="mini reveal"><div class="mini-num">04</div><h4>VAT Ready</h4><p>Track VAT automatically. Export reports for your accountant in one click.</p></div>
-      <div class="mini reveal"><div class="mini-num">05</div><h4>Email &amp; SMS</h4><p>Send quotes, invoices and reminders directly to customers.</p></div>
-      <div class="mini reveal"><div class="mini-num">06</div><h4>Secure &amp; Backed Up</h4><p>Your data is encrypted and backed up daily. Sleep easy.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="how" style="background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">How it works</div>
-      <h2>From sign-up to first invoice.</h2>
-      <p class="sec-sub">Get started in minutes, not hours. No training required.</p>
-    </div>
-    <div class="tl">
-      <div class="tl-item reveal"><div class="tl-step">STEP 01</div><h3>Create your account</h3><p>Sign up with your email. Add your business name, logo and contact details. Takes about 2 minutes.</p></div>
-      <div class="tl-item reveal"><div class="tl-step">STEP 02</div><h3>Add your services</h3><p>Set up your common services and materials with default pricing. Makes quoting lightning-fast.</p></div>
-      <div class="tl-item reveal"><div class="tl-step">STEP 03</div><h3>Create your first quote</h3><p>Add a customer, select services, adjust pricing and send. Professional quote out the door in minutes.</p></div>
-      <div class="tl-item reveal"><div class="tl-step">STEP 04</div><h3>Do the job, get paid</h3><p>Convert accepted quotes to invoices with one click. Track payments and send reminders automatically.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="pricing">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">Pricing</div>
-      <h2>Simple, honest pricing.</h2>
-      <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time.</p>
-    </div>
-    <div class="plans">
-      <div class="plan basic reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Basic</div>
-        <div class="plan-price"><b>£5.99</b><span>/month</span></div>
-        <p class="plan-desc"></p>
-        <ul>
-          <li>Quotes &amp; invoices</li>
-          <li>Customer database</li>
-          <li>Properties &amp; jobs</li>
-          <li class="off">Diary &amp; scheduling</li>
-          <li class="off">Reports</li>
-          <li class="off">Certificates &amp; documents</li>
-        </ul>
-        <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
-      </div>
-      <div class="plan bronze reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
-        <div class="plan-price"><b>£12.99</b><span>/month</span></div>
-        <p class="plan-desc"></p>
-        <ul>
-          <li>Everything in Basic</li>
-          <li>Customer follow-ups</li>
-          <li>Automated reminders</li>
-          <li class="off">Diary &amp; scheduling</li>
-          <li class="off">Reports</li>
-          <li class="off">Certificates &amp; documents</li>
-        </ul>
-        <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
-      </div>
-      <div class="plan silver popular reveal">
-        <div class="plan-flag">Most popular</div>
-        <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
-        <div class="plan-price"><b>£18.99</b><span>/month</span></div>
-        <p class="plan-desc"></p>
-        <ul>
-          <li>Everything in Bronze</li>
-          <li>Diary &amp; team scheduling</li>
-          <li>Reports &amp; insights</li>
-          <li>Materials library</li>
-          <li class="off">Certificates &amp; documents</li>
-        </ul>
-        <a href="/serviceops/register" class="btn btn-green">Start free trial</a>
-      </div>
-      <div class="plan gold reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
-        <div class="plan-price"><b>£28.99</b><span>/month</span></div>
-        <p class="plan-desc"></p>
-        <ul>
-          <li>Everything in Silver</li>
-          <li>Certificate vault</li>
-          <li>Document store</li>
-          <li>Advanced reporting &amp; export</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="/serviceops/register" class="btn btn-ghost">Start free trial</a>
-      </div>
-    </div>
-    <p class="pricing-note">ALL PRICES IN GBP // 14-DAY FREE TRIAL ON EVERY PLAN // CANCEL ANY TIME</p>
-  </div>
-</section>
-
-<section class="cta">
-  <div class="container">
-    <div class="kicker reveal" style="justify-content:center">Ready to work smarter?</div>
-    <h2 class="reveal">Spend less time on paperwork.<br>More time on the tools.</h2>
-    <p class="reveal">Join UK tradespeople already running quotes, jobs and invoices through ServiceOps.</p>
-    <div class="hero-btns reveal">
-      <a href="/serviceops/register" class="btn btn-green btn-lg">Start your free trial →</a>
-      <a href="mailto:hello@alzaro.co.uk" class="btn btn-ghost btn-lg">Talk to us</a>
-    </div>
-    <p class="hero-note reveal">No card required // set up in minutes // UK support</p>
-  </div>
-</section>
-
-</div><!-- /page-home -->
-
-  <div id="page-privacy" class="page">
-    <section class="legal-page">
-      <div class="legal-container">
-        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
-        
-        <div class="legal-header">
-          <h1>Privacy Policy</h1>
-          <p class="legal-meta">Last updated: 25 March 2026</p>
-        </div>
-
-        <div class="legal-content">
-          <div class="legal-box">
-            <p><strong>Summary:</strong> We collect only what we need to provide the service. We don't sell your data. Your business information stays yours. We use industry-standard security.</p>
-          </div>
-
-          <h2>1. Who we are</h2>
-          <p>Alzaro ServiceOps ("we", "us", "our") is a job management software service for tradespeople, operated by Alzaro Group, based in Milton Keynes, United Kingdom.</p>
-          <p>We are committed to protecting your privacy and handling your data transparently.</p>
-
-          <h2>2. What data we collect</h2>
-          
-          <h3>Account information</h3>
-          <ul>
-            <li>Name and email address</li>
-            <li>Business name and address</li>
-            <li>Phone number</li>
-            <li>Payment information (processed securely via Stripe)</li>
-          </ul>
-          
-          <h3>Business data you enter</h3>
-          <ul>
-            <li>Customer information</li>
-            <li>Quotes and invoices</li>
-            <li>Job schedules and records</li>
-            <li>Materials and pricing</li>
-          </ul>
-          
-          <h3>Technical data</h3>
-          <ul>
-            <li>IP address and browser type</li>
-            <li>Device information</li>
-            <li>Usage patterns within the application</li>
-          </ul>
-
-          <h2>3. How we use your data</h2>
-          <ul>
-            <li>Provide and maintain the ServiceOps service</li>
-            <li>Process your subscription payments</li>
-            <li>Send important service updates</li>
-            <li>Provide customer support</li>
-            <li>Improve our software</li>
-            <li>Comply with legal obligations</li>
-          </ul>
-
-          <h2>4. Data sharing</h2>
-          <p><strong>We do not sell your data. Ever.</strong></p>
-          <p>We only share data with:</p>
-          <ul>
-            <li><strong>Stripe:</strong> For payment processing</li>
-            <li><strong>Cloud hosting providers:</strong> For secure storage</li>
-            <li><strong>Legal authorities:</strong> Only when required by law</li>
-          </ul>
-
-          <h2>5. Data security</h2>
-          <ul>
-            <li>SSL/TLS encryption for all data transmission</li>
-            <li>Encrypted database storage</li>
-            <li>Regular security audits</li>
-            <li>Access controls and authentication</li>
-            <li>Daily backups</li>
-          </ul>
-
-          <h2>6. Your rights</h2>
-          <p>Under UK GDPR, you have the right to:</p>
-          <ul>
-            <li>Access your personal data</li>
-            <li>Correct inaccurate data</li>
-            <li>Delete your data</li>
-            <li>Export your data</li>
-            <li>Object to certain processing</li>
-            <li>Withdraw consent</li>
-          </ul>
-          <p>Contact us at <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a></p>
-
-          <h2>7. Data retention</h2>
-          <p>We retain your data while your account is active. After closure:</p>
-          <ul>
-            <li>30 days to export your data</li>
-            <li>Deletion within 90 days</li>
-            <li>Some data retained for legal compliance</li>
-          </ul>
-
-          <h2>8. Cookies</h2>
-          <p>We use essential cookies only for login and preferences. No advertising or tracking cookies.</p>
-
-          <h2>9. Contact</h2>
-          <p>
-            <strong>Email:</strong> <a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a><br>
-            <strong>Address:</strong> Alzaro ServiceOps, Milton Keynes, United Kingdom
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- TERMS PAGE -->
-  <div id="page-terms" class="page">
-    <section class="legal-page">
-      <div class="legal-container">
-        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
-        
-        <div class="legal-header">
-          <h1>Terms of Service</h1>
-          <p class="legal-meta">Last updated: 25 March 2026</p>
-        </div>
-
-        <div class="legal-content">
-          <div class="legal-box">
-            <p><strong>Summary:</strong> Use ServiceOps lawfully and responsibly. Pay your subscription on time. We'll provide reliable software and protect your data. Your business data belongs to you.</p>
-          </div>
-
-          <h2>1. Agreement to terms</h2>
-          <p>By using Alzaro ServiceOps ("the Service"), you agree to these Terms. If you do not agree, do not use the Service.</p>
-
-          <h2>2. Description of service</h2>
-          <p>ServiceOps is a cloud-based job management platform for UK tradespeople. Features include:</p>
-          <ul>
-            <li>Quote and invoice creation</li>
-            <li>Job scheduling</li>
-            <li>Customer database</li>
-            <li>Payment tracking</li>
-            <li>Business reporting</li>
-          </ul>
-
-          <h2>3. Account registration</h2>
-          <ul>
-            <li>Provide accurate registration information</li>
-            <li>Be at least 18 years old</li>
-            <li>Keep login credentials secure</li>
-            <li>You're responsible for all account activity</li>
-          </ul>
-
-          <h2>4. Subscription and payment</h2>
-          
-          <h3>Free trial</h3>
-          <p>14-day free trial with Gold tier access. No credit card required.</p>
-          
-          <h3>Pricing</h3>
-          <ul>
-            <li><strong>Basic:</strong> £5.99/month</li>
-            <li><strong>Bronze:</strong> £12.99/month</li>
-            <li><strong>Silver:</strong> £18.99/month</li>
-            <li><strong>Gold:</strong> £28.99/month</li>
-          </ul>
-          
-          <h3>Billing</h3>
-          <ul>
-            <li>Billed monthly in advance via Stripe</li>
-            <li>Prices exclude VAT where applicable</li>
-            <li>30 days notice for price changes</li>
-          </ul>
-
-          <h2>5. Cancellation</h2>
-          <ul>
-            <li>Cancel anytime, effective end of billing period</li>
-            <li>No partial refunds</li>
-            <li>30 days read-only access to export data</li>
-          </ul>
-
-          <h2>6. Your data</h2>
-          <p><strong>Your business data belongs to you.</strong> We only use it to provide the Service.</p>
-          <p>Export your data anytime via CSV export or request a full export within 7 days.</p>
-
-          <h2>7. Acceptable use</h2>
-          <p>You agree NOT to:</p>
-          <ul>
-            <li>Use the Service unlawfully</li>
-            <li>Share accounts with unauthorised users</li>
-            <li>Access other users' data</li>
-            <li>Reverse engineer the software</li>
-            <li>Upload malicious content</li>
-          </ul>
-
-          <div class="legal-box warning">
-            <p><strong>Warning:</strong> Violations may result in immediate account termination without refund.</p>
-          </div>
-
-          <h2>8. Service availability</h2>
-          <p>We target 99.9% uptime but don't guarantee uninterrupted service. Maintenance will be notified in advance when possible.</p>
-
-          <h2>9. Limitation of liability</h2>
-          <ul>
-            <li>Service provided "as is"</li>
-            <li>Not liable for indirect damages</li>
-            <li>Total liability limited to 12 months of payments</li>
-            <li>Not responsible for your tax/VAT compliance</li>
-          </ul>
-
-          <h2>10. Governing law</h2>
-          <p>These terms are governed by the laws of England and Wales.</p>
-
-          <h2>11. Contact</h2>
-          <p>
-            <strong>Email:</strong> <a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a><br>
-            <strong>Address:</strong> Alzaro ServiceOps, Milton Keynes, United Kingdom
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-
-<footer>
-  <div class="container">
-    <div class="foot">
-      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>ServiceOps</span></a>
-      <div class="foot-links">
+  <header class="lnav" aria-label="Primary">
+    <div class="lcontainer lnav-inner">
+      <a class="lnav-logo" href="/serviceops">
+        <span class="lnav-mark" style="background:var(--grad)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+        </span>
+        <span>Alzaro <span class="grad-text">ServiceOps</span></span>
+      </a>
+      <nav class="lnav-links" aria-label="Sections">
+        <a href="#pipeline">Pipeline</a>
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
-        <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
-        <a href="#" onclick="showPage('terms'); return false;">Terms</a>
-        <a href="mailto:hello@alzaro.co.uk">Contact</a>
-      </div>
-      <div class="foot-copy">
-        <span>© 2026 Alzaro Group. All rights reserved.</span>
-        <span>PART OF THE ALZARO PLATFORM FAMILY // MILTON KEYNES, UK</span>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="lnav-actions">
+        <a class="lnav-login" href="/serviceops/login">Log in</a>
+        <a class="btn btn-cta btn-sm magnetic" href="/serviceops/register">Start free trial</a>
+        <button class="lnav-burger" aria-expanded="false" aria-label="Open menu"><span></span></button>
       </div>
     </div>
-  </div>
-</footer>
+  </header>
+  <nav class="lnav-mobile" aria-label="Mobile">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="/serviceops/login">Log in</a>
+  </nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-  function showPage(pageName) {
-    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-    const targetPage = document.getElementById('page-' + pageName);
-    if (targetPage) targetPage.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (pageName === 'home') { history.pushState(null, '', window.location.pathname); }
-    else { history.pushState(null, '', '#' + pageName); }
-    const navCenter = document.querySelector('.nav-center');
-    if (navCenter) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
-  }
+  <main id="main">
 
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function(e) {
-      const href = this.getAttribute('href');
-      if (href.startsWith('#') && href.length > 1 && !href.includes('page')) {
-        e.preventDefault();
-        const homePage = document.getElementById('page-home');
-        const go = () => { const target = document.querySelector(href); if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-        if (!homePage.classList.contains('active')) { showPage('home'); setTimeout(go, 100); } else { go(); }
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="hero-3d" id="hero-3d" aria-hidden="true">
+        <!-- Poster: floating documents (mobile / reduced motion / no WebGL) -->
+        <div class="hero-poster">
+          <svg width="88%" viewBox="0 0 900 500" fill="none" role="img" aria-label="Floating quote and invoice documents">
+            <g transform="rotate(-8 150 210)">
+              <rect x="80" y="130" width="150" height="190" rx="12" fill="#fff" stroke="#E4E1F5"/>
+              <rect x="80" y="130" width="150" height="34" rx="12" fill="#4F46E5"/>
+              <text x="96" y="152" font-family="monospace" font-size="14" fill="#fff">QUO-001</text>
+              <rect x="96" y="182" width="110" height="8" rx="4" fill="#E7E4F8"/>
+              <rect x="96" y="200" width="90" height="8" rx="4" fill="#EEECFA"/>
+              <rect x="96" y="228" width="118" height="8" rx="4" fill="#E7E4F8"/>
+              <rect x="96" y="284" width="70" height="10" rx="5" fill="#8B5CF6"/>
+            </g>
+            <g transform="rotate(7 760 260)">
+              <rect x="680" y="150" width="150" height="190" rx="12" fill="#fff" stroke="#E4E1F5"/>
+              <rect x="680" y="150" width="150" height="34" rx="12" fill="#8B5CF6"/>
+              <text x="696" y="172" font-family="monospace" font-size="14" fill="#fff">INV-001</text>
+              <rect x="696" y="202" width="110" height="8" rx="4" fill="#E7E4F8"/>
+              <rect x="696" y="220" width="90" height="8" rx="4" fill="#EEECFA"/>
+              <rect x="696" y="248" width="118" height="8" rx="4" fill="#E7E4F8"/>
+              <rect x="696" y="304" width="70" height="10" rx="5" fill="#FF6B5E"/>
+            </g>
+            <circle cx="120" cy="80" r="6" fill="#8B5CF6" opacity=".5"/>
+            <circle cx="820" cy="90" r="5" fill="#FF6B5E" opacity=".6"/>
+            <circle cx="450" cy="470" r="7" fill="#4F46E5" opacity=".35"/>
+          </svg>
+        </div>
+      </div>
+      <div class="lcontainer hero-inner">
+        <span class="eyebrow center reveal">For UK trades &amp; service businesses</span>
+        <h1 class="reveal" style="transition-delay:.08s">Quotes to invoices, <span class="grad-text">without the admin</span>.</h1>
+        <p class="hero-sub reveal" style="transition-delay:.16s">ServiceOps runs the paperwork side of the trade — numbered quotes, scheduled jobs, clean invoices and clients who pay — so evenings go back to being evenings.</p>
+        <div class="hero-ctas reveal" style="transition-delay:.24s">
+          <a class="btn btn-cta magnetic" href="/serviceops/register">Start free trial <span class="btn-arrow" aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href="#pipeline">See the pipeline</a>
+        </div>
+        <p class="hero-note reveal" style="transition-delay:.32s">
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>14-day free trial</span>
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>No card required</span>
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Cancel any time</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= TRADES MARQUEE ================= -->
+    <section class="band" aria-label="Trades served">
+      <p class="band-label">One system, every trade</p>
+      <div class="marquee">
+        <div class="marquee-track">
+          <span class="chip"><i></i>Plumbers</span>
+          <span class="chip"><i></i>Electricians</span>
+          <span class="chip"><i></i>Builders</span>
+          <span class="chip"><i></i>Gas engineers</span>
+          <span class="chip"><i></i>Landscapers</span>
+          <span class="chip"><i></i>Roofers</span>
+          <span class="chip"><i></i>Plasterers</span>
+          <span class="chip"><i></i>Locksmiths</span>
+          <span class="chip"><i></i>Painters &amp; decorators</span>
+          <span class="chip"><i></i>Handyman services</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PIPELINE ================= -->
+    <section class="lsection" id="pipeline">
+      <div class="lcontainer">
+        <div class="section-head center reveal">
+          <span class="eyebrow center">The pipeline</span>
+          <h2>Quote → job → invoice → <span class="grad-text">paid</span></h2>
+          <p>Every piece of work moves along one clean pipeline. Nothing gets lost in a van, a voicemail or a carrier bag of receipts.</p>
+        </div>
+        <div class="pipe" data-stagger="120">
+          <article class="pipe-step tilt">
+            <span class="p-tag">QUO-014</span>
+            <div class="p-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>
+            <h3>Quote it</h3>
+            <p>Numbered automatically, dated sensibly, priced from your own lines. Send it before you've left the drive.</p>
+          </article>
+          <article class="pipe-step tilt">
+            <span class="p-tag">DIARY</span>
+            <div class="p-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+            <h3>Book it</h3>
+            <p>Accepted quotes become jobs in the diary — with the property, the client and the notes attached.</p>
+          </article>
+          <article class="pipe-step tilt">
+            <span class="p-tag">INV-038</span>
+            <div class="p-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h13l3 3v15H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+            <h3>Invoice it</h3>
+            <p>The finished job turns into the invoice — same lines, next number in the sequence, no re-typing.</p>
+          </article>
+          <article class="pipe-step tilt">
+            <span class="p-tag">SETTLED</span>
+            <div class="p-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></div>
+            <h3>Get paid</h3>
+            <p>Track what's sent, due and settled at a glance — and chase the stragglers with a follow-up, not a fallout.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BOOTING DASHBOARD ================= -->
+    <section class="lsection" style="background:var(--bg-soft);border-block:1px solid var(--line)">
+      <div class="lcontainer split">
+        <div class="split-copy reveal rv-left">
+          <span class="eyebrow">Mission control</span>
+          <h2 style="font-size:clamp(28px,3.6vw,42px);margin:14px 0 16px">The whole business, on one quiet screen</h2>
+          <p style="color:var(--ink-soft)">Watch the week assemble itself: money in, jobs booked, invoices out. No spreadsheets stitched together at midnight.</p>
+          <ul>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Quotes and invoices in one numbered stream</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Diary and team scheduling on Silver+</li>
+            <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Reports &amp; insights when you want the bigger picture</li>
+          </ul>
+        </div>
+        <div class="reveal rv-right">
+          <div class="boot-wrap tilt" data-tilt-max="4">
+            <div class="boot" aria-hidden="true">
+              <div class="b-bar"><i></i><i></i><i></i><span>SERVICEOPS · THIS WEEK</span></div>
+              <div class="b-grid">
+                <div class="b-kpi" data-boot="1"><span>Invoiced</span><b>£<span data-count="3120">0</span></b></div>
+                <div class="b-kpi" data-boot="2"><span>Jobs booked</span><b><span data-count="11">0</span></b></div>
+                <div class="b-kpi" data-boot="3"><span>Awaiting payment</span><b>£<span data-count="840">0</span></b></div>
+              </div>
+              <div class="b-rows" data-boot="4">
+                <div class="b-row"><span>INV-041 · Bathroom re-fit, final</span><span class="mono">£1,450</span><span class="b-pill paid">Paid</span></div>
+                <div class="b-row"><span>INV-042 · Consumer unit swap</span><span class="mono">£520</span><span class="b-pill sent">Sent</span></div>
+                <div class="b-row"><span>QUO-019 · Garden office, first fix</span><span class="mono">£2,300</span><span class="b-pill sent">Awaiting</span></div>
+                <div class="b-row"><span>INV-039 · Boiler service ×2</span><span class="mono">£190</span><span class="b-pill due">Overdue</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FEATURES ================= -->
+    <section class="lsection" id="features">
+      <div class="lcontainer">
+        <div class="section-head center reveal">
+          <span class="eyebrow center">The details</span>
+          <h2>Small touches that save whole evenings</h2>
+        </div>
+        <div class="feats" data-stagger="100">
+          <article class="feat tilt">
+            <div class="f-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+            <h3>Numbering that never skips</h3>
+            <p>Quotes and invoices number themselves — QUO-001, INV-001 and onwards — sequential, tidy and exactly what your accountant hopes to see.</p>
+            <div class="f-art" aria-hidden="true">
+              <span class="numchip"><b>INV-041</b> auto</span><span class="numchip"><b>INV-042</b> auto</span><span class="numchip"><b>QUO-019</b> auto</span>
+            </div>
+          </article>
+          <article class="feat tilt">
+            <div class="f-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+            <h3>Dates that default sensibly</h3>
+            <p>Issue date today, due date set from your terms, quote validity pre-filled. Change them when you like — stop typing them when you don't.</p>
+            <div class="f-art date-row" aria-hidden="true">
+              <span class="date-chip on">Due in 14 days</span><span class="date-chip">Due in 7 days</span><span class="date-chip">Due on receipt</span>
+            </div>
+          </article>
+          <article class="feat tilt">
+            <div class="f-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <h3>Clients &amp; properties, remembered</h3>
+            <p>Every client, every property, every past job in one place — so the callback about "that leak from last spring" takes seconds, not shoebox archaeology.</p>
+            <div class="f-art" aria-hidden="true">
+              <div class="client-row"><span class="av">JT</span><span><b>J. Thompson</b> · 4 Weaver's Close</span><small>6 jobs</small></div>
+              <div class="client-row"><span class="av">MB</span><span><b>M. Begum</b> · The Old Bakery</span><small>3 jobs</small></div>
+            </div>
+          </article>
+          <article class="feat tilt">
+            <div class="f-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3 4 6.5V12c0 4.8 3.4 8 8 9 4.6-1 8-4.2 8-9V6.5z"/><path d="m9 12 2 2 4-4.5"/></svg></div>
+            <h3>Certificates &amp; documents</h3>
+            <p>On Gold, the certificate vault and document store keep gas certs, EICRs and job photos attached to the property they belong to.</p>
+            <div class="f-art" aria-hidden="true">
+              <span class="numchip"><b>CP12</b> vaulted</span><span class="numchip"><b>EICR</b> vaulted</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PRICING ================= -->
+    <section class="lsection" id="pricing" style="background:var(--bg-soft);border-block:1px solid var(--line)">
+      <div class="lcontainer">
+        <div class="section-head center reveal">
+          <span class="eyebrow center">Pricing</span>
+          <h2>Priced like a tool, not a consultancy</h2>
+          <p>Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time. Billed monthly in GBP via Stripe.</p>
+        </div>
+        <div class="plans" data-stagger="90">
+          <article class="plan">
+            <h3>Basic</h3>
+            <p class="price">£5.99<small>/month</small></p>
+            <p class="per">Paperwork, sorted</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Quotes &amp; invoices</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Customer database</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Properties &amp; jobs</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/serviceops/register">Start free trial</a>
+          </article>
+          <article class="plan">
+            <h3>Bronze</h3>
+            <p class="price">£12.99<small>/month</small></p>
+            <p class="per">Adds the chasing</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Everything in Basic</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Customer follow-ups</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Automated reminders</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/serviceops/register">Start free trial</a>
+          </article>
+          <article class="plan is-featured">
+            <span class="flag">Most popular</span>
+            <h3>Silver</h3>
+            <p class="price">£18.99<small>/month</small></p>
+            <p class="per">For teams on the tools</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Everything in Bronze</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Diary &amp; team scheduling</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Reports &amp; insights</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Materials library</li>
+            </ul>
+            <a class="btn btn-cta btn-sm magnetic" href="/serviceops/register">Start free trial</a>
+          </article>
+          <article class="plan">
+            <h3>Gold</h3>
+            <p class="price">£28.99<small>/month</small></p>
+            <p class="per">The full office</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Everything in Silver</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Certificate vault</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Document store</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Advanced reporting &amp; export</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Priority support</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/serviceops/register">Start free trial</a>
+          </article>
+        </div>
+        <p class="plans-note">All prices in GBP · 14-day free trial on every plan · Cancel any time</p>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="lsection" id="faq">
+      <div class="lcontainer">
+        <div class="section-head center reveal">
+          <span class="eyebrow center">FAQ</span>
+          <h2>Fair questions</h2>
+        </div>
+        <div class="faq-wrap reveal">
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">How does the free trial work?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time — if it doesn't stick, you've lost nothing but a fortnight of tidier paperwork.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">Do quotes really turn into invoices?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Yes — an accepted quote carries its lines, client and property straight through to the invoice, which takes the next number in your sequence automatically.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">Can I use my own invoice numbering?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Numbering runs sequentially and automatically so there are no gaps or duplicates. You set where the sequence starts; ServiceOps keeps it honest from there.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">I work alone. Is this overkill?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Basic at £5.99 a month is built for exactly that: quotes, invoices, clients and jobs. The team features stay out of your way until you need them.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">How am I billed, and can I cancel?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Monthly in GBP via Stripe. Cancel any time; cancellation takes effect at the end of the current billing period.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">What happens to my data if I leave?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Your data is yours. Reports and exports let you take your clients, quotes and invoices with you — no lock-in, no hostage-taking.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FINAL CTA ================= -->
+    <section class="lsection" style="padding-top:0">
+      <div class="lcontainer">
+        <div class="final reveal rv-scale">
+          <h2>Do the work. Skip the admin.</h2>
+          <p>Fourteen days of the full system, free, no card. Send your first numbered quote tonight.</p>
+          <div class="hero-ctas" style="justify-content:center">
+            <a class="btn btn-cta magnetic" href="/serviceops/register">Start free trial <span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost" href="/serviceops/login">Log in</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="lfooter">
+    <div class="lcontainer">
+      <div class="lfooter-grid">
+        <div>
+          <a class="lnav-logo" href="/serviceops">
+            <span class="lnav-mark" style="background:var(--grad)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+            </span>
+            <span>Alzaro <span class="grad-text">ServiceOps</span></span>
+          </a>
+          <p style="color:var(--ink-soft);font-size:14.5px;max-width:34ch;margin-top:12px">Job management for UK tradespeople — quotes, jobs, invoices and clients on one clean pipeline.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="/serviceops/login">Log in</a></li>
+            <li><a href="/serviceops/register">Start free trial</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Alzaro suite</h4>
+          <ul>
+            <li><a href="/platform">The platform</a></li>
+            <li><a href="/garageops">GarageOps</a></li>
+            <li><a href="/tyreops">TyreOps</a></li>
+            <li><a href="/propertyops">PropertyOps</a></li>
+            <li><a href="/soloops">SoloOps</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <ul>
+            <li><a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a></li>
+            <li><a href="mailto:privacy@alzaro.co.uk">privacy@alzaro.co.uk</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="lfooter-base">
+        <span>© 2026 Alzaro. Built in the UK for UK trades.</span>
+        <span>All prices in GBP · VAT where applicable</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/landing-assets/shared.js" defer></script>
+  <script>
+    /* ServiceOps hero — QUO/INV documents orbit gently and stack into place on
+       load, then drift with mouse parallax. Lazy; poster covers mobile. */
+    (function () {
+      function mount() {
+        if (!window.AlzaroHero) return;
+        AlzaroHero.mount({
+          container: "#hero-3d",
+          fov: 40,
+          cameraZ: 10.5,
+          build: function (THREE, scene, camera, h) {
+            h.softLights(0xfdfbff, 0xd8d4e8, 0xffffff);
+
+            /* Draw a document face (header bar + label + body lines) to a texture */
+            function docTexture(label, headColor, accent) {
+              var c = document.createElement("canvas");
+              c.width = 256; c.height = 340;
+              var g = c.getContext("2d");
+              g.fillStyle = "#ffffff"; g.fillRect(0, 0, 256, 340);
+              g.fillStyle = headColor; g.fillRect(0, 0, 256, 62);
+              g.fillStyle = "#ffffff";
+              g.font = "600 30px 'JetBrains Mono', monospace";
+              g.fillText(label, 22, 42);
+              g.fillStyle = "#E7E4F8";
+              for (var i = 0; i < 5; i++) g.fillRect(22, 96 + i * 34, i % 2 ? 150 : 200, 12);
+              g.fillStyle = accent; g.fillRect(22, 286, 110, 16);
+              var tex = new THREE.CanvasTexture(c);
+              return tex;
+            }
+
+            function makeDoc(label, headColor, accent) {
+              var g = new THREE.Group();
+              var face = new THREE.MeshStandardMaterial({ map: docTexture(label, headColor, accent), roughness: 0.65 });
+              var side = new THREE.MeshStandardMaterial({ color: 0xf0eefb, roughness: 0.7 });
+              var body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.55, 0.07),
+                [side, side, side, side, face, side]);
+              g.add(body);
+              return g;
+            }
+
+            var docs = [
+              { m: makeDoc("INV-001", "#8B5CF6", "#FF6B5E"), home: [ 4.15, 0.25, 0], tilt: 0.16, delay: 0.0 },
+              { m: makeDoc("QUO-001", "#4F46E5", "#8B5CF6"), home: [-4.15, 0.15, 0], tilt: -0.16, delay: 0.25 },
+              { m: makeDoc("INV-002", "#6D5AEC", "#FF8A7E"), home: [ 4.9, -1.5, -2.4], tilt: 0.3, delay: 0.5 },
+              { m: makeDoc("QUO-002", "#7C4FF0", "#B49CFA"), home: [-4.9, -1.6, -2.6], tilt: -0.3, delay: 0.7 }
+            ];
+            /* deterministic start offsets */
+            var seed = 719;
+            function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+            docs.forEach(function (d) {
+              d.from = [d.home[0] * 1.9, d.home[1] + 5 + rnd() * 3, d.home[2] - 5 - rnd() * 3];
+              d.rotFrom = (rnd() - 0.5) * 2.4;
+              d.m.position.set(d.from[0], d.from[1], d.from[2]);
+              scene.add(d.m);
+            });
+
+            /* accent shapes */
+            var coral = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 0),
+              new THREE.MeshStandardMaterial({ color: 0xff6b5e, roughness: 0.45 }));
+            coral.position.set(2.6, 2.6, -3);
+            scene.add(coral);
+            var indigoRing = h.wire(new THREE.TorusGeometry(1.05, 0.015, 8, 64), 0x8b5cf6, 0.5);
+            indigoRing.position.set(-2.9, 2.4, -3.4);
+            scene.add(indigoRing);
+
+            var ASSEMBLE = 1.3;
+            function ease(p) { return 1 - Math.pow(1 - p, 3); }
+
+            return {
+              update: function (t, mouse) {
+                docs.forEach(function (d, i) {
+                  var p = Math.min(Math.max((t - 0.2 - d.delay) / ASSEMBLE, 0), 1);
+                  var e = ease(p);
+                  var fx = d.from[0] + (d.home[0] - d.from[0]) * e;
+                  var fy = d.from[1] + (d.home[1] - d.from[1]) * e;
+                  var fz = d.from[2] + (d.home[2] - d.from[2]) * e;
+                  /* settled: gentle orbit-bob + parallax */
+                  var bob = Math.sin(t * 0.55 + i * 1.7) * 0.16 * e;
+                  d.m.position.set(fx + mouse.x * (0.5 + i * 0.25), fy + bob - mouse.y * (0.4 + i * 0.2), fz);
+                  d.m.rotation.z = d.rotFrom * (1 - e) + Math.sin(t * 0.4 + i) * 0.03 * e;
+                  d.m.rotation.y = d.tilt * e + mouse.x * 0.14;
+                  d.m.rotation.x = mouse.y * 0.1;
+                });
+                coral.rotation.y = t * 0.5;
+                coral.position.y = 2.6 + Math.sin(t * 0.7) * 0.2;
+                indigoRing.rotation.z = t * 0.2;
+                indigoRing.position.y = 2.4 + Math.sin(t * 0.5 + 2) * 0.24;
+                camera.lookAt(0, 0, 0);
+              }
+            };
+          }
+        });
       }
-    });
-  });
-
-  const nav = document.getElementById('nav');
-  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
-  window.addEventListener('scroll', onScroll, {passive:true});
-  onScroll();
-
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.nav-center a');
-  window.addEventListener('scroll', () => {
-    const homePage = document.getElementById('page-home');
-    if (!homePage.classList.contains('active')) return;
-    let current = '';
-    sections.forEach(section => { if (window.scrollY >= section.offsetTop - 110) current = section.getAttribute('id'); });
-    navLinks.forEach(link => { link.classList.toggle('active', link.getAttribute('href') === '#' + current); });
-  }, {passive:true});
-
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-  }, {threshold: 0.12});
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-
-  window.addEventListener('load', () => {
-    const hash = window.location.hash.slice(1);
-    if (hash === 'privacy' || hash === 'terms') showPage(hash);
-  });
-  window.addEventListener('popstate', () => {
-    const hash = window.location.hash.slice(1);
-    if (hash === 'privacy' || hash === 'terms') showPage(hash);
-    else showPage('home');
-  });
-
-  // ===== 3D motion gates =====
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const finePointer = matchMedia('(pointer: fine)').matches;
-
-  // Auto-rotating workflow cube (Quote -> Schedule -> Invoice)
-  (function(){
-    const cube = document.getElementById('cube');
-    const scene = document.querySelector('.flow-scene');
-    if (!cube) return;
-    if (reduceMotion) return;
-    const faces = [0, -120, -240];
-    let i = 0, paused = false;
-    if (scene){
-      scene.addEventListener('mouseenter', () => { paused = true; });
-      scene.addEventListener('mouseleave', () => { paused = false; });
-    }
-    setInterval(() => {
-      if (paused) return;
-      i = (i + 1) % faces.length;
-      cube.style.transform = `translateZ(-190px) rotateY(${faces[i]}deg)`;
-    }, 3200);
-  })();
-
-  // WebGL hero: rotating wireframe wrench + bolt
-  (function(){
-    if (reduceMotion || typeof THREE === 'undefined') return;
-    const hero = document.querySelector('.hero');
-    if (!hero) return;
-    let renderer;
-    try { renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); }
-    catch (e) { return; }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-    renderer.domElement.className = 'webgl-canvas';
-    hero.prepend(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.set(0, 0, 9);
-
-    const wire = (geo, color, opacity) =>
-      new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
-    const GREEN = 0x22c55e, GREENL = 0x4ade80, GREY = 0x98a89e;
-
-    const tools = new THREE.Group();
-
-    // spanner: long shaft + open head (two prongs)
-    const spanner = new THREE.Group();
-    spanner.add(wire(new THREE.BoxGeometry(0.3, 3.2, 0.22), GREENL, 0.8));         // shaft
-    const headL = wire(new THREE.BoxGeometry(0.7, 0.22, 0.22), GREEN, 0.85); headL.position.set(-0.25, 1.7, 0); headL.rotation.z = 0.5;
-    const headR = wire(new THREE.BoxGeometry(0.7, 0.22, 0.22), GREEN, 0.85); headR.position.set(0.25, 1.7, 0); headR.rotation.z = -0.5;
-    spanner.add(headL); spanner.add(headR);
-    const ring = wire(new THREE.TorusGeometry(0.42, 0.1, 8, 18), GREEN, 0.8); ring.position.y = -1.7;
-    spanner.add(ring);
-    spanner.rotation.z = 0.5;
-    tools.add(spanner);
-
-    // hex bolt orbiting
-    const bolt = wire(new THREE.CylinderGeometry(0.6, 0.6, 0.35, 6), GREY, 0.7);
-    bolt.position.set(2.2, -0.6, 0);
-    tools.add(bolt);
-
-    tools.rotation.x = 0.3;
-    scene.add(tools);
-
-    const pGeo = new THREE.BufferGeometry();
-    const N = 200, pos = new Float32Array(N * 3);
-    for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * 16;
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x98a89e, size: 0.03, transparent: true, opacity: 0.45 })));
-
-    let mx = 0, my = 0;
-    if (finePointer) addEventListener('mousemove', e => {
-      mx = (e.clientX / innerWidth - 0.5); my = (e.clientY / innerHeight - 0.5);
-    }, { passive: true });
-
-    const resize = () => {
-      const w = hero.clientWidth, h = hero.clientHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h; camera.updateProjectionMatrix();
-      tools.position.x = w > 960 ? 2.4 : 0;
-      renderer.domElement.style.opacity = w > 960 ? 0.45 : 0.22;
-    };
-    addEventListener('resize', resize, { passive: true }); resize();
-
-    let running = true;
-    document.addEventListener('visibilitychange', () => { running = !document.hidden; });
-    const clock = new THREE.Clock();
-    (function animate(){
-      requestAnimationFrame(animate);
-      if (!running) return;
-      const t = clock.getElapsedTime();
-      tools.rotation.z = t * 0.25;
-      bolt.rotation.y = t * 0.8;
-      tools.rotation.y = Math.sin(t * 0.3) * 0.2;
-      camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
-      camera.position.y += (-my * 0.6 - camera.position.y) * 0.04;
-      camera.lookAt(tools.position.x * 0.5, 0, 0);
-      renderer.render(scene, camera);
+      if (document.readyState !== "loading") mount();
+      else document.addEventListener("DOMContentLoaded", mount);
     })();
-  })();
-</script>
+  </script>
 </body>
 </html>

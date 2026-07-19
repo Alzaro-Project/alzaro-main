@@ -25,945 +25,632 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Extended head: theme colour + display/body type -->
+  <meta name="theme-color" content="#F6F8FA">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing-assets/shared.css">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg:#0a0d12;
-      --bg2:#0d1118;
-      --surface:#12161f;
-      --surface2:#1a2030;
-      --line:rgba(255,255,255,0.06);
-      --line2:rgba(255,255,255,0.12);
-      --text:#f4f7fb;
-      --text2:#97a3b4;
-      --text3:#586575;
-      --blue:#3b82f6;
-      --blue-light:#60a5fa;
-      --blue-subtle:rgba(59,130,246,0.08);
-      --blue-glow:rgba(59,130,246,0.35);
-      --green:#22c55e;
-      --amber:#f59e0b;
-      --mono:'JetBrains Mono',monospace;
+      --bg:#F6F8FA; --bg-soft:#ECF0F4; --card:#FFFFFF;
+      --ink:#252E38; --ink-soft:#57626E; --ink-faint:#8B96A2;
+      --line:rgba(37,46,56,.12);
+      --accent:#EA5A0B; --accent-soft:#FCEAE0;
+      --slate:#38424E; --slate-deep:#2B333D;
+      --cta:#EA5A0B; --cta-hover:#CE4C05; --cta-ink:#FFF6F0;
+      --glass:rgba(246,248,250,.8); --glass-line:rgba(37,46,56,.08);
+      --radius:10px; --radius-lg:16px; --maxw:1200px;
+      --font-display:'Archivo',system-ui,sans-serif;
+      --font-body:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+      --shadow-s:0 2px 10px -4px rgba(37,46,56,.12);
+      --shadow-m:0 14px 34px -16px rgba(37,46,56,.22);
+      --shadow-l:0 30px 70px -28px rgba(37,46,56,.3);
     }
-    html{scroll-behavior:smooth}
-    @media (prefers-reduced-motion:reduce){
-      html{scroll-behavior:auto}
-      *,*::before,*::after{animation-duration:0.001s!important;transition-duration:0.001s!important}
-    }
-    body{font-family:'Space Grotesk',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
-    a{color:inherit;text-decoration:none}
-    .container{max-width:1180px;margin:0 auto;padding:0 28px}
-    .mono{font-family:var(--mono)}
-    .page{display:none}
-    .page.active{display:block}
+    body{font-size:16.5px}
+    h1,h2,h3{font-family:var(--font-display);font-weight:800;letter-spacing:-.025em;line-height:1.04;color:var(--ink);text-transform:none}
+    .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+    .eyebrow::before{content:"";width:22px;height:8px;background:repeating-linear-gradient(-55deg,var(--accent) 0 3px,transparent 3px 6px)}
+    .section-head{max-width:680px;margin-bottom:clamp(38px,5vw,58px)}
+    .section-head h2{font-size:clamp(30px,4.6vw,50px);margin:14px 0 16px;text-transform:uppercase;letter-spacing:-.01em}
+    .section-head p{color:var(--ink-soft);font-size:17.5px}
+    .rule{border:0;border-top:2px solid var(--ink);opacity:.9}
 
-    /* NAV */
-    nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:16px 0;transition:background .3s,border-color .3s;border-bottom:1px solid transparent}
-    nav.scrolled{background:rgba(10,13,18,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom-color:var(--line)}
-    nav .container{display:flex;align-items:center;justify-content:space-between}
-    .logo{font-size:20px;font-weight:700;letter-spacing:-0.01em}
-    .logo span{color:var(--blue)}
-    .nav-center{display:flex;gap:26px}
-    .nav-center a{font-size:13.5px;font-weight:500;color:var(--text2);transition:color .2s}
-    .nav-center a:hover,.nav-center a.active{color:var(--text)}
-    .nav-right{display:flex;gap:10px;align-items:center}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;border-radius:8px;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
-    .btn-blue{background:linear-gradient(135deg,var(--blue),#2563eb);color:#fff;font-size:13.5px;padding:10px 20px;box-shadow:0 4px 18px var(--blue-glow)}
-    .btn-blue:hover{transform:translateY(-1px);box-shadow:0 8px 26px var(--blue-glow)}
-    .btn-ghost{border:1px solid var(--line2);color:var(--text2);font-size:13.5px;padding:10px 20px}
-    .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.28)}
-    .btn-lg{font-size:15px;padding:15px 28px;border-radius:10px}
-
-    /* HERO */
-    .hero{padding:150px 0 80px;position:relative;overflow:hidden}
-    .hero-glow{position:absolute;inset:0;pointer-events:none;background:
-      radial-gradient(ellipse 800px 500px at 75% 20%,rgba(59,130,246,0.10) 0%,transparent 65%),
-      radial-gradient(ellipse 600px 400px at 10% 90%,rgba(59,130,246,0.05) 0%,transparent 60%)}
-    .webgl-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.45}
-    .hero .container{display:grid;grid-template-columns:1.02fr 0.98fr;gap:54px;align-items:center;position:relative;z-index:1}
-    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--blue-light);background:var(--blue-subtle);border:1px solid rgba(59,130,246,0.25);border-radius:4px;padding:6px 13px;margin-bottom:26px}
-    .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);animation:blink 2.4s ease infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-    h1{font-size:clamp(38px,5.2vw,64px);font-weight:700;line-height:1.06;letter-spacing:-0.03em;margin-bottom:22px}
-    h1 .blue{color:var(--blue)}
-    .hero-sub{font-size:16.5px;color:var(--text2);max-width:480px;line-height:1.75;margin-bottom:34px}
-    .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
-    .hero-note{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.05em}
-    .hero-note b{color:var(--text2)}
-
-    /* SIGNATURE: stock/batch panel */
-    .stock-scene{perspective:1500px;position:relative}
-    .cube{position:relative;width:100%;height:380px;transform-style:preserve-3d;transition:transform 1.1s cubic-bezier(.6,.05,.2,1);transform:translateZ(-190px) rotateY(0deg)}
-    .face{position:absolute;inset:0;border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,var(--surface2),var(--surface));box-shadow:0 30px 80px rgba(0,0,0,0.55),0 0 0 1px rgba(59,130,246,0.05);overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden}
-    .face-front{transform:rotateY(0deg) translateZ(190px)}
-    .face-right{transform:rotateY(120deg) translateZ(190px)}
-    .face-back{transform:rotateY(240deg) translateZ(190px)}
-    .sc-badge.warn{color:var(--amber);border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.08)}
-    /* P&L face */
-    .pl-big{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
-    .pl-label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3)}
-    .pl-amount{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--text);letter-spacing:-0.02em}
-    .pl-sub{color:var(--text3);font-size:20px}
-    .pl-rows{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
-    .pl-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
-    .pl-row:last-child{border-bottom:none}
-    .pl-row b{font-family:var(--mono);color:var(--text);font-weight:600}
-    .pl-row b.muted{color:var(--text2)}
-    /* Alerts face */
-    .alert-list{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
-    .alert-row{display:flex;align-items:center;gap:11px;padding:12px 14px;font-size:12.5px;border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
-    .alert-row:last-child{border-bottom:none}
-    .alert-row .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .alert-row.crit .dot{background:#ef4444;box-shadow:0 0 8px #ef4444}
-    .alert-row.warn .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
-    .alert-row .ar-name{color:var(--text2)}
-    .alert-row .ar-qty{margin-left:auto;font-family:var(--mono);color:var(--text);font-weight:600}
-    .sc-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line);background:rgba(0,0,0,0.22)}
-    .sc-title{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
-    .sc-title b{color:var(--text);font-weight:600}
-    .sc-badge{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--green);border:1px solid rgba(34,197,94,0.35);background:rgba(34,197,94,0.08);border-radius:4px;padding:4px 9px}
-    .sc-body{padding:18px 20px}
-    .sc-sku{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-    .sc-sku .name{font-size:14.5px;font-weight:600}
-    .sc-sku .size{font-family:var(--mono);font-size:11px;color:var(--text2);background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:3px 9px}
-    .sc-batches{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
-    .sc-batch{display:flex;align-items:center;gap:12px;padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--line);background:rgba(255,255,255,0.015)}
-    .sc-batch:last-child{border-bottom:none}
-    .sc-batch .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-    .sc-batch .lbl{font-family:var(--mono);color:var(--text3);font-size:10.5px;letter-spacing:0.06em;width:62px}
-    .sc-batch .qty{margin-left:auto;font-family:var(--mono);color:var(--text2)}
-    .sc-batch .cost{font-family:var(--mono);color:var(--text);width:68px;text-align:right}
-    .sc-batch.next{background:rgba(59,130,246,0.07)}
-    .sc-batch.next .dot{background:var(--blue);box-shadow:0 0 8px var(--blue)}
-    .sc-batch.queued .dot{background:var(--text3)}
-    .sc-fifo{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:9px;background:var(--blue-subtle);border:1px solid rgba(59,130,246,0.25)}
-    .sc-fifo .label{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--blue-light)}
-    .sc-fifo .val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)}
-    .sc-chip{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;border-radius:7px;padding:9px 13px;border:1px solid var(--line2);background:var(--surface2);box-shadow:0 14px 36px rgba(0,0,0,0.5);display:flex;align-items:center;gap:8px;color:var(--text2)}
-    .sc-chip .dot{width:7px;height:7px;border-radius:50%}
-    .chip-1{top:-16px;right:6%}
-    .chip-1 .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
-    .chip-2{bottom:-14px;left:5%}
-    .chip-2 .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
-
-    /* STATS STRIP */
-    .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);padding:26px 0}
-    .strip .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-    .st{text-align:center}
-    .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:var(--blue-light)}
-    .st span{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
-
-    /* SECTION SHELL */
-    section{padding:90px 0}
-    .sec-head{max-width:620px;margin-bottom:52px}
-    .kicker{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--blue-light);margin-bottom:14px;display:flex;align-items:center;gap:10px}
-    .kicker::before{content:'';width:22px;height:1px;background:var(--blue)}
-    h2{font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-0.025em;line-height:1.12;margin-bottom:14px}
-    .sec-sub{font-size:15.5px;color:var(--text2);line-height:1.75}
-
-    /* BIG FEATURES */
-    .bigfeat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
-    .bf{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:28px;position:relative;transition:border-color .25s,transform .2s;overflow:hidden}
-    .bf::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent 70%);opacity:0;transition:opacity .25s}
-    .bf:hover{border-color:rgba(59,130,246,0.35);transform:translateY(-3px)}
-    .bf:hover::before{opacity:1}
-    .bf-num{font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;color:var(--text3);margin-bottom:18px}
-    .bf-icon{width:44px;height:44px;border-radius:10px;border:1px solid rgba(59,130,246,0.3);background:var(--blue-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-    .bf-icon svg{width:21px;height:21px;stroke:var(--blue-light);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .bf h3{font-size:18px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em}
-    .bf p{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:14px}
-    .bf .tag{font-family:var(--mono);font-size:10.5px;color:var(--blue-light);letter-spacing:0.04em;display:inline-flex;align-items:center;gap:7px}
-    .bf .tag::before{content:'→';color:var(--blue)}
-
-    /* MINI FEATURES */
-    .minis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-    .mini{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:22px}
-    .mini-num{font-family:var(--mono);font-size:10px;letter-spacing:0.16em;color:var(--text3);margin-bottom:14px}
-    .mini h4{font-size:15.5px;font-weight:600;margin-bottom:8px}
-    .mini p{font-size:13px;color:var(--text2);line-height:1.7}
-
-    /* PRICING */
-    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:stretch}
-    .plan{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:30px 26px;display:flex;flex-direction:column;position:relative;transition:border-color .25s,transform .2s}
-    .plan:hover{transform:translateY(-3px)}
-    .plan.popular{border-color:rgba(59,130,246,0.45);background:linear-gradient(180deg,rgba(59,130,246,0.06),var(--surface) 40%)}
-    .plan-flag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:var(--blue);color:#fff;border-radius:5px;padding:4px 12px}
-    .plan-tier{font-family:var(--mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:9px}
-    .tier-dot{width:9px;height:9px;border-radius:50%}
-    .basic .tier-dot{background:#6b7280}
-    .bronze .tier-dot{background:#cd7f32}
-    .silver .tier-dot{background:#c0c0c0}
-    .gold .tier-dot{background:var(--amber)}
-    .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
-    .plan-price b{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-0.02em}
-    .plan-price span{font-size:13px;color:var(--text3)}
-    .plan-desc{font-size:13px;color:var(--text2);margin-bottom:22px;min-height:38px}
-    .plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:26px;flex:1}
-    .plan li{font-size:13.5px;color:var(--text2);display:flex;gap:10px;align-items:flex-start;line-height:1.5}
-    .plan li::before{content:'✓';color:var(--blue-light);font-weight:700;flex-shrink:0}
-    .plan li.off{color:var(--text3);opacity:0.6}
-    .plan li.off::before{content:'—';color:var(--text3)}
-    .plan .btn{width:100%}
-    .pricing-note{text-align:center;margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.04em}
-
-    /* CTA */
-    .cta{text-align:center;padding:110px 0;position:relative;overflow:hidden}
-    .cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 380px at 50% 50%,rgba(59,130,246,0.10),transparent 70%);pointer-events:none}
-    .cta .container{position:relative}
-    .cta h2{margin-bottom:16px}
-    .cta p{font-size:15.5px;color:var(--text2);max-width:460px;margin:0 auto 32px}
-    .cta .hero-btns{justify-content:center;margin-bottom:18px}
-
-    /* FOOTER */
-    footer{border-top:1px solid var(--line);padding:42px 0 34px;background:var(--bg2)}
-    .foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
-    .foot-links{display:flex;gap:22px;flex-wrap:wrap}
-    .foot-links a{font-size:13px;color:var(--text2);transition:color .2s}
-    .foot-links a:hover{color:var(--text)}
-    .foot-copy{font-family:var(--mono);font-size:10.5px;color:var(--text3);letter-spacing:0.05em;width:100%;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-
-    .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
-    .reveal.in{opacity:1;transform:none}
-    a:focus-visible,button:focus-visible{outline:2px solid var(--blue-light);outline-offset:3px;border-radius:6px}
-
-    /* LEGAL */
-    .legal-page{padding:140px 0 90px;min-height:100vh}
-    .legal-container{max-width:760px;margin:0 auto;padding:0 28px}
-    .back-link{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text2);margin-bottom:34px;transition:color .2s}
-    .back-link:hover{color:var(--blue-light)}
-    .legal-header h1{font-size:clamp(30px,4vw,44px);margin-bottom:8px}
-    .legal-meta{font-family:var(--mono);font-size:11.5px;color:var(--text3);letter-spacing:0.06em;margin-bottom:38px}
-    .legal-box{border:1px solid rgba(59,130,246,0.3);background:var(--blue-subtle);border-radius:10px;padding:18px 20px;margin-bottom:34px;font-size:14px;color:var(--text2);line-height:1.7}
-    .legal-content h2{font-size:21px;margin:36px 0 12px;letter-spacing:-0.015em}
-    .legal-content h3{font-size:15.5px;font-weight:600;margin:22px 0 8px;color:var(--text)}
-    .legal-content p{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:12px}
-    .legal-content ul{margin:0 0 14px 20px}
-    .legal-content li{font-size:14.5px;color:var(--text2);line-height:1.8;margin-bottom:5px}
-    .legal-content a{color:var(--blue-light);text-decoration:underline;text-underline-offset:3px}
-    .legal-content strong{color:var(--text)}
-
+    /* ===== Hero ===== */
+    .hero{position:relative;min-height:min(880px,100svh);display:flex;align-items:center;padding:150px 0 90px;overflow:hidden;
+      background:
+        radial-gradient(900px 560px at 88% 30%, rgba(234,90,11,.08), transparent 60%),
+        linear-gradient(180deg, var(--bg) 70%, var(--bg-soft)),
+        var(--bg)}
+    .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
+    .hero-grid{display:grid;grid-template-columns:minmax(0,600px) 1fr;gap:30px;align-items:center;width:100%}
+    .hero h1{font-size:clamp(42px,6.2vw,80px);margin:20px 0 22px;text-transform:uppercase}
+    .hero h1 .o{color:var(--accent)}
+    .hero-sub{font-size:clamp(17px,1.9vw,19.5px);color:var(--ink-soft);max-width:46ch;margin-bottom:32px}
+    .hero-ctas{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+    .hero-note{margin-top:20px;font-family:var(--font-mono);font-size:12.5px;color:var(--ink-faint);display:flex;gap:16px;flex-wrap:wrap}
+    .hero-note span{display:inline-flex;align-items:center;gap:7px}
+    .hero-note svg{color:var(--accent)}
+    .hero-visual{position:relative;min-height:440px;height:min(600px,60vh)}
     @media (max-width:960px){
-      .hero .container{grid-template-columns:1fr;gap:48px}
-      .stockcard{transform:none}
-      .bigfeat{grid-template-columns:1fr}
-      .minis{grid-template-columns:repeat(2,1fr)}
-      .plans{grid-template-columns:1fr}
-      .strip .container{grid-template-columns:repeat(2,1fr);gap:24px}
+      .hero{padding-top:120px;min-height:0}
+      .hero-grid{grid-template-columns:1fr}
+      .hero-visual{min-height:320px;height:46vw;max-height:420px}
     }
-    @media (max-width:640px){
-      .nav-center{display:none}
-      .hero{padding-top:118px}
-      .minis{grid-template-columns:1fr}
-      .container{padding:0 20px}
-      .sc-chip{display:none}
-    }
+
+    /* ===== Sizes marquee ===== */
+    .band{padding:26px 0;border-block:2px solid var(--ink);background:var(--card)}
+    .band .chip{display:inline-flex;align-items:baseline;gap:10px;font-family:var(--font-mono);font-weight:600;font-size:17px;color:var(--ink);white-space:nowrap}
+    .band .chip small{color:var(--ink-faint);font-size:11px;letter-spacing:.12em}
+    .band .chip.season{color:var(--accent)}
+
+    /* ===== Oversized numerals stats ===== */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(18px,3vw,40px)}
+    .stat{padding-top:18px;border-top:2px solid var(--ink)}
+    .stat b{display:block;font-family:var(--font-display);font-weight:900;font-size:clamp(56px,8vw,116px);line-height:.9;color:var(--ink);letter-spacing:-.04em;white-space:nowrap}
+    .stat b i{font-style:normal;color:var(--accent)}
+    .stat b .unit{font-size:.32em;font-weight:700;letter-spacing:0;color:var(--ink-faint);margin-left:4px}
+    .stat > span{display:block;margin-top:12px;color:var(--ink-soft);font-size:14.5px;max-width:22ch}
+    @media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr);row-gap:36px}}
+
+    /* ===== Editorial feature rows ===== */
+    .frows{display:grid}
+    .frow{display:grid;grid-template-columns:110px 1.1fr 1fr;gap:clamp(18px,3vw,44px);align-items:center;padding:clamp(30px,4.5vw,54px) 0;border-top:1.5px solid var(--line)}
+    .frow:last-child{border-bottom:1.5px solid var(--line)}
+    .frow .fnum{font-family:var(--font-display);font-weight:900;font-size:clamp(44px,5.5vw,84px);line-height:.9;color:transparent;-webkit-text-stroke:2px var(--accent);letter-spacing:-.03em}
+    .frow h3{font-size:clamp(22px,2.6vw,30px);margin-bottom:10px;text-transform:uppercase}
+    .frow p{color:var(--ink-soft);font-size:15.5px;max-width:52ch}
+    .frow .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+    .frow .tag{font-family:var(--font-mono);font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--slate);background:var(--bg-soft);border:1px solid var(--line);padding:5px 10px;border-radius:6px}
+    @media (max-width:900px){.frow{grid-template-columns:1fr}.frow .fnum{font-size:44px}}
+
+    /* feature art mocks */
+    .art{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-s)}
+    .picker{display:grid;gap:10px}
+    .picker-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .picker-row label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;color:var(--ink-faint);width:52px}
+    .pchip{font-family:var(--font-mono);font-size:12.5px;font-weight:600;border:1.5px solid var(--line);border-radius:7px;padding:6px 10px;color:var(--ink-soft)}
+    .pchip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+    .stock-row{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:12.5px;padding:9px 4px;border-top:1px dashed var(--line);color:var(--ink-soft)}
+    .stock-row b{color:var(--ink)}
+    .stock-row .qty{color:var(--accent);font-weight:600}
+    .fit-row{display:flex;gap:10px;align-items:center;padding:9px 4px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-soft)}
+    .fit-row .st{margin-left:auto;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;background:var(--accent-soft);color:var(--accent)}
+    .fit-row .st.done{background:#E5F5EB;color:#187A43}
+    .inv-line{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12.5px;padding:8px 4px;border-top:1px dashed var(--line);color:var(--ink-soft)}
+    .inv-line.total{border-top:2px solid var(--ink);color:var(--ink);font-weight:600}
+    .fu-row{display:flex;gap:10px;align-items:center;padding:9px 4px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-soft)}
+    .fu-row .ic{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+
+    /* ===== FIFO / VAT split ===== */
+    .fifo-wrap{background:var(--slate-deep);color:#E8EDF2}
+    .fifo-wrap .section-head h2{color:#fff}
+    .fifo-wrap .section-head p{color:#A5B1BD}
+    .fifo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .fifo-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-lg);padding:28px}
+    .fifo-card h3{color:#fff;font-size:21px;text-transform:uppercase;margin-bottom:10px}
+    .fifo-card p{color:#A5B1BD;font-size:14.5px;margin-bottom:18px}
+    .fifo-line{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12.5px;padding:8px 2px;border-top:1px dashed rgba(255,255,255,.14);color:#C4CEd8}
+    .fifo-line b{color:#fff}
+    .fifo-line .hl{color:#FF8A4C}
+    @media (max-width:860px){.fifo-grid{grid-template-columns:1fr}}
+
+    /* ===== Pricing ===== */
+    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch}
+    .plan{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius-lg);padding:28px 24px;display:flex;flex-direction:column;box-shadow:var(--shadow-s)}
+    .plan.is-featured{border-color:var(--accent);box-shadow:var(--shadow-m);position:relative}
+    .plan .flag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 14px;border-radius:99px;white-space:nowrap}
+    .plan h3{font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+    .plan .price{margin:14px 0 6px;font-family:var(--font-display);font-weight:900;font-size:40px;color:var(--ink);letter-spacing:-.03em}
+    .plan .price small{font-family:var(--font-body);font-size:14px;color:var(--ink-faint);font-weight:500}
+    .plan .per{font-size:13px;color:var(--ink-faint);margin-bottom:18px}
+    .plan ul{list-style:none;display:grid;gap:9px;margin-bottom:24px}
+    .plan li{display:flex;gap:9px;font-size:13.8px;color:var(--ink-soft)}
+    .plan li svg{color:var(--accent);flex:none;margin-top:3px}
+    .plan .btn{margin-top:auto;width:100%}
+    .plans-note{text-align:center;color:var(--ink-faint);font-size:13px;margin-top:26px;font-family:var(--font-mono);letter-spacing:.04em}
+    @media (max-width:1020px){.plans{grid-template-columns:1fr 1fr}}
+    @media (max-width:560px){.plans{grid-template-columns:1fr}}
+
+    .faq-wrap{max-width:760px;margin-inline:auto}
+
+    /* ===== Final CTA ===== */
+    .final{background:var(--slate-deep);padding:clamp(64px,9vw,120px) 0;text-align:center;color:#E8EDF2;position:relative;overflow:hidden}
+    .final::before{content:"";position:absolute;inset:0;background:
+      repeating-linear-gradient(-55deg, rgba(234,90,11,.07) 0 14px, transparent 14px 42px)}
+    .final>*{position:relative}
+    .final h2{color:#fff;font-size:clamp(32px,5vw,60px);max-width:20ch;margin:0 auto 16px;text-transform:uppercase}
+    .final p{color:#A5B1BD;max-width:52ch;margin:0 auto 32px;font-size:17px}
+    .final .btn-ghost{color:#E8EDF2;box-shadow:inset 0 0 0 1.5px rgba(232,237,242,.35)}
+    .final .btn-ghost:hover{box-shadow:inset 0 0 0 1.5px rgba(232,237,242,.8)}
   </style>
 </head>
 <body>
 
-<nav id="nav">
-  <div class="container">
-    <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>TyreOps</span></a>
-    <div class="nav-center">
-      <a href="#features">Features</a>
-      <a href="#more">More</a>
-      <a href="#pricing">Pricing</a>
-    </div>
-    <div class="nav-right">
-      <a href="/tyreops/login" class="btn btn-ghost">Log in</a>
-      <a href="/tyreops/login?tab=register" class="btn btn-blue">Start free trial</a>
-    </div>
-  </div>
-</nav>
+  <a class="sr-only" href="#main">Skip to content</a>
 
-<!-- ================= HOME ================= -->
-<div id="page-home" class="page active">
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-glow" aria-hidden="true"></div>
-  <div class="container">
-    <div>
-      <div class="eyebrow">Built for UK tyre garages · Live</div>
-      <h1>Know your true cost<br><span class="blue">on every tyre sold.</span></h1>
-      <p class="hero-sub">TyreOps tracks every purchase batch separately, sells oldest stock first, and works out your real margin automatically — so you stop guessing what you actually made on a sale.</p>
-      <div class="hero-btns">
-        <a href="/tyreops/login?tab=register" class="btn btn-blue btn-lg">Start your 14-day free trial →</a>
-        <a href="#features" class="btn btn-ghost btn-lg">See what's inside</a>
-      </div>
-      <p class="hero-note"><b>No card required</b> // full features // cancel any time</p>
-    </div>
-
-    <!-- signature: auto-rotating 3-face panel -->
-    <div class="stock-scene">
-      <div class="sc-chip chip-1"><span class="dot"></span>Live in TyreOps</div>
-      <div class="cube" id="cube" aria-label="TyreOps live data panel">
-
-        <!-- FACE 1: FIFO stock -->
-        <div class="face face-front">
-          <div class="sc-head">
-            <span class="sc-title">STOCK <b>· 205/55 R16</b></span>
-            <span class="sc-badge">IN STOCK</span>
-          </div>
-          <div class="sc-body">
-            <div class="sc-sku">
-              <span class="name">Continental PremiumContact</span>
-              <span class="size">205/55 R16</span>
-            </div>
-            <div class="sc-batches">
-              <div class="sc-batch next"><span class="dot"></span><span class="lbl">FIFO #1</span><span class="qty">4 left</span><span class="cost">£62.40</span></div>
-              <div class="sc-batch queued"><span class="dot"></span><span class="lbl">BATCH #2</span><span class="qty">8 left</span><span class="cost">£64.10</span></div>
-              <div class="sc-batch queued"><span class="dot"></span><span class="lbl">BATCH #3</span><span class="qty">12 left</span><span class="cost">£66.80</span></div>
-            </div>
-            <div class="sc-fifo">
-              <span class="label">Next sale cost</span>
-              <span class="val">£62.40 · 41% margin</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- FACE 2: P&L summary -->
-        <div class="face face-right">
-          <div class="sc-head">
-            <span class="sc-title">P&amp;L <b>· THIS MONTH</b></span>
-            <span class="sc-badge">+18.4%</span>
-          </div>
-          <div class="sc-body">
-            <div class="pl-big">
-              <span class="pl-label">Net profit</span>
-              <span class="pl-amount">£4,182<span class="pl-sub">.60</span></span>
-            </div>
-            <div class="pl-rows">
-              <div class="pl-row"><span>Sales</span><b>£11,940</b></div>
-              <div class="pl-row"><span>Cost of stock (FIFO)</span><b class="muted">£7,012</b></div>
-              <div class="pl-row"><span>VAT on margin</span><b class="muted">£745</b></div>
-            </div>
-            <div class="sc-fifo">
-              <span class="label">Best seller</span>
-              <span class="val">205/55 R16 · 38 sold</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- FACE 3: Low-stock alerts -->
-        <div class="face face-back">
-          <div class="sc-head">
-            <span class="sc-title">ALERTS <b>· REORDER</b></span>
-            <span class="sc-badge warn">3 LOW</span>
-          </div>
-          <div class="sc-body">
-            <div class="alert-list">
-              <div class="alert-row crit"><span class="dot"></span><span class="ar-name">205/55 R16 · Continental</span><span class="ar-qty">4 left</span></div>
-              <div class="alert-row warn"><span class="dot"></span><span class="ar-name">195/65 R15 · Michelin</span><span class="ar-qty">6 left</span></div>
-              <div class="alert-row warn"><span class="dot"></span><span class="ar-name">225/45 R17 · Pirelli</span><span class="ar-qty">7 left</span></div>
-            </div>
-            <div class="sc-fifo">
-              <span class="label">Reorder point hit</span>
-              <span class="val">Auto-flagged · 3 SKUs</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-      <div class="sc-chip chip-2"><span class="dot"></span>Updates as you trade</div>
-    </div>
-  </div>
-</section>
-
-<!-- STATS STRIP -->
-<div class="strip">
-  <div class="container">
-    <div class="st"><b>FIFO</b><span>Costed automatically</span></div>
-    <div class="st"><b>Per batch</b><span>True margin tracking</span></div>
-    <div class="st"><b>14 days</b><span>Free trial, full access</span></div>
-    <div class="st"><b>UK</b><span>VAT margin scheme ready</span></div>
-  </div>
-</div>
-
-<!-- BIG FEATURES -->
-<section id="features">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">The core</div>
-      <h2>Three things tyre shops<br>can't run without.</h2>
-      <p class="sec-sub">Built around how a tyre business actually makes money — batch costs, used stock, and the VAT margin scheme.</p>
-    </div>
-    <div class="bigfeat">
-      <div class="bf reveal">
-        <div class="bf-num">CORE 01</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div>
-        <h3>FIFO Batch Tracking</h3>
-        <p>Each purchase batch is tracked separately and the oldest stock sells first, automatically. Know your true cost on every single sale — no more guesswork.</p>
-        <span class="tag">Automatic cost calculation per sale</span>
-      </div>
-      <div class="bf reveal">
-        <div class="bf-num">CORE 02</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"/></svg></div>
-        <h3>Used Tyre Management</h3>
-        <p>Part-exchange and used stock with full traceability. Track source customer, tread depth and margin on every used tyre you buy and sell.</p>
-        <span class="tag">Part-exchange tracking</span>
-      </div>
-      <div class="bf reveal">
-        <div class="bf-num">CORE 03</div>
-        <div class="bf-icon"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg></div>
-        <h3>VAT Margin Scheme</h3>
-        <p>Automatic VAT calculation for used tyres. Pay VAT only on the profit margin, not the full sale price. Compliant with HMRC requirements.</p>
-        <span class="tag">Automatic margin scheme calculations</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- MINI FEATURES -->
-<section id="more" style="padding-top:0">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">Everything else</div>
-      <h2>The day-to-day, sorted.</h2>
-    </div>
-    <div class="minis">
-      <div class="mini reveal"><div class="mini-num">01</div><h4>Instant Invoicing</h4><p>Create professional invoices in seconds. Email directly to customers. Track cash, card or bank transfer payments.</p></div>
-      <div class="mini reveal"><div class="mini-num">02</div><h4>Customer Database</h4><p>Store customer details, vehicle reg and full purchase history. See lifetime value at a glance.</p></div>
-      <div class="mini reveal"><div class="mini-num">03</div><h4>Low Stock Alerts</h4><p>Set reorder points per SKU. Never miss a sale because you're out of a popular size.</p></div>
-      <div class="mini reveal"><div class="mini-num">04</div><h4>P&amp;L Dashboard</h4><p>See your real margins, best sellers and slowest movers. Make smarter buying decisions.</p></div>
-      <div class="mini reveal"><div class="mini-num">05</div><h4>Works on Mobile</h4><p>Full access from your phone. Check stock, create invoices and track payments on the go.</p></div>
-      <div class="mini reveal"><div class="mini-num">06</div><h4>CSV Export</h4><p>Export reports for your accountant in one click. Works with any accounting software.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- PRICING -->
-<section id="pricing">
-  <div class="container">
-    <div class="sec-head reveal">
-      <div class="kicker">Pricing</div>
-      <h2>Simple, honest pricing.</h2>
-      <p class="sec-sub">Every plan starts with a 14-day free trial with full Gold features. No card required, cancel any time.</p>
-    </div>
-    <div class="plans">
-      <div class="plan basic reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Basic</div>
-        <div class="plan-price"><b>£5.99</b><span>/month</span></div>
-        <p class="plan-desc">Everything to run the day-to-day.</p>
-        <ul>
-          <li>Invoicing</li>
-          <li>Inventory &amp; purchases</li>
-          <li>Customer database</li>
-          <li>FIFO automatic pricing</li>
-          <li>1 user</li>
-          <li class="off">Customer follow-ups</li>
-          <li class="off">VAT reports</li>
-        </ul>
-        <a href="/tyreops/login?plan=basic&tab=register" class="btn btn-ghost">Start free trial</a>
-      </div>
-      <div class="plan bronze reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Bronze</div>
-        <div class="plan-price"><b>£12.99</b><span>/month</span></div>
-        <p class="plan-desc">Adds customer retention tools.</p>
-        <ul>
-          <li>Everything in Basic</li>
-          <li>Customer follow-ups</li>
-          <li>Email &amp; WhatsApp reminders</li>
-          <li>1 user</li>
-          <li class="off">Used tyre tracking</li>
-          <li class="off">VAT margin scheme</li>
-        </ul>
-        <a href="/tyreops/login?plan=bronze&tab=register" class="btn btn-ghost">Start free trial</a>
-      </div>
-      <div class="plan silver popular reveal">
-        <div class="plan-flag">Most popular</div>
-        <div class="plan-tier"><span class="tier-dot"></span>Silver</div>
-        <div class="plan-price"><b>£18.99</b><span>/month</span></div>
-        <p class="plan-desc">For growing garages with used stock.</p>
-        <ul>
-          <li>Unlimited invoices</li>
-          <li>Batch override control</li>
-          <li>Supplier tracking</li>
-          <li>Used tyre management</li>
-          <li>VAT reports</li>
-          <li>2 users</li>
-        </ul>
-        <a href="/tyreops/login?plan=silver&tab=register" class="btn btn-blue">Start free trial</a>
-      </div>
-      <div class="plan gold reveal">
-        <div class="plan-tier"><span class="tier-dot"></span>Gold</div>
-        <div class="plan-price"><b>£28.99</b><span>/month</span></div>
-        <p class="plan-desc">Full power for serious operators.</p>
-        <ul>
-          <li>Everything in Silver</li>
-          <li>Full P&amp;L dashboard</li>
-          <li>VAT Margin Scheme</li>
-          <li>Reports &amp; CSV export</li>
-          <li>Unlimited users</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="/tyreops/login?plan=gold&tab=register" class="btn btn-ghost">Start free trial</a>
-      </div>
-    </div>
-    <p class="pricing-note">ALL PRICES IN GBP // 14-DAY FREE TRIAL ON EVERY PLAN // CANCEL ANY TIME</p>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta">
-  <div class="container">
-    <div class="kicker reveal" style="justify-content:center">Ready when you are</div>
-    <h2 class="reveal">Stop guessing your margins.<br>Start knowing them.</h2>
-    <p class="reveal">Set up your stock, raise your first invoice, and see your true cost on every sale.</p>
-    <div class="hero-btns reveal">
-      <a href="/tyreops/login?tab=register" class="btn btn-blue btn-lg">Start your 14-day free trial →</a>
-      <a href="mailto:hello@alzaro.co.uk" class="btn btn-ghost btn-lg">Ask us anything</a>
-    </div>
-    <p class="hero-note reveal">No card required // set up in minutes // UK support</p>
-  </div>
-</section>
-
-</div><!-- /page-home -->
-
-  <div id="page-privacy" class="page">
-    <section class="legal-page">
-      <div class="legal-container">
-        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
-        
-        <div class="legal-header">
-          <h1>Privacy Policy</h1>
-          <p class="legal-meta">Last updated: 21 March 2026</p>
-        </div>
-
-        <div class="legal-content">
-          <div class="legal-box">
-            <p><strong>Summary:</strong> We collect only what we need to provide Alzaro TyreOps services. We never sell your data. Your garage data belongs to you.</p>
-          </div>
-
-          <h2>1. Who we are</h2>
-          <p>Alzaro TyreOps ("we", "us", "our") is a tyre management software platform operated in the United Kingdom. We are committed to protecting your privacy and handling your data in accordance with UK GDPR and the Data Protection Act 2018.</p>
-          <p><strong>Contact:</strong> <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a></p>
-
-          <h2>2. What data we collect</h2>
-          
-          <h3>Account information</h3>
-          <ul>
-            <li>Email address</li>
-            <li>Password (encrypted)</li>
-            <li>Garage name and contact details</li>
-          </ul>
-
-          <h3>Business data you enter</h3>
-          <ul>
-            <li>Inventory records (SKUs, batches, stock levels)</li>
-            <li>Customer information (names, emails, phone numbers, vehicle registrations)</li>
-            <li>Invoice and payment records</li>
-            <li>Supplier information</li>
-          </ul>
-
-          <h3>Automatically collected</h3>
-          <ul>
-            <li>IP address and browser type</li>
-            <li>Usage analytics (pages visited, features used)</li>
-            <li>Error logs for troubleshooting</li>
-          </ul>
-
-          <h2>3. How we use your data</h2>
-          <p>We use your data to:</p>
-          <ul>
-            <li>Provide and maintain Alzaro TyreOps services</li>
-            <li>Process your subscription payments</li>
-            <li>Send service-related emails (password resets, subscription updates)</li>
-            <li>Improve our software based on usage patterns</li>
-            <li>Comply with legal obligations (e.g., tax records)</li>
-          </ul>
-
-          <h2>4. Data storage and security</h2>
-          <p>Your data is stored securely using <strong>Supabase</strong>, with servers located in the European Union. We implement:</p>
-          <ul>
-            <li>Encryption in transit (TLS/SSL)</li>
-            <li>Encryption at rest</li>
-            <li>Row-level security ensuring garage data isolation</li>
-            <li>Regular security audits</li>
-          </ul>
-
-          <h2>5. Data sharing</h2>
-          <p>We <strong>never sell</strong> your data. We only share data with:</p>
-          <ul>
-            <li><strong>Supabase</strong> — database hosting (EU servers)</li>
-            <li><strong>Stripe</strong> — payment processing</li>
-            <li><strong>Vercel</strong> — application hosting</li>
-          </ul>
-          <p>All third parties are GDPR-compliant and process data only as necessary to provide their services.</p>
-
-          <h2>6. Your rights</h2>
-          <p>Under UK GDPR, you have the right to:</p>
-          <ul>
-            <li><strong>Access</strong> — request a copy of your data</li>
-            <li><strong>Rectification</strong> — correct inaccurate data</li>
-            <li><strong>Erasure</strong> — request deletion of your data</li>
-            <li><strong>Portability</strong> — export your data in a standard format</li>
-            <li><strong>Object</strong> — opt out of certain processing</li>
-          </ul>
-          <p>To exercise these rights, email us at <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a>.</p>
-
-          <h2>7. Data retention</h2>
-          <p>We retain your data for as long as your account is active. Upon account deletion:</p>
-          <ul>
-            <li>Business data is deleted within 30 days</li>
-            <li>Backup copies are purged within 90 days</li>
-            <li>Anonymised analytics may be retained indefinitely</li>
-          </ul>
-
-          <h2>8. Cookies</h2>
-          <p>We use essential cookies only:</p>
-          <ul>
-            <li><strong>Authentication cookies</strong> — to keep you logged in</li>
-            <li><strong>Session cookies</strong> — to maintain your session state</li>
-          </ul>
-          <p>We do not use advertising or tracking cookies.</p>
-
-          <h2>9. Changes to this policy</h2>
-          <p>We may update this policy from time to time. We will notify you of significant changes via email or in-app notification.</p>
-
-          <h2>10. Contact us</h2>
-          <p>For privacy-related questions or concerns:</p>
-          <p>
-            <strong>Email:</strong> <a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a><br>
-            <strong>Address:</strong> Alzaro TyreOps, Milton Keynes, United Kingdom
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- TERMS PAGE -->
-  <div id="page-terms" class="page">
-    <section class="legal-page">
-      <div class="legal-container">
-        <a href="#" onclick="showPage('home'); return false;" class="back-link">← Back to Home</a>
-        
-        <div class="legal-header">
-          <h1>Terms of Service</h1>
-          <p class="legal-meta">Last updated: 21 March 2026</p>
-        </div>
-
-        <div class="legal-content">
-          <div class="legal-box">
-            <p><strong>Summary:</strong> Use Alzaro TyreOps lawfully and responsibly. Pay your subscription on time. We'll provide reliable software and protect your data. Your business data belongs to you.</p>
-          </div>
-
-          <h2>1. Agreement to terms</h2>
-          <p>By accessing or using Alzaro TyreOps ("the Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.</p>
-          <p>These terms constitute a legally binding agreement between you ("User", "you") and Alzaro TyreOps ("we", "us", "our").</p>
-
-          <h2>2. Description of service</h2>
-          <p>Alzaro TyreOps is a cloud-based tyre management software platform designed for UK tyre garages. The Service includes:</p>
-          <ul>
-            <li>Inventory management with FIFO batch tracking</li>
-            <li>Invoice creation and management</li>
-            <li>Customer database</li>
-            <li>VAT reporting tools</li>
-            <li>Business analytics and reporting</li>
-          </ul>
-
-          <h2>3. Account registration</h2>
-          <p>To use Alzaro TyreOps, you must:</p>
-          <ul>
-            <li>Provide accurate and complete registration information</li>
-            <li>Be at least 18 years old</li>
-            <li>Have authority to bind your business to these terms</li>
-            <li>Keep your login credentials secure</li>
-          </ul>
-          <p>You are responsible for all activity under your account. Notify us immediately if you suspect unauthorised access.</p>
-
-          <h2>4. Subscription and payment</h2>
-          
-          <h3>Free trial</h3>
-          <p>New users receive a 14-day free trial with full access to Gold tier features. No credit card is required to start the trial.</p>
-          
-          <h3>Pricing tiers</h3>
-          <ul>
-            <li><strong>Basic:</strong> £5.99/month</li>
-            <li><strong>Bronze:</strong> £12.99/month</li>
-            <li><strong>Silver:</strong> £18.99/month</li>
-            <li><strong>Gold:</strong> £28.99/month</li>
-          </ul>
-          
-          <h3>Billing</h3>
-          <ul>
-            <li>Subscriptions are billed monthly in advance</li>
-            <li>Payments are processed via Stripe</li>
-            <li>Prices are exclusive of VAT where applicable</li>
-            <li>We reserve the right to change pricing with 30 days notice</li>
-          </ul>
-          
-          <h3>Failed payments</h3>
-          <p>If payment fails, we will attempt to process it again. After 7 days of failed payments, your account may be suspended until payment is received.</p>
-
-          <h2>5. Cancellation and refunds</h2>
-          <ul>
-            <li>You may cancel your subscription at any time</li>
-            <li>Cancellation takes effect at the end of your current billing period</li>
-            <li>No refunds are provided for partial months</li>
-            <li>Upon cancellation, you retain read-only access for 30 days to export your data</li>
-          </ul>
-
-          <h2>6. Your data</h2>
-          
-          <h3>Ownership</h3>
-          <p><strong>Your business data belongs to you.</strong> This includes inventory records, customer information, invoices, and all other data you enter into Alzaro TyreOps.</p>
-          
-          <h3>Data export</h3>
-          <p>You may export your data at any time via CSV export features. Upon request, we will provide a complete data export within 7 days.</p>
-          
-          <h3>Data protection</h3>
-          <p>We handle your data in accordance with our <a href="#" onclick="showPage('privacy'); return false;">Privacy Policy</a> and UK data protection law.</p>
-
-          <h2>7. Acceptable use</h2>
-          <p>You agree NOT to:</p>
-          <ul>
-            <li>Use the Service for any unlawful purpose</li>
-            <li>Share your account with unauthorised users</li>
-            <li>Attempt to access other users' data</li>
-            <li>Reverse engineer or attempt to extract source code</li>
-            <li>Use automated systems to scrape or overload the Service</li>
-            <li>Upload malicious code or content</li>
-            <li>Resell or redistribute the Service without permission</li>
-          </ul>
-
-          <div class="legal-box warning">
-            <p><strong>Warning:</strong> Violation of acceptable use policies may result in immediate account termination without refund.</p>
-          </div>
-
-          <h2>8. Service availability</h2>
-          <p>We strive to maintain 99.9% uptime but do not guarantee uninterrupted service. We may temporarily suspend the Service for:</p>
-          <ul>
-            <li>Scheduled maintenance (with advance notice where possible)</li>
-            <li>Emergency security updates</li>
-            <li>Circumstances beyond our reasonable control</li>
-          </ul>
-
-          <h2>9. Intellectual property</h2>
-          <p>Alzaro TyreOps and its original content, features, and functionality are owned by us and protected by UK and international copyright, trademark, and other intellectual property laws.</p>
-          <p>You retain all rights to your business data. By using the Service, you grant us a limited licence to process your data solely to provide the Service.</p>
-
-          <h2>10. Limitation of liability</h2>
-          <p>To the maximum extent permitted by law:</p>
-          <ul>
-            <li>Alzaro TyreOps is provided "as is" without warranties of any kind</li>
-            <li>We are not liable for indirect, incidental, or consequential damages</li>
-            <li>Our total liability is limited to the amount you paid us in the 12 months preceding the claim</li>
-            <li>We are not responsible for your compliance with tax, VAT, or other regulations</li>
-          </ul>
-
-          <h2>11. Indemnification</h2>
-          <p>You agree to indemnify and hold harmless Alzaro TyreOps from any claims, damages, or expenses arising from your use of the Service or violation of these terms.</p>
-
-          <h2>12. Changes to terms</h2>
-          <p>We may modify these terms at any time. We will provide notice of material changes via email or in-app notification at least 30 days before they take effect.</p>
-          <p>Continued use of the Service after changes take effect constitutes acceptance of the new terms.</p>
-
-          <h2>13. Termination</h2>
-          <p>We may terminate or suspend your account immediately if you:</p>
-          <ul>
-            <li>Violate these terms</li>
-            <li>Engage in fraudulent activity</li>
-            <li>Fail to pay after repeated notices</li>
-          </ul>
-          <p>Upon termination, your right to use the Service ceases immediately. We will retain your data for 30 days to allow export, then delete it.</p>
-
-          <h2>14. Governing law</h2>
-          <p>These terms are governed by the laws of England and Wales. Any disputes shall be subject to the exclusive jurisdiction of the courts of England and Wales.</p>
-
-          <h2>15. Contact</h2>
-          <p>For questions about these terms:</p>
-          <p>
-            <strong>Email:</strong> <a href="mailto:legal@tyreops.co.uk">legal@tyreops.co.uk</a><br>
-            <strong>Address:</strong> Alzaro TyreOps, Milton Keynes, United Kingdom
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-
-<!-- FOOTER -->
-<footer>
-  <div class="container">
-    <div class="foot">
-      <a href="#" onclick="showPage('home'); return false;" class="logo">Alzaro<span>TyreOps</span></a>
-      <div class="foot-links">
+  <header class="lnav" aria-label="Primary">
+    <div class="lcontainer lnav-inner">
+      <a class="lnav-logo" href="/tyreops">
+        <span class="lnav-mark" style="background:var(--slate-deep)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
+        </span>
+        <span>Alzaro <span style="color:var(--accent)">TyreOps</span></span>
+      </a>
+      <nav class="lnav-links" aria-label="Sections">
         <a href="#features">Features</a>
+        <a href="#stock">Stock engine</a>
         <a href="#pricing">Pricing</a>
-        <a href="#" onclick="showPage('privacy'); return false;">Privacy</a>
-        <a href="#" onclick="showPage('terms'); return false;">Terms</a>
-        <a href="mailto:hello@alzaro.co.uk">Contact</a>
-      </div>
-      <div class="foot-copy">
-        <span>© 2026 Alzaro Group. All rights reserved.</span>
-        <span>PART OF THE ALZARO PLATFORM FAMILY // MILTON KEYNES, UK</span>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="lnav-actions">
+        <a class="lnav-login" href="/tyreops/login">Log in</a>
+        <a class="btn btn-cta btn-sm magnetic" href="/tyreops/login?tab=register">Start free trial</a>
+        <button class="lnav-burger" aria-expanded="false" aria-label="Open menu"><span></span></button>
       </div>
     </div>
-  </div>
-</footer>
+  </header>
+  <nav class="lnav-mobile" aria-label="Mobile">
+    <a href="#features">Features</a>
+    <a href="#stock">Stock engine</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="/tyreops/login">Log in</a>
+  </nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-  // Page navigation (privacy / terms / home)
-  function showPage(pageName) {
-    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-    const targetPage = document.getElementById('page-' + pageName);
-    if (targetPage) targetPage.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (pageName === 'home') {
-      history.pushState(null, '', window.location.pathname);
-    } else {
-      history.pushState(null, '', '#' + pageName);
-    }
-    const navCenter = document.querySelector('.nav-center');
-    if (navCenter) navCenter.style.display = (pageName === 'home') ? 'flex' : 'none';
-  }
+  <main id="main">
 
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function(e) {
-      const href = this.getAttribute('href');
-      if (href.startsWith('#') && href.length > 1 && !href.includes('page')) {
-        e.preventDefault();
-        const homePage = document.getElementById('page-home');
-        const go = () => {
-          const target = document.querySelector(href);
-          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        };
-        if (!homePage.classList.contains('active')) {
-          showPage('home');
-          setTimeout(go, 100);
-        } else {
-          go();
-        }
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="lcontainer hero-grid">
+        <div>
+          <span class="eyebrow reveal">UK tyre garages &amp; fitters</span>
+          <h1 class="reveal" style="transition-delay:.08s">Tyre stock, fitting and sales — <span class="o">sorted</span>.</h1>
+          <p class="hero-sub reveal" style="transition-delay:.16s">Every tyre on the shelf, every fitting in the diary, every invoice out the door — with FIFO stock pricing and the VAT margin scheme handled for you.</p>
+          <div class="hero-ctas reveal" style="transition-delay:.24s">
+            <a class="btn btn-cta magnetic" href="/tyreops/login?tab=register">Start free trial <span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost" href="#features">See what it does</a>
+          </div>
+          <p class="hero-note reveal" style="transition-delay:.32s">
+            <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>14-DAY FREE TRIAL</span>
+            <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>NO CARD REQUIRED</span>
+            <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>FROM £8/MONTH</span>
+          </p>
+        </div>
+
+        <div class="hero-visual reveal rv-scale" style="transition-delay:.2s">
+          <div class="hero-3d" id="hero-3d" aria-hidden="true">
+            <!-- Static poster: stacked tyres, shown on mobile / reduced motion / no WebGL -->
+            <div class="hero-poster">
+              <svg width="70%" viewBox="0 0 380 360" fill="none" role="img" aria-label="Illustration of stacked tyres">
+                <ellipse cx="190" cy="322" rx="140" ry="22" fill="#38424E" opacity=".1"/>
+                <g>
+                  <ellipse cx="150" cy="280" rx="112" ry="40" fill="#2B333D"/>
+                  <ellipse cx="150" cy="266" rx="112" ry="40" fill="#38424E"/>
+                  <ellipse cx="150" cy="266" rx="58" ry="20" fill="#ECF0F4"/>
+                  <ellipse cx="150" cy="222" rx="112" ry="40" fill="#2B333D"/>
+                  <ellipse cx="150" cy="208" rx="112" ry="40" fill="#404B58"/>
+                  <ellipse cx="150" cy="208" rx="58" ry="20" fill="#ECF0F4"/>
+                  <ellipse cx="150" cy="164" rx="112" ry="40" fill="#2B333D"/>
+                  <ellipse cx="150" cy="150" rx="112" ry="40" fill="#38424E"/>
+                  <ellipse cx="150" cy="150" rx="58" ry="20" fill="#EA5A0B"/>
+                  <ellipse cx="150" cy="150" rx="34" ry="12" fill="#ECF0F4"/>
+                </g>
+                <g transform="rotate(14 300 190)">
+                  <circle cx="300" cy="150" r="64" fill="#2B333D"/>
+                  <circle cx="300" cy="150" r="40" fill="#404B58"/>
+                  <circle cx="300" cy="150" r="26" fill="#ECF0F4"/>
+                  <circle cx="300" cy="150" r="10" fill="#EA5A0B"/>
+                  <g fill="#1F262E">
+                    <rect x="296" y="84" width="8" height="14" rx="2"/>
+                    <rect x="296" y="202" width="8" height="14" rx="2"/>
+                    <rect x="238" y="146" width="14" height="8" rx="2"/>
+                    <rect x="348" y="146" width="14" height="8" rx="2"/>
+                  </g>
+                </g>
+                <circle cx="66" cy="96" r="5" fill="#EA5A0B" opacity=".7"/>
+                <circle cx="342" cy="286" r="6" fill="#38424E" opacity=".4"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SIZES MARQUEE ================= -->
+    <section class="band" aria-label="Tyre sizes and seasons">
+      <div class="marquee">
+        <div class="marquee-track">
+          <span class="chip">175/65 R14</span>
+          <span class="chip season">■ SUMMER</span>
+          <span class="chip">195/65 R15</span>
+          <span class="chip">205/55 R16</span>
+          <span class="chip season">■ ALL-SEASON</span>
+          <span class="chip">225/45 R17</span>
+          <span class="chip">235/40 R18</span>
+          <span class="chip season">■ WINTER</span>
+          <span class="chip">255/35 R19</span>
+          <span class="chip">275/40 R20</span>
+          <span class="chip season">■ PART-WORN</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= OVERSIZED STATS ================= -->
+    <section class="lsection">
+      <div class="lcontainer">
+        <div class="stats" data-stagger="120">
+          <div class="stat"><b>£<i><span data-count="8">0</span></i><span class="unit">/MO</span></b><span>to start on Basic — priced for the fitting bay, not the boardroom</span></div>
+          <div class="stat"><b><span data-count="14">0</span><span class="unit">DAYS</span></b><span>free trial with full Gold-tier access from day one</span></div>
+          <div class="stat"><b><span data-count="4">0</span><span class="unit">PLANS</span></b><span>Basic to Gold — grow when the stock room does</span></div>
+          <div class="stat"><b><i><span data-count="0">0</span></i><span class="unit">CARD</span></b><span>details needed to start — try it, then decide</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EDITORIAL FEATURE ROWS ================= -->
+    <section class="lsection" id="features" style="padding-top:0">
+      <div class="lcontainer">
+        <div class="section-head reveal">
+          <span class="eyebrow">The system</span>
+          <h2>Built around the four jobs of a tyre garage</h2>
+          <p>Stock in, fittings booked, invoices out, customers back. TyreOps does the admin for all four.</p>
+        </div>
+
+        <div class="frows">
+          <article class="frow reveal">
+            <div class="fnum" aria-hidden="true">01</div>
+            <div>
+              <h3>Stock that knows its sizes</h3>
+              <p>Log tyres by brand, size and season with proper pickers — no free-text chaos. Search 205/55 R16 and see exactly what's on the shelf, what it cost and what it should sell for.</p>
+              <div class="tags" aria-hidden="true"><span class="tag">BRAND PICKER</span><span class="tag">SIZE PICKER</span><span class="tag">NEW / PART-WORN</span><span class="tag">FIFO PRICING</span></div>
+            </div>
+            <div class="art" aria-hidden="true">
+              <div class="picker">
+                <div class="picker-row"><label>WIDTH</label><span class="pchip">195</span><span class="pchip on">205</span><span class="pchip">225</span></div>
+                <div class="picker-row"><label>PROFILE</label><span class="pchip">45</span><span class="pchip on">55</span><span class="pchip">65</span></div>
+                <div class="picker-row"><label>RIM</label><span class="pchip">15</span><span class="pchip on">16</span><span class="pchip">17</span></div>
+              </div>
+              <div style="margin-top:12px">
+                <div class="stock-row"><b>205/55 R16 91V · All-season</b><span class="qty">14 in stock</span></div>
+                <div class="stock-row"><b>205/55 R16 94W · Summer</b><span class="qty">6 in stock</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="frow reveal">
+            <div class="fnum" aria-hidden="true">02</div>
+            <div>
+              <h3>Fitting jobs in the diary</h3>
+              <p>Book the fitting, pull the tyres from stock, and the job carries its own costs. The bay always knows what's next and the counter always knows what's promised.</p>
+              <div class="tags" aria-hidden="true"><span class="tag">BOOKINGS</span><span class="tag">STOCK PULL</span><span class="tag">JOB COSTS</span></div>
+            </div>
+            <div class="art" aria-hidden="true">
+              <div class="fit-row"><b>08:30</b> Fiesta · 2× 195/65 R15 + tracking<span class="st done">Done</span></div>
+              <div class="fit-row"><b>10:15</b> Octavia · 4× 205/55 R16<span class="st">In bay</span></div>
+              <div class="fit-row"><b>11:45</b> X5 · 2× 275/40 R20 run-flat<span class="st">Booked</span></div>
+              <div class="fit-row"><b>13:30</b> Puncture repair · walk-in<span class="st">Booked</span></div>
+            </div>
+          </article>
+
+          <article class="frow reveal">
+            <div class="fnum" aria-hidden="true">03</div>
+            <div>
+              <h3>Invoices that add themselves up</h3>
+              <p>Tyres, fitting, balancing, valves, disposal — itemised and totalled with VAT handled correctly, including the margin scheme for part-worn sales.</p>
+              <div class="tags" aria-hidden="true"><span class="tag">ITEMISED</span><span class="tag">VAT &amp; MARGIN SCHEME</span><span class="tag">UNLIMITED ON SILVER+</span></div>
+            </div>
+            <div class="art" aria-hidden="true">
+              <div class="inv-line"><span>4× 205/55 R16 91V</span><b>£312.00</b></div>
+              <div class="inv-line"><span>Fitting &amp; balancing ×4</span><b>£48.00</b></div>
+              <div class="inv-line"><span>Valves ×4 · disposal ×4</span><b>£22.00</b></div>
+              <div class="inv-line total"><span>TOTAL INC. VAT</span><b>£382.00</b></div>
+            </div>
+          </article>
+
+          <article class="frow reveal">
+            <div class="fnum" aria-hidden="true">04</div>
+            <div>
+              <h3>Customers who come back</h3>
+              <p>Follow-ups and reminders by email or WhatsApp — winter changeovers, tracking checks, the quote they never answered. Repeat business without the ring-round.</p>
+              <div class="tags" aria-hidden="true"><span class="tag">FOLLOW-UPS</span><span class="tag">EMAIL + WHATSAPP</span><span class="tag">BRONZE AND UP</span></div>
+            </div>
+            <div class="art" aria-hidden="true">
+              <div class="fu-row"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Winter tyre changeover — 214 customers due</div>
+              <div class="fu-row"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9.3 8.4 8.6 8.6 0 0 1-3.9-1L3 20l1.2-4.6a8.4 8.4 0 1 1 16.8-3.9z"/></svg></span>WhatsApp reminder — free retorque, J. Barnes</div>
+              <div class="fu-row"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>Quote follow-up — 2× 225/45 R17, job not booked</div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FIFO / VAT ENGINE ================= -->
+    <section class="lsection fifo-wrap" id="stock">
+      <div class="lcontainer">
+        <div class="section-head reveal">
+          <span class="eyebrow" style="color:#FF8A4C">The stock engine</span>
+          <h2>The clever bits, running quietly underneath</h2>
+          <p>Two things tyre garages get wrong in spreadsheets — priced batches and part-worn VAT — handled properly, automatically.</p>
+        </div>
+        <div class="fifo-grid" data-stagger="120">
+          <article class="fifo-card tilt">
+            <h3>FIFO automatic pricing</h3>
+            <p>Bought the same tyre at three different prices? TyreOps sells the oldest batch first and margins stay true — with batch override control on Silver+ when you need to take charge.</p>
+            <div class="fifo-line"><span>Batch 04 Mar · 8 units @ £61.20</span><b class="hl">← selling</b></div>
+            <div class="fifo-line"><span>Batch 22 Apr · 12 units @ £64.80</span><b>queued</b></div>
+            <div class="fifo-line"><span>Batch 03 Jun · 16 units @ £59.95</span><b>queued</b></div>
+          </article>
+          <article class="fifo-card tilt">
+            <h3>VAT margin scheme</h3>
+            <p>Part-worn tyres bought from the public are VAT-margin sales — VAT due on the margin, not the full price. TyreOps calculates it per sale and rolls it into your VAT reports on Gold.</p>
+            <div class="fifo-line"><span>Part-worn 225/45 R17 · sale</span><b>£45.00</b></div>
+            <div class="fifo-line"><span>Purchase cost</span><b>£20.00</b></div>
+            <div class="fifo-line"><span>VAT due (margin £25.00)</span><b class="hl">£4.17</b></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PRICING ================= -->
+    <section class="lsection" id="pricing" style="background:var(--bg-soft)">
+      <div class="lcontainer">
+        <div class="section-head reveal">
+          <span class="eyebrow">Pricing</span>
+          <h2>From £8 a month, all in GBP</h2>
+          <p>Every plan starts with a 14-day free trial with full Gold access. No card required, cancel any time. Billed monthly via Stripe.</p>
+        </div>
+        <div class="plans" data-stagger="90">
+          <article class="plan">
+            <h3>Basic</h3>
+            <p class="price">£8<small>/month</small></p>
+            <p class="per">The day-to-day, covered</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Invoicing</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Inventory &amp; purchases</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Customer database</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>FIFO automatic pricing</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>1 user</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/tyreops/login?plan=basic&amp;tab=register">Start free trial</a>
+          </article>
+          <article class="plan">
+            <h3>Bronze</h3>
+            <p class="price">£12.99<small>/month</small></p>
+            <p class="per">Adds customer retention</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Everything in Basic</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Customer follow-ups</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Email &amp; WhatsApp reminders</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>1 user</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/tyreops/login?plan=bronze&amp;tab=register">Start free trial</a>
+          </article>
+          <article class="plan is-featured">
+            <span class="flag">Most popular</span>
+            <h3>Silver</h3>
+            <p class="price">£18.99<small>/month</small></p>
+            <p class="per">For serious stock rooms</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Unlimited invoices</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Batch override control</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Supplier tracking</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Used tyre management</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>VAT reports · 2 users</li>
+            </ul>
+            <a class="btn btn-cta btn-sm magnetic" href="/tyreops/login?plan=silver&amp;tab=register">Start free trial</a>
+          </article>
+          <article class="plan">
+            <h3>Gold</h3>
+            <p class="price">£28.99<small>/month</small></p>
+            <p class="per">The full operation</p>
+            <ul>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Everything in Silver</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Full P&amp;L dashboard</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>VAT Margin Scheme</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Reports &amp; CSV export</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>Unlimited users · priority support</li>
+            </ul>
+            <a class="btn btn-ghost btn-sm" href="/tyreops/login?plan=gold&amp;tab=register">Start free trial</a>
+          </article>
+        </div>
+        <p class="plans-note">ALL PRICES IN GBP // 14-DAY FREE TRIAL ON EVERY PLAN // CANCEL ANY TIME</p>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="lsection" id="faq">
+      <div class="lcontainer">
+        <div class="section-head reveal" style="text-align:center;margin-inline:auto">
+          <span class="eyebrow" style="justify-content:center">FAQ</span>
+          <h2>Asked at the counter</h2>
+        </div>
+        <div class="faq-wrap reveal">
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">How does the free trial work?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Every plan starts with a 14-day free trial with full access to Gold-tier features. No credit card is required to start the trial, and you can cancel any time.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">What is FIFO pricing and why should I care?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>First in, first out. When you've bought the same tyre at different prices over the year, TyreOps sells the oldest batch first, so your cost-of-sale and margins reflect what you actually paid — not a guess.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">Does it handle part-worn tyres?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Yes — used tyre management is built in on Silver and above, and the VAT Margin Scheme on Gold calculates VAT on the margin for qualifying part-worn sales, then feeds it into your VAT reports.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">Can I import my existing stock?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Yes. Stock can be imported by CSV — brand, size, season, cost and quantity — so a stock room's worth of tyres is in the system in minutes rather than weeks.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">How am I billed, and can I cancel?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Monthly in GBP via Stripe. Cancel any time — cancellation takes effect at the end of your current billing period.</p></div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-q" aria-expanded="false">How many people can use it?<span class="faq-icon" aria-hidden="true">+</span></button>
+            <div class="faq-a"><div><p>Basic and Bronze include one user, Silver includes two, and Gold is unlimited — counter, bay and back office all in the same system.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FINAL CTA ================= -->
+    <section class="final">
+      <div class="lcontainer">
+        <h2 class="reveal">Stop running stock from memory.</h2>
+        <p class="reveal">Fourteen days of the full system, free, no card. If your stock room isn't calmer by week two, walk away.</p>
+        <div class="hero-ctas reveal" style="justify-content:center">
+          <a class="btn btn-cta magnetic" href="/tyreops/login?tab=register">Start free trial <span class="btn-arrow" aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href="/tyreops/login">Log in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="lfooter">
+    <div class="lcontainer">
+      <div class="lfooter-grid">
+        <div>
+          <a class="lnav-logo" href="/tyreops">
+            <span class="lnav-mark" style="background:var(--slate-deep)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21M5.6 5.6l2.3 2.3M16.1 16.1l2.3 2.3M18.4 5.6l-2.3 2.3M7.9 16.1l-2.3 2.3"/></svg>
+            </span>
+            <span>Alzaro <span style="color:var(--accent)">TyreOps</span></span>
+          </a>
+          <p style="color:var(--ink-soft);font-size:14.5px;max-width:34ch;margin-top:12px">Tyre management software for UK garages — stock, fittings, invoicing and follow-ups with FIFO pricing and the VAT margin scheme built in.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="/tyreops/login">Log in</a></li>
+            <li><a href="/tyreops/login?tab=register">Start free trial</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Alzaro suite</h4>
+          <ul>
+            <li><a href="/platform">The platform</a></li>
+            <li><a href="/garageops">GarageOps</a></li>
+            <li><a href="/serviceops">ServiceOps</a></li>
+            <li><a href="/propertyops">PropertyOps</a></li>
+            <li><a href="/soloops">SoloOps</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <ul>
+            <li><a href="mailto:hello@alzaro.co.uk">hello@alzaro.co.uk</a></li>
+            <li><a href="mailto:privacy@tyreops.co.uk">privacy@tyreops.co.uk</a></li>
+            <li><a href="mailto:legal@tyreops.co.uk">legal@tyreops.co.uk</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="lfooter-base">
+        <span>© 2026 Alzaro. Built in the UK for UK tyre garages.</span>
+        <span>All prices in GBP · VAT where applicable</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/landing-assets/shared.js" defer></script>
+  <script>
+    /* TyreOps hero — macro tyre rotating up close, with stacked tyres drifting
+       in parallax layers behind. Lazy-loaded; mobile keeps the poster. */
+    (function () {
+      function mount() {
+        if (!window.AlzaroHero) return;
+        AlzaroHero.mount({
+          container: "#hero-3d",
+          fov: 40,
+          cameraZ: 8.2,
+          build: function (THREE, scene, camera, h) {
+            h.softLights(0xf3f7fb, 0xc5ced8, 0xffffff);
+            var rim = new THREE.DirectionalLight(0xffb27d, 0.35);
+            rim.position.set(-5, 2, -3);
+            scene.add(rim);
+
+            var rubber = new THREE.MeshStandardMaterial({ color: 0x2b333d, roughness: 0.9, metalness: 0.05 });
+            var rubberLight = new THREE.MeshStandardMaterial({ color: 0x38424e, roughness: 0.9, metalness: 0.05 });
+            var orange = new THREE.MeshStandardMaterial({ color: 0xea5a0b, roughness: 0.5, metalness: 0.1 });
+            var steel = new THREE.MeshStandardMaterial({ color: 0xd4dae1, roughness: 0.3, metalness: 0.7 });
+
+            /* --- Macro tyre, front and centre --- */
+            var macro = new THREE.Group();
+            scene.add(macro);
+            macro.position.set(0.4, 0, 0);
+            macro.rotation.y = 0.42;
+
+            var tyre = new THREE.Mesh(new THREE.TorusGeometry(2.1, 0.72, 26, 64), rubber);
+            macro.add(tyre);
+            /* Chunky tread: two offset rows of blocks for a real tread pattern */
+            var tb1 = new THREE.BoxGeometry(0.34, 0.12, 0.52);
+            for (var i = 0; i < 34; i++) {
+              var a = (i / 34) * Math.PI * 2;
+              var r = 2.78;
+              var b1 = new THREE.Mesh(tb1, rubberLight);
+              b1.position.set(Math.cos(a) * r, Math.sin(a) * r, 0.34);
+              b1.rotation.z = a + Math.PI / 2;
+              tyre.add(b1);
+              var a2 = a + Math.PI / 34;
+              var b2 = new THREE.Mesh(tb1, rubberLight);
+              b2.position.set(Math.cos(a2) * r, Math.sin(a2) * r, -0.34);
+              b2.rotation.z = a2 + Math.PI / 2;
+              tyre.add(b2);
+            }
+            /* Rim hint + orange centre */
+            var dish = new THREE.Mesh(new THREE.CylinderGeometry(1.34, 1.34, 0.34, 36), steel);
+            dish.rotation.x = Math.PI / 2;
+            macro.add(dish);
+            var hubcap = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 28), orange);
+            hubcap.rotation.x = Math.PI / 2;
+            macro.add(hubcap);
+
+            /* --- Parallax stack layers behind --- */
+            function stack(n, scale, x, y, z, mat) {
+              var g = new THREE.Group();
+              for (var s = 0; s < n; s++) {
+                var t = new THREE.Mesh(new THREE.TorusGeometry(1.15 * scale, 0.42 * scale, 14, 36), mat);
+                t.rotation.x = Math.PI / 2;
+                t.position.y = s * 0.62 * scale;
+                g.add(t);
+              }
+              g.position.set(x, y, z);
+              scene.add(g);
+              return g;
+            }
+            var stackA = stack(3, 1.0, -4.6, -2.6, -3.5, rubberLight);
+            var stackB = stack(2, 0.8, 4.9, -2.4, -5, rubber);
+            var loose = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.34, 14, 36), rubberLight);
+            loose.position.set(-4.2, 2.6, -6);
+            loose.rotation.set(0.6, 0.4, 0.3);
+            scene.add(loose);
+
+            return {
+              update: function (t, mouse) {
+                macro.rotation.z = -t * 0.22;                       /* slow macro rotation */
+                macro.rotation.y = 0.42 + mouse.x * 0.4;
+                macro.rotation.x = mouse.y * 0.28;
+                macro.position.y = Math.sin(t * 0.5) * 0.06;
+                /* parallax layers drift against the mouse at depth-scaled rates */
+                stackA.position.x = -4.6 - mouse.x * 0.9;
+                stackA.position.y = -2.6 + Math.sin(t * 0.4) * 0.08 + mouse.y * 0.4;
+                stackB.position.x = 4.9 - mouse.x * 1.4;
+                stackB.position.y = -2.4 + Math.sin(t * 0.34 + 2) * 0.1 + mouse.y * 0.6;
+                loose.rotation.z = t * 0.18;
+                loose.position.y = 2.6 + Math.sin(t * 0.45 + 1) * 0.16;
+                loose.position.x = -4.2 - mouse.x * 1.8;
+                camera.lookAt(0.3, 0, 0);
+              }
+            };
+          }
+        });
       }
-    });
-  });
-
-  const nav = document.getElementById('nav');
-  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
-  window.addEventListener('scroll', onScroll, {passive:true});
-  onScroll();
-
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.nav-center a');
-  window.addEventListener('scroll', () => {
-    const homePage = document.getElementById('page-home');
-    if (!homePage.classList.contains('active')) return;
-    let current = '';
-    sections.forEach(section => {
-      if (window.scrollY >= section.offsetTop - 110) current = section.getAttribute('id');
-    });
-    navLinks.forEach(link => {
-      link.classList.toggle('active', link.getAttribute('href') === '#' + current);
-    });
-  }, {passive:true});
-
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-  }, {threshold: 0.12});
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-
-  window.addEventListener('load', () => {
-    const hash = window.location.hash.slice(1);
-    if (hash === 'privacy' || hash === 'terms') showPage(hash);
-  });
-  window.addEventListener('popstate', () => {
-    const hash = window.location.hash.slice(1);
-    if (hash === 'privacy' || hash === 'terms') showPage(hash);
-    else showPage('home');
-  });
-
-  // ===== 3D: motion gates =====
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const finePointer = matchMedia('(pointer: fine)').matches;
-
-  // Auto-rotating 3-face panel (FIFO stock -> P&L -> alerts)
-  (function(){
-    const cube = document.getElementById('cube');
-    const scene = document.querySelector('.stock-scene');
-    if (!cube) return;
-    if (reduceMotion){ return; } // stays on face 1, fully readable
-    const faces = [0, -120, -240];
-    let i = 0, paused = false;
-    if (scene){
-      scene.addEventListener('mouseenter', () => { paused = true; });
-      scene.addEventListener('mouseleave', () => { paused = false; });
-    }
-    setInterval(() => {
-      if (paused) return;
-      i = (i + 1) % faces.length;
-      cube.style.transform = `translateZ(-190px) rotateY(${faces[i]}deg)`;
-    }, 3200);
-  })();
-
-  // WebGL hero: single rotating wireframe tyre/wheel
-  (function(){
-    if (reduceMotion || typeof THREE === 'undefined') return;
-    const hero = document.querySelector('.hero');
-    if (!hero) return;
-    let renderer;
-    try { renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); }
-    catch (e) { return; }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-    renderer.domElement.className = 'webgl-canvas';
-    hero.prepend(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.set(0, 0, 9);
-
-    const wheel = new THREE.Group();
-    const wire = (geo, color, opacity) =>
-      new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
-    wheel.add(wire(new THREE.TorusGeometry(2.6, 0.55, 12, 44), 0x97a3b4, 0.5));   // tyre
-    wheel.add(wire(new THREE.TorusGeometry(1.7, 0.12, 8, 36), 0x3b82f6, 0.85));   // rim
-    for (let i = 0; i < 6; i++) {
-      const spoke = wire(new THREE.BoxGeometry(0.13, 3.1, 0.13), 0x60a5fa, 0.7);
-      spoke.rotation.z = (i / 6) * Math.PI * 2;
-      wheel.add(spoke);
-    }
-    const hub = wire(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16), 0x3b82f6, 0.9);
-    hub.rotation.x = Math.PI / 2;
-    wheel.add(hub);
-    wheel.rotation.y = 0.5;
-    scene.add(wheel);
-
-    const pGeo = new THREE.BufferGeometry();
-    const N = 220, pos = new Float32Array(N * 3);
-    for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * 16;
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    scene.add(new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x97a3b4, size: 0.03, transparent: true, opacity: 0.45 })));
-
-    let mx = 0, my = 0;
-    if (finePointer) addEventListener('mousemove', e => {
-      mx = (e.clientX / innerWidth - 0.5);
-      my = (e.clientY / innerHeight - 0.5);
-    }, { passive: true });
-
-    const resize = () => {
-      const w = hero.clientWidth, h = hero.clientHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h; camera.updateProjectionMatrix();
-      wheel.position.x = w > 960 ? 2.6 : 0;
-      renderer.domElement.style.opacity = w > 960 ? 0.45 : 0.25;
-    };
-    addEventListener('resize', resize, { passive: true }); resize();
-
-    let running = true;
-    document.addEventListener('visibilitychange', () => { running = !document.hidden; });
-    const clock = new THREE.Clock();
-    (function animate(){
-      requestAnimationFrame(animate);
-      if (!running) return;
-      const t = clock.getElapsedTime();
-      wheel.rotation.z = -t * 0.42;
-      wheel.rotation.y = 0.5 + Math.sin(t * 0.35) * 0.18;
-      camera.position.x += (mx * 0.9 - camera.position.x) * 0.04;
-      camera.position.y += (-my * 0.6 - camera.position.y) * 0.04;
-      camera.lookAt(wheel.position.x * 0.6, 0, 0);
-      renderer.render(scene, camera);
+      if (document.readyState !== "loading") mount();
+      else document.addEventListener("DOMContentLoaded", mount);
     })();
-  })();
-</script>
+  </script>
 </body>
 </html>
