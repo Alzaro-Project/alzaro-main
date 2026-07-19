@@ -230,7 +230,10 @@ export default async function handler(req, res) {
           greetingTimeout: 10000,
           tls: addr.servername ? { servername: addr.servername } : undefined,
         })
-        const fromEmail = cfg.smtp_from_email || cfg.smtp_user
+        // The from address comes from the user's own saved settings, but it
+        // still goes into a raw header — accept it only if it's a single clean
+        // address, else fall back to the SMTP username they authenticate as.
+        const fromEmail = isValidEmail(cfg.smtp_from_email) ? cfg.smtp_from_email.trim() : cfg.smtp_user
         const fromDisplay = safeFromName || sanitizeHeader(cfg.smtp_from_name) || fromEmail
         const info = await transporter.sendMail({
           from: `"${fromDisplay}" <${fromEmail}>`,
