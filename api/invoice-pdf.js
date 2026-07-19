@@ -135,7 +135,9 @@ export default async function handler(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     return res.status(200).send(Buffer.from(pdfBytes))
   } catch (err) {
+    // Detail stays in the server log — err.message can carry internal URLs /
+    // library internals that don't belong in a client response.
     console.error('invoice-pdf failed:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Could not generate the PDF. Please try again.' })
   }
 }

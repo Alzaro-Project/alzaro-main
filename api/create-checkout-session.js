@@ -147,7 +147,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ url: session.url })
   } catch (err) {
+    // Detail stays in the server log — Stripe/fetch errors can carry internal
+    // detail that doesn't belong in a client response.
     console.error('create-checkout-session failed:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Could not start checkout. Please try again.' })
   }
 }

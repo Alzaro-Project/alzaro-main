@@ -308,7 +308,9 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ success: true, id: data.id })
   } catch (err) {
+    // Detail stays in the server log — err.message can carry internal URLs /
+    // library internals that don't belong in a client response.
     console.error('send-email failed:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Could not send the email. Please try again.' })
   }
 }

@@ -155,7 +155,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ url: session.url })
   } catch (err) {
+    // Detail stays in the server log — Stripe/fetch errors can carry internal
+    // detail that doesn't belong in a client response.
     console.error('create-portal-session failed:', err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Could not open the billing portal. Please try again.' })
   }
 }
