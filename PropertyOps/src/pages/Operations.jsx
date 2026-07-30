@@ -1236,7 +1236,7 @@ export function ReportsPage({ user }) {
 
 export function SettingsPage({ user }) {
   const isMobile = useIsMobile();
-  const validTabs = ["organisation", "notifications", "email", "vat", "subscription"];
+  const validTabs = ["organisation", "notifications", "email", "vat", "security", "subscription"];
   const [tab, setTab] = useState(() => {
     if (typeof window !== "undefined") {
       // Returning from Stripe Checkout/Portal lands with ?billing=... — always
@@ -1264,6 +1264,12 @@ export function SettingsPage({ user }) {
   const [email, setEmail] = useState({ smtp_provider: "custom", smtp_host: "", smtp_port: 587, smtp_secure: false, smtp_user: "", smtp_pass: "", smtp_from_name: "", smtp_from_email: "", smtp_reply_to: "" });
   const [vat, setVat] = useState({ vat_scheme: "standard", vat_number: "", flat_rate: 16.5 });
   const [showPass, setShowPass] = useState(false);
+  // Change-password form (Security tab). Kept separate from the SMTP password
+  // state above, which is a stored credential rather than an auth secret.
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwShow, setPwShow] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState({ tone: "", text: "" });
   const [passSaveState, setPassSaveState] = useState(null); // null | 'saving' | 'saved' | 'error'
   const [smtpTest, setSmtpTest] = useState(null); // null | 'testing' | 'success' | 'error'
   const [smtpTestMsg, setSmtpTestMsg] = useState("");
@@ -1399,6 +1405,7 @@ export function SettingsPage({ user }) {
     { key: "notifications", label: "Notifications", icon: "ti-bell" },
     { key: "email", label: "Email", icon: "ti-mail" },
     { key: "vat", label: "VAT", icon: "ti-receipt" },
+    { key: "security", label: "Security", icon: "ti-lock" },
     { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
   ];
 
@@ -1519,6 +1526,42 @@ export function SettingsPage({ user }) {
       setPassSaveState("error");
       setErr("The write succeeded but no encrypted password was stored — the encryption trigger (migration 03) may not be active on this database.");
     }
+  };
+
+  // Change the account password. Supabase's updateUser() will happily change a
+  // password using only the existing session, so we re-verify the current one
+  // first — otherwise anyone finding an unlocked, signed-in device could lock
+  // the real owner out of the account.
+  const changePassword = async () => {
+    const { current, next, confirm } = pwForm;
+    setPwMsg({ tone: "", text: "" });
+
+    if (!current || !next || !confirm) return setPwMsg({ tone: "err", text: "Please fill in all three fields." });
+    if (next.length < 6) return setPwMsg({ tone: "err", text: "New password must be at least 6 characters." });
+    if (next !== confirm) return setPwMsg({ tone: "err", text: "The new passwords don't match." });
+    if (next === current) return setPwMsg({ tone: "err", text: "The new password is the same as your current one." });
+    if (!DB_READY || !user?.email) return setPwMsg({ tone: "err", text: "Not connected — add your Supabase keys." });
+
+    setPwBusy(true);
+    try {
+      // Re-authenticate. Same user, so this refreshes rather than switches session.
+      const { error: authErr } = await db.auth.signInWithPassword({ email: user.email, password: current });
+      if (authErr) {
+        setPwBusy(false);
+        return setPwMsg({ tone: "err", text: "Your current password isn't correct." });
+      }
+      const { error: upErr } = await db.auth.updateUser({ password: next });
+      if (upErr) {
+        setPwBusy(false);
+        return setPwMsg({ tone: "err", text: upErr.message || "Could not update your password." });
+      }
+      setPwForm({ current: "", next: "", confirm: "" });
+      setPwShow(false);
+      setPwMsg({ tone: "ok", text: "Password updated. You'll use the new one next time you sign in." });
+    } catch (e) {
+      setPwMsg({ tone: "err", text: friendlyError(e, "updating your password") });
+    }
+    setPwBusy(false);
   };
 
   const saveOrg = async () => {
@@ -1933,6 +1976,59 @@ export function SettingsPage({ user }) {
       )}
 
       {/* SUBSCRIPTION */}
+      {/* SECURITY */}
+      {tab === "security" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 520 }}>
+          <div style={card}>
+            {head("ti-lock", "Change password")}
+            <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
+              This is the password for <strong style={{ color: "var(--txt)" }}>{user?.email || "your account"}</strong>, used across all your Alzaro platforms.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <label style={fld}>Current password
+                <input style={inp} type={pwShow ? "text" : "password"} autoComplete="current-password"
+                  value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} />
+              </label>
+              <label style={fld}>New password
+                <input style={inp} type={pwShow ? "text" : "password"} autoComplete="new-password" placeholder="At least 6 characters"
+                  value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} />
+              </label>
+              <label style={fld}>Confirm new password
+                <input style={inp} type={pwShow ? "text" : "password"} autoComplete="new-password"
+                  value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && !pwBusy && changePassword()} />
+                {/* Mismatch is worth flagging before they hit the button. */}
+                {pwForm.confirm && pwForm.next !== pwForm.confirm && (
+                  <span style={{ fontSize: 11, color: "var(--amber)", marginTop: 4 }}>Passwords don't match yet</span>
+                )}
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--txt-2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={pwShow} onChange={(e) => setPwShow(e.target.checked)} style={{ cursor: "pointer" }} />
+                Show passwords
+              </label>
+
+              {pwMsg.text && (
+                <div style={{ fontSize: 11.5, lineHeight: 1.5, color: pwMsg.tone === "ok" ? "var(--green)" : "var(--red)" }}>
+                  {pwMsg.tone === "ok" ? "✓ " : ""}{pwMsg.text}
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                <span onClick={() => !pwBusy && changePassword()}>
+                  <Btn icon="ti-lock-check" label={pwBusy ? "Updating…" : "Update password"} primary />
+                </span>
+              </div>
+
+              <div style={{ fontSize: 10.5, color: "var(--txt-3)", lineHeight: 1.5, marginTop: 4 }}>
+                Forgotten your current password? Sign out and use the “Forgot password?” link on the sign-in screen to reset it by email.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
