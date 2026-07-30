@@ -5,23 +5,113 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alzaro Group — One Brand. Five Platforms.</title>
   <link rel="canonical" href="https://alzaro.co.uk/">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="apple-touch-icon" href="/favicon.svg">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Alzaro">
   <meta property="og:title" content="Alzaro Group — One Brand. Five Platforms.">
   <meta property="og:description" content="Alzaro is a UK-based group of five specialist business platforms: TyreOps, GarageOps, ServiceOps, SoloOps and PropertyOps.">
   <meta property="og:url" content="https://alzaro.co.uk/">
-  <meta property="og:image" content="https://alzaro.co.uk/favicon.svg">
+  <meta property="og:image" content="https://alzaro.co.uk/icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
   <meta property="og:locale" content="en_GB">
   <!-- Twitter -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Alzaro Group — One Brand. Five Platforms.">
   <meta name="twitter:description" content="Alzaro is a UK-based group of five specialist business platforms: TyreOps, GarageOps, ServiceOps, SoloOps and PropertyOps.">
-  <meta name="twitter:image" content="https://alzaro.co.uk/favicon.svg">
+  <meta name="twitter:image" content="https://alzaro.co.uk/icon-512.png">
   <meta name="robots" content="index, follow">
   <meta name="description" content="Alzaro is a UK-based group of five specialist business platforms: TyreOps, GarageOps, ServiceOps, SoloOps and PropertyOps.">
+  <!-- Once official profiles exist (LinkedIn, X, Companies House), add a "sameAs" array of
+       their URLs to the Organization node below — it's the strongest signal for
+       distinguishing this brand from similarly named ones. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://alzaro.co.uk/#organization",
+        "name": "Alzaro",
+        "alternateName": "Alzaro Group",
+        "url": "https://alzaro.co.uk/",
+        "logo": { "@type": "ImageObject", "url": "https://alzaro.co.uk/icon-512.png", "width": 512, "height": 512 },
+        "image": "https://alzaro.co.uk/icon-512.png",
+        "description": "Alzaro is a UK-based group of five specialist business software platforms: TyreOps, GarageOps, ServiceOps, SoloOps and PropertyOps.",
+        "areaServed": { "@type": "Country", "name": "United Kingdom" },
+        "knowsAbout": ["Property management software","Garage management software","Tyre retail software","Field service management","Bookkeeping software"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://alzaro.co.uk/#website",
+        "url": "https://alzaro.co.uk/",
+        "name": "Alzaro",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" },
+        "inLanguage": "en-GB"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://alzaro.co.uk/propertyops#software",
+        "name": "PropertyOps",
+        "url": "https://alzaro.co.uk/propertyops",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "Property management and compliance software for UK landlords, letting agents and property managers. Tenancy management, rent tracking, maintenance scheduling, document storage and compliance tools.",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://alzaro.co.uk/tyreops#software",
+        "name": "TyreOps",
+        "url": "https://alzaro.co.uk/tyreops",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "Tyre garage management software for UK tyre retailers, with FIFO batch inventory, instant invoicing, VAT margin scheme calculations and a customer database.",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://alzaro.co.uk/garageops#software",
+        "name": "GarageOps",
+        "url": "https://alzaro.co.uk/garageops",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "Full-service garage management software for UK garages, covering customers, invoicing, parts, purchases, booking calendar and reporting.",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://alzaro.co.uk/serviceops#software",
+        "name": "ServiceOps",
+        "url": "https://alzaro.co.uk/serviceops",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "Field service management software for UK trades, covering quotes, jobs, diary scheduling, invoicing, certificates and documents.",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://alzaro.co.uk/soloops#software",
+        "name": "SoloOps",
+        "url": "https://alzaro.co.uk/soloops",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "description": "Bookkeeping and self-assessment software for UK sole traders, covering income, expenses, banking, receipts, mileage and tax reporting.",
+        "inLanguage": "en-GB",
+        "publisher": { "@id": "https://alzaro.co.uk/#organization" }
+      }
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
