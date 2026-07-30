@@ -116,16 +116,36 @@ export const gbp = (n) => "£" + n.toLocaleString("en-GB");
 // in the past is treated as Overdue everywhere — without needing anyone to
 // manually flip the row. Paid/already-Overdue statuses are returned as-is.
 // Case-insensitive: normalises stored values like "sent"/"paid" too.
+// How much of an invoice has actually been received. Partial payments live in
+// `paid_amount`; a row with amount 500 and paid_amount 300 owes 200.
+export const paidOf = (p) => {
+  const total = +(p?.amount) || 0;
+  const raw = p?.paid_amount;
+  // An explicit "Paid" status always means settled in full, whatever the
+  // column says — this covers rows marked paid before the column existed and
+  // rows still sitting at the default 0 before the backfill migration runs.
+  if (String(p?.status || "").toLowerCase() === "paid") return Math.max(total, +raw || 0);
+  if (raw === undefined || raw === null || raw === "") return 0;
+  return Math.max(0, +raw || 0);
+};
+export const outstandingOf = (p) => Math.max(0, (+(p?.amount) || 0) - paidOf(p));
+
 export const effectiveStatus = (p) => {
   const s = String(p?.status || "").toLowerCase();
-  if (s === "paid") return "Paid";
+  const total = +(p?.amount) || 0;
+  const paid = paidOf(p);
+  // Settled either explicitly or because payments now cover the invoice.
+  if (s === "paid" || (total > 0 && paid >= total)) return "Paid";
   if (s === "overdue") return "Overdue";
   const base = s === "sent" ? "Sent" : "Pending";
   if (p?.due_date) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const due = new Date(p.due_date); due.setHours(0, 0, 0, 0);
+    // Overdue wins over "Part paid" so arrears totals stay correct — the
+    // part-payment is still visible in the Paid / Outstanding columns.
     if (!isNaN(due) && due < today) return "Overdue";
   }
+  if (paid > 0) return "Part paid";
   return base;
 };
 
