@@ -78,52 +78,114 @@ function TiltCard({ label, value, sub, subColor, color = "var(--txt)", icon, onC
 // 6-month rent chart: Collected (Paid) vs Outstanding (Pending + Overdue),
 // grouped by due-date month. Hand-drawn bars (no chart library), with a hover
 // tooltip, gridlines and a legend — matching the interactive card style.
-function RentChart({ pays, go }) {
-  const [hov, setHov] = useState(null);
-  const now = new Date();
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    months.push({ key, label: d.toLocaleDateString("en-GB", { month: "short" }), collected: 0, outstanding: 0 });
+// Bucket boundaries for the rent chart, chosen so the bar count stays readable
+// whatever range is active: a week shows days, a month shows weeks, a year
+// shows months. Buckets are clamped to the window so a partial first/last
+// month can't pull in payments from outside the range.
+function rentBuckets(win) {
+  const sod = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const short = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+  // No range (all time) — keep the original rolling 6 months.
+  if (!win) {
+    const now = new Date(), out = [];
+    for (let i = 5; i >= 0; i--) {
+      const s = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const e = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      out.push({ start: sod(s), end: sod(e), label: s.toLocaleDateString("en-GB", { month: "short" }) });
+    }
+    return out;
   }
-  const idx = Object.fromEntries(months.map((m, i) => [m.key, i]));
+
+  const [ws, we] = [sod(win[0]), sod(win[1])];
+  const span = Math.round((we - ws) / 864e5) + 1;
+  const out = [];
+
+  if (span <= 14) {
+    // Daily. Weekday initials for a week or less, dates beyond that.
+    for (let d = new Date(ws); d <= we; d.setDate(d.getDate() + 1)) {
+      const s = sod(d);
+      out.push({ start: s, end: s, label: span <= 8 ? s.toLocaleDateString("en-GB", { weekday: "short" }) : short(s) });
+    }
+  } else if (span <= 31) {
+    // Weekly, aligned to the start of the window (so a month reads 1–7, 8–14…).
+    for (let d = new Date(ws); d <= we; d.setDate(d.getDate() + 7)) {
+      const s = sod(d);
+      const e = new Date(s); e.setDate(s.getDate() + 6);
+      const end = e > we ? we : e;
+      out.push({ start: s, end: sod(end), label: `${s.getDate()}–${end.getDate()}` });
+    }
+  } else if (span <= 750) {
+    // Monthly. Year suffix only when the window straddles more than one.
+    const multiYear = ws.getFullYear() !== we.getFullYear();
+    let d = new Date(ws.getFullYear(), ws.getMonth(), 1);
+    while (d <= we) {
+      const s = sod(d), mEnd = sod(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+      out.push({
+        start: s < ws ? ws : s,
+        end: mEnd > we ? we : mEnd,
+        label: d.toLocaleDateString("en-GB", { month: "short" }) + (multiYear ? ` ${String(d.getFullYear()).slice(2)}` : ""),
+      });
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    }
+  } else {
+    // Yearly, for long custom spans.
+    for (let y = ws.getFullYear(); y <= we.getFullYear(); y++) {
+      const s = sod(new Date(y, 0, 1)), e = sod(new Date(y, 11, 31));
+      out.push({ start: s < ws ? ws : s, end: e > we ? we : e, label: String(y) });
+    }
+  }
+  return out;
+}
+
+function RentChart({ pays, go, win, title }) {
+  const [hov, setHov] = useState(null);
+  const months = rentBuckets(win).map((b) => ({ ...b, collected: 0, outstanding: 0 }));
+
   (pays || []).forEach((p) => {
     const dateStr = p.due_date || p.billing_date;
     if (!dateStr) return;
-    const key = String(dateStr).slice(0, 7);
-    if (!(key in idx)) return;
+    const d = new Date(dateStr); if (isNaN(d)) return;
+    d.setHours(0, 0, 0, 0);
+    const i = months.findIndex((b) => d >= b.start && d <= b.end);
+    if (i === -1) return; // outside the active range
     const amt = +p.amount || 0;
-    if (p.status === "Paid") months[idx[key]].collected += amt;
-    else months[idx[key]].outstanding += amt; // Pending or Overdue
+    if (p.status === "Paid") months[i].collected += amt;
+    else months[i].outstanding += amt; // Pending or Overdue
   });
+
   const maxVal = Math.max(...months.map((m) => m.collected + m.outstanding), 1) * 1.15;
   const totalCollected = months.reduce((s, m) => s + m.collected, 0);
   const hasAny = months.some((m) => m.collected || m.outstanding);
+  // Bars get thinner as the bucket count rises; thin out x-labels to match.
+  const gap = months.length > 8 ? 4 : 10;
+  const labelEvery = Math.ceil(months.length / 12);
 
   return (
     <div className="pdash-card" onClick={() => go("finance")}
       style={{ background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: 16, cursor: "pointer", position: "relative", overflow: "hidden", animationDelay: "0ms" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: ".6px", textTransform: "uppercase", color: "var(--txt-3)" }}>Rent Collected · Last 6 Months</div>
+        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: ".6px", textTransform: "uppercase", color: "var(--txt-3)" }}>Rent Collected · {title}</div>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--green)" }}>{gbp(totalCollected)}</div>
       </div>
 
       {!hasAny ? (
-        <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "28px 0", textAlign: "center" }}>No rent payments logged yet. Add payments in Finance to see them here.</div>
+        <div style={{ fontSize: 12, color: "var(--txt-3)", padding: "28px 0", textAlign: "center" }}>
+          {win ? "No rent payments in this period. Try a wider range." : "No rent payments logged yet. Add payments in Finance to see them here."}
+        </div>
       ) : (
         <>
           <div style={{ position: "relative", height: 150, marginTop: 14 }}>
             {[0.25, 0.5, 0.75, 1].map((g) => (
               <div key={g} style={{ position: "absolute", left: 0, right: 0, bottom: `${g * 100}%`, borderTop: "0.5px solid var(--line)", opacity: 0.6 }} />
             ))}
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: "100%", position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap, height: "100%", position: "relative" }}>
               {months.map((m, i) => {
                 const total = m.collected + m.outstanding;
                 const collH = (m.collected / maxVal) * 100;
                 const outH = (m.outstanding / maxVal) * 100;
                 return (
-                  <div key={m.key} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
+                  <div key={i} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(null)}
                     style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", cursor: "pointer" }}>
                     <div style={{ width: "72%", maxWidth: 46, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", borderRadius: 6, overflow: "hidden", opacity: hov === null || hov === i ? 1 : 0.45, transition: "opacity .15s" }}>
                       {outH > 0 && <div style={{ height: `${outH}%`, background: "var(--amber)", transition: "height .3s ease" }} />}
@@ -134,7 +196,7 @@ function RentChart({ pays, go }) {
               })}
             </div>
             {hov !== null && (
-              <div style={{ position: "absolute", top: -6, left: `${(hov + 0.5) * (100 / 6)}%`, transform: "translateX(-50%)", background: "var(--panel-2)", border: "0.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 11, whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5, boxShadow: "0 8px 20px rgba(0,0,0,.25)" }}>
+              <div style={{ position: "absolute", top: -6, left: `${(hov + 0.5) * (100 / months.length)}%`, transform: "translateX(-50%)", background: "var(--panel-2)", border: "0.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 11, whiteSpace: "nowrap", pointerEvents: "none", zIndex: 5, boxShadow: "0 8px 20px rgba(0,0,0,.25)" }}>
                 <div style={{ color: "var(--txt-3)", fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{months[hov].label}</div>
                 <div style={{ color: "var(--green)" }}>Collected {gbp(Math.round(months[hov].collected))}</div>
                 <div style={{ color: "var(--amber)" }}>Outstanding {gbp(Math.round(months[hov].outstanding))}</div>
@@ -142,7 +204,7 @@ function RentChart({ pays, go }) {
             )}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-            {months.map((m) => <div key={m.key} style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: "var(--txt-3)" }}>{m.label}</div>)}
+            {months.map((m, i) => <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 10.5, color: "var(--txt-3)", whiteSpace: "nowrap", overflow: "hidden" }}>{i % labelEvery === 0 ? m.label : ""}</div>)}
           </div>
           <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--line)" }}>
             <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, background: "var(--green)", borderRadius: 2 }} />Collected</span>
@@ -195,16 +257,18 @@ export function DashboardPage({ range, customRange, go, user, tier }) {
 
   // Active range window from the tabs at the top. null = all time.
   const win = dashRange(range, customRange);
-  // Card sublabel for the window. Custom shows the real dates ("01/03/2026 –
-  // 31/03/2026", or "since X" / "up to X" when one side is open-ended).
-  const rangeLabel = (() => {
-    if (!win) return "all time";
-    if (range !== "Custom") return String(range).toLowerCase();
-    let { from = "", to = "" } = customRange || {};
-    if (from && to && from > to) { const t = from; from = to; to = t; } // mirror dashRange's swap
-    if (from && to) return `${ukDate(from)} – ${ukDate(to)}`;
-    return from ? `since ${ukDate(from)}` : `up to ${ukDate(to)}`;
-  })();
+  // Card sublabels read better with real dates than the word "custom".
+  // Open-ended sides are described rather than shown as 1900/3000 sentinels.
+  const customLabel = () => {
+    const f = customRange && customRange.from, t = customRange && customRange.to;
+    if (f && t) return `${ukDate(f)} – ${ukDate(t)}`;
+    if (f) return `since ${ukDate(f)}`;
+    if (t) return `up to ${ukDate(t)}`;
+    return "all time";
+  };
+  const rangeLabel = !win ? "all time"
+    : range === "Custom" ? customLabel()
+    : String(range).toLowerCase();
 
   // properties / occupancy — a property counts as let if it has a tenancy
   // overlapping the window. Falls back to its current status when the range
@@ -285,7 +349,7 @@ export function DashboardPage({ range, customRange, go, user, tier }) {
       </div>
       {canFinance && (
         <div style={{ marginBottom: 12 }}>
-          <RentChart pays={pays} go={go} />
+          <RentChart pays={pays} go={go} win={win} title={!win ? "Last 6 Months" : range === "Custom" ? rangeLabel : range} />
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
