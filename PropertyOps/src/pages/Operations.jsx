@@ -1982,7 +1982,7 @@ export function SettingsPage({ user }) {
           <div style={card}>
             {head("ti-lock", "Change password")}
             <p style={{ fontSize: 11.5, color: "var(--txt-2)", marginTop: -6, marginBottom: 16, lineHeight: 1.5 }}>
-              This is the password for <strong style={{ color: "var(--txt)" }}>{user?.email || "your account"}</strong>, used across all your Alzaro platforms.
+              This changes the sign-in password for <strong style={{ color: "var(--txt)" }}>{user?.email || "your account"}</strong>. Each Alzaro product is subscribed to separately — changing your password doesn't affect what you have access to.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
