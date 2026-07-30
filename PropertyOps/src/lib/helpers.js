@@ -118,15 +118,18 @@ export const gbp = (n) => "£" + n.toLocaleString("en-GB");
 // Case-insensitive: normalises stored values like "sent"/"paid" too.
 // How much of an invoice has actually been received. Partial payments live in
 // `paid_amount`; a row with amount 500 and paid_amount 300 owes 200.
+//
+// An explicitly entered figure always wins, even if the stored status still
+// says "Paid" — otherwise editing the amount received on a paid-marked invoice
+// would silently do nothing. The "Paid means settled" fallback applies only
+// when no figure has been entered (0, blank, or the column missing entirely),
+// which covers rows predating this column and the default value.
 export const paidOf = (p) => {
   const total = +(p?.amount) || 0;
   const raw = p?.paid_amount;
-  // An explicit "Paid" status always means settled in full, whatever the
-  // column says — this covers rows marked paid before the column existed and
-  // rows still sitting at the default 0 before the backfill migration runs.
-  if (String(p?.status || "").toLowerCase() === "paid") return Math.max(total, +raw || 0);
-  if (raw === undefined || raw === null || raw === "") return 0;
-  return Math.max(0, +raw || 0);
+  const entered = !(raw === undefined || raw === null || raw === "") && +raw > 0;
+  if (entered) return Math.max(0, +raw);
+  return String(p?.status || "").toLowerCase() === "paid" ? total : 0;
 };
 export const outstandingOf = (p) => Math.max(0, (+(p?.amount) || 0) - paidOf(p));
 
@@ -135,7 +138,11 @@ export const effectiveStatus = (p) => {
   const total = +(p?.amount) || 0;
   const paid = paidOf(p);
   // Settled either explicitly or because payments now cover the invoice.
-  if (s === "paid" || (total > 0 && paid >= total)) return "Paid";
+  // A stored "Paid" is only trusted when nothing is actually left owing —
+  // otherwise a part-payment entered against a paid-marked invoice would
+  // still show a green Paid badge next to a non-zero outstanding balance.
+  if (total > 0 && paid >= total) return "Paid";
+  if (total <= 0 && s === "paid") return "Paid";
   if (s === "overdue") return "Overdue";
   const base = s === "sent" ? "Sent" : "Pending";
   if (p?.due_date) {
@@ -145,7 +152,8 @@ export const effectiveStatus = (p) => {
     // part-payment is still visible in the Paid / Outstanding columns.
     if (!isNaN(due) && due < today) return "Overdue";
   }
-  if (paid > 0) return "Part paid";
+  // Only "Part paid" when money is in and a balance genuinely remains.
+  if (paid > 0 && total > paid) return "Part paid";
   return base;
 };
 
