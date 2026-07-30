@@ -548,6 +548,13 @@ export function FinancePage({ user, go }) {
     savingRef.current = true; setSaving(true);
     const invoiceNo = form.invoice_no || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, paid_amount: form.paid_amount === "" ? 0 : +form.paid_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
+    // Keep status and paid amount consistent so the stored row can't contradict
+    // itself: entering less than the total demotes a "Paid" row to Pending,
+    // and covering the total promotes it to Paid.
+    if (payload.amount > 0) {
+      if (payload.paid_amount >= payload.amount) payload.status = "Paid";
+      else if (String(payload.status || "").toLowerCase() === "paid") payload.status = "Pending";
+    }
     // Empty date → null (not delete), so clearing a date on edit actually clears it.
     payload.due_date = form.due_date || null;
     payload.billing_date = form.billing_date || null;
