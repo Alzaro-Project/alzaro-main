@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
-import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus, friendlyError } from "../lib/helpers.js";
+import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus, outstandingOf, paidOf, friendlyError } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // Reusable centered popup for quick-add forms (tenant/property in Finance).
@@ -44,6 +44,41 @@ export function MaintenancePage({ user, go }) {
   const properties = usePropertyList();
   const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
   const [form, setForm] = useState(blank);
+
+  // Attach a contractor report / invoice straight from a job card. The file
+  // lands in the shared Documents vault (category Invoices, tagged to the
+  // job's property) so it sits alongside everything else for that property.
+  const upFileRef = useRef(null);
+  const [upJob, setUpJob] = useState(null);
+  const [upMsg, setUpMsg] = useState("");
+  const startUpload = (j) => {
+    if (!DB_READY) { setErr("Add your Supabase keys to upload."); return; }
+    if (upJob) return; // one upload at a time
+    setErr(""); setUpMsg(""); setUpJob(j);
+    setTimeout(() => upFileRef.current && upFileRef.current.click(), 0);
+  };
+  const onUpPick = async (e) => {
+    const file = e.target.files[0];
+    const j = upJob;
+    if (!file || !j) { setUpJob(null); return; }
+    try {
+      const path = `${user.id}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await db.storage.from("documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { error: dbErr } = await db.from("prop_documents").insert([{
+        name: `${j.title || "Maintenance"} — ${file.name}`,
+        category: "Invoices",
+        file_path: path,
+        size_kb: Math.round(file.size / 1024),
+        property_id: j.property_id || null,
+        user_id: user.id,
+      }]);
+      if (dbErr) throw dbErr;
+      setUpMsg(`Attached to "${j.title || "job"}" — saved in Documents.`);
+    } catch (e2) { setErr(friendlyError(e2, "uploading the file")); }
+    setUpJob(null);
+    if (upFileRef.current) upFileRef.current.value = "";
+  };
 
   useEffect(() => {
     if (!DB_READY) { setRows([]); return; }
@@ -100,6 +135,7 @@ export function MaintenancePage({ user, go }) {
 
   return (
     <div className="fade-in">
+      <input ref={upFileRef} type="file" style={{ display: "none" }} onChange={onUpPick} />
       <ConfirmDialog {...confirm.props} />
       <PageHead title="Maintenance" sub={rows ? `${open} open job${open === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
         right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New job"} primary /></span>} />
@@ -122,10 +158,17 @@ export function MaintenancePage({ user, go }) {
         </div>
       )}
 
+      {upMsg && (
+        <div style={{ fontSize: 11.5, color: "var(--green)", background: "var(--green-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+          <span>{upMsg}</span>
+          <span onClick={() => go && go("documents")} style={{ cursor: "pointer", textDecoration: "underline", fontWeight: 600 }}>Open Documents</span>
+        </div>
+      )}
+
       {rows && rows.length > 0 && DB_READY && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--txt-3)", marginBottom: 12 }}>
           <i className="ti ti-info-circle" style={{ fontSize: 13 }} />
-          <span>Hold and drag a card between columns to update its stage{isMobile ? ", or use the ← → arrows on each card" : ""}.</span>
+          <span>Hold and drag a card between columns to update its stage{isMobile ? ", or use the ← → arrows on each card" : ""}. Use the ↑ icon on a card to attach a report or invoice.</span>
         </div>
       )}
 
@@ -176,6 +219,7 @@ export function MaintenancePage({ user, go }) {
                           <div style={{ display: "flex", gap: 10 }}>
                             <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
                             <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                            <i className={`ti ${upJob && upJob.id === j.id ? "ti-loader" : "ti-upload"}`} onClick={() => startUpload(j)} style={{ fontSize: 14, color: "var(--brand)", cursor: upJob ? "default" : "pointer" }} title="Attach report or invoice" />
                             <i className="ti ti-folder" onClick={() => go && go("documents")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="View documents" />
                           </div>
                         </div>
@@ -367,7 +411,7 @@ export function FinancePage({ user, go }) {
   const pSavingRef = useRef(false);
   const [tSaving, setTSaving] = useState(false);
   const [pSaving, setPSaving] = useState(false);
-  const blank = { tenant: "", property_id: "", amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
+  const blank = { tenant: "", property_id: "", amount: "", paid_amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
   const [filter, setFilter] = useState("All");
@@ -468,7 +512,7 @@ export function FinancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
+  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", paid_amount: p.paid_amount ?? "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
@@ -503,7 +547,7 @@ export function FinancePage({ user, go }) {
     setErr("");
     savingRef.current = true; setSaving(true);
     const invoiceNo = form.invoice_no || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
-    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
+    const payload = { ...form, amount: form.amount === "" ? 0 : +form.amount, paid_amount: form.paid_amount === "" ? 0 : +form.paid_amount, property_id: form.property_id || null, property: propLabel(properties, form.property_id), invoice_no: invoiceNo };
     // Empty date → null (not delete), so clearing a date on edit actually clears it.
     payload.due_date = form.due_date || null;
     payload.billing_date = form.billing_date || null;
@@ -515,7 +559,9 @@ export function FinancePage({ user, go }) {
     setForm(blank); setAdding(false); setEditId(null); refresh();
   };
 
-  const markReceived = async (p) => { if (p.id && DB_READY) { await db.from("prop_payments").update({ status: "Paid" }).eq("id", p.id); refresh(); } };
+  // Marking received settles the whole invoice, so paid_amount matches the
+  // total — otherwise a part-paid row would still show an outstanding balance.
+  const markReceived = async (p) => { if (p.id && DB_READY) { await db.from("prop_payments").update({ status: "Paid", paid_amount: +p.amount || 0 }).eq("id", p.id); refresh(); } };
 
   // Build forward projection of rent invoices from Let properties' rent + invoice_day
   const buildProjection = () => {
@@ -590,9 +636,11 @@ const data = rows || [];
     const x = String(s || "").toLowerCase();
     return x === "paid" ? "Paid" : x === "overdue" ? "Overdue" : x === "sent" ? "Sent" : "Pending";
   };
-  const collected = data.filter((p) => effectiveStatus(p) === "Paid").reduce((s, p) => s + (p.amount || 0), 0);
-  const overdue = data.filter((p) => effectiveStatus(p) === "Overdue").reduce((s, p) => s + (p.amount || 0), 0);
-  const pending = data.filter((p) => ["Pending", "Sent"].includes(effectiveStatus(p))).reduce((s, p) => s + (p.amount || 0), 0);
+  // Money actually banked, including part-payments on invoices still open.
+  // Overdue/pending totals show what's still owed, not the full invoice.
+  const collected = data.reduce((s, p) => s + paidOf(p), 0);
+  const overdue = data.filter((p) => effectiveStatus(p) === "Overdue").reduce((s, p) => s + outstandingOf(p), 0);
+  const pending = data.filter((p) => ["Pending", "Sent", "Part paid"].includes(effectiveStatus(p))).reduce((s, p) => s + outstandingOf(p), 0);
   const expected = collected + overdue + pending;
   const rate = expected ? Math.round((collected / expected) * 100) : 0;
   const paidCount = data.filter((p) => effectiveStatus(p) === "Paid").length;
@@ -664,6 +712,18 @@ const data = rows || [];
               <select style={inp} value={form.property_id} onChange={(e) => onPickProperty(e.target.value)}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select>
             )}</label>
             <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="auto-fills from rent — editable" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label style={fld}>Amount paid (£)
+              <input style={inp} type="number" placeholder="0 — leave blank if unpaid" value={form.paid_amount} onChange={(e) => setForm({ ...form, paid_amount: e.target.value })} />
+              {/* Live balance so part-payments are obvious before saving. */}
+              {(() => {
+                const tot = +form.amount || 0, pd = +form.paid_amount || 0;
+                if (!tot || !pd) return null;
+                const owed = Math.max(0, tot - pd);
+                return <span style={{ fontSize: 11, color: owed > 0 ? "var(--amber)" : "var(--green)", marginTop: 4 }}>
+                  {pd > tot ? `Overpaid by ${gbp(pd - tot)}` : owed > 0 ? `Outstanding ${gbp(owed)}` : "Fully paid"}
+                </span>;
+              })()}
+            </label>
             <label style={fld}>Billing date (optional, DD/MM/YYYY)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date (DD/MM/YYYY)<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -677,7 +737,7 @@ const data = rows || [];
      {/* Filter tabs */}
       {rows && (
         <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-          {["All", "Pending", "Sent", "Paid", "Overdue", "Future"].map((f) => (
+          {["All", "Pending", "Sent", "Part paid", "Paid", "Overdue", "Future"].map((f) => (
             <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
           ))}
         </div>
@@ -726,6 +786,8 @@ const data = rows || [];
             case "vat": return vatBreakdown(p.amount).vat;
             case "total": return vatBreakdown(p.amount).total;
             case "due_date": return p.due_date || p.due || "";
+            case "paid": return paidOf(p);
+            case "outstanding": return outstandingOf(p);
             case "status": return effectiveStatus(p);
             default: return "";
           }
@@ -742,7 +804,7 @@ const data = rows || [];
           return sort.dir === "asc" ? cmp : -cmp;
         });
         return (
-        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "tenant" }, { label: "Property", sortKey: "property" }, { label: "Subtotal", sortKey: "subtotal" }, { label: "VAT", sortKey: "vat" }, { label: "Total", sortKey: "total" }, { label: "Due date", sortKey: "due_date" }, { label: "Status", sortKey: "status" }, "Actions"]}>
+        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "tenant" }, { label: "Property", sortKey: "property" }, { label: "Subtotal", sortKey: "subtotal" }, { label: "VAT", sortKey: "vat" }, { label: "Total", sortKey: "total" }, { label: "Paid", sortKey: "paid" }, { label: "Outstanding", sortKey: "outstanding" }, { label: "Due date", sortKey: "due_date" }, { label: "Status", sortKey: "status" }, "Actions"]}>
           {shown.map((p, i) => {
             const isOpen = expandedId === (p.id || i);
             const pid = p.property_id;
@@ -762,20 +824,22 @@ const data = rows || [];
                   <Td color="var(--txt-2)">{vatApplies ? money(b.sub) : money(b.total)}</Td>
                   <Td color="var(--txt-2)">{vatApplies ? money(b.vat) : "—"}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
+                  <Td color={paidOf(p) ? "var(--green)" : "var(--txt-3)"}>{paidOf(p) ? money(paidOf(p)) : "—"}</Td>
+                  <Td><span style={{ fontWeight: outstandingOf(p) ? 600 : 400, color: outstandingOf(p) ? "var(--amber)" : "var(--txt-3)" }}>{outstandingOf(p) ? money(outstandingOf(p)) : "—"}</span></Td>
                   <Td color="var(--txt-2)">{ukDate(p.due_date || p.due)}</Td>
                   <Td><Pill text={effectiveStatus(p)} tone={effectiveStatus(p) === "Paid" ? "green" : effectiveStatus(p) === "Overdue" ? "red" : effectiveStatus(p) === "Sent" ? "blue" : "amber"} /></Td>
                   <Td>{p.id && DB_READY ? (
                     <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                       <ActionBtn icon="ti-send" title="Preview & send email" tone="brand" onClick={() => setEmailPayment(p)} />
                       <ActionBtn icon="ti-pencil" title="Edit" onClick={() => openEdit(p)} />
-                      {["Pending", "Sent", "Overdue"].includes(effectiveStatus(p)) && <ActionBtn icon="ti-check" title="Mark received" tone="green" onClick={() => markReceived(p)} />}
+                      {["Pending", "Sent", "Overdue", "Part paid"].includes(effectiveStatus(p)) && <ActionBtn icon="ti-check" title={outstandingOf(p) && paidOf(p) ? `Settle remaining ${gbp(outstandingOf(p))}` : "Mark received"} tone="green" onClick={() => markReceived(p)} />}
                       <ActionBtn icon="ti-trash" title="Delete" tone="red" onClick={() => remove(p.id)} />
                     </div>
                   ) : null}</Td>
                 </tr>
                 {isOpen && (
                   <tr>
-                    <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                    <td colSpan={11} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px" }}>
                         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
                           <DetailBox title="Tenant(s)" icon="ti-users" empty={pT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
