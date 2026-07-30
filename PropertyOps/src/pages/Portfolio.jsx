@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Panel, Pill, Table, Td, WelcomeBanner, useConfirm } from "../components/UI.jsx";
-import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus, friendlyError, dashRange, inDashRange } from "../lib/helpers.js";
+import { gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, NAV, TIER_ORDER, effectiveStatus, outstandingOf, paidOf, friendlyError, dashRange, inDashRange } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
 
 // ===== Dashboard interactivity: cursor-tilt cards, hover lift/glow, staggered entrance =====
@@ -149,9 +149,10 @@ function RentChart({ pays, go, win, title }) {
     d.setHours(0, 0, 0, 0);
     const i = months.findIndex((b) => d >= b.start && d <= b.end);
     if (i === -1) return; // outside the active range
-    const amt = +p.amount || 0;
-    if (p.status === "Paid") months[i].collected += amt;
-    else months[i].outstanding += amt; // Pending or Overdue
+    // Split each invoice by what's actually been received, so a £500 rent with
+    // £300 paid shows as £300 collected + £200 outstanding on the same bar.
+    months[i].collected += paidOf(p);
+    months[i].outstanding += outstandingOf(p);
   });
 
   const maxVal = Math.max(...months.map((m) => m.collected + m.outstanding), 1) * 1.15;
@@ -290,8 +291,8 @@ export function DashboardPage({ range, customRange, go, user, tier }) {
   const letProps = props.filter(letInWindow).length;
   const occupancy = totalProps ? Math.round((letProps / totalProps) * 1000) / 10 : 0;
   const income = pays
-    .filter((p) => String(p.status || "").toLowerCase() === "paid" && inDashRange(p.due_date, win))
-    .reduce((s, p) => s + (p.amount || 0), 0);
+    .filter((p) => inDashRange(p.due_date, win))
+    .reduce((s, p) => s + paidOf(p), 0);
 
   // compliance — when a range is active, only score certificates expiring
   // inside that window; otherwise score the whole portfolio.
@@ -304,7 +305,7 @@ export function DashboardPage({ range, customRange, go, user, tier }) {
 
   // finance — arrears from payments due inside the window.
   const overdue = pays.filter((p) => effectiveStatus(p) === "Overdue" && inDashRange(p.due_date, win));
-  const arrears = overdue.reduce((s, p) => s + (p.amount || 0), 0);
+  const arrears = overdue.reduce((s, p) => s + outstandingOf(p), 0);
   const arrearsCount = overdue.length;
 
   // maintenance — jobs logged inside the window.
