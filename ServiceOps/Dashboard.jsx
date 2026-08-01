@@ -180,6 +180,14 @@ const errBanner = { fontSize: 11.5, color: "var(--red)", background: "var(--red-
 const emptyCard = { color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" };
 const rowActions = (DB, onEdit, onDel) => DB ? <span style={{ display: "flex", gap: 12 }}><i className="ti ti-pencil" onClick={onEdit} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" /><i className="ti ti-trash" onClick={onDel} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" /></span> : null;
 
+/* Overlay — renders children at document.body via a portal.
+   Needed because .fade-in animates `transform`, and a transformed ancestor
+   becomes the containing block for position:fixed children — so modals opened
+   while a page is still animating in (e.g. customer detail straight from
+   search) get pinned to the page div instead of the viewport. Portaling to
+   body means no ancestor transform can ever capture the overlay. */
+function Overlay({ children }) { return ReactDOM.createPortal(children, document.body); }
+
 /* Shared confirm dialog. useConfirm() returns [confirmNode, ask].
    ask(message, onConfirm) opens the dialog; on confirm it runs onConfirm. */
 function useConfirm() {
@@ -636,6 +644,7 @@ function CustomerDetail({ customer, onClose, go }) {
   );
 
   return (
+    <Overlay>
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -664,6 +673,7 @@ function CustomerDetail({ customer, onClose, go }) {
         </div>
       </div>
     </div>
+    </Overlay>
   );
 }
 /* ================================================================== */
