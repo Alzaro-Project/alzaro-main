@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db, DB_READY } from '../lib/db.js'
 import { gbp, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
-import { PageHead, Btn, Pill, Table, Td, rowActions, useConfirm, useCustomers } from '../components/UI.jsx'
+import { Overlay, PageHead, Btn, Pill, Table, Td, rowActions, useConfirm, useCustomers } from '../components/UI.jsx'
 
 function CustomersPage({ user, openCustomerId, clearOpen, go }) {
   const [q, setQ] = useState("");
@@ -167,6 +167,7 @@ function CustomerDetail({ customer, onClose, go }) {
   );
 
   return (
+    <Overlay>
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ padding: "18px 20px", borderBottom: "0.5px solid var(--line)", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -195,6 +196,7 @@ function CustomerDetail({ customer, onClose, go }) {
         </div>
       </div>
     </div>
+    </Overlay>
   );
 }
 // PROPERTIES
