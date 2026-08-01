@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { db, DB_READY } from '../lib/db.js'
 import { gbp, toneVar, inp, fld, errBanner } from '../lib/helpers.js'
+
+/* Overlay — renders children at document.body via a portal.
+   Needed because .fade-in animates `transform`, and a transformed ancestor
+   becomes the containing block for position:fixed children — so modals opened
+   while a page is still animating in (e.g. customer detail straight from
+   search) get pinned to the page div instead of the viewport. Portaling to
+   body means no ancestor transform can ever capture the overlay. */
+function Overlay({ children }) { return createPortal(children, document.body); }
 
 function PageHead({ title, sub, right }) {
   return (
@@ -239,4 +248,4 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
 
 // ROOT — decides: login screen or dashboard
 
-export { PageHead, Btn, Metric, Panel, Pill, Table, Td, rowActions, useConfirm, useIsMobile, useCustomers, useProperties, QuickAddCustomer, QuickAddProperty, CustomerPropertyPicker, SearchGroup };
+export { Overlay, PageHead, Btn, Metric, Panel, Pill, Table, Td, rowActions, useConfirm, useIsMobile, useCustomers, useProperties, QuickAddCustomer, QuickAddProperty, CustomerPropertyPicker, SearchGroup };
