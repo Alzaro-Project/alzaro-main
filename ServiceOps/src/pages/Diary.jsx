@@ -17,7 +17,9 @@ const nextInvRef = (rows) => {
      • svc_bookings          (tone: blue)  — has a time, slots into grid
      • svc_quotes (scheduled) (tone: amber) — scheduled_date, all-day
      • svc_invoices (scheduled)(tone: green) — scheduled_date, all-day
-   Bookings are editable here; quotes/invoices are read-only links.
+   Bookings are fully editable here; quotes/invoices support a quick
+   edit (date, time, amount, status) straight from the event popup —
+   customer/property links and everything else stay on their own pages.
    A booking can spawn an invoice (simple amount dialog).
    ================================================================== */
 
@@ -135,6 +137,14 @@ export default function DiaryPage({ user }) {
     await db.from("svc_bookings").delete().eq("id", b.id); setSelected(null); load();
   });
 
+  // ---- quote/invoice quick-edit from the diary (schedule, amount, status) ----
+  const saveScheduled = async (ev, patch) => {
+    const table = ev.src === "invoice" ? "svc_invoices" : "svc_quotes";
+    const { error } = await db.from(table).update(patch).eq("id", ev.rawId);
+    if (error) throw error;
+    setSelected(null); load();
+  };
+
   // ---- nav ----
   const navPrev = () => { const d = new Date(refDate); if (view === "month") d.setMonth(d.getMonth() - 1); else if (view === "week") d.setDate(d.getDate() - 7); else d.setDate(d.getDate() - 1); setRefDate(d); };
   const navNext = () => { const d = new Date(refDate); if (view === "month") d.setMonth(d.getMonth() + 1); else if (view === "week") d.setDate(d.getDate() + 7); else d.setDate(d.getDate() + 1); setRefDate(d); };
@@ -206,7 +216,7 @@ export default function DiaryPage({ user }) {
         </div>
       )}
 
-      {selected && <EventModal event={selected} onClose={() => setSelected(null)} onEdit={openEdit} onDelete={deleteBooking} onInvoice={(b) => { setSelected(null); setInvoiceBooking(b); }} />}
+      {selected && <EventModal event={selected} onClose={() => setSelected(null)} onEdit={openEdit} onDelete={deleteBooking} onInvoice={(b) => { setSelected(null); setInvoiceBooking(b); }} onSaveScheduled={saveScheduled} />}
       {formMode && <BookingForm mode={formMode} initial={formInitial} user={user} customers={customers} properties={properties} reloadCustomers={reloadCustomers} reloadProperties={reloadProperties} onClose={() => setFormMode(null)} onSave={saveBooking} />}
       {invoiceBooking && <BookingInvoice booking={invoiceBooking} user={user} onClose={() => setInvoiceBooking(null)} onDone={() => { setInvoiceBooking(null); load(); }} />}
       {confirmNode}
@@ -434,11 +444,38 @@ function TodayPanel({ byDate, onEvent, onAdd, user }) {
 }
 
 // ---------- event detail modal ----------
-function EventModal({ event, onClose, onEdit, onDelete, onInvoice }) {
+function EventModal({ event, onClose, onEdit, onDelete, onInvoice, onSaveScheduled }) {
   const t = toneVar(SRC_TONE[event.src]);
   const isBooking = event.src === "booking";
+  // quick-edit state for quotes/invoices (bookings use the full BookingForm)
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(() => ({
+    scheduled_date: event.raw.scheduled_date || event.date || "",
+    scheduled_time: fmtTime(event.raw.scheduled_time || event.time) || "",
+    amount: event.raw.amount === null || event.raw.amount === undefined ? "" : event.raw.amount,
+    status: event.raw.status || "Draft",
+  }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const statuses = event.src === "invoice" ? ["Draft", "Sent", "Paid", "Overdue"] : ["Draft", "Sent", "Approved", "Rejected", "Invoiced"];
+
+  const save = async () => {
+    setError("");
+    if (!form.scheduled_date) { setError("Please choose a date."); return; }
+    if (!DB_READY) { setError("Add your Supabase keys to save."); return; }
+    setBusy(true);
+    try {
+      await onSaveScheduled(event, {
+        scheduled_date: form.scheduled_date,
+        scheduled_time: form.scheduled_time || null,
+        amount: form.amount === "" ? 0 : +form.amount,
+        status: form.status,
+      });
+    } catch (e) { setError(e.message || "Failed to save"); setBusy(false); }
+  };
+
   return (
-    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600, padding: 16 }}>
+    <div onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600, padding: 16 }}>
       <div style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 16, padding: 22, width: 460, maxWidth: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div>
@@ -446,15 +483,26 @@ function EventModal({ event, onClose, onEdit, onDelete, onInvoice }) {
             <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.3px" }}>{event.customer || event.title}</div>
             {event.customer && event.title !== event.customer && <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{event.title}</div>}
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--txt-3)", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
+          <button onClick={onClose} disabled={busy} style={{ background: "none", border: "none", color: "var(--txt-3)", fontSize: 22, cursor: "pointer" }}><i className="ti ti-x" /></button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <Field label="Date" value={event.date || "—"} />
-          <Field label="Time" value={event.time ? fmtTime(event.time) : "All-day"} />
-          {event.site && <Field label="Site" value={event.site} />}
-          {event.sub && <Field label={isBooking ? "Engineer" : "Amount"} value={event.sub} />}
-        </div>
-        <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 14, marginTop: 6, display: "flex", gap: 8, justifyContent: "space-between" }}>
+        {error && <div style={errBanner}>{error}</div>}
+        {editing ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <label style={fld}>Date<input style={inp} type="date" value={form.scheduled_date} onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })} /></label>
+            <label style={fld}>Time (blank = all-day)<input style={inp} type="time" value={form.scheduled_time} onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })} /></label>
+            <label style={fld}>Amount (£)<input style={inp} type="number" placeholder="e.g. 540" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((x) => <option key={x}>{x}</option>)}</select></label>
+            {event.site && <div style={{ gridColumn: "span 2" }}><Field label="Site" value={event.site} /></div>}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <Field label="Date" value={event.date || "—"} />
+            <Field label="Time" value={event.time ? fmtTime(event.time) : "All-day"} />
+            {event.site && <Field label="Site" value={event.site} />}
+            {event.sub && <Field label={isBooking ? "Engineer" : "Amount"} value={event.sub} />}
+          </div>
+        )}
+        <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 14, marginTop: 6, display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
           {isBooking ? (
             <>
               <span onClick={() => onDelete(event.raw)}><Btn icon="ti-trash" label="Delete" /></span>
@@ -463,8 +511,16 @@ function EventModal({ event, onClose, onEdit, onDelete, onInvoice }) {
                 <span onClick={() => onEdit(event.raw)}><Btn icon="ti-pencil" label="Edit" primary /></span>
               </div>
             </>
+          ) : editing ? (
+            <>
+              <span onClick={busy ? undefined : () => { setEditing(false); setError(""); }}><Btn icon="ti-x" label="Cancel" /></span>
+              <span onClick={busy ? undefined : save}><Btn icon="ti-device-floppy" label={busy ? "Saving…" : "Save changes"} primary /></span>
+            </>
           ) : (
-            <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginLeft: "auto" }}>Edit this from the {SRC_LABEL[event.src]}s page.</div>
+            <>
+              <div style={{ fontSize: 11.5, color: "var(--txt-3)" }}>Customer and full details are on the {SRC_LABEL[event.src]}s page.</div>
+              <span onClick={() => setEditing(true)}><Btn icon="ti-pencil" label="Edit" primary /></span>
+            </>
           )}
         </div>
       </div>
