@@ -64,7 +64,7 @@ function WelcomeBanner({ d, go, user }) {
   );
 }
 
-function DashboardPage({ range, go, user }) {
+function DashboardPage({ range, rangeFrom, rangeTo, go, user }) {
   const [d, setD] = useState(null);
 
   useEffect(() => {
@@ -86,12 +86,35 @@ function DashboardPage({ range, go, user }) {
 
   if (!d) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading dashboard…</div>;
 
-  const today = new Date().toISOString().slice(0, 10);
+  // ---- period filter: the range pills drive the money + activity stats ----
+  // Mirrors TyreOps' filterByPeriod: Week and 6 Months are rolling windows;
+  // Month, Quarter and Year are calendar periods. Invoices are dated by
+  // created_at (falling back to due_date), the same key the chart uses.
+  const inRange = (iso) => {
+    if (!iso) return false;
+    const dt = new Date(iso);
+    const now = new Date();
+    if (range === "Custom") {
+      if (!(rangeFrom && rangeTo)) return true;
+      return dt >= new Date(rangeFrom + "T00:00:00") && dt <= new Date(rangeTo + "T23:59:59");
+    }
+    if (range === "Today") return dt.toDateString() === now.toDateString();
+    if (range === "This Week") { const w = new Date(now); w.setDate(now.getDate() - 7); return dt >= w; }
+    if (range === "This Month") return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
+    if (range === "Quarter") return Math.floor(dt.getMonth() / 3) === Math.floor(now.getMonth() / 3) && dt.getFullYear() === now.getFullYear();
+    if (range === "6 Months") { const s = new Date(now); s.setMonth(now.getMonth() - 6); return dt >= s; }
+    if (range === "This Year") return dt.getFullYear() === now.getFullYear();
+    return true;
+  };
+  const invDate = (v) => v.created_at || v.due_date || "";
+  const periodWord = { "Today": "today", "This Week": "this week", "This Month": "this month", "Quarter": "this quarter", "6 Months": "in 6 months", "This Year": "this year", "Custom": "in range" }[range] || "";
+  const rangeLabel = range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range;
+
   const openJobs = d.jobs.filter((j) => j.status !== "Completed" && j.status !== "Invoiced");
-  const jobsToday = d.jobs.filter((j) => (j.created_at || "").slice(0, 10) === today).length;
-  const collected = d.invoices.filter((v) => v.status === "Paid").reduce((s, v) => s + (+v.amount || 0), 0);
-  const outstanding = d.invoices.filter((v) => v.status === "Sent" || v.status === "Overdue").reduce((s, v) => s + (+v.amount || 0), 0);
-  const overdueCount = d.invoices.filter((v) => v.status === "Overdue").length;
+  const jobsAdded = d.jobs.filter((j) => inRange(j.created_at)).length;
+  const collected = d.invoices.filter((v) => v.status === "Paid" && inRange(invDate(v))).reduce((s, v) => s + (+v.amount || 0), 0);
+  const outstanding = d.invoices.filter((v) => (v.status === "Sent" || v.status === "Overdue") && inRange(invDate(v))).reduce((s, v) => s + (+v.amount || 0), 0);
+  const overdueCount = d.invoices.filter((v) => v.status === "Overdue" && inRange(invDate(v))).length;
   const openQuotes = d.quotes.filter((q) => q.status === "Sent" || q.status === "Draft");
   const quoteValue = openQuotes.reduce((s, q) => s + (+q.amount || 0), 0);
   const awaitingInvoice = d.jobs.filter((j) => j.status === "Completed").length;
@@ -129,13 +152,13 @@ function DashboardPage({ range, go, user }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <h2 className="font-head" style={{ fontSize: 30, fontWeight: 700 }}>Dashboard</h2>
-        <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
+        <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {rangeLabel}</div>
       </div>
       <WelcomeBanner d={d} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <DashCard index={0} label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
-        <DashCard index={1} label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
-        <DashCard index={2} label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("quotes")} />
+        <DashCard index={0} label="Collected" value={gbp(collected)} sub={`Paid ${periodWord}`} color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
+        <DashCard index={1} label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue ${periodWord}`} color="var(--red)" onClick={() => go("invoicing")} />
+        <DashCard index={2} label="Open Jobs" value={openJobs.length} sub={`${jobsAdded} added ${periodWord}`} color="var(--blue)" onClick={() => go("quotes")} />
         <DashCard index={3} label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
