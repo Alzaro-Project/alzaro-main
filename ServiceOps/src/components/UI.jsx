@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { db, DB_READY } from '../lib/db.js'
 import { gbp, toneVar, inp, fld, errBanner } from '../lib/helpers.js'
@@ -29,6 +29,66 @@ function Btn({ icon, label, primary }) {
       background: primary ? "var(--brand)" : "var(--panel-2)", color: primary ? "#fff" : "var(--txt)", border: "0.5px solid " + (primary ? "var(--brand)" : "var(--line)") }}>
       {icon && <i className={`ti ${icon}`} style={{ fontSize: 15 }} />}{label}
     </span>
+  );
+}
+
+/* DashCard / TiltPanel — the TyreOps dashboard motion system on ServiceOps
+   tokens: staggered entrance (.dash-card + animationDelay), cursor-following
+   3D tilt, and a soft colour glow. Same APIs as Metric / Panel plus `index`
+   for the stagger, so the dashboard swaps 1:1. Mouse-only tilt; touch and
+   reduced-motion users just get the plain card. */
+function DashCard({ label, value, sub, color = "var(--txt)", subColor, onClick, index = 0 }) {
+  const ref = useRef(null);
+  const [transform, setTransform] = useState("");
+  const [hover, setHover] = useState(false);
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    setTransform(`perspective(700px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-4px) scale(1.02)`);
+  };
+  const onLeave = () => { setTransform(""); setHover(false); };
+  return (
+    <div ref={ref} className="dash-card" onMouseMove={onMove} onMouseEnter={() => setHover(true)} onMouseLeave={onLeave} onClick={onClick}
+      style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px",
+        cursor: onClick ? "pointer" : "default", position: "relative", overflow: "hidden", transform, animationDelay: `${index * 60}ms` }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hover ? 1 : 0, transition: "opacity .25s",
+        background: `radial-gradient(420px circle at 30% 0%, color-mix(in srgb, ${color} 14%, transparent), transparent 70%)` }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span className="mono" style={{ fontSize: 10, fontWeight: 500, letterSpacing: ".8px", color: "var(--txt-2)", textTransform: "uppercase" }}>{label}</span>
+        {onClick && <span style={{ fontSize: 13, color, opacity: hover ? 1 : 0.35, transform: hover ? "translateX(2px)" : "none", transition: "all .2s" }}>→</span>}
+      </div>
+      <div className="mono" style={{ fontSize: 25, fontWeight: 500, color, position: "relative" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: subColor || "var(--txt-3)", marginTop: 4, position: "relative" }}>{sub}</div>
+    </div>
+  );
+}
+
+function TiltPanel({ title, action, children, onAction, accent = "var(--txt-2)", index = 0 }) {
+  const ref = useRef(null);
+  const [transform, setTransform] = useState("");
+  const [hover, setHover] = useState(false);
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    setTransform(`perspective(900px) rotateX(${(-y * 2.5).toFixed(2)}deg) rotateY(${(x * 3.5).toFixed(2)}deg) translateY(-3px)`);
+  };
+  const onLeave = () => { setTransform(""); setHover(false); };
+  return (
+    <div ref={ref} className="dash-card" onMouseMove={onMove} onMouseEnter={() => setHover(true)} onMouseLeave={onLeave}
+      style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "15px 18px",
+        position: "relative", overflow: "hidden", transform, animationDelay: `${index * 60}ms` }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hover ? 1 : 0, transition: "opacity .25s",
+        background: `radial-gradient(560px circle at 25% 0%, color-mix(in srgb, ${accent} 10%, transparent), transparent 70%)` }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 13, position: "relative" }}>
+        <span style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>{title}</span>
+        {action && <span onClick={onAction} style={{ fontSize: 11.5, color: "var(--brand)", cursor: "pointer" }}>{action}</span>}
+      </div>
+      <div style={{ position: "relative" }}>{children}</div>
+    </div>
   );
 }
 
@@ -248,4 +308,4 @@ function SearchGroup({ title, rows, goLabel, onGo }) {
 
 // ROOT — decides: login screen or dashboard
 
-export { Overlay, PageHead, Btn, Metric, Panel, Pill, Table, Td, rowActions, useConfirm, useIsMobile, useCustomers, useProperties, QuickAddCustomer, QuickAddProperty, CustomerPropertyPicker, SearchGroup };
+export { Overlay, PageHead, Btn, Metric, Panel, DashCard, TiltPanel, Pill, Table, Td, rowActions, useConfirm, useIsMobile, useCustomers, useProperties, QuickAddCustomer, QuickAddProperty, CustomerPropertyPicker, SearchGroup };
