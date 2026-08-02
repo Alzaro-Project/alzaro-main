@@ -119,12 +119,46 @@ function DashboardPage({ range, rangeFrom, rangeTo, go, user }) {
   const quoteValue = openQuotes.reduce((s, q) => s + (+q.amount || 0), 0);
   const awaitingInvoice = d.jobs.filter((j) => j.status === "Completed").length;
 
-  const months = [];
-  for (let k = 5; k >= 0; k--) { const dt = new Date(); dt.setMonth(dt.getMonth() - k); months.push({ key: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`, label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
-  const series = months.map((m) => {
+  // ---- revenue chart follows the selected period ----
+  // Short ranges bucket by day, long ones by month; the SVG sizes its bars
+  // to however many buckets the period produces.
+  const mkey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+  const dkey = (dt) => `${mkey(dt)}-${String(dt.getDate()).padStart(2, "0")}`;
+  const buckets = [];
+  let bucketBy = "month", chartTitle = "last 6 months";
+  const nowD = new Date();
+  if (range === "Today" || range === "This Week") {
+    bucketBy = "day"; chartTitle = "last 7 days";
+    for (let k = 6; k >= 0; k--) { const dt = new Date(nowD); dt.setDate(nowD.getDate() - k); buckets.push({ key: dkey(dt), label: dt.toLocaleDateString("en-GB", { weekday: "short" }) }); }
+  } else if (range === "This Month") {
+    bucketBy = "day"; chartTitle = "this month";
+    const days = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).getDate();
+    for (let k = 1; k <= days; k++) { const dt = new Date(nowD.getFullYear(), nowD.getMonth(), k); buckets.push({ key: dkey(dt), label: String(k) }); }
+  } else if (range === "Quarter") {
+    chartTitle = "this quarter";
+    const q0 = Math.floor(nowD.getMonth() / 3) * 3;
+    for (let k = 0; k < 3; k++) { const dt = new Date(nowD.getFullYear(), q0 + k, 1); buckets.push({ key: mkey(dt), label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
+  } else if (range === "This Year") {
+    chartTitle = "this year";
+    for (let k = 0; k < 12; k++) { const dt = new Date(nowD.getFullYear(), k, 1); buckets.push({ key: mkey(dt), label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
+  } else if (range === "Custom" && rangeFrom && rangeTo) {
+    chartTitle = "custom range";
+    const from = new Date(rangeFrom + "T00:00:00"), to = new Date(rangeTo + "T00:00:00");
+    const spanDays = Math.round((to - from) / 86400000) + 1;
+    if (spanDays >= 1 && spanDays <= 45) {
+      bucketBy = "day";
+      for (let k = 0; k < spanDays; k++) { const dt = new Date(from); dt.setDate(from.getDate() + k); buckets.push({ key: dkey(dt), label: `${dt.getDate()}/${dt.getMonth() + 1}` }); }
+    } else {
+      const cur = new Date(from.getFullYear(), from.getMonth(), 1);
+      while (cur <= to && buckets.length < 36) { buckets.push({ key: mkey(cur), label: cur.toLocaleDateString("en-GB", { month: "short" }) }); cur.setMonth(cur.getMonth() + 1); }
+    }
+  } else {
+    for (let k = 5; k >= 0; k--) { const dt = new Date(); dt.setMonth(dt.getMonth() - k); buckets.push({ key: mkey(dt), label: dt.toLocaleDateString("en-GB", { month: "short" }) }); }
+  }
+  const series = buckets.map((m) => {
     let coll = 0, out = 0;
     d.invoices.forEach((v) => {
-      const k = (v.created_at || v.due_date || "").slice(0, 7);
+      const k = (v.created_at || v.due_date || "").slice(0, bucketBy === "day" ? 10 : 7);
       if (k !== m.key) return;
       if (v.status === "Paid") coll += +v.amount || 0;
       else if (v.status === "Sent" || v.status === "Overdue") out += +v.amount || 0;
@@ -132,6 +166,7 @@ function DashboardPage({ range, rangeFrom, rangeTo, go, user }) {
     return { ...m, coll, out };
   });
   const maxVal = Math.max(1, ...series.map((s) => Math.max(s.coll, s.out)));
+  const labelEvery = Math.max(1, Math.ceil(series.length / 8));
   const expiring = (d.certs || []).map((c) => ({ ...c, days: c.expiry_date ? Math.ceil((new Date(c.expiry_date + "T00:00:00") - new Date()) / 86400000) : 9999 })).filter((c) => c.days <= 90).sort((a, b) => a.days - b.days).slice(0, 5);
 
   const acts = [];
@@ -162,16 +197,21 @@ function DashboardPage({ range, rangeFrom, rangeTo, go, user }) {
         <DashCard index={3} label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <TiltPanel index={4} accent="var(--brand)" title="Revenue — last 6 months" action="View invoices →" onAction={() => go("invoicing")}>
+        <TiltPanel index={4} accent="var(--brand)" title={`Revenue — ${chartTitle}`} action="View invoices →" onAction={() => go("invoicing")}>
           <svg viewBox="0 0 380 140" style={{ width: "100%", height: 120 }}>
             <line x1="0" y1="108" x2="380" y2="108" stroke="var(--line)" strokeWidth="1" />
             {series.map((s, i) => {
-              const x = 24 + i * 60; const ch = Math.round((s.coll / maxVal) * 80); const oh = Math.round((s.out / maxVal) * 80);
+              const n = series.length;
+              const slot = 356 / n;
+              const bw = Math.max(2.5, Math.min(16, slot * 0.36));
+              const gap = Math.min(2, bw * 0.15 + 0.5);
+              const x = 12 + i * slot + (slot - (bw * 2 + gap)) / 2;
+              const ch = Math.round((s.coll / maxVal) * 80); const oh = Math.round((s.out / maxVal) * 80);
               return (
                 <g key={s.key}>
-                  <rect x={x} y={108 - ch} width="16" height={ch} rx="2" fill="var(--brand)" />
-                  <rect x={x + 18} y={108 - oh} width="16" height={oh} rx="2" fill="var(--amber)" />
-                  <text x={x + 17} y="124" fontSize="9" fill="var(--txt-3)" textAnchor="middle">{s.label}</text>
+                  <rect x={x} y={108 - ch} width={bw} height={ch} rx={Math.min(2, bw / 2)} fill="var(--brand)" />
+                  <rect x={x + bw + gap} y={108 - oh} width={bw} height={oh} rx={Math.min(2, bw / 2)} fill="var(--amber)" />
+                  {i % labelEvery === 0 && <text x={12 + i * slot + slot / 2} y="124" fontSize="9" fill="var(--txt-3)" textAnchor="middle">{s.label}</text>}
                 </g>
               );
             })}
