@@ -39,7 +39,7 @@ const REPORTS = [
   ]},
 ];
 
-const RANGES = ["Today", "This Week", "This Month", "Quarter", "This Year", "Custom"];
+const RANGES = ["Today", "This Week", "This Month", "Quarter", "6 Months", "This Year", "Custom"];
 
 const gbp = (n) => "£" + n.toLocaleString("en-GB");
 const toneVar = (t) => ({ color: `var(--${t})`, soft: `var(--${t}-soft)` });
