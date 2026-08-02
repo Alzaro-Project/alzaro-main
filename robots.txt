@@ -1,7 +1,28 @@
+# Alzaro — https://alzaro.co.uk
+# All crawlers are welcome on the marketing pages.
+# App/auth internals are kept out of search results.
+
 User-agent: *
 Allow: /
+Disallow: /platform
+Disallow: /confirmed
+Disallow: /*/login
+Disallow: /*/register
+Disallow: /*/dashboard
+Disallow: /*/reset-password
+Disallow: /*/forgot-password
+Disallow: /*/admin
 
-# Keep app/auth internals out of search results
+# Explicitly welcome major search and AI crawlers (same rules as above —
+# named groups override the * group, so the disallows are repeated here).
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: PerplexityBot
+User-agent: Google-Extended
+Allow: /
 Disallow: /platform
 Disallow: /confirmed
 Disallow: /*/login

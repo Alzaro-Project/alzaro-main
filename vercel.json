@@ -9,6 +9,17 @@
   "outputDirectory": ".",
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.alzaro.co.uk"
+        }
+      ],
+      "destination": "https://alzaro.co.uk/:path*",
+      "statusCode": 301
+    },
+    {
       "source": "/TyreOps",
       "destination": "/tyreops",
       "permanent": true
