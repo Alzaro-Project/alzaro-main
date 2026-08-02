@@ -807,7 +807,7 @@ function SettingsPage({ user }) {
       vat_number: vat.vat_number || biz.vat_number,
       notify_certificate: notif.notify_certificate, notify_invoice: notif.notify_invoice, notify_job: notif.notify_job, reminder_lead: notif.reminder_lead,
       smtp_provider: email.smtp_provider, smtp_host: email.smtp_host, smtp_port: email.smtp_port, smtp_secure: email.smtp_secure,
-      smtp_user: email.smtp_user, smtp_pass: email.smtp_pass, smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
+      smtp_user: email.smtp_user, smtp_pass: (email.smtp_provider === "gmail" ? (email.smtp_pass || "").replace(/\s+/g, "") : (email.smtp_pass || "").trim()), smtp_from_name: email.smtp_from_name, smtp_from_email: email.smtp_from_email, smtp_reply_to: email.smtp_reply_to,
       vat_scheme: vat.vat_scheme, flat_rate: vat.flat_rate,
       updated_at: new Date().toISOString(),
     };
@@ -836,8 +836,8 @@ function SettingsPage({ user }) {
     try {
       const res = await fetch("/api/test-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: email.smtp_pass, fromName: email.smtp_from_name || biz.trading_name || "" }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ host: email.smtp_host, port: email.smtp_port || 587, secure: !!email.smtp_secure, user: email.smtp_user, pass: (email.smtp_provider === "gmail" ? email.smtp_pass.replace(/\s+/g, "") : email.smtp_pass.trim()), fromName: email.smtp_from_name || biz.trading_name || "" }),
       });
       let data = {}; try { data = await res.json(); } catch { /* non-JSON */ }
       if (!res.ok) throw new Error(data.error || `Server responded with status ${res.status}`);
