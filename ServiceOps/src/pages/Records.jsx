@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db, DB_READY } from '../lib/db.js'
 import { REPORTS, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
-import { PageHead, Btn, Metric, Panel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker, useIsMobile } from '../components/UI.jsx'
+import { PageHead, Btn, Metric, Panel, DashCard, TiltPanel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker, useIsMobile } from '../components/UI.jsx'
 
 // Shared storage bucket (same one the old Documents page used).
 const DOC_BUCKET = "svc-documents";
@@ -126,20 +126,20 @@ function DashboardPage({ range, go, user }) {
   };
 
   return (
-    <div className="fade-in">
+    <div>
       <div style={{ marginBottom: 16 }}>
         <h2 className="font-head" style={{ fontSize: 30, fontWeight: 700 }}>Dashboard</h2>
         <div style={{ fontSize: 13, color: "var(--txt-2)", marginTop: 2 }}>{greet}, {name} · {openJobs.length} open job{openJobs.length === 1 ? "" : "s"} · {overdueCount} overdue · {range}</div>
       </div>
       <WelcomeBanner d={d} go={go} user={user} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 12 }}>
-        <Metric label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
-        <Metric label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
-        <Metric label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("quotes")} />
-        <Metric label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
+        <DashCard index={0} label="Collected" value={gbp(collected)} sub="Paid invoices" color="var(--brand)" subColor="var(--green)" onClick={() => go("invoicing")} />
+        <DashCard index={1} label="Outstanding" value={gbp(outstanding)} sub={`${overdueCount} overdue`} color="var(--red)" onClick={() => go("invoicing")} />
+        <DashCard index={2} label="Open Jobs" value={openJobs.length} sub={`${jobsToday} added today`} color="var(--blue)" onClick={() => go("quotes")} />
+        <DashCard index={3} label="Open Quotes" value={openQuotes.length} sub={`${gbp(quoteValue)} potential`} color="var(--amber)" onClick={() => go("quotes")} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Revenue — last 6 months" action="View invoices →" onAction={() => go("invoicing")}>
+        <TiltPanel index={4} accent="var(--brand)" title="Revenue — last 6 months" action="View invoices →" onAction={() => go("invoicing")}>
           <svg viewBox="0 0 380 140" style={{ width: "100%", height: 120 }}>
             <line x1="0" y1="108" x2="380" y2="108" stroke="var(--line)" strokeWidth="1" />
             {series.map((s, i) => {
@@ -157,8 +157,8 @@ function DashboardPage({ range, go, user }) {
             <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--brand)" }} />Collected</span>
             <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--amber)" }} />Outstanding</span>
           </div>
-        </Panel>
-        <Panel title="Certificates expiring" action="View all" onAction={() => go("certificates")}>
+        </TiltPanel>
+        <TiltPanel index={5} accent="var(--amber)" title="Certificates expiring" action="View all" onAction={() => go("certificates")}>
           {expiring.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>No certificates due in the next 90 days.</div> : expiring.map((c, i) => {
             const tone = c.days <= 7 ? "red" : c.days <= 30 ? "amber" : "blue";
             return (
@@ -168,10 +168,10 @@ function DashboardPage({ range, go, user }) {
               </div>
             );
           })}
-        </Panel>
+        </TiltPanel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Panel title="Jobs by Stage" action="View all" onAction={() => go("quotes")}>
+        <TiltPanel index={6} accent="var(--blue)" title="Jobs by Stage" action="View all" onAction={() => go("quotes")}>
           {["New", "Scheduled", "In Progress", "Completed", "Invoiced"].map((s, i, arr) => {
             const n = d.jobs.filter((j) => j.status === s).length;
             const tone = s === "Completed" ? "green" : s === "In Progress" ? "amber" : s === "Invoiced" ? "brand" : "blue";
@@ -182,20 +182,20 @@ function DashboardPage({ range, go, user }) {
               </div>
             );
           })}
-        </Panel>
-        <Panel title="Recent Activity">
+        </TiltPanel>
+        <TiltPanel index={7} title="Recent Activity">
           {recent.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>No activity yet. Add a customer, quote or job to get started.</div> : recent.map((a, i) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < recent.length - 1 ? 13 : 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: `var(--${a.tone})`, marginTop: 5, flexShrink: 0 }} />
               <div><div style={{ fontSize: 11.5 }}>{a.text}</div><div style={{ fontSize: 10.5, color: "var(--txt-3)" }}>{ago(a.when)}</div></div>
             </div>
           ))}
-        </Panel>
+        </TiltPanel>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-        <Metric label="Awaiting Invoice" value={awaitingInvoice} sub="Completed jobs" color="var(--blue)" />
-        <Metric label="Total Quotes" value={d.quotes.length} sub={`${d.quotes.filter((q) => q.status === "Approved").length} approved`} color="var(--amber)" />
-        <Metric label="Active Customers" value={d.customers.length} sub="In your database" color="var(--txt)" subColor="var(--green)" />
+        <DashCard index={8} label="Awaiting Invoice" value={awaitingInvoice} sub="Completed jobs" color="var(--blue)" />
+        <DashCard index={9} label="Total Quotes" value={d.quotes.length} sub={`${d.quotes.filter((q) => q.status === "Approved").length} approved`} color="var(--amber)" />
+        <DashCard index={10} label="Active Customers" value={d.customers.length} sub="In your database" color="var(--txt)" subColor="var(--green)" />
       </div>
     </div>
   );
