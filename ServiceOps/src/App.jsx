@@ -125,7 +125,7 @@ function Dashboard({ user, signOut }) {
   if (activeNav && !tierAllows(activeNav.min)) {
     body = <TierLocked feature={activeNav.label} requiredTier={activeNav.min} currentTier={biz.tier} onUpgrade={() => goTo("settings")} />;
   }
-  else if (active === "dashboard") body = <DashboardPage range={range === "Custom" && rangeFrom && rangeTo ? `${rangeFrom} → ${rangeTo}` : range} go={goTo} user={user} />;
+  else if (active === "dashboard") body = <DashboardPage range={range} rangeFrom={rangeFrom} rangeTo={rangeTo} go={goTo} user={user} />;
   else if (active === "customers") body = <CustomersPage user={user} openCustomerId={openCustomerId} clearOpen={() => setOpenCustomerId(null)} go={goTo} />;
   else { const P = PAGES[active]; body = <P user={user} />; }
 
