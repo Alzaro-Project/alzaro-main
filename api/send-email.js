@@ -8,8 +8,10 @@
 //      table, keyed by the validated caller's user_id — they are NO LONGER
 //      accepted from the request body. This is how PropertyOps invoices go out
 //      FROM the company's own address.
-//   2. Resend — the shared fallback (invoices@alzaro.co.uk) used by TyreOps and
-//      ServiceOps. Guarded: the caller must be authenticated AND hold an active
+//   2. Resend — the shared fallback (invoices@alzaro.co.uk). Used only by
+//      products that have no own-domain sending. PropertyOps, SoloOps and
+//      TyreOps all send from their OWN address and never reach this path.
+//      Guarded anyway: the caller must be authenticated AND hold an active
 //      product_members row before we will send from the shared Alzaro domain.
 //
 // SECURITY (see also api/_netguard.js):
@@ -26,7 +28,7 @@ import nodemailer from 'nodemailer'
 import { resolveSafeAddress, rateLimit, isValidEmail, sanitizeHeader } from './_netguard.js'
 
 // Products with server-side SMTP wired up: product -> { table, columns }.
-// PropertyOps and SoloOps send their own-domain SMTP. To add another vertical,
+// PropertyOps, SoloOps and TyreOps send their own-domain SMTP. To add another vertical,
 // map it to its settings table here (its SMTP columns must match this shape,
 // i.e. it must expose every column in SMTP_COLS below).
 //
@@ -36,14 +38,21 @@ import { resolveSafeAddress, rateLimit, isValidEmail, sanitizeHeader } from './_
 const SMTP_PRODUCTS = {
   propertyops: { table: 'prop_settings', secretRpc: 'prop_smtp_secret' },
   soloops: { table: 'soloops_settings', secretRpc: 'soloops_smtp_secret' },
+  // TyreOps: garages invoice their own customers, so mail must leave from the
+  // garage's own address — never invoices@alzaro.co.uk. TyreOps keeps its
+  // settings in the SHARED product_settings table (one row per user+product),
+  // so this entry also needs the product filter.
+  tyreops: {
+    table: 'product_settings',
+    productFilter: 'tyreops',
+    secretRpc: 'tyreops_smtp_secret',
+  },
 }
 
 // Default Resend "From" display name per product, used only when the caller
-// doesn't pass its own fromName. Neutral "Alzaro" for everyone except TyreOps,
-// which historically sent as "Alzaro TyreOps" (special-cased to preserve it).
-const PRODUCT_SENDER = {
-  tyreops: 'Alzaro TyreOps',
-}
+// doesn't pass its own fromName. Neutral "Alzaro" for everyone — no product
+// brands the shared address any more.
+const PRODUCT_SENDER = {}
 function defaultSender(product) {
   return PRODUCT_SENDER[String(product || '')] || 'Alzaro'
 }
@@ -60,10 +69,12 @@ function resolveSupabaseUrl() {
 
 // Read one row from a settings table scoped to the caller (their own token, so
 // RLS returns only their row — no service-role needed, ownership is inherent).
-async function readOwnSettings({ supabaseUrl, anonKey, token, table, userId, cols }) {
+async function readOwnSettings({ supabaseUrl, anonKey, token, table, userId, cols, productFilter }) {
   const url =
     `${supabaseUrl}/rest/v1/${table}` +
-    `?user_id=eq.${encodeURIComponent(userId)}&select=${cols}&limit=1`
+    `?user_id=eq.${encodeURIComponent(userId)}` +
+    (productFilter ? `&product=eq.${encodeURIComponent(productFilter)}` : '') +
+    `&select=${cols}&limit=1`
   const r = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
   if (!r.ok) return null
   const rows = await r.json().catch(() => [])
@@ -183,6 +194,7 @@ export default async function handler(req, res) {
       const cfg = await readOwnSettings({
         supabaseUrl, anonKey: supabaseAnonKey, token,
         table: map.table, userId, cols: SMTP_COLS,
+        productFilter: map.productFilter,
       })
       if (!cfg || !cfg.smtp_host || !cfg.smtp_user) {
         return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
