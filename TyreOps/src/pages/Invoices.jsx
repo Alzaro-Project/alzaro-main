@@ -578,7 +578,7 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
         const totals = { subtotal, vat, total: subtotal + vat }
 
         // Generate email content first
-        const subject = `Invoice ${invoice.id} from ${settings.name || 'Alzaro TyreOps'}`
+        const subject = `Invoice ${invoice.id} from ${settings.name || 'your garage'}`
         const textContent = generateInvoiceEmailText(invoice, settings, invoice.lines, totals)
         const htmlContent = generateInvoiceEmailHTML(invoice, settings, invoice.lines, totals)
         
@@ -695,7 +695,7 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
               Invoice {invoice.id} sent to {invoice.custEmail}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '8px' }}>
-              Sent via {method === 'smtp' ? 'SMTP' : method === 'emailjs' ? 'EmailJS' : method === 'resend' ? 'Resend' : method}
+              Sent from your own email address
             </div>
           </div>
         )}
