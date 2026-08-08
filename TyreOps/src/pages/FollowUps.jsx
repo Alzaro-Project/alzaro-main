@@ -109,8 +109,8 @@ export default function FollowUps() {
       subject: emailSubject,
       html: plainToHtml(emailBody, settings),
       text: emailBody,
-      fromName: settings.emailFromName || settings.name || 'Alzaro TyreOps',
-      replyTo: settings.emailReplyTo || settings.email || undefined,
+      fromName: settings.smtpFromName || settings.emailFromName || settings.name || '',
+      replyTo: settings.smtpReplyTo || settings.emailReplyTo || settings.email || undefined,
     })
     setSendingEmail(false)
     if (result.success) {
