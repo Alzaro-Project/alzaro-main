@@ -141,8 +141,21 @@ export function senderName(settings = {}) {
 // EMAIL TEMPLATES
 // ============================================================
 
-export function generateInvoiceEmailHTML(invoice, settings, lines, totals) {
+/** Default subject line for an invoice email. */
+export function buildInvoiceSubject(invoice, settings = {}) {
+  return `Invoice ${invoice.id} from ${settings.name || 'your garage'}`
+}
+
+export function generateInvoiceEmailHTML(invoice, settings, lines, totals, opts = {}) {
   const { custName, custEmail, id, date, due, reg, notes } = invoice
+  // Optional personal note the garage typed on the send screen. Escaped, then
+  // newlines turned into <br> — it is user input, never raw HTML.
+  const personal = String(opts.message || '').trim()
+  const personalHtml = personal
+    ? `<div class="section" style="margin-bottom:24px;"><p style="margin:0;white-space:pre-wrap;">${personal
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>')}</p></div>`
+    : ''
   const { name: garageName, addr, city, post, phone, email: garageEmail, vatNumber } = settings
   const { subtotal, vat, total } = totals
 
@@ -176,6 +189,7 @@ export function generateInvoiceEmailHTML(invoice, settings, lines, totals) {
   </style>
 </head>
 <body>
+  ${personalHtml}
   <div class="header">
     <div>
       ${settings.logoUrl
@@ -266,13 +280,14 @@ export function generateInvoiceEmailHTML(invoice, settings, lines, totals) {
 `
 }
 
-export function generateInvoiceEmailText(invoice, settings, lines, totals) {
+export function generateInvoiceEmailText(invoice, settings, lines, totals, opts = {}) {
   const { custName, id, date, due, reg } = invoice
   const { name: garageName } = settings
   const { subtotal, vat, total } = totals
+  const personal = String(opts.message || '').trim()
 
   let text = `
-INVOICE ${id}
+${personal ? personal + '\n\n' : ''}INVOICE ${id}
 From: ${garageName}
 Date: ${date}
 Due: ${due}
@@ -395,17 +410,20 @@ export function openMailto(toEmail, subject, body) {
  *
  * Returns { success, method, error?, needsManualSend? }
  */
-export async function sendInvoiceEmail(invoice, settings, lines, totals, preferredMethod = null) {
-  const { custEmail, custName, id } = invoice
+export async function sendInvoiceEmail(invoice, settings, lines, totals, preferredMethod = null, overrides = {}) {
+  const { custName, id } = invoice
 
+  // The send screen lets the garage correct the address, retitle the subject
+  // and add a personal note before anything goes out. Whatever they left in
+  // those boxes wins over the generated defaults.
+  const custEmail = (overrides.to || invoice.custEmail || '').trim()
   if (!custEmail) {
     return { success: false, error: 'No customer email address' }
   }
 
-  const garageName = settings.name || 'your garage'
-  const subject = `Invoice ${id} from ${garageName}`
-  const htmlContent = generateInvoiceEmailHTML(invoice, settings, lines, totals)
-  const textContent = generateInvoiceEmailText(invoice, settings, lines, totals)
+  const subject = overrides.subject || buildInvoiceSubject(invoice, settings)
+  const htmlContent = generateInvoiceEmailHTML(invoice, settings, lines, totals, overrides)
+  const textContent = generateInvoiceEmailText(invoice, settings, lines, totals, overrides)
 
   // Explicit manual-send choices from the preview screen
   if (preferredMethod === 'gmail') {
