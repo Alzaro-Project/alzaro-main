@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
-import { sendInvoiceEmail, generateInvoiceEmailHTML, generateInvoiceEmailText
+import {
+  sendInvoiceEmail, generateInvoiceEmailHTML, generateInvoiceEmailText,
+  buildInvoiceSubject, isSmtpConfigured, senderName,
 } from '../lib/email'
 
 const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red' }
@@ -563,122 +565,241 @@ function PaymentModal({ invoice, onClose, onConfirm }) {
   )
 }
 
-// Email Sending Modal with status feedback and fallback preview
+// Email compose + preview modal.
+// Nothing is sent until the garage has seen exactly what the customer will get
+// and pressed Send. They can correct the address, retitle the subject and add a
+// personal note first; the invoice table itself is generated and not editable,
+// so the figures can't be altered on their way out.
 function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
-  const [status, setStatus] = useState('checking') // checking, sending, success, error, preview
+  const totals = useMemo(() => {
+    const subtotal = invoice.lines.reduce((a, l) => a + l.qty * l.unit, 0)
+    const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold')
+    return { subtotal, vat, total: subtotal + vat }
+  }, [invoice, settings.flatRate, tier])
+
+  const [status, setStatus] = useState('compose') // compose | sending | success | error
   const [error, setError] = useState('')
-  const [method, setMethod] = useState('')
-  const [emailContent, setEmailContent] = useState({ subject: '', body: '', html: '' })
+  const [tab, setTab] = useState('preview')       // preview | text
+  const [to, setTo] = useState(invoice.custEmail || '')
+  const [subject, setSubject] = useState(buildInvoiceSubject(invoice, settings))
+  const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    const attemptSend = async () => {
-      try {
-        const subtotal = invoice.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-        const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold')
-        const totals = { subtotal, vat, total: subtotal + vat }
+  const emailSetUp = isSmtpConfigured(settings)
+  const fromLine = senderName(settings) || settings.name || 'your garage'
+  const fromAddr = settings.smtpFromEmail || settings.smtpUser || settings.email || ''
 
-        // Generate email content first
-        const subject = `Invoice ${invoice.id} from ${settings.name || 'your garage'}`
-        const textContent = generateInvoiceEmailText(invoice, settings, invoice.lines, totals)
-        const htmlContent = generateInvoiceEmailHTML(invoice, settings, invoice.lines, totals)
-        
-        setEmailContent({ subject, body: textContent, html: htmlContent })
-        setStatus('sending')
+  // Live preview — regenerated as they type, so what they read is what sends.
+  const html = useMemo(
+    () => generateInvoiceEmailHTML(invoice, settings, invoice.lines, totals, { message }),
+    [invoice, settings, totals, message]
+  )
+  const text = useMemo(
+    () => generateInvoiceEmailText(invoice, settings, invoice.lines, totals, { message }),
+    [invoice, settings, totals, message]
+  )
 
-        const result = await sendInvoiceEmail(invoice, settings, invoice.lines, totals)
-        
-        if (result.success) {
-          // If it opened Gmail/mailto, show preview instead
-          if (result.method === 'gmail_compose' || result.method === 'mailto') {
-            setStatus('preview')
-            setMethod(result.method)
-          } else {
-            setStatus('success')
-            setMethod(result.method)
-            setTimeout(() => {
-              onSuccess && onSuccess()
-              onClose()
-            }, 2000)
-          }
-        } else {
-          setStatus('error')
-          setError(result.error || 'Failed to send email')
-        }
-      } catch (err) {
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to.trim())
+
+  const doSend = async () => {
+    if (!validEmail) { setError('That email address doesn\'t look right.'); return }
+    setError('')
+    setStatus('sending')
+    try {
+      const result = await sendInvoiceEmail(
+        invoice, settings, invoice.lines, totals, null,
+        { to: to.trim(), subject, message }
+      )
+      if (result.success && !result.needsManualSend) {
+        setStatus('success')
+        setTimeout(() => { onSuccess && onSuccess(); onClose() }, 1800)
+      } else if (result.needsManualSend) {
+        setStatus('compose')
+        setError('Your own email isn\'t set up yet — use Gmail or your mail app below, or add your details in Settings → Email.')
+      } else {
         setStatus('error')
-        setError(err.message || 'An unexpected error occurred')
+        setError(result.error || 'Failed to send email')
       }
+    } catch (err) {
+      setStatus('error')
+      setError(err.message || 'An unexpected error occurred')
     }
+  }
 
-    attemptSend()
-  }, [])
-
-  // Copy email body to clipboard
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(emailContent.body)
+      await navigator.clipboard.writeText(text)
       alert('Email content copied to clipboard!')
     } catch (err) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea')
-      textArea.value = emailContent.body
-      document.body.appendChild(textArea)
-      textArea.select()
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta); ta.select()
       document.execCommand('copy')
-      document.body.removeChild(textArea)
+      document.body.removeChild(ta)
       alert('Email content copied to clipboard!')
     }
   }
 
-  // Open in default mail client
   const openMailClient = () => {
-    window.location.href = `mailto:${invoice.custEmail}?subject=${encodeURIComponent(emailContent.subject)}&body=${encodeURIComponent(emailContent.body)}`
+    onSuccess && onSuccess()
+    window.location.href = `mailto:${to.trim()}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
+  }
+  const openGmail = () => {
+    onSuccess && onSuccess()
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to.trim())}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, '_blank')
   }
 
-  // Open in Gmail
-  const openGmail = () => {
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(invoice.custEmail)}&su=${encodeURIComponent(emailContent.subject)}&body=${encodeURIComponent(emailContent.body)}`, '_blank')
+  const fieldLabel = {
+    fontSize: '10px', fontWeight: 700, color: 'var(--text3)',
+    textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px',
+  }
+  const fieldInput = {
+    width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)',
+    borderRadius: '6px', padding: '9px 11px', fontSize: '13px',
+    color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
   }
 
   return (
-    <div style={{ 
-      position: 'fixed', 
-      inset: 0, 
-      background: 'rgba(0,0,0,.75)', 
-      zIndex: 600, 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      padding: '16px'
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 600,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
     }} onClick={e => { if (e.target === e.currentTarget && status !== 'sending') onClose() }}>
-      <div style={{ 
-        background: 'var(--surface)', 
-        border: '1px solid var(--border)', 
-        borderRadius: '16px', 
-        padding: '28px', 
-        width: status === 'preview' ? '600px' : '380px', 
-        maxWidth: '95vw',
-        maxHeight: '90vh',
-        overflowY: 'auto'
+      <div style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px',
+        padding: '24px', width: status === 'compose' ? '680px' : '380px',
+        maxWidth: '95vw', maxHeight: '92vh', overflowY: 'auto',
       }}>
-        {(status === 'checking' || status === 'sending') && (
+
+        {status === 'compose' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 700 }}>
+                Send Invoice {invoice.id}
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '18px' }}>
+              Check it over before it goes — nothing is sent until you press Send.
+            </div>
+
+            {!emailSetUp && (
+              <div style={{
+                background: 'rgba(245,200,66,0.1)', border: '1px solid rgba(245,200,66,0.3)',
+                borderRadius: '8px', padding: '11px 13px', marginBottom: '16px',
+                fontSize: '12px', color: 'var(--accent)',
+              }}>
+                Your own email isn't set up yet, so this can't send automatically. Add your
+                details in <strong>Settings → Email</strong>, or use the Gmail / mail app
+                buttons below to send it from your own account.
+              </div>
+            )}
+
+            {/* From — fixed, shown so they can see it's their address going out */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={fieldLabel}>From</div>
+              <div style={{ ...fieldInput, color: 'var(--text2)', background: 'var(--surface3)' }}>
+                {fromLine}{fromAddr ? ` <${fromAddr}>` : ''}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <div style={fieldLabel}>To</div>
+                <input
+                  style={{ ...fieldInput, borderColor: to && !validEmail ? 'var(--red)' : 'var(--border)' }}
+                  value={to}
+                  onChange={e => setTo(e.target.value)}
+                  placeholder="customer@example.com"
+                />
+              </div>
+              <div>
+                <div style={fieldLabel}>Customer</div>
+                <div style={{ ...fieldInput, color: 'var(--text2)', background: 'var(--surface3)' }}>
+                  {invoice.custName || '—'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <div style={fieldLabel}>Subject</div>
+              <input style={fieldInput} value={subject} onChange={e => setSubject(e.target.value)} />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={fieldLabel}>Message to customer (optional)</div>
+              <textarea
+                style={{ ...fieldInput, minHeight: '76px', resize: 'vertical', lineHeight: 1.5 }}
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Hi Dave, here's the invoice for the four tyres fitted Tuesday. Any questions just give us a ring."
+              />
+              <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px' }}>
+                Appears at the top of the email, above the invoice.
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ ...fieldLabel, marginBottom: 0, flex: 1 }}>Preview — what the customer sees</div>
+              <Btn variant={tab === 'preview' ? 'primary' : 'secondary'} sm onClick={() => setTab('preview')}>Email</Btn>
+              <Btn variant={tab === 'text' ? 'primary' : 'secondary'} sm onClick={() => setTab('text')}>Plain text</Btn>
+            </div>
+
+            {tab === 'preview' ? (
+              <iframe
+                title="Email preview"
+                srcDoc={html}
+                sandbox=""
+                style={{
+                  width: '100%', height: '340px', border: '1px solid var(--border)',
+                  borderRadius: '8px', background: '#fff', display: 'block',
+                }}
+              />
+            ) : (
+              <div style={{
+                background: 'var(--surface2)', borderRadius: '8px', padding: '12px',
+                fontSize: '12px', fontFamily: 'DM Mono, monospace', whiteSpace: 'pre-wrap',
+                height: '340px', overflowY: 'auto', lineHeight: 1.5,
+                border: '1px solid var(--border)',
+              }}>
+                {text}
+              </div>
+            )}
+
+            {error && (
+              <div style={{
+                marginTop: '12px', background: 'rgba(255,95,95,0.08)',
+                border: '1px solid rgba(255,95,95,0.25)', borderRadius: '8px',
+                padding: '10px 13px', fontSize: '12px', color: 'var(--red)',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px', alignItems: 'center' }}>
+              <Btn variant="primary" onClick={doSend} disabled={!emailSetUp || !validEmail}>
+                📨 Send Email
+              </Btn>
+              <div style={{ flex: 1 }} />
+              <Btn variant="secondary" onClick={copyToClipboard}>📋 Copy</Btn>
+              <Btn variant="secondary" onClick={openGmail}>Gmail</Btn>
+              <Btn variant="secondary" onClick={openMailClient}>Mail app</Btn>
+              <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+            </div>
+          </>
+        )}
+
+        {status === 'sending' && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>✉️</div>
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 700, marginBottom: '8px' }}>
               Sending Invoice...
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
-              Sending to {invoice.custEmail}
-            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)' }}>Sending to {to}</div>
             <div style={{ marginTop: '20px' }}>
-              <div style={{ 
-                width: '40px', 
-                height: '40px', 
-                border: '3px solid var(--surface2)', 
-                borderTopColor: 'var(--accent)', 
-                borderRadius: '50%', 
-                margin: '0 auto',
-                animation: 'spin 1s linear infinite'
+              <div style={{
+                width: '40px', height: '40px', border: '3px solid var(--surface2)',
+                borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto',
+                animation: 'spin 1s linear infinite',
               }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
@@ -692,77 +813,12 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
               Email Sent!
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
-              Invoice {invoice.id} sent to {invoice.custEmail}
+              Invoice {invoice.id} sent to {to}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '8px' }}>
               Sent from your own email address
             </div>
           </div>
-        )}
-
-        {status === 'preview' && (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 700 }}>
-                ✉️ Email Preview
-              </div>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: '18px', cursor: 'pointer' }}>✕</button>
-            </div>
-
-            <div style={{ 
-              background: 'rgba(245,200,66,0.1)', 
-              border: '1px solid rgba(245,200,66,0.3)', 
-              borderRadius: '8px', 
-              padding: '12px', 
-              marginBottom: '16px',
-              fontSize: '12px',
-              color: 'var(--accent)'
-            }}>
-              💡 No email service configured. You can copy the email content or open in your mail client.
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>To</div>
-              <div style={{ background: 'var(--surface2)', borderRadius: '6px', padding: '10px 12px', fontSize: '13px' }}>
-                {invoice.custName} &lt;{invoice.custEmail}&gt;
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Subject</div>
-              <div style={{ background: 'var(--surface2)', borderRadius: '6px', padding: '10px 12px', fontSize: '13px' }}>
-                {emailContent.subject}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Message</div>
-              <div style={{ 
-                background: 'var(--surface2)', 
-                borderRadius: '6px', 
-                padding: '12px', 
-                fontSize: '12px',
-                fontFamily: 'DM Mono, monospace',
-                whiteSpace: 'pre-wrap',
-                maxHeight: '250px',
-                overflowY: 'auto',
-                lineHeight: 1.5
-              }}>
-                {emailContent.body}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Btn variant="primary" onClick={copyToClipboard}>📋 Copy to Clipboard</Btn>
-              <Btn variant="secondary" onClick={openMailClient}>📧 Open Mail App</Btn>
-              <Btn variant="secondary" onClick={openGmail}>Gmail</Btn>
-              <Btn variant="ghost" onClick={onClose}>Close</Btn>
-            </div>
-
-            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '12px', textAlign: 'center' }}>
-              💡 Tip: Configure SMTP in Settings → Email for automatic sending
-            </div>
-          </>
         )}
 
         {status === 'error' && (
@@ -771,10 +827,11 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 700, marginBottom: '8px', color: 'var(--red)' }}>
               Failed to Send
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '16px' }}>
-              {error}
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '16px' }}>{error}</div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <Btn variant="secondary" onClick={() => { setStatus('compose'); setError('') }}>← Back to edit</Btn>
+              <Btn variant="ghost" onClick={onClose}>Close</Btn>
             </div>
-            <Btn variant="secondary" onClick={onClose}>Close</Btn>
           </div>
         )}
       </div>
@@ -1029,9 +1086,15 @@ export default function Invoices() {
       alert('No customer email address. Please add an email to send the invoice.')
       return
     }
+    // Just open the compose/preview screen. The invoice is NOT marked sent and
+    // stock is NOT deducted here — the user can still cancel. Both happen in
+    // markInvoiceSent() once the email has actually gone.
     setSendingInv(inv)
-    // Update status to sent if it was draft — and deduct stock at that point
-    if (inv.status === 'draft') {
+  }
+
+  // Called after a genuine send (or after a manual Gmail/mail-app send).
+  const markInvoiceSent = (inv) => {
+    if (inv && inv.status === 'draft') {
       deductStockForLines(inv.lines)
       updateInvoice(inv.id, { status: 'sent' })
     }
@@ -1139,9 +1202,7 @@ export default function Invoices() {
           settings={settings}
           tier={tier}
           onClose={() => setSendingInv(null)}
-          onSuccess={() => {
-            // Optionally update invoice status
-          }}
+          onSuccess={() => markInvoiceSent(sendingInv)}
         />
       )}
 
