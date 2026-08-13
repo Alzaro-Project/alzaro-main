@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    version: '2026-08-13-4',
+    date: '13/08/2026',
+    title: 'Layout fix',
+    items: [
+      { type: 'fixed', text: 'The sidebar now stays pinned at full height while you scroll, instead of scrolling away with the page.' },
+    ],
+  },
+  {
     version: '2026-08-13-3',
     date: '13/08/2026',
     title: 'Dashboard tidy-up',
