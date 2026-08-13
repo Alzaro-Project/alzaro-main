@@ -415,10 +415,6 @@ function Shell() {
           )})}
         </div>
         <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
-        <button onClick={openWhatsNew} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', position:'relative'}}>
-          ✨ What's new
-          {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'9px', right:'11px', width:'8px', height:'8px', borderRadius:'50%', background:'var(--orange)' }} />}
-        </button>
         <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
           {theme==='dark' ? '☀ Light mode' : '🌙 Dark mode'}
         </button>
@@ -438,12 +434,16 @@ function Shell() {
         <div className="solo-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
           <div className="solo-header-actions" style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
-            {!['clients','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+            <button onClick={openWhatsNew} title="What's new" style={{...btnSec, padding:'8px 14px', display:'flex', alignItems:'center', gap:'7px', position:'relative', fontSize:'13px'}}>
+              ✨ What's new
+              {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'5px', right:'6px', width:'7px', height:'7px', borderRadius:'50%', background:'var(--orange)' }} />}
+            </button>
+            {!['dashboard','clients','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
               <option value="custom">Custom range…</option>
             </select>}
-            {!['clients','settings','documents'].includes(view) && yearFilter==='custom' && (
+            {!['dashboard','clients','settings','documents'].includes(view) && yearFilter==='custom' && (
               <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
                 <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
                 <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
