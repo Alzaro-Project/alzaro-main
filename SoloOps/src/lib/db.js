@@ -189,6 +189,20 @@ export async function upsertRules(rows) {
     .upsert(rows, { onConflict: 'user_id,pattern', ignoreDuplicates: true })
 }
 
+// ---------- items (reusable income/expense presets) ----------
+export async function loadItems() {
+  return sb.from('soloops_items').select('*').order('name')
+}
+export async function insertItem(row) {
+  return sb.from('soloops_items').insert(row)
+}
+export async function updateItem(id, patch) {
+  return sb.from('soloops_items').update(patch).eq('id', id)
+}
+export async function deleteItem(id) {
+  return sb.from('soloops_items').delete().eq('id', id)
+}
+
 // ---------- documents ----------
 export async function loadDocuments() {
   return sb.from('soloops_documents').select('*').order('uploaded_at', { ascending: false })
