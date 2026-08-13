@@ -47,7 +47,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
   }
 
   return (
-    <div style={{ ...card, marginBottom: '16px' }}>
+    <div style={{ ...card }}>
       <div style={{ fontWeight: 700, marginBottom: '4px' }}>{title}</div>
       <div style={{ fontSize: '12.5px', color: 'var(--text3)', marginBottom: '16px' }}>{blurb}</div>
       {err && <ErrBox m={err} />}
@@ -85,7 +85,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
 
       {/* List */}
       {rows.length === 0 ? <Empty msg={isIncome ? 'No income items yet — add the things you invoice for regularly.' : 'No expense items yet — add the costs you log regularly.'} />
-      : <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      : <div style={{ maxHeight: '240px', overflowY: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><Th cols={isIncome ? ['Description', 'Price', ''] : ['Merchant / name', 'Category', 'Amount', '']} /></thead>
         <tbody>{rows.map(it => (
           <tr key={it.id} style={{ opacity: editId === it.id ? .5 : 1 }}>
@@ -103,7 +103,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
               </div>
             </Td>
           </tr>))}</tbody>
-      </table>}
+      </table></div>}
     </div>
   )
 }
@@ -113,19 +113,19 @@ export default function Items({ uid, items, onChange, flash, clients = [], invoi
   const expense = (items || []).filter(i => i.kind === 'expense')
   return (
     <>
-      <ItemSection
-        kind="income" rows={income} uid={uid} onChange={onChange} flash={flash}
-        title="Income items"
-        blurb="Your regular products and services. They appear as a quick-pick in the Add income form, filling the line description and price for you."
-      />
-      <ItemSection
-        kind="expense" rows={expense} uid={uid} onChange={onChange} flash={flash}
-        title="Expense items"
-        blurb="Your regular costs, kept as a reference list."
-      />
-      <div style={{ marginTop: '24px' }}>
-        <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
+      <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start', marginBottom: '16px' }}>
+        <ItemSection
+          kind="income" rows={income} uid={uid} onChange={onChange} flash={flash}
+          title="Income items"
+          blurb="Quick-picks for the Add income form — description and price fill themselves."
+        />
+        <ItemSection
+          kind="expense" rows={expense} uid={uid} onChange={onChange} flash={flash}
+          title="Expense items"
+          blurb="Your regular costs, kept as a reference list."
+        />
       </div>
+      <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
     </>
   )
 }
