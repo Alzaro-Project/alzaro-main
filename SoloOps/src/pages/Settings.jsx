@@ -404,7 +404,7 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   // sent straight to checkout.
   const tiers = [
     { key:'basic',  name:'⚪ Basic',  price:'£5.99/mo', color:'#6b7280', features:['Dashboard', 'Income & invoicing', 'Client database'] },
-    { key:'bronze', name:'🥉 Bronze', price:'£12.99/mo', color:'#cd7f32', features:['Everything in Basic', 'Expenses', 'Recurring-expense detection', 'Receipts'] },
+    { key:'bronze', name:'🥉 Bronze', price:'£12.99/mo', color:'#cd7f32', features:['Everything in Basic', 'Expenses', 'Receipts'] },
     { key:'silver', name:'🥈 Silver', price:'£18.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Bank import', 'Mileage', 'Reports'] },
     { key:'gold',   name:'🥇 Gold',   price:'£28.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Document store', 'Tax tools', 'Accountant export pack'] },
   ]
