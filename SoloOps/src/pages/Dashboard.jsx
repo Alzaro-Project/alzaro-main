@@ -156,7 +156,7 @@ function DashSearch({ clients, invoices, expenses, setView }) {
     const s = q.trim().toLowerCase()
     if (s.length < 2) return []
     const out = []
-    clients.forEach(c => { if ((c.name || '').toLowerCase().includes(s)) out.push({ type: 'Client', label: c.name, view: 'clients' }) })
+    clients.forEach(c => { if ((c.name || '').toLowerCase().includes(s)) out.push({ type: 'Client', label: c.name, view: 'items' }) })
     invoices.forEach(i => {
       const hay = `${i.number || ''} ${i.client_name || ''}`.toLowerCase()
       if (hay.includes(s)) out.push({ type: 'Invoice', label: `${i.number || '—'} · ${i.client_name || ''}`, sub: gbp(i.total || 0), view: 'income' })
@@ -323,7 +323,7 @@ export default function Dashboard({
         </TiltPanel>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignContent: 'start' }}>
-          <DashCard label="Clients" value={clients.length} delta="Total on file" hint="View clients →" index={7} onClick={() => setView('clients')} />
+          <DashCard label="Clients" value={clients.length} delta="Total on file" hint="View clients →" index={7} onClick={() => setView('items')} />
           <DashCard label="Invoices" value={pInvoices.length} delta={periodLabel} hint="View income →" index={8} onClick={() => setView('income')} />
           {tierAllows('silver')
             ? <DashCard label="Mileage" value={`${mileage.reduce((s, m) => s + Number(m.miles || 0), 0).toFixed(0)} mi`} delta={`${mileage.length} journeys`} hint="View mileage →" color="var(--blue)" index={9} onClick={() => setView('mileage')} />

@@ -15,7 +15,6 @@ import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, T
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
-import Clients from './pages/Clients.jsx'
 import BankImport from './pages/BankImport.jsx'
 import Items from './pages/Items.jsx'
 import Receipts from './pages/Receipts.jsx'
@@ -30,7 +29,9 @@ const VALID_VIEWS = NAV.map(n => n[0])
 function Shell() {
   const navigate = useNavigate()
   const { view: routeView } = useParams()
-  const view = VALID_VIEWS.includes(routeView) ? routeView : 'dashboard'
+  // Clients now lives inside the Items page — keep old /clients links working.
+  const aliased = routeView === 'clients' ? 'items' : routeView
+  const view = VALID_VIEWS.includes(aliased) ? aliased : 'dashboard'
   // An unknown view (/soloops/<garbage>) still renders the dashboard; correct
   // the URL to match rather than leaving a stale/invalid path in the bar.
   useEffect(() => {
@@ -375,7 +376,7 @@ function Shell() {
           {search.trim().length >= 2 && (() => {
             const q = search.trim().toLowerCase()
             const hits = []
-            clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'clients' }) })
+            clients.forEach(c => { if ((c.name||'').toLowerCase().includes(q)) hits.push({ type:'Client', label:c.name, view:'items' }) })
             invoices.forEach(i => { if ((`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q)) hits.push({ type:'Invoice', label:`${i.number||'—'} · ${i.client_name||''}`, view:'income' }) })
             expenses.forEach(e => { if ((`${e.merchant||''} ${e.category||''}`).toLowerCase().includes(q)) hits.push({ type:'Expense', label:`${e.merchant} · ${gbp(e.amount)}`, view:'expenses' }) })
             // Never surface hits that lead to a tier-locked page (e.g. expense
@@ -444,12 +445,12 @@ function Shell() {
               ✨ What's new
               {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'5px', right:'6px', width:'7px', height:'7px', borderRadius:'50%', background:'var(--orange)' }} />}
             </button>
-            {!['dashboard','clients','items','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+            {!['dashboard','items','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
               <option value="custom">Custom range…</option>
             </select>}
-            {!['dashboard','clients','items','settings','documents'].includes(view) && yearFilter==='custom' && (
+            {!['dashboard','items','settings','documents'].includes(view) && yearFilter==='custom' && (
               <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
                 <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
                 <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
@@ -538,12 +539,8 @@ function Shell() {
             )
           })()}
 
-          {view==='clients' && (
-            <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={loadAll} flash={flash} />
-          )}
-
           {view==='items' && (
-            <Items uid={uid} items={items} onChange={loadAll} flash={flash} />
+            <Items uid={uid} items={items} clients={clients} invoices={invoices} expenses={expenses} onChange={loadAll} flash={flash} />
           )}
 
           {view==='expenses' && (
@@ -553,7 +550,7 @@ function Shell() {
                 <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
                 <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
-                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span onClick={()=>setViewReceipt(e)} title="View receipt" style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px', cursor:'pointer' }}>receipt</span>}</Td>
+                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span onClick={()=>setViewReceipt(e)} title="View receipt" style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px', cursor:'pointer' }}>receipt</span>}{e.notes && <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'2px' }}>{e.notes}</div>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
                     <Td right>
@@ -712,7 +709,7 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm items={items} onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
       {modal==='send' && sendInvoice && (
         <SendInvoice
           invoice={sendInvoice}

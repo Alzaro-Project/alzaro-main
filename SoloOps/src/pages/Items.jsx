@@ -1,6 +1,7 @@
 import React from 'react'
 import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, ErrBox, CATEGORIES } from '../components/UI.jsx'
 import { insertItem, updateItem, deleteItem } from '../lib/db.js'
+import Clients from './Clients.jsx'
 
 // One section (income or expense) with an add/edit row and a list.
 function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
@@ -107,7 +108,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
   )
 }
 
-export default function Items({ uid, items, onChange, flash }) {
+export default function Items({ uid, items, onChange, flash, clients = [], invoices = [], expenses = [] }) {
   const income = (items || []).filter(i => i.kind === 'income')
   const expense = (items || []).filter(i => i.kind === 'expense')
   return (
@@ -120,8 +121,11 @@ export default function Items({ uid, items, onChange, flash }) {
       <ItemSection
         kind="expense" rows={expense} uid={uid} onChange={onChange} flash={flash}
         title="Expense items"
-        blurb="Your regular costs. They appear as a quick-pick in the Add expense form, filling the merchant, category and amount for you."
+        blurb="Your regular costs, kept as a reference list."
       />
+      <div style={{ marginTop: '24px' }}>
+        <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
+      </div>
     </>
   )
 }
