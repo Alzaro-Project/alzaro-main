@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    version: '2026-08-13-2',
+    date: '13/08/2026',
+    title: 'View your receipts',
+    items: [
+      { type: 'added', text: 'You can now view attached receipt files — a new "Attached receipts" list in the Receipts tab, and clicking the green receipt tag on any expense opens it too.' },
+    ],
+  },
+  {
     version: '2026-08-13',
     date: '13/08/2026',
     title: 'Menu cleanup',
