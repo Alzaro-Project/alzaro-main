@@ -253,6 +253,7 @@ export default function Dashboard({
   const periodLabel = period === 'custom' && (rangeFrom || rangeTo)
     ? `${fmtShort(rangeFrom)} → ${fmtShort(rangeTo)}`
     : (PERIODS.find(p => p.key === period)?.label || '')
+  const trendSub = `Revenue vs expenses — ${period === 'custom' && (rangeFrom || rangeTo) ? periodLabel : periodLabel.toLowerCase()}`
 
   return (
     <>
@@ -301,8 +302,8 @@ export default function Dashboard({
 
       {/* Chart + breakdown */}
       <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: canExpense ? '1fr 1fr' : '1fr', gap: '16px', marginBottom: '18px' }}>
-        <TiltPanel title="Monthly trend" subtitle="Revenue vs expenses, last 6 months" accent="var(--orange)" index={4} onClick={() => setView('reports')}>
-          <MonthlyChart invoices={pInvoices} expenses={pExpenses} />
+        <TiltPanel title="Trend" subtitle={trendSub} accent="var(--orange)" index={4} onClick={() => setView('reports')}>
+          <MonthlyChart invoices={pInvoices} expenses={pExpenses} period={period} rangeFrom={rangeFrom} rangeTo={rangeTo} subtitle={trendSub} />
         </TiltPanel>
         {canExpense && (
           <TiltPanel title="Expense breakdown" subtitle="By category" accent="var(--red)" index={5} onClick={() => setView('expenses')}>
@@ -325,9 +326,7 @@ export default function Dashboard({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignContent: 'start' }}>
           <DashCard label="Clients" value={clients.length} delta="Total on file" hint="View clients →" index={7} onClick={() => setView('items')} />
           <DashCard label="Invoices" value={pInvoices.length} delta={periodLabel} hint="View income →" index={8} onClick={() => setView('income')} />
-          {tierAllows('silver')
-            ? <DashCard label="Mileage" value={`${mileage.reduce((s, m) => s + Number(m.miles || 0), 0).toFixed(0)} mi`} delta={`${mileage.length} journeys`} hint="View mileage →" color="var(--blue)" index={9} onClick={() => setView('mileage')} />
-            : <DashCard label="Mileage" value="—" delta="Silver feature" index={9} />}
+          <DashCard label="Receipts" value={pExpenses.filter(e => e.has_receipt).length} delta={`of ${pExpenses.length} expenses`} hint="View receipts →" color="var(--blue)" index={9} onClick={() => setView('receipts')} />
           <DashCard label="Taxable profit" value={gbp(taxable)} delta={`after £${Number(allowance || 0).toLocaleString()} allowance`} hint="View tax →" color="var(--amber)" index={10} onClick={() => setView('tax')} />
         </div>
       </div>
