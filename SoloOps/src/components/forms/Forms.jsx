@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
-import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
+import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule, uploadFile, insertDocument, updateExpenseReceipt } from '../../lib/db.js'
 
-export function ExpenseForm({onClose,onSaved,uid,expenses,edit,items}) {
+export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
+  const [notes,setNotes]=useState(edit?.notes||'')
+  const [receiptFile,setReceiptFile]=useState(null)
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
-  const presets = (items||[]).filter(i=>i.kind==='expense')
-  const useItem = (id) => {
-    const it = presets.find(x=>x.id===id); if(!it) return
-    setMerchant(it.name || '')
-    if (it.category) setCategory(it.category)
-    if (it.amount != null) setAmount(String(it.amount))
-    setErr('')
-  }
 
   const suggest = async (m) => {
     setMerchant(m)
@@ -23,23 +17,49 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit,items}) {
     const hit = (data||[]).find(r => m.toUpperCase().includes(r.pattern.toUpperCase()))
     if (hit) setCategory(hit.category)
   }
+
+  // Upload the chosen receipt, link it to the expense, and mark the expense.
+  // Best-effort: if this fails the expense itself is already saved, so we
+  // don't block the save — the receipt can be attached from the Receipts tab.
+  const attachReceipt = async (expenseId) => {
+    if (!receiptFile || !expenseId) return
+    try {
+      const safe = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const storagePath = `${uid}/${crypto.randomUUID()}-${safe}`
+      const { error: upErr } = await uploadFile(storagePath, receiptFile)
+      if (upErr) throw upErr
+      const { error: docErr } = await insertDocument({
+        user_id: uid, type: 'Receipt', name: receiptFile.name,
+        storage_path: storagePath, size_bytes: receiptFile.size, expense_id: expenseId
+      })
+      if (docErr) throw docErr
+      const { error: exErr } = await updateExpenseReceipt(expenseId, receiptFile.name)
+      if (exErr) throw exErr
+    } catch (e) { console.warn('Expense saved but the receipt could not be attached:', e?.message) }
+  }
+
   const save = async () => {
     if(!merchant||!amount) return setErr('Merchant and amount are required')
     if(Number(amount) < 0) return setErr('Amount cannot be negative')
     setBusy(true); setErr('')
+    // A description only makes sense for "Other" — clear it on other categories
+    // so switching away from Other doesn't leave a stale note behind.
+    const noteVal = category==='Other' ? (notes.trim() || null) : null
     if (edit) {
       // Edit is a plain update — no rule learning or client creation, which are
       // onboarding side-effects meant for brand-new expenses.
       const { error } = await updateExpense(edit.id, {
-        merchant:merchant.trim(), category, amount:Number(amount), spent_on:date
+        merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, notes:noteVal
       })
       if(error){ setErr(error.message); setBusy(false); return }
+      await attachReceipt(edit.id)
       onSaved(); return
     }
-    const { error } = await insertExpense({
-      user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual'
+    const { data: created, error } = await insertExpense({
+      user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual', notes:noteVal
     })
     if(error){ setErr(error.message); setBusy(false); return }
+    await attachReceipt(created?.id)
 
     await upsertRule({ user_id:uid, pattern:merchant.trim().split(' ')[0].toUpperCase(), category })
       .then(()=>{}).catch(()=>{})
@@ -49,14 +69,6 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit,items}) {
   }
   return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    {presets.length > 0 && (
-      <Field label="Saved item" hint="fills the fields below">
-        <select style={inp} value="" onChange={e=>useItem(e.target.value)}>
-          <option value="">— Pick from your items —</option>
-          {presets.map(p=><option key={p.id} value={p.id}>{p.name}{p.amount!=null?` · ${gbp(p.amount)}`:''}</option>)}
-        </select>
-      </Field>
-    )}
     <Field label="Supplier / merchant">
       <input style={inp} list="past-merchants" placeholder="e.g. Adobe UK" value={merchant} onChange={e=>suggest(e.target.value)} />
       <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
@@ -66,8 +78,21 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit,items}) {
         {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
       </select>
     </Field>
+    {category==='Other' && (
+      <Field label="What was it?" hint="saved with the expense">
+        <input style={inp} placeholder="Short description, e.g. parking fine, stationery…" value={notes} onChange={e=>setNotes(e.target.value)} />
+      </Field>
+    )}
     <Field label="Amount">
       <input style={inp} type="number" placeholder="£0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+    </Field>
+    <Field label="Receipt" hint="optional">
+      <label style={{...inp, display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', color: receiptFile?'var(--text)':'var(--text3)' }}>
+        <span aria-hidden="true">📎</span>
+        <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{receiptFile ? receiptFile.name : 'Attach a receipt…'}</span>
+        {receiptFile && <span onClick={(ev)=>{ev.preventDefault(); setReceiptFile(null)}} title="Remove" style={{ color:'var(--text3)', padding:'0 4px' }}>✕</span>}
+        <input type="file" accept="image/*,.pdf" onChange={e=>{const f=e.target.files?.[0]; if(f) setReceiptFile(f); e.target.value=''}} style={{ display:'none' }} />
+      </label>
     </Field>
     <Field label="Date" style={{ marginBottom:'4px' }}>
       <DateField value={date} onChange={setDate} />

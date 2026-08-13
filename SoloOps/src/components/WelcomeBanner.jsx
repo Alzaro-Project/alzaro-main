@@ -14,7 +14,7 @@ export default function WelcomeBanner({ invoices, expenses, clients, bizName, se
 
   const steps = [
     { id:'biz',     label:'Set up your business details', done: !!(bizName && bizName.trim()), action: () => setView('settings') },
-    { id:'client',  label:'Add your first client',        done: (clients  || []).length > 0,    action: () => setView('clients') },
+    { id:'client',  label:'Add your first client',        done: (clients  || []).length > 0,    action: () => setView('items') },
     // Expenses are a Bronze feature — only surface the onboarding step (which
     // opens the expense form) when the user's tier can actually reach it.
     ...(canExpense ? [{ id:'expense', label:'Log your first expense', done: (expenses || []).length > 0, action: () => setModal('expense') }] : []),

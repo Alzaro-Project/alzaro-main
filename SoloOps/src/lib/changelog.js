@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    version: '2026-08-13-6',
+    date: '13/08/2026',
+    title: 'Simpler expenses, tidier sidebar',
+    items: [
+      { type: 'added', text: 'Attach a receipt right in the Add expense form — pick the file with 📎 and it saves with the expense, no separate matching step.' },
+      { type: 'added', text: 'Choosing the "Other" category now asks what the expense was, and the description shows in your expenses list.' },
+      { type: 'improved', text: 'Clients now lives inside the Items page — one place for your saved items, customers and suppliers. Old links still work.' },
+      { type: 'removed', text: 'The "Saved item" dropdown at the top of Add expense.' },
+    ],
+  },
+  {
     version: '2026-08-13-5',
     date: '13/08/2026',
     title: 'Items',

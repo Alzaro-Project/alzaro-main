@@ -122,7 +122,9 @@ export async function deleteInvoiceLines(invoice_id) {
 
 // ---------- expenses ----------
 export async function insertExpense(row) {
-  return sb.from('soloops_expenses').insert(row)
+  // Returns the created row: the expense form needs the new id back to link
+  // an attached receipt document to it in the same save.
+  return sb.from('soloops_expenses').insert(row).select().single()
 }
 export async function insertExpenses(rows) {
   return sb.from('soloops_expenses').insert(rows)
