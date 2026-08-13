@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    version: '2026-08-13-5',
+    date: '13/08/2026',
+    title: 'Items',
+    items: [
+      { type: 'added', text: 'New Items tab — save the things you invoice for and the costs you log regularly, then pick them straight into the Add income and Add expense forms instead of retyping.' },
+      { type: 'fixed', text: 'Suppliers (auto-added from your expenses) no longer appear in the client dropdown when adding income — that list is customers only now.' },
+    ],
+  },
+  {
     version: '2026-08-13-4',
     date: '13/08/2026',
     title: 'Layout fix',
