@@ -196,6 +196,13 @@ export async function loadDocuments() {
 export async function insertDocument(row) {
   return sb.from('soloops_documents').insert(row)
 }
+// The receipt file attached to one expense (newest wins if it was re-attached).
+export async function loadReceiptDoc(expenseId) {
+  return sb.from('soloops_documents').select('*')
+    .eq('expense_id', expenseId)
+    .order('uploaded_at', { ascending: false })
+    .limit(1)
+}
 export async function deleteDocument(id) {
   return sb.from('soloops_documents').delete().eq('id', id)
 }
