@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    version: '2026-08-13-3',
+    date: '13/08/2026',
+    title: 'Dashboard tidy-up',
+    items: [
+      { type: 'added', text: 'Custom date range on the dashboard timeline — pick any From/To dates alongside Today, This Month and the rest.' },
+      { type: 'improved', text: "What's new moved to the top right of the page, and the redundant year dropdown is gone from the dashboard (the timeline is the filter there)." },
+    ],
+  },
+  {
     version: '2026-08-13-2',
     date: '13/08/2026',
     title: 'View your receipts',
