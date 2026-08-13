@@ -2,11 +2,19 @@ import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule } from '../../lib/db.js'
 
-export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
+export function ExpenseForm({onClose,onSaved,uid,expenses,edit,items}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
+  const presets = (items||[]).filter(i=>i.kind==='expense')
+  const useItem = (id) => {
+    const it = presets.find(x=>x.id===id); if(!it) return
+    setMerchant(it.name || '')
+    if (it.category) setCategory(it.category)
+    if (it.amount != null) setAmount(String(it.amount))
+    setErr('')
+  }
 
   const suggest = async (m) => {
     setMerchant(m)
@@ -41,6 +49,14 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
   }
   return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
+    {presets.length > 0 && (
+      <Field label="Saved item" hint="fills the fields below">
+        <select style={inp} value="" onChange={e=>useItem(e.target.value)}>
+          <option value="">— Pick from your items —</option>
+          {presets.map(p=><option key={p.id} value={p.id}>{p.name}{p.amount!=null?` · ${gbp(p.amount)}`:''}</option>)}
+        </select>
+      </Field>
+    )}
     <Field label="Supplier / merchant">
       <input style={inp} list="past-merchants" placeholder="e.g. Adobe UK" value={merchant} onChange={e=>suggest(e.target.value)} />
       <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
@@ -81,7 +97,7 @@ function nextFreeNumber(invoices){
   return candidate
 }
 
-export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}) {
+export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,items}) {
   const [number,setNumber]=useState(()=> edit ? (edit.number||'') : nextInvoiceNumber(invoices))
   const [status,setStatus]=useState(edit?.status||'sent')
   const [date,setDate]=useState(edit?.issue_date || new Date().toISOString().slice(0,10))
@@ -101,7 +117,10 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
   const [client,setClient]=useState(edit?.client_name||'')
 
   // client picker
-  const savedClients = clients||[]
+  // Only customers (and 'both') belong in the income picker — suppliers are
+  // auto-created from expenses and belong on the expense side. Legacy rows
+  // with no kind are treated as customers.
+  const savedClients = (clients||[]).filter(c => (c.kind||'customer') !== 'supplier')
   const initialPick = edit?.client_name
     ? (savedClients.find(c=>(c.name||'').toLowerCase()===(edit.client_name||'').toLowerCase())?.id || '__new__')
     : ''
@@ -132,6 +151,20 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
   const setLine = (i, key, val) => setLines(ls => ls.map((l,idx)=> idx===i ? {...l, [key]:val} : l))
   const addLine = () => setLines(ls => [...ls, blankLine()])
   const removeLine = (i) => setLines(ls => ls.length>1 ? ls.filter((_,idx)=>idx!==i) : ls)
+
+  // Income items catalogue → append a pre-filled line (or fill the last line
+  // if it's still completely blank, so the default empty row gets used first).
+  const catalogue = (items||[]).filter(i=>i.kind==='income')
+  const addFromItem = (id) => {
+    const it = catalogue.find(x=>x.id===id); if(!it) return
+    const nl = { description: it.name || '', qty:'1', unit_price: it.unit_price!=null ? String(it.unit_price) : '' }
+    setLines(ls => {
+      const last = ls[ls.length-1]
+      const lastBlank = last && !last.description.trim() && !String(last.unit_price).trim()
+      return lastBlank ? [...ls.slice(0,-1), nl] : [...ls, nl]
+    })
+    setErr('')
+  }
 
   const subtotal = lines.reduce((s,l)=> s + (Number(l.qty)||0)*(Number(l.unit_price)||0), 0)
   const vat = vatRegistered ? (isFlat ? subtotal*flatRate/100 : subtotal*(Number(vatRate)||0)/100) : 0
@@ -249,6 +282,12 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings}
       </div>
     ))}
     <button onClick={addLine} style={{ background:'transparent', border:'1px dashed var(--border-light)', borderRadius:'8px', color:'var(--text2)', padding:'9px', width:'100%', cursor:'pointer', fontSize:'13px', marginTop:'2px' }}>+ Add line</button>
+    {catalogue.length > 0 && (
+      <select style={{...inp, marginTop:'8px'}} value="" onChange={e=>addFromItem(e.target.value)}>
+        <option value="">＋ Add a line from your items…</option>
+        {catalogue.map(it=><option key={it.id} value={it.id}>{it.name}{it.unit_price!=null?` · ${gbp(it.unit_price)}`:''}</option>)}
+      </select>
+    )}
 
     {/* VAT (only if registered) */}
     {vatRegistered && !isFlat && (
