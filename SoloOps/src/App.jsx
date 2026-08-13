@@ -8,13 +8,14 @@ import {
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
+import WhatsNew from './components/WhatsNew.jsx'
+import { LATEST_VERSION } from './lib/changelog.js'
 import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
 import Clients from './pages/Clients.jsx'
 import BankImport from './pages/BankImport.jsx'
-import Recurring from './pages/Recurring.jsx'
 import Receipts from './pages/Receipts.jsx'
 import Reports from './pages/Reports.jsx'
 import Documents from './pages/Documents.jsx'
@@ -65,6 +66,17 @@ function Shell() {
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
   })
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
+  // The sidebar button shows a dot until the latest changelog entry is seen.
+  const [changelogSeen, setChangelogSeen] = useState(() => {
+    try { return localStorage.getItem('soloops-changelog-seen') } catch (e) { return LATEST_VERSION }
+  })
+  const hasNews = changelogSeen !== LATEST_VERSION
+  const openWhatsNew = () => {
+    setShowWhatsNew(true)
+    setChangelogSeen(LATEST_VERSION)
+    try { localStorage.setItem('soloops-changelog-seen', LATEST_VERSION) } catch (e) { /* storage unavailable */ }
+  }
   const [mobileNav, setMobileNav] = useState(false)
 
   // Close the mobile nav drawer whenever the view changes or on Escape.
@@ -401,6 +413,10 @@ function Shell() {
           )})}
         </div>
         <div style={{ fontSize:'12px', color:'var(--text3)', padding:'12px 12px 8px', wordBreak:'break-all', flexShrink:0 }}>{session.user.email}</div>
+        <button onClick={openWhatsNew} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', position:'relative'}}>
+          ✨ What's new
+          {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'9px', right:'11px', width:'8px', height:'8px', borderRadius:'50%', background:'var(--orange)' }} />}
+        </button>
         <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} style={{...btnSec, width:'100%', marginBottom:'8px', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
           {theme==='dark' ? '☀ Light mode' : '🌙 Dark mode'}
         </button>
@@ -541,10 +557,6 @@ function Shell() {
 
           {view==='banking' && (
             <BankImport uid={uid} existingExpenses={expenses} onImported={()=>{loadAll();flash('Transactions imported')}} />
-          )}
-
-          {view==='recurring' && (
-            <Recurring expenses={fExpenses} />
           )}
 
           {view==='receipts' && (
@@ -713,6 +725,8 @@ function Shell() {
 
       {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
+
+      {showWhatsNew && <WhatsNew onClose={()=>setShowWhatsNew(false)} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', maxWidth:'calc(100vw - 48px)', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
