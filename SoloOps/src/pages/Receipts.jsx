@@ -1,6 +1,7 @@
 import React from 'react'
-import { card, inp, btnPri, gbp, fmtDate, KPI, Th, Td, Empty, ErrBox, DateField } from '../components/UI.jsx'
+import { card, inp, btnPri, btnSec, gbp, fmtDate, KPI, Th, Td, Empty, ErrBox, DateField } from '../components/UI.jsx'
 import { uploadFile, insertDocument, updateExpenseReceipt } from '../lib/db.js'
+import ReceiptViewer from '../components/ReceiptViewer.jsx'
 
 export default function Receipts({ uid, expenses, onMatched }) {
   const [fileObj, setFileObj] = React.useState(null)
@@ -10,6 +11,7 @@ export default function Receipts({ uid, expenses, onMatched }) {
   const [suggestions, setSuggestions] = React.useState(null)
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  const [viewing, setViewing] = React.useState(null)
 
   const withReceipt = expenses.filter(e => e.has_receipt)
   const withoutReceipt = expenses.filter(e => !e.has_receipt)
@@ -126,6 +128,23 @@ export default function Receipts({ uid, expenses, onMatched }) {
       </div>
 
       <div style={{...card, marginTop:'16px'}}>
+        <div style={{fontWeight:700, marginBottom:'4px'}}>Attached receipts</div>
+        <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Every expense with a receipt on it — click View to see the file</div>
+        {withReceipt.length === 0 ? <Empty msg="No receipts attached yet. Use “Match a receipt” above to attach your first one." />
+        : <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead><Th cols={['Date','Merchant','Category','Amount','']} /></thead>
+          <tbody>{withReceipt.map(e => (
+            <tr key={e.id}>
+              <Td muted mono>{fmtDate(e.spent_on)}</Td>
+              <Td>{e.merchant}{e.receipt_name && <span style={{ fontSize:'11px', color:'var(--text3)', marginLeft:'8px' }}>{e.receipt_name}</span>}</Td>
+              <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
+              <Td mono right>{gbp(e.amount)}</Td>
+              <Td right><button style={{...btnSec, padding:'6px 14px'}} onClick={()=>setViewing(e)}>View</button></Td>
+            </tr>))}</tbody>
+        </table>}
+      </div>
+
+      <div style={{...card, marginTop:'16px'}}>
         <div style={{fontWeight:700, marginBottom:'4px'}}>Expenses missing a receipt</div>
         <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Good to attach these for your records / HMRC</div>
         {withoutReceipt.length === 0 ? <Empty msg="Every expense has a receipt attached. Nice." />
@@ -139,6 +158,8 @@ export default function Receipts({ uid, expenses, onMatched }) {
             </tr>))}</tbody>
         </table>}
       </div>
+
+      {viewing && <ReceiptViewer expense={viewing} onClose={()=>setViewing(null)} />}
     </>
   )
 }
