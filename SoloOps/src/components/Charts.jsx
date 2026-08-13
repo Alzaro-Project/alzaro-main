@@ -1,43 +1,94 @@
 import React from 'react'
 import { card, gbp, CAT_COLORS, Empty } from './UI.jsx'
 
-export function MonthlyChart({ invoices, expenses }) {
-  const ym = d => (d||'').slice(0,7)
-  // Build the YYYY-MM key from LOCAL year/month. Using toISOString() here would
-  // convert local midnight-on-the-1st to UTC, rolling the key back a month in
-  // any UTC+ offset (e.g. every month during British Summer Time), so the bars
-  // would show the previous month's data under the current month's label.
-  const mkey = (y,m) => `${y}-${String(m+1).padStart(2,'0')}`
+export function MonthlyChart({ invoices, expenses, period = '6months', rangeFrom = '', rangeTo = '', subtitle }) {
+  const pad = n => String(n).padStart(2, '0')
+  // Local-date keys throughout — toISOString() would shift keys across the
+  // UTC boundary (the BST bug fixed here before). Date strings in the data are
+  // already local YYYY-MM-DD, so slicing them is safe.
+  const dk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const mk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+  const parse = s2 => { const [y, m, d] = (s2 || '').slice(0, 10).split('-').map(Number); return (y && m && d) ? new Date(y, m - 1, d) : null }
   const now = new Date()
-  const months = []
-  for (let i=5; i>=0; i--) {
-    const dt = new Date(now.getFullYear(), now.getMonth()-i, 1)
-    months.push({ key: mkey(dt.getFullYear(), dt.getMonth()), label: dt.toLocaleDateString('en-GB',{month:'short'}) })
+
+  const allDates = () => [...invoices.map(i => i.issue_date), ...expenses.map(e => e.spent_on)].map(parse).filter(Boolean)
+
+  // Bucket granularity + window follow the dashboard's selected period.
+  let mode = 'month', start = new Date(now.getFullYear(), now.getMonth() - 5, 1), end = new Date(now)
+  if (period === 'today') { mode = 'day'; start = new Date(now) }
+  else if (period === 'week') { mode = 'day'; start = new Date(now); start.setDate(now.getDate() - 6) }
+  else if (period === 'month') { mode = 'day'; start = new Date(now.getFullYear(), now.getMonth(), 1) }
+  else if (period === 'quarter') { mode = 'month'; start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1) }
+  else if (period === 'year') { mode = 'month'; start = new Date(now.getFullYear(), 0, 1) }
+  else if (period === 'all') {
+    const ds = allDates()
+    start = ds.length ? new Date(Math.min(...ds)) : start
+    const span = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    mode = span > 24 ? 'year' : 'month'
   }
+  else if (period === 'custom') {
+    const ds = allDates()
+    start = parse(rangeFrom) || (ds.length ? new Date(Math.min(...ds)) : new Date(now.getFullYear(), now.getMonth(), 1))
+    end = parse(rangeTo) || new Date(now)
+    if (end < start) { const t = start; start = end; end = t }
+    const days = (end - start) / 86400000
+    mode = days <= 31 ? 'day' : days <= 740 ? 'month' : 'year'
+  }
+
+  const buckets = []
+  if (mode === 'day') {
+    const c = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    while (c <= end && buckets.length < 62) {
+      const label = period === 'today' ? 'Today'
+        : period === 'week' ? c.toLocaleDateString('en-GB', { weekday: 'short' })
+        : String(c.getDate())
+      buckets.push({ key: dk(c), label })
+      c.setDate(c.getDate() + 1)
+    }
+  } else if (mode === 'month') {
+    const c = new Date(start.getFullYear(), start.getMonth(), 1)
+    const stop = new Date(end.getFullYear(), end.getMonth(), 1)
+    while (c <= stop && buckets.length < 36) {
+      const yearMark = c.getMonth() === 0 || buckets.length === 0
+      buckets.push({ key: mk(c), label: c.toLocaleDateString('en-GB', { month: 'short' }) + (yearMark && period !== 'quarter' && period !== 'year' ? ` ’${String(c.getFullYear()).slice(2)}` : '') })
+      c.setMonth(c.getMonth() + 1)
+    }
+  } else {
+    for (let y = start.getFullYear(); y <= end.getFullYear() && buckets.length < 20; y++) {
+      buckets.push({ key: String(y), label: String(y) })
+    }
+  }
+
+  const keyOf = s2 => mode === 'day' ? (s2 || '').slice(0, 10) : mode === 'month' ? (s2 || '').slice(0, 7) : (s2 || '').slice(0, 4)
   const rev = {}, exp = {}
-  invoices.filter(i=>i.status==='paid').forEach(i => { const k=ym(i.issue_date); rev[k]=(rev[k]||0)+Number(i.total||0) })
-  expenses.forEach(e => { const k=ym(e.spent_on); exp[k]=(exp[k]||0)+Number(e.amount||0) })
-  const max = Math.max(1, ...months.map(m => Math.max(rev[m.key]||0, exp[m.key]||0)))
-  const hasData = months.some(m => (rev[m.key]||0) || (exp[m.key]||0))
+  invoices.filter(i => i.status === 'paid').forEach(i => { const k = keyOf(i.issue_date); rev[k] = (rev[k] || 0) + Number(i.total || 0) })
+  expenses.forEach(e => { const k = keyOf(e.spent_on); exp[k] = (exp[k] || 0) + Number(e.amount || 0) })
+  const max = Math.max(1, ...buckets.map(b => Math.max(rev[b.key] || 0, exp[b.key] || 0)))
+  const hasData = buckets.some(b => (rev[b.key] || 0) || (exp[b.key] || 0))
+
+  const dense = buckets.length > 14
+  const labelEvery = buckets.length > 16 ? Math.ceil(buckets.length / 12) : 1
+  const barW = dense ? '7px' : '14px'
+
   return (
     <div data-card style={{...card, marginBottom:'16px'}}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-        <div style={{fontWeight:700}}>Monthly trend</div>
+        <div style={{fontWeight:700}}>Trend</div>
         <div style={{ display:'flex', gap:'14px', fontSize:'12px', color:'var(--text3)' }}>
           <span style={{display:'flex',alignItems:'center',gap:'6px'}}><span style={{width:'10px',height:'10px',borderRadius:'2px',background:'var(--green)'}}/>Revenue</span>
           <span style={{display:'flex',alignItems:'center',gap:'6px'}}><span style={{width:'10px',height:'10px',borderRadius:'2px',background:'var(--orange)'}}/>Expenses</span>
         </div>
       </div>
-      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Revenue vs expenses, last 6 months</div>
-      {!hasData ? <Empty msg="No data yet — add income and expenses to see your trend." />
-      : <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-around', height:'170px', gap:'12px' }}>
-        {months.map((m,idx) => (
-          <div key={m.key} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', height:'100%' }}>
-            <div style={{ flex:1, display:'flex', alignItems:'flex-end', gap:'4px', width:'100%', justifyContent:'center' }}>
-              <div className="bar-grow" title={'Revenue '+gbp(rev[m.key]||0)} style={{ width:'14px', height:`${Math.round(((rev[m.key]||0)/max)*100)}%`, minHeight:(rev[m.key]?'4px':'0'), background:'var(--green)', borderRadius:'4px 4px 0 0', animationDelay:`${idx*70}ms` }} />
-              <div className="bar-grow" title={'Expenses '+gbp(exp[m.key]||0)} style={{ width:'14px', height:`${Math.round(((exp[m.key]||0)/max)*100)}%`, minHeight:(exp[m.key]?'4px':'0'), background:'var(--orange)', borderRadius:'4px 4px 0 0', animationDelay:`${idx*70+35}ms` }} />
+      <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>{subtitle || 'Revenue vs expenses'}</div>
+      {!hasData ? <Empty msg="Nothing in this period yet — add income and expenses, or pick a wider range." />
+      : <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-around', height:'170px', gap: dense ? '4px' : '12px' }}>
+        {buckets.map((b, idx) => (
+          <div key={b.key} style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', height:'100%' }}>
+            <div style={{ flex:1, display:'flex', alignItems:'flex-end', gap: dense ? '2px' : '4px', width:'100%', justifyContent:'center' }}>
+              <div className="bar-grow" title={`${b.label} — Revenue ${gbp(rev[b.key]||0)}`} style={{ width:barW, height:`${Math.round(((rev[b.key]||0)/max)*100)}%`, minHeight:(rev[b.key]?'4px':'0'), background:'var(--green)', borderRadius:'4px 4px 0 0', animationDelay:`${Math.min(idx*40, 800)}ms` }} />
+              <div className="bar-grow" title={`${b.label} — Expenses ${gbp(exp[b.key]||0)}`} style={{ width:barW, height:`${Math.round(((exp[b.key]||0)/max)*100)}%`, minHeight:(exp[b.key]?'4px':'0'), background:'var(--orange)', borderRadius:'4px 4px 0 0', animationDelay:`${Math.min(idx*40+20, 820)}ms` }} />
             </div>
-            <div style={{ fontSize:'12px', color:'var(--text3)' }}>{m.label}</div>
+            <div style={{ fontSize: dense ? '10px' : '12px', color:'var(--text3)', whiteSpace:'nowrap' }}>{idx % labelEvery === 0 ? b.label : ''}</div>
           </div>
         ))}
       </div>}
