@@ -9,6 +9,7 @@ import {
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
 import WhatsNew from './components/WhatsNew.jsx'
+import ReceiptViewer from './components/ReceiptViewer.jsx'
 import { LATEST_VERSION } from './lib/changelog.js'
 import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
@@ -67,6 +68,7 @@ function Shell() {
     try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
   })
   const [showWhatsNew, setShowWhatsNew] = useState(false)
+  const [viewReceipt, setViewReceipt] = useState(null)
   // The sidebar button shows a dot until the latest changelog entry is seen.
   const [changelogSeen, setChangelogSeen] = useState(() => {
     try { return localStorage.getItem('soloops-changelog-seen') } catch (e) { return LATEST_VERSION }
@@ -541,7 +543,7 @@ function Shell() {
                 <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
                 <tbody>{fExpenses.map(e => (
                   <tr key={e.id}>
-                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px' }}>receipt</span>}</Td>
+                    <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span onClick={()=>setViewReceipt(e)} title="View receipt" style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px', cursor:'pointer' }}>receipt</span>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
                     <Td right>
@@ -727,6 +729,8 @@ function Shell() {
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
       {showWhatsNew && <WhatsNew onClose={()=>setShowWhatsNew(false)} />}
+
+      {viewReceipt && <ReceiptViewer expense={viewReceipt} onClose={()=>setViewReceipt(null)} />}
 
       {toast && <div style={{ position:'fixed', bottom:'24px', right:'24px', maxWidth:'calc(100vw - 48px)', background:'var(--surface2)', border:'1px solid var(--border-light)', borderLeft:'3px solid var(--orange)', borderRadius:'12px', padding:'14px 18px', fontSize:'13.5px', boxShadow:'0 14px 40px rgba(0,0,0,.5)', zIndex:200 }}>✓ {toast}</div>}
     </div>
