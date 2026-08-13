@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
-  loadInvoices, loadExpenses, loadMileage, loadClients, deleteInvoice, updateInvoice,
+  loadInvoices, loadExpenses, loadMileage, loadClients, loadItems, deleteInvoice, updateInvoice,
   deleteExpense, deleteMileage,
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
@@ -17,6 +17,7 @@ import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.
 import Dashboard from './pages/Dashboard.jsx'
 import Clients from './pages/Clients.jsx'
 import BankImport from './pages/BankImport.jsx'
+import Items from './pages/Items.jsx'
 import Receipts from './pages/Receipts.jsx'
 import Reports from './pages/Reports.jsx'
 import Documents from './pages/Documents.jsx'
@@ -43,6 +44,7 @@ function Shell() {
   const [rangeTo, setRangeTo] = useState('')
   const [invoices, setInvoices] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [items, setItems] = useState([])
   const [mileage, setMileage] = useState([])
   const [clients, setClients] = useState([])
   const [bizName, setBizName] = useState('')
@@ -154,9 +156,12 @@ function Shell() {
       }
       setMember(mem || null)
     }
-    const [invR, expR, milR, cliR] = await Promise.all([
-      loadInvoices(), loadExpenses(), loadMileage(), loadClients(),
+    const [invR, expR, milR, cliR, itmR] = await Promise.all([
+      loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(),
     ])
+    // Items are deliberately NOT part of the hard-fail check: if the
+    // soloops_items migration hasn't run yet, the rest of the app must still
+    // load — the Items page and quick-picks just come up empty.
     if (invR.error || expR.error || milR.error || cliR.error) {
       // A failed load must not render as an empty account — surface a retry.
       setLoadError(true); setLoading(false)
@@ -166,6 +171,7 @@ function Shell() {
     setExpenses(expR.data || [])
     setMileage(milR.data || [])
     setClients(cliR.data || [])
+    setItems(itmR.error ? [] : (itmR.data || []))
     setLoading(false)
   }
   // Reload only when the logged-in USER changes (real login/logout),
@@ -438,12 +444,12 @@ function Shell() {
               ✨ What's new
               {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'5px', right:'6px', width:'7px', height:'7px', borderRadius:'50%', background:'var(--orange)' }} />}
             </button>
-            {!['dashboard','clients','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
+            {!['dashboard','clients','items','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
               <option value="all">All years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
               <option value="custom">Custom range…</option>
             </select>}
-            {!['dashboard','clients','settings','documents'].includes(view) && yearFilter==='custom' && (
+            {!['dashboard','clients','items','settings','documents'].includes(view) && yearFilter==='custom' && (
               <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
                 <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
                 <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
@@ -534,6 +540,10 @@ function Shell() {
 
           {view==='clients' && (
             <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={loadAll} flash={flash} />
+          )}
+
+          {view==='items' && (
+            <Items uid={uid} items={items} onChange={loadAll} flash={flash} />
           )}
 
           {view==='expenses' && (
@@ -702,7 +712,7 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
+      {modal==='expense' && <ExpenseForm items={items} onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
       {modal==='send' && sendInvoice && (
         <SendInvoice
           invoice={sendInvoice}
@@ -725,7 +735,7 @@ function Shell() {
         />
       )}
 
-      {modal==='invoice' && <InvoiceForm onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
+      {modal==='invoice' && <InvoiceForm items={items} onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
       {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
 
       {showWhatsNew && <WhatsNew onClose={()=>setShowWhatsNew(false)} />}
