@@ -1,11 +1,11 @@
 import React, { useState, useRef, useMemo } from 'react'
-import { gbp, Empty } from '../components/UI.jsx'
+import { gbp, Empty, DateField } from '../components/UI.jsx'
 import { MonthlyChart, Donut } from '../components/Charts.jsx'
 import WelcomeBanner from '../components/WelcomeBanner.jsx'
 
 // ---------------------------------------------------------------------------
-// Period filter — scoped to this dashboard only. The app-wide year filter in
-// the header is untouched; this narrows further within whatever it selected.
+// Period filter — scoped to this dashboard only (the app-wide year filter in
+// the header is hidden on the dashboard; these tabs are the only filter here).
 // ---------------------------------------------------------------------------
 export const PERIODS = [
   { key: 'today',   label: 'Today' },
@@ -15,6 +15,7 @@ export const PERIODS = [
   { key: '6months', label: '6 Months' },
   { key: 'year',    label: 'This Year' },
   { key: 'all',     label: 'All Time' },
+  { key: 'custom',  label: 'Custom' },
 ]
 
 // Parse a yyyy-mm-dd date string as a LOCAL date (not UTC) so BST/GMT offsets
@@ -26,10 +27,17 @@ function localDate(s) {
   return new Date(y, m - 1, d)
 }
 
-export function inPeriod(dateStr, period) {
+export function inPeriod(dateStr, period, from, to) {
   if (period === 'all') return true
   const d = localDate(dateStr)
   if (!d) return false
+  if (period === 'custom') {
+    // Unset bounds are open-ended: no dates picked yet shows everything.
+    const f = localDate(from), t = localDate(to)
+    if (f && d < f) return false
+    if (t && d > t) return false
+    return true
+  }
   const now = new Date()
   if (period === 'today')   return d.toDateString() === now.toDateString()
   if (period === 'week')    { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w }
@@ -219,11 +227,13 @@ export default function Dashboard({
   taxRate, nicRate, allowance,
 }) {
   const [period, setPeriod] = useState('month')
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo, setRangeTo] = useState('')
   const canExpense = tierAllows('bronze')
 
   // Narrow to the selected period (dashboard-scoped only).
-  const pInvoices = useMemo(() => invoices.filter(i => inPeriod(i.issue_date, period)), [invoices, period])
-  const pExpenses = useMemo(() => expenses.filter(e => inPeriod(e.spent_on, period)), [expenses, period])
+  const pInvoices = useMemo(() => invoices.filter(i => inPeriod(i.issue_date, period, rangeFrom, rangeTo)), [invoices, period, rangeFrom, rangeTo])
+  const pExpenses = useMemo(() => expenses.filter(e => inPeriod(e.spent_on, period, rangeFrom, rangeTo)), [expenses, period, rangeFrom, rangeTo])
 
   const revenue = pInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.total || 0), 0)
   const totalExp = pExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
@@ -239,7 +249,10 @@ export default function Dashboard({
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1])
 
   const paidCount = pInvoices.filter(i => i.status === 'paid').length
-  const periodLabel = PERIODS.find(p => p.key === period)?.label || ''
+  const fmtShort = (s) => { const d = localDate(s); return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '…' }
+  const periodLabel = period === 'custom' && (rangeFrom || rangeTo)
+    ? `${fmtShort(rangeFrom)} → ${fmtShort(rangeTo)}`
+    : (PERIODS.find(p => p.key === period)?.label || '')
 
   return (
     <>
@@ -263,6 +276,20 @@ export default function Dashboard({
             }}>{p.label}</button>
         ))}
       </div>
+
+      {period === 'custom' && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '18px', marginTop: '-8px' }}>
+          <div style={{ maxWidth: '170px' }}><DateField value={rangeFrom} onChange={setRangeFrom} /></div>
+          <span style={{ color: 'var(--text3)', fontSize: '13px' }}>→</span>
+          <div style={{ maxWidth: '170px' }}><DateField value={rangeTo} onChange={setRangeTo} /></div>
+          {(rangeFrom || rangeTo) && (
+            <button onClick={() => { setRangeFrom(''); setRangeTo('') }}
+              style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text3)', borderRadius: '8px', padding: '7px 12px', cursor: 'pointer', fontSize: '12.5px' }}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {/* KPI row */}
       <div className="solo-kpi-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${canExpense ? 4 : 3},1fr)`, gap: '12px', marginBottom: '18px' }}>
