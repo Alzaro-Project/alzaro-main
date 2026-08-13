@@ -3,23 +3,19 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, loadItems, deleteInvoice, updateInvoice,
-  deleteExpense, deleteMileage,
+  deleteExpense,
   updateUser, loadSettings, getMember, joinProduct,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
-import WhatsNew from './components/WhatsNew.jsx'
 import ReceiptViewer from './components/ReceiptViewer.jsx'
-import { LATEST_VERSION } from './lib/changelog.js'
 import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
-import { ExpenseForm, InvoiceForm, MileageForm } from './components/forms/Forms.jsx'
+import { ExpenseForm, InvoiceForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
-import BankImport from './pages/BankImport.jsx'
 import Items from './pages/Items.jsx'
 import Receipts from './pages/Receipts.jsx'
 import Reports from './pages/Reports.jsx'
-import Documents from './pages/Documents.jsx'
 import Settings from './pages/Settings.jsx'
 import Login from './pages/Login.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
@@ -30,7 +26,7 @@ function Shell() {
   const navigate = useNavigate()
   const { view: routeView } = useParams()
   // Clients now lives inside the Items page — keep old /clients links working.
-  const aliased = routeView === 'clients' ? 'items' : routeView
+  const aliased = routeView === 'clients' ? 'items' : routeView === 'tax' ? 'reports' : routeView
   const view = VALID_VIEWS.includes(aliased) ? aliased : 'dashboard'
   // An unknown view (/soloops/<garbage>) still renders the dashboard; correct
   // the URL to match rather than leaving a stale/invalid path in the bar.
@@ -63,25 +59,13 @@ function Shell() {
   const [editInvoice, setEditInvoice] = useState(null)
   const [sendInvoice, setSendInvoice] = useState(null)
   const [editExpense, setEditExpense] = useState(null)
-  const [editMileage, setEditMileage] = useState(null)
   const [incFilter, setIncFilter] = useState('all')
   const [incSearch, setIncSearch] = useState('')
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
   })
-  const [showWhatsNew, setShowWhatsNew] = useState(false)
   const [viewReceipt, setViewReceipt] = useState(null)
-  // The sidebar button shows a dot until the latest changelog entry is seen.
-  const [changelogSeen, setChangelogSeen] = useState(() => {
-    try { return localStorage.getItem('soloops-changelog-seen') } catch (e) { return LATEST_VERSION }
-  })
-  const hasNews = changelogSeen !== LATEST_VERSION
-  const openWhatsNew = () => {
-    setShowWhatsNew(true)
-    setChangelogSeen(LATEST_VERSION)
-    try { localStorage.setItem('soloops-changelog-seen', LATEST_VERSION) } catch (e) { /* storage unavailable */ }
-  }
   const [mobileNav, setMobileNav] = useState(false)
 
   // Close the mobile nav drawer whenever the view changes or on Escape.
@@ -234,13 +218,6 @@ function Shell() {
     const { error } = await deleteExpense(e.id)
     if(error){ flash('Delete failed'); return }
     loadAll(); flash('Expense deleted')
-  }
-  const onEditMileage = (m) => { setEditMileage(m); setModal('mileage') }
-  const onDeleteMileage = async (m) => {
-    if(!window.confirm(`Delete journey ${m.start_loc||''} → ${m.end_loc||''} (${m.miles} mi)? This cannot be undone.`)) return
-    const { error } = await deleteMileage(m.id)
-    if(error){ flash('Delete failed'); return }
-    loadAll(); flash('Journey deleted')
   }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
 
@@ -441,22 +418,6 @@ function Shell() {
         <div className="solo-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
           <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
           <div className="solo-header-actions" style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
-            <button onClick={openWhatsNew} title="What's new" style={{...btnSec, padding:'8px 14px', display:'flex', alignItems:'center', gap:'7px', position:'relative', fontSize:'13px'}}>
-              ✨ What's new
-              {hasNews && <span aria-label="New updates" style={{ position:'absolute', top:'5px', right:'6px', width:'7px', height:'7px', borderRadius:'50%', background:'var(--orange)' }} />}
-            </button>
-            {!['dashboard','items','settings','documents'].includes(view) && <select value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'9px 12px', color:'var(--text)', fontSize:'13px', outline:'none', cursor:'pointer' }}>
-              <option value="all">All years</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              <option value="custom">Custom range…</option>
-            </select>}
-            {!['dashboard','items','settings','documents'].includes(view) && yearFilter==='custom' && (
-              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
-                <input type="date" value={rangeFrom} onChange={e=>setRangeFrom(e.target.value)} title="From" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
-                <span style={{ color:'var(--text3)', fontSize:'13px' }}>→</span>
-                <input type="date" value={rangeTo} onChange={e=>setRangeTo(e.target.value)} title="To" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'8px 10px', color:'var(--text)', fontSize:'13px', outline:'none' }} />
-              </div>
-            )}
             {['income','expenses'].includes(view) && <>
               {tierAllows('bronze') && <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>}
               <button style={btnPri} onClick={()=>setModal("invoice")}>+ Income</button>
@@ -564,102 +525,15 @@ function Shell() {
             </div>
           )}
 
-          {view==='banking' && (
-            <BankImport uid={uid} existingExpenses={expenses} onImported={()=>{loadAll();flash('Transactions imported')}} />
-          )}
-
           {view==='receipts' && (
             <Receipts uid={uid} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
           )}
 
           {view==='reports' && (
+            <>
             <Reports invoices={fInvoices} expenses={fExpenses} mileage={fMileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
-          )}
-
-          {view==='documents' && (
-            <Documents uid={uid} />
-          )}
-
-          {view==='mileage' && (() => {
-            const totalMiles = fMileage.reduce((s,m)=>s+(Number(m.miles)||0),0)
-            const first = Math.min(totalMiles, 10000)
-            const over = Math.max(0, totalMiles - 10000)
-            const claim = first * 0.45 + over * 0.25
-            // Per-row claim recomputed from the cumulative 45p/25p split over the
-            // filtered period, so the column sums to the KPI. The stored m.claim
-            // freezes the all-time split at save time and goes stale when other
-            // journeys are edited or deleted.
-            const claimByRow = {}
-            {
-              let cum = 0
-              ;[...fMileage]
-                .sort((a,b)=>(a.journey_date||'').localeCompare(b.journey_date||''))
-                .forEach(m => {
-                  const mi = Number(m.miles)||0
-                  const at45 = Math.max(0, Math.min(mi, 10000 - cum))
-                  claimByRow[m.id] = at45*0.45 + (mi-at45)*0.25
-                  cum += mi
-                })
-            }
-            const downloadReport = () => {
-              const rows = [['Date','From','To','Purpose','Miles']]
-              fMileage.forEach(m => rows.push([m.journey_date||'', m.start_loc||'', m.end_loc||'', m.purpose||'', m.miles||0]))
-              rows.push([])
-              rows.push(['Total miles', totalMiles])
-              rows.push(['First 10,000 miles @ 45p', (first*0.45).toFixed(2)])
-              rows.push(['Over 10,000 miles @ 25p', (over*0.25).toFixed(2)])
-              rows.push(['Total claim (GBP)', claim.toFixed(2)])
-              // Quote-escape every field so commas/quotes in a location or purpose
-              // can't shift columns.
-              const cell = (c) => { const s = String(c ?? ''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s }
-              const csv = rows.map(r => r.map(cell).join(',')).join('\n')
-              const blob = new Blob([csv], { type:'text/csv' })
-              const a = document.createElement('a')
-              a.href = URL.createObjectURL(blob)
-              a.download = 'soloops-mileage-report.csv'
-              a.click()
-            }
-            return (
-            <>
-              <div className="solo-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'16px', marginBottom:'16px' }}>
-                <KPI label="Total miles" value={totalMiles.toLocaleString('en-GB')} />
-                <KPI label="HMRC claim" value={gbp(claim)} color="var(--green)" sub="45p/25p AMAP split" />
-                <KPI label="Journeys" value={fMileage.length} />
-              </div>
-              <div style={card}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'10px', flexWrap:'wrap' }}>
-                  <div>
-                    <div style={{fontWeight:700}}>Mileage log</div>
-                    <div style={{fontSize:'12.5px', color:'var(--text3)'}}>HMRC approved rates: 45p/mile up to 10,000, 25p after</div>
-                  </div>
-                  <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
-                    {fMileage.length>0 && <button style={btnSec} onClick={downloadReport}>Download HMRC report</button>}
-                    <button style={btnPri} onClick={()=>setModal('mileage')}>+ Log journey</button>
-                  </div>
-                </div>
-                {fMileage.length===0 ? <Empty msg="No journeys logged yet. Click “+ Log journey” to add one." />
-                : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead><Th cols={['Date','From','To','Purpose','Miles','Claim','Actions']} /></thead>
-                  <tbody>{fMileage.map(m => (
-                    <tr key={m.id}>
-                      <Td muted mono>{fmtDate(m.journey_date)}</Td><Td>{m.start_loc}</Td><Td>{m.end_loc}</Td>
-                      <Td muted>{m.purpose}</Td><Td mono right>{m.miles}</Td>
-                      <Td mono right style={{color:'var(--green)'}}>{gbp(claimByRow[m.id] ?? m.claim)}</Td>
-                      <Td right>
-                        <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
-                          <button style={actBtn} onClick={()=>onEditMileage(m)}>Edit</button>
-                          <button style={actBtnDanger} onClick={()=>onDeleteMileage(m)}>Delete</button>
-                        </div>
-                      </Td>
-                    </tr>))}</tbody>
-                </table>}
-              </div>
-            </>
-            )
-          })()}
-
-          {view==='tax' && (
-            <>
+            {tierAllows('gold') ? (
+              <div style={{ marginTop:'16px' }}>
             <div style={{ background:'var(--amber-soft, rgba(245,158,11,0.1))', border:'1px solid rgba(245,158,11,0.3)', borderRadius:'12px', padding:'14px 18px', marginBottom:'16px', fontSize:'13px', color:'var(--text2)', lineHeight:1.6 }}>
               <strong style={{color:'var(--amber)'}}>⚠ Estimate only — not tax advice.</strong> These figures are a rough guide based on simplified UK rates and your recorded income and expenses. They are not a substitute for professional advice or an official HMRC calculation. Always confirm your actual liability with an accountant or HMRC before filing.
             </div>
@@ -698,6 +572,12 @@ function Shell() {
                 <Check ok={mileage.length>0} t="Mileage logged" />
               </div>
             </div>
+              </div>
+            ) : (
+              <div style={{ ...card, marginTop:'16px', textAlign:'center', color:'var(--text2)', fontSize:'13.5px' }}>
+                🔒 The tax estimate is a Gold feature. <span onClick={()=>navigate('/settings#billing')} style={{ color:'var(--orange)', cursor:'pointer', fontWeight:600 }}>View plans</span>
+              </div>
+            )}
             </>
           )}
 
@@ -733,9 +613,6 @@ function Shell() {
       )}
 
       {modal==='invoice' && <InvoiceForm items={items} onClose={()=>{setModal(null);setEditInvoice(null)}} onSaved={(r)=>{const wasEdit=editInvoice;setModal(null);setEditInvoice(null);loadAll();flash(wasEdit?'Income updated':(r&&r.addedClient?`Income added · ${r.addedClient} added to Clients`:'Income added'))}} uid={uid} invoices={invoices} clients={clients} edit={editInvoice} settings={settings} />}
-      {modal==='mileage' && <MileageForm onClose={()=>{setModal(null);setEditMileage(null)}} onSaved={()=>{const wasEdit=editMileage;setModal(null);setEditMileage(null);loadAll();flash(wasEdit?'Journey updated':'Journey logged')}} uid={uid} mileage={mileage} edit={editMileage} />}
-
-      {showWhatsNew && <WhatsNew onClose={()=>setShowWhatsNew(false)} />}
 
       {viewReceipt && <ReceiptViewer expense={viewReceipt} onClose={()=>setViewReceipt(null)} />}
 

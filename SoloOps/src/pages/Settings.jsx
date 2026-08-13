@@ -405,8 +405,8 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   const tiers = [
     { key:'basic',  name:'⚪ Basic',  price:'£5.99/mo', color:'#6b7280', features:['Dashboard', 'Income & invoicing', 'Client database'] },
     { key:'bronze', name:'🥉 Bronze', price:'£12.99/mo', color:'#cd7f32', features:['Everything in Basic', 'Expenses', 'Receipts'] },
-    { key:'silver', name:'🥈 Silver', price:'£18.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Bank import', 'Mileage', 'Reports'] },
-    { key:'gold',   name:'🥇 Gold',   price:'£28.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Document store', 'Tax tools', 'Accountant export pack'] },
+    { key:'silver', name:'🥈 Silver', price:'£18.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Reports & exports'] },
+    { key:'gold',   name:'🥇 Gold',   price:'£28.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Tax estimate & tools', 'Accountant export pack'] },
   ]
 
   const sectionTitle = { fontWeight:700, fontSize:'15px', marginBottom:'14px' }
