@@ -403,10 +403,10 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
   // match the shared Stripe prices (api/_billing-config.js); the tier key is
   // sent straight to checkout.
   const tiers = [
-    { key:'basic',  name:'⚪ Basic',  price:'£5.99/mo', color:'#6b7280', features:['Dashboard', 'Income & invoicing', 'Client database'] },
+    { key:'basic',  name:'⚪ Basic',  price:'£5.99/mo', color:'#6b7280', features:['Dashboard', 'Income & invoicing', 'Items & client database'] },
     { key:'bronze', name:'🥉 Bronze', price:'£12.99/mo', color:'#cd7f32', features:['Everything in Basic', 'Expenses', 'Receipts'] },
-    { key:'silver', name:'🥈 Silver', price:'£18.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Reports & exports'] },
-    { key:'gold',   name:'🥇 Gold',   price:'£28.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Tax estimate & tools', 'Accountant export pack'] },
+    { key:'silver', name:'🥈 Silver', price:'£18.99/mo', color:'#c0c0c0', features:['Everything in Bronze', 'Reports & CSV exports'] },
+    { key:'gold',   name:'🥇 Gold',   price:'£28.99/mo', color:'var(--orange)', features:['Everything in Silver', 'Tax estimate (inside Reports)', 'Accountant export pack'] },
   ]
 
   const sectionTitle = { fontWeight:700, fontSize:'15px', marginBottom:'14px' }
