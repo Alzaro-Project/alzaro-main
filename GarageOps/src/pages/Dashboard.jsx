@@ -59,6 +59,37 @@ const btnPrimary = {
   fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
 }
+const searchBox = {
+  flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
+  background: 'var(--surface2)', border: '1px solid var(--border)',
+  padding: '10px 13px', borderRadius: '10px',
+}
+const tileSub = { fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }
+const toggleBtn = (on) => ({
+  padding: '4px 8px', fontSize: '10px',
+  color: on ? 'var(--text)' : 'var(--text2)',
+  background: on ? 'var(--surface3)' : 'transparent',
+  border: 'none', borderRadius: '4px',
+  cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+})
+const calNav = {
+  width: '24px', height: '24px',
+  background: 'var(--surface2)', border: 'none',
+  color: 'var(--text2)', borderRadius: '5px', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px',
+}
+const iconBtn = {
+  width: '26px', height: '26px',
+  background: 'var(--surface2)', border: 'none',
+  borderRadius: '5px', color: 'var(--text2)', cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: '12px', textDecoration: 'none',
+}
+const linkBtn = {
+  background: 'none', border: 'none',
+  color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
+}
+
 // ============================================================
 // ANIMATED CARDS (ported from TyreOps) — 3D tilt-follow, hover glow,
 // click-through arrow hint. Pass `onClick` to make a card navigate.
