@@ -10,6 +10,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Items from './pages/Items'
 import Purchases from './pages/Purchases'
+import Stock from './pages/Stock'
 import Calendar from './pages/Calendar'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -118,6 +119,7 @@ function AppLayout() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/items" element={<Items />} />
+            <Route path="/stock" element={<Stock />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/reports" element={<Reports />} />
