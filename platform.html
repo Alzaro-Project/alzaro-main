@@ -55,6 +55,44 @@
 // ============================================================
 const { useState, useEffect } = React
 
+
+// ============================================================
+// Product changelog — shown only here in the platform admin.
+// Newest entry FIRST. To record a release, prepend an entry:
+// { version:'YYYY-MM-DD', date:'DD/MM/YYYY', product:'SoloOps',
+//   title:'…', items:[{type:'added|improved|fixed|removed', text:'…'}] }
+// ============================================================
+const CHANGELOG = [
+  { version:'2026-08-14', date:'14/08/2026', product:'SoloOps', title:'Slimmer SoloOps', items:[
+    { type:'removed',  text:'Banking, Mileage, Documents and Tax pages removed from the app — all underlying data kept; tax now lives inside Reports.' },
+    { type:'improved', text:'Dashboard chart follows the selected period (today / week / month / quarter / year / custom range).' },
+    { type:'improved', text:'Clients merged into the Items page (Items/Clients); user-facing changelog retired in favour of this admin one.' },
+  ]},
+  { version:'2026-08-13-6', date:'13/08/2026', product:'SoloOps', title:'Simpler expenses', items:[
+    { type:'added',    text:'Attach a receipt directly in the Add expense form.' },
+    { type:'added',    text:'"Other" category asks for a short description, shown in the expenses list.' },
+    { type:'improved', text:'Clients moved into the Items page.' },
+    { type:'removed',  text:'"Saved item" dropdown from Add expense.' },
+  ]},
+  { version:'2026-08-13-5', date:'13/08/2026', product:'SoloOps', title:'Items', items:[
+    { type:'added', text:'Items catalogue — reusable income/expense presets, income items pickable in the invoice form.' },
+    { type:'fixed', text:'Suppliers no longer listed in the client dropdown when adding income.' },
+  ]},
+  { version:'2026-08-13-4', date:'13/08/2026', product:'SoloOps', title:'Layout fix', items:[
+    { type:'fixed', text:'Sidebar stays pinned at full height while scrolling.' },
+  ]},
+  { version:'2026-08-13-3', date:'13/08/2026', product:'SoloOps', title:'Dashboard tidy-up', items:[
+    { type:'added',    text:'Custom date range on the dashboard timeline.' },
+    { type:'improved', text:'Redundant year dropdown removed from the dashboard.' },
+  ]},
+  { version:'2026-08-13-2', date:'13/08/2026', product:'SoloOps', title:'View your receipts', items:[
+    { type:'added', text:'Attached receipts viewable from the Receipts tab and the receipt tag on expenses.' },
+  ]},
+  { version:'2026-08-13', date:'13/08/2026', product:'SoloOps', title:'Menu cleanup', items:[
+    { type:'removed', text:'Recurring section removed (was a computed view — no data affected).' },
+  ]},
+]
+
 const VERTICALS = {
   tyreops:     { label: 'TyreOps',     color: 'var(--amber)' },
   garageops:   { label: 'GarageOps',   color: 'var(--orange)' },
@@ -346,6 +384,8 @@ function Platform() {
         )}
       </div>
 
+      <Changelog />
+
       {showAdmins && <AdminModal callFn={callFn} onClose={()=>{ setShowAdmins(false); loadUsers() }} />}
     </div>
   )
@@ -353,6 +393,39 @@ function Platform() {
 
 // ---------- small components ----------
 function Center({children}) { return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)',padding:'20px'}}>{children}</div> }
+function Changelog() {
+  const TYPES = {
+    added:    { label:'Added',    color:'var(--green)',  bg:'rgba(34,197,94,.12)' },
+    improved: { label:'Improved', color:'var(--blue)',   bg:'rgba(59,130,246,.12)' },
+    fixed:    { label:'Fixed',    color:'var(--amber)',  bg:'rgba(245,158,11,.12)' },
+    removed:  { label:'Removed',  color:'var(--text3)',  bg:'var(--surface3)' },
+  }
+  return (
+    <div style={{...card, marginTop:'16px'}}>
+      <div style={{ fontWeight:700, marginBottom:'4px' }}>Changelog</div>
+      <div style={{ color:'var(--text3)', fontSize:'12.5px', marginBottom:'18px' }}>Product release notes — edit the CHANGELOG list at the top of this file to add entries.</div>
+      {CHANGELOG.map(e => (
+        <div key={e.version} style={{ borderTop:'1px solid var(--border)', padding:'14px 0' }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:'10px', flexWrap:'wrap', marginBottom:'10px' }}>
+            <span style={{ fontSize:'11px', fontWeight:700, color:'var(--orange-light)', background:'var(--orange-subtle)', padding:'2px 8px', borderRadius:'6px' }}>{e.product}</span>
+            <span style={{ fontWeight:700, fontSize:'14px' }}>{e.title}</span>
+            <span className="mono" style={{ fontSize:'12px', color:'var(--text3)', marginLeft:'auto' }}>{e.date}</span>
+          </div>
+          {e.items.map((it,i) => {
+            const t = TYPES[it.type] || TYPES.improved
+            return (
+              <div key={i} style={{ display:'flex', gap:'10px', alignItems:'flex-start', fontSize:'13px', color:'var(--text2)', lineHeight:1.55, marginBottom:'8px' }}>
+                <span style={{ padding:'1px 7px', borderRadius:'6px', fontSize:'10px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', color:t.color, background:t.bg, flexShrink:0, marginTop:'2px' }}>{t.label}</span>
+                <span>{it.text}</span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Stat({label,value,color}) { return <div style={{...card, padding:'18px'}}><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.6px',fontWeight:600}}>{label}</div><div style={{fontSize:'24px',fontWeight:600,marginTop:'6px',letterSpacing:'-0.5px',color:color||'var(--orange-light)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
 function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600}}>{v}</span></div> }

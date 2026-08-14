@@ -7,7 +7,7 @@ export const CAT_COLORS = { Software:'#f97316', Fuel:'#f59e0b', Marketing:'#3b82
 
 export const NAV = [
   ['dashboard','Dashboard','📊','basic','ti-layout-dashboard'], ['income','Income','📄','basic','ti-file-invoice'], ['items','Items/Clients','📦','basic','ti-package'], ['expenses','Expenses','💷','bronze','ti-receipt-2'],
-  ['receipts','Receipts','🧾','bronze','ti-receipt'], ['reports','Reports','📈','silver','ti-chart-bar'], ['settings','Settings','🔧','basic','ti-settings']
+  ['receipts','Receipts','🧾','bronze','ti-receipt'], ['reports','Reports/Tax','📈','silver','ti-chart-bar'], ['settings','Settings','🔧','basic','ti-settings']
 ]
 
 export const TIER_ORDER = ['basic','bronze','silver','gold']

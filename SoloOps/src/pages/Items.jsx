@@ -54,24 +54,24 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
 
       {/* Add / edit row */}
       <div className="solo-2col" style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '16px' }}>
-        <div style={{ flex: '2 1 180px', minWidth: 0 }}>
+        <div style={{ flex: '1 1 130px', minWidth: 0 }}>
           <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>{isIncome ? 'Description' : 'Merchant / name'}</div>
           <input style={inp} placeholder={isIncome ? 'e.g. Day rate — web design' : 'e.g. Adobe UK'} value={name} onChange={e => setName(e.target.value)} />
         </div>
         {isIncome ? (
-          <div style={{ flex: '1 1 110px' }}>
+          <div style={{ flex: '0 1 100px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Price (£ each)</div>
             <input style={inp} type="number" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} />
           </div>
         ) : (
           <>
-            <div style={{ flex: '1 1 140px' }}>
+            <div style={{ flex: '0 1 120px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Category</div>
               <select style={inp} value={category} onChange={e => setCategory(e.target.value)}>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div style={{ flex: '1 1 110px' }}>
+            <div style={{ flex: '0 1 100px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Amount (£, optional)</div>
               <input style={inp} type="number" placeholder="—" value={amount} onChange={e => setAmount(e.target.value)} />
             </div>
@@ -85,7 +85,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
 
       {/* List */}
       {rows.length === 0 ? <Empty msg={isIncome ? 'No income items yet — add the things you invoice for regularly.' : 'No expense items yet — add the costs you log regularly.'} />
-      : <div style={{ maxHeight: '240px', overflowY: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      : <div style={{ maxHeight: '200px', overflowY: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><Th cols={isIncome ? ['Description', 'Price', ''] : ['Merchant / name', 'Category', 'Amount', '']} /></thead>
         <tbody>{rows.map(it => (
           <tr key={it.id} style={{ opacity: editId === it.id ? .5 : 1 }}>
@@ -113,7 +113,8 @@ export default function Items({ uid, items, onChange, flash, clients = [], invoi
   const expense = (items || []).filter(i => i.kind === 'expense')
   return (
     <>
-      <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start', marginBottom: '16px' }}>
+      <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
+      <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
         <ItemSection
           kind="income" rows={income} uid={uid} onChange={onChange} flash={flash}
           title="Income items"
@@ -125,7 +126,6 @@ export default function Items({ uid, items, onChange, flash, clients = [], invoi
           blurb="Your regular costs, kept as a reference list."
         />
       </div>
-      <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
     </>
   )
 }
