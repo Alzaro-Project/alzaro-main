@@ -15,6 +15,7 @@ const NAV = [
   { path: '/invoices',  icon: 'ti-file-text',        label: 'Invoices',  min: 'basic' },
   { path: '/customers', icon: 'ti-users',            label: 'Customers', min: 'basic' },
   { path: '/items',     icon: 'ti-package',          label: 'Items',     min: 'basic' },
+  { path: '/stock',     icon: 'ti-stack-2',          label: 'Stock',     min: 'basic' },
   { path: '/purchases', icon: 'ti-shopping-cart',    label: 'Purchases', min: 'basic' },
   { path: '/calendar',  icon: 'ti-calendar',         label: 'Calendar',  min: 'basic' },
   { path: '/reports',   icon: 'ti-receipt-tax',      label: 'VAT & Reports', min: 'silver' },
@@ -31,10 +32,20 @@ const TIER_STYLE = {
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, tier, logout, settings, theme, toggleTheme } = useStore()
+  const { user, tier, logout, settings, theme, toggleTheme, garageStatus, trialEnds } = useStore()
 
   const isDark = theme !== 'light'
   const ts = TIER_STYLE[tier] || TIER_STYLE.bronze
+
+  // Days left of trial — only shown while status is 'trial' and not expired
+  // (expired trials are handled by TrialGuard before the app renders).
+  let trialDaysLeft = null
+  if (garageStatus === 'trial' && trialEnds) {
+    const end = new Date(trialEnds); end.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const days = Math.round((end - today) / 86400000)
+    if (days >= 0) trialDaysLeft = days
+  }
 
   const handleNav = (item) => {
     // Always navigate — if user lacks the required tier, the destination page's
@@ -81,6 +92,22 @@ export default function Sidebar({ onNavigate, isMobile }) {
           <i className={`ti ${ts.icon}`} style={{ fontSize: '11px' }} aria-hidden="true" />
           {tier}
         </span>
+        {trialDaysLeft !== null && (
+          <div style={{
+            marginTop: '8px',
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            padding: '4px 9px', borderRadius: '20px',
+            fontSize: '10px', fontWeight: 700, fontFamily: 'monospace',
+            background: 'rgba(217,119,6,0.12)', color: '#d97706',
+            border: '1px solid rgba(217,119,6,0.3)',
+            textTransform: 'uppercase', letterSpacing: '0.3px',
+          }}>
+            <i className="ti ti-hourglass" style={{ fontSize: '11px' }} aria-hidden="true" />
+            {trialDaysLeft === 0
+              ? 'Trial ends today'
+              : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left`}
+          </div>
+        )}
       </div>
 
       {/* Search */}
