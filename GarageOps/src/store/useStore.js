@@ -99,7 +99,7 @@ export const useStore = create(
       // --------------------------------------------------------
       // THEME STATE (NEW)
       // --------------------------------------------------------
-      theme: 'dark',  // 'dark' | 'light'
+      theme: 'light',  // 'light' | 'dark' — light is the default
 
       // --------------------------------------------------------
       // SHARED DATA STATE (both products)
@@ -1185,7 +1185,7 @@ export const useStore = create(
       // After the persisted state is rehydrated on page load, apply the saved
       // theme to <html> so the app opens in the right appearance.
       onRehydrateStorage: () => (state) => {
-        if (state?.theme) applyTheme(state.theme)
+        applyTheme(state?.theme === 'dark' ? 'dark' : 'light')
       },
     }
   )
