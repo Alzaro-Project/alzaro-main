@@ -59,43 +59,6 @@ const btnPrimary = {
   fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
 }
-const btnSecondary = {
-  background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border2)',
-  padding: '11px 14px', borderRadius: '10px',
-  fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
-  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-}
-const searchBox = {
-  flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
-  background: 'var(--surface2)', border: '1px solid var(--border)',
-  padding: '10px 13px', borderRadius: '10px',
-}
-const tileSub = { fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }
-const toggleBtn = (on) => ({
-  padding: '4px 8px', fontSize: '10px',
-  color: on ? 'var(--text)' : 'var(--text2)',
-  background: on ? 'var(--surface3)' : 'transparent',
-  border: 'none', borderRadius: '4px',
-  cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-})
-const calNav = {
-  width: '24px', height: '24px',
-  background: 'var(--surface2)', border: 'none',
-  color: 'var(--text2)', borderRadius: '5px', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px',
-}
-const iconBtn = {
-  width: '26px', height: '26px',
-  background: 'var(--surface2)', border: 'none',
-  borderRadius: '5px', color: 'var(--text2)', cursor: 'pointer',
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: '12px', textDecoration: 'none',
-}
-const linkBtn = {
-  background: 'none', border: 'none',
-  color: 'var(--red)', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
-}
-
 // ============================================================
 // ANIMATED CARDS (ported from TyreOps) — 3D tilt-follow, hover glow,
 // click-through arrow hint. Pass `onClick` to make a card navigate.
@@ -270,21 +233,6 @@ export default function Dashboard() {
     return monthInv.reduce((s, i) => s + invoiceTotal(i), 0) / monthInv.length
   }, [invoices])
 
-  // -------- QUICK SALE --------
-  const handleQuickSale = () => {
-    const choice = window.confirm(
-      'Quick sale — what kind?\n\n' +
-      'OK = Walk-in / cash (no customer needed)\n' +
-      'Cancel = Pre-filled paid invoice (still pick a customer)'
-    )
-    if (choice) {
-      sessionStorage.setItem('garageops_quick_sale', 'walkin')
-    } else {
-      sessionStorage.setItem('garageops_quick_sale', 'paid')
-    }
-    navigate('/invoices')
-  }
-
   // -------- CALENDAR DAY CLICK --------
   // Hands the chosen date to the full Calendar page via sessionStorage,
   // then navigates there. The Calendar page can read
@@ -309,9 +257,6 @@ export default function Dashboard() {
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => navigate('/invoices')} style={btnPrimary}>
           <i className="ti ti-plus" aria-hidden="true" /> New invoice
-        </button>
-        <button onClick={handleQuickSale} style={btnSecondary}>
-          <i className="ti ti-bolt" aria-hidden="true" /> Quick sale
         </button>
         <div style={searchBox}>
           <i className="ti ti-search" style={{ color: 'var(--text3)' }} aria-hidden="true" />
@@ -343,7 +288,7 @@ export default function Dashboard() {
       </div>
 
       {/* ===== TOP 4 TILES ===== */}
-      <div className="dash-top4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
+      <div className="dash-top4" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px' }}>
         {/* Sales (has an internal toggle, so use the children slot) */}
         <DashCard label="Sales" index={0} onClick={() => navigate('/invoices')} color="var(--green)">
           <div style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '6px', padding: '2px', margin: '6px 0 10px' }}>
@@ -371,9 +316,6 @@ export default function Dashboard() {
         ) : (
           <LockedTile label="MOT reminders" requiredTier="silver" onUpgrade={() => navigate('/settings', { state: { tab: 'subscription' } })} />
         )}
-
-        {/* Placeholder */}
-        <PlaceholderTile />
       </div>
 
       {/* ===== MID ROW: P&L + CALENDAR ===== */}
@@ -402,7 +344,7 @@ export default function Dashboard() {
       )}
 
       {/* ===== BOTTOM 4 TILES ===== */}
-      <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+      <div className="dash-bot4" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
         <DashCard
           label="Unpaid sent" index={0} color="var(--blue)"
           value={unpaidSent.count} delta={`${money(unpaidSent.total)} awaiting`}
@@ -418,7 +360,6 @@ export default function Dashboard() {
           value={customers.length} delta="On the books"
           hint="View customers →" onClick={() => navigate('/customers')}
         />
-        <PlaceholderTile />
       </div>
 
       {/* Responsive + calendar hover */}
@@ -462,21 +403,6 @@ function LockedTile({ label, requiredTier, onUpgrade }) {
       }}>
         Upgrade to {tierName}
       </div>
-    </div>
-  )
-}
-
-function PlaceholderTile() {
-  return (
-    <div style={{
-      background: 'rgba(229,57,53,0.04)',
-      border: '0.5px dashed rgba(229,57,53,0.3)',
-      borderRadius: '12px', padding: '14px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100px', color: 'var(--text3)',
-    }}>
-      <i className="ti ti-plus" style={{ fontSize: '20px', color: 'var(--red)', opacity: 0.6, marginBottom: '6px' }} aria-hidden="true" />
-      <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text3)' }}>Add later</div>
     </div>
   )
 }
