@@ -165,7 +165,15 @@ export default function Stock() {
             How many of each part you actually have on the shelf
           </div>
         </div>
-        <button onClick={() => setModal({ mode: 'intake' })} style={primaryBtn} disabled={!active.length}>
+        <button
+          onClick={() => {
+            if (loading) return
+            if (active.length) setModal({ mode: 'intake' })
+            else navigate('/items')  // no parts yet — take them to the catalog
+          }}
+          style={{ ...primaryBtn, opacity: active.length || loading ? 1 : 0.55 }}
+          title={active.length ? 'Record stock arriving' : 'No parts yet — add them in Items → Parts first'}
+        >
           <i className="ti ti-truck-delivery" aria-hidden="true" /> Add stock
         </button>
       </div>
