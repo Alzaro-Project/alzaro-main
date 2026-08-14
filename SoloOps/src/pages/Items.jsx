@@ -72,7 +72,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash }) {
               </select>
             </div>
             <div style={{ flex: '0 1 100px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Amount (£, optional)</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Amount (£)</div>
               <input style={inp} type="number" placeholder="—" value={amount} onChange={e => setAmount(e.target.value)} />
             </div>
           </>
@@ -113,8 +113,7 @@ export default function Items({ uid, items, onChange, flash, clients = [], invoi
   const expense = (items || []).filter(i => i.kind === 'expense')
   return (
     <>
-      <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
-      <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+      <div className="solo-dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         <ItemSection
           kind="income" rows={income} uid={uid} onChange={onChange} flash={flash}
           title="Income items"
@@ -126,6 +125,7 @@ export default function Items({ uid, items, onChange, flash, clients = [], invoi
           blurb="Your regular costs, kept as a reference list."
         />
       </div>
+      <Clients uid={uid} clients={clients} invoices={invoices} expenses={expenses} onChange={onChange} flash={flash} />
     </>
   )
 }
