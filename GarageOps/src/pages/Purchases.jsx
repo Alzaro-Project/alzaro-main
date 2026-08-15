@@ -8,10 +8,11 @@ import {
 // ============================================================
 // Purchases — full CRUD + receipts
 // ------------------------------------------------------------
-// One row per item bought. Optional customer/vehicle tag for
-// job-specific purchases (these get offered at invoice time).
-// Untagged rows are general workshop spend — still count for
-// VAT. Receipts live in the private 'receipts' storage bucket;
+// One row per item bought, with an optional vehicle reg on
+// job-specific spend; blank reg = general workshop spend.
+// Legacy rows may still carry customer/invoice tags — they
+// load and display fine, but the form no longer sets them.
+// Receipts live in the private 'receipts' storage bucket;
 // receipt_url holds the storage path, viewing uses signed URLs.
 // ============================================================
 
@@ -155,14 +156,10 @@ export default function Purchases() {
     createPurchase, updatePurchase, deletePurchase,
   } = usePurchases()
 
-  const customers = useStore(s => s.customers) || []
-  const vehicles = useStore(s => s.vehicles) || []
-
   const [formMode, setFormMode] = useState(null) // null | 'create' | 'edit'
   const [formInitial, setFormInitial] = useState({})
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
-  const [billFilter, setBillFilter] = useState('all') // all | unbilled | billed
   const [methodFilter, setMethodFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all') // key from DATE_FILTERS
   const [customFrom, setCustomFrom] = useState('')
@@ -208,33 +205,25 @@ export default function Purchases() {
 
   const regSuggestions = useMemo(() => {
     const seen = new Set(), out = []
-    const add = (r) => {
-      const v = (r || '').trim().toUpperCase()
+    purchases.forEach(p => {
+      const v = (p.vehicle_reg || '').trim().toUpperCase()
       if (v && !seen.has(v)) { seen.add(v); out.push(v) }
-    }
-    purchases.forEach(p => add(p.vehicle_reg))
-    vehicles.forEach(v => add(v.reg))
-    customers.forEach(c => add(c.reg))
+    })
     return out
-  }, [purchases, vehicles, customers])
+  }, [purchases])
 
   // ---------- Stats ----------
   const stats = useMemo(() => {
     const now = new Date()
     const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    let monthGross = 0, monthVat = 0, unbilledCount = 0, unbilledValue = 0
+    let monthGross = 0, monthVat = 0
     purchases.forEach(p => {
       if ((p.purchase_date || '').startsWith(monthPrefix)) {
         monthGross += Number(p.gross) || 0
         monthVat += Number(p.vat) || 0
       }
-      const jobTagged = p.customer_id || p.customer_name || p.vehicle_reg
-      if (jobTagged && !p.invoice_id) {
-        unbilledCount += 1
-        unbilledValue += Number(p.gross) || 0
-      }
     })
-    return { monthGross, monthVat, unbilledCount, unbilledValue }
+    return { monthGross, monthVat }
   }, [purchases])
 
   // ---------- Filtering ----------
@@ -243,8 +232,6 @@ export default function Purchases() {
     const range = dateRangeFor(dateFilter, customFrom, customTo)
     return purchases.filter(p => {
       if (catFilter !== 'all' && p.category !== catFilter) return false
-      if (billFilter === 'unbilled' && p.invoice_id) return false
-      if (billFilter === 'billed' && !p.invoice_id) return false
       if (methodFilter !== 'all' && p.payment_method !== methodFilter) return false
       if (range) {
         const d = p.purchase_date || ''
@@ -261,10 +248,10 @@ export default function Purchases() {
         (p.invoice_id || '').toLowerCase().includes(q)
       )
     })
-  }, [purchases, search, catFilter, billFilter, methodFilter, dateFilter, customFrom, customTo])
+  }, [purchases, search, catFilter, methodFilter, dateFilter, customFrom, customTo])
 
   const anyFilterActive =
-    search.trim() !== '' || catFilter !== 'all' || billFilter !== 'all' ||
+    search.trim() !== '' || catFilter !== 'all' ||
     methodFilter !== 'all' || dateFilter !== 'all'
 
   const filteredTotals = useMemo(() => {
@@ -321,7 +308,7 @@ export default function Purchases() {
         <div>
           <div style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px' }}>Purchases</div>
           <div style={{ fontSize: '13px', color: T.text2, marginTop: '2px' }}>
-            Everything you buy — tag job purchases to a customer so they're ready at invoice time
+            Everything you buy from suppliers — receipts, VAT and spend in one place
           </div>
         </div>
         <button onClick={openCreate} style={primaryBtn}>
@@ -330,15 +317,9 @@ export default function Purchases() {
       </div>
 
       {/* Stats */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
         <StatTile label="Spend this month" value={money(stats.monthGross)} sub="inc. VAT" />
         <StatTile label="VAT this month" value={money(stats.monthVat)} sub="reclaimable" color={T.teal} />
-        <StatTile
-          label="Unbilled job purchases"
-          value={stats.unbilledCount}
-          sub={stats.unbilledCount > 0 ? `${money(stats.unbilledValue)} waiting to be invoiced` : 'all caught up'}
-          color={stats.unbilledCount > 0 ? T.amber : T.green}
-        />
       </div>
 
       {/* Toolbar */}
@@ -348,7 +329,7 @@ export default function Purchases() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search supplier, item, reg, customer..."
+            placeholder="Search supplier, item, reg..."
             style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: T.text, fontSize: '12px', fontFamily: 'inherit' }}
           />
           {search && (
@@ -362,11 +343,6 @@ export default function Purchases() {
         <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)} style={selectStyle}>
           <option value="all">All payment methods</option>
           {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        <select value={billFilter} onChange={e => setBillFilter(e.target.value)} style={selectStyle}>
-          <option value="all">Billed + unbilled</option>
-          <option value="unbilled">Unbilled only</option>
-          <option value="billed">Billed only</option>
         </select>
         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={selectStyle}>
           {DATE_FILTERS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
@@ -578,7 +554,7 @@ function EmptyState({ anyAtAll, onAdd }) {
         <>
           <div style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px' }}>No purchases recorded yet</div>
           <div style={{ fontSize: '12px', color: T.text2, maxWidth: '420px', margin: '0 auto 16px' }}>
-            Log what you buy from suppliers. Tag a customer and reg on job-specific purchases and they'll be waiting for you on the invoice form.
+            Log what you buy from suppliers. Add a vehicle reg on job-specific purchases; leave it blank for general workshop spend.
           </div>
           <button onClick={onAdd} style={primaryBtn}>
             <i className="ti ti-plus" aria-hidden="true" /> Add your first purchase
@@ -598,9 +574,10 @@ function PurchaseForm({
   onViewReceiptPath, onPreviewLocalImage, viewerOpen,
 }) {
   const garageId = useStore(s => s.garageId)
-  const customers = useStore(s => s.customers) || []
-  const vehicles = useStore(s => s.vehicles) || []
 
+  // customer_id / customer_name / invoice_id are pass-through only: the
+  // form no longer sets them, but keeping them in state means editing a
+  // legacy row preserves its existing tags instead of nulling them.
   const [form, setForm] = useState(() => ({
     id: initial.id || null,
     supplier: initial.supplier || '',
@@ -633,36 +610,6 @@ function PurchaseForm({
   // Dirty check for Esc-to-close (Feature 6)
   const [initialJson] = useState(() => JSON.stringify(form))
   const isDirty = () => JSON.stringify(form) !== initialJson || receiptFile !== null || removeReceipt
-
-  // Customer search (same pattern as the booking form)
-  const [custQuery, setCustQuery] = useState(form.customer_name || '')
-  const [showCustList, setShowCustList] = useState(false)
-  const filteredCustomers = useMemo(() => {
-    const q = custQuery.toLowerCase().trim()
-    if (!q) return customers.slice(0, 20)
-    return customers.filter(c =>
-      (c.name || '').toLowerCase().includes(q) ||
-      (c.email || '').toLowerCase().includes(q) ||
-      (c.phone || '').includes(q) ||
-      (c.reg || '').toLowerCase().includes(q)
-    ).slice(0, 20)
-  }, [customers, custQuery])
-
-  const customerVehicles = useMemo(() => {
-    if (!form.customer_id) return []
-    return vehicles.filter(v => v.customer_id === form.customer_id)
-  }, [vehicles, form.customer_id])
-
-  const pickCustomer = (c) => {
-    setForm(f => ({ ...f, customer_id: c.id, customer_name: c.name, vehicle_reg: c.reg || '' }))
-    setCustQuery(c.name)
-    setShowCustList(false)
-  }
-
-  const clearCustomer = () => {
-    setForm(f => ({ ...f, customer_id: '', customer_name: '', vehicle_reg: '' }))
-    setCustQuery('')
-  }
 
   // ---------- Money (net or gross entry) ----------
   const [amountMode, setAmountMode] = useState('net') // 'net' | 'gross'
@@ -948,76 +895,26 @@ function PurchaseForm({
           {fieldErrors.amount && <div style={fieldErr}>{fieldErrors.amount}</div>}
         </div>
 
-        {/* Job link (optional) */}
-        <div style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', color: T.text2, marginBottom: '10px' }}>
-            <i className="ti ti-link" aria-hidden="true" /> <strong>Bought for a specific job?</strong> Tag the customer — it'll be offered when you raise their invoice. Leave blank for general workshop spend.
-          </div>
-          <div style={{ position: 'relative', marginBottom: '10px' }}>
-            <div style={fieldLbl}>Customer (optional)</div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <input
-                value={custQuery}
-                onChange={e => { setCustQuery(e.target.value); setShowCustList(true); setForm(f => ({ ...f, customer_id: '', customer_name: e.target.value })) }}
-                onFocus={() => setShowCustList(true)}
-                onBlur={() => setTimeout(() => setShowCustList(false), 150)}
-                placeholder="Type to search customers"
-                style={inputStyle}
-              />
-              {(form.customer_name || form.customer_id) && (
-                <button onClick={clearCustomer} style={{ ...chipBtn, padding: '0 10px' }} title="Clear customer">✕</button>
-              )}
-            </div>
-            {showCustList && filteredCustomers.length > 0 && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: '4px',
-                background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '8px',
-                maxHeight: '180px', overflowY: 'auto',
-              }}>
-                {filteredCustomers.map(c => (
-                  <div key={c.id} onMouseDown={() => pickCustomer(c)} style={{
-                    padding: '8px 12px', cursor: 'pointer', fontSize: '12px',
-                    borderBottom: `0.5px solid ${T.border}`,
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = T.surface3}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <div style={{ fontWeight: 500 }}>{c.name}</div>
-                    <div style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace', marginTop: '2px' }}>
-                      {c.phone || c.email || ''} {c.reg ? `· ${c.reg}` : ''}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div style={fieldLbl}>Vehicle</div>
-            {customerVehicles.length > 0 ? (
-              <select value={form.vehicle_reg || ''} onChange={e => setForm(f => ({ ...f, vehicle_reg: e.target.value }))} style={inputStyle}>
-                <option value="">— No vehicle —</option>
-                {customerVehicles.map(v => (
-                  <option key={v.id} value={v.reg}>{v.reg} {v.make ? `· ${v.make}` : ''} {v.model || ''}</option>
-                ))}
-              </select>
-            ) : (
-              <SuggestInput
-                value={form.vehicle_reg}
-                onChange={v => setForm(f => ({ ...f, vehicle_reg: v.toUpperCase() }))}
-                suggestions={regSuggestions}
-                placeholder="Vehicle reg (e.g. MK21 ABC)"
-                inputStyleExtra={{ textTransform: 'uppercase' }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Ref / paid */}
+        {/* Ref / vehicle */}
         <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Supplier invoice / receipt no.</div>
             <input value={form.supplier_ref} onChange={e => setForm(f => ({ ...f, supplier_ref: e.target.value }))} placeholder="Optional" style={inputStyle} />
           </div>
+          <div>
+            <div style={fieldLbl}>Vehicle</div>
+            <SuggestInput
+              value={form.vehicle_reg}
+              onChange={v => setForm(f => ({ ...f, vehicle_reg: v.toUpperCase() }))}
+              suggestions={regSuggestions}
+              placeholder="Vehicle reg (e.g. MK21 ABC)"
+              inputStyleExtra={{ textTransform: 'uppercase' }}
+            />
+          </div>
+        </div>
+
+        {/* Paid / payment method */}
+        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Payment</div>
             <select value={form.payment_status} onChange={e => setForm(f => ({ ...f, payment_status: e.target.value }))} style={inputStyle}>
@@ -1025,10 +922,6 @@ function PurchaseForm({
               <option value="unpaid">Unpaid (on account)</option>
             </select>
           </div>
-        </div>
-
-        {/* Payment method / notes */}
-        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Payment method *</div>
             <select value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))} style={inputStyle}>
@@ -1036,10 +929,12 @@ function PurchaseForm({
             </select>
             {fieldErrors.payment_method && <div style={fieldErr}>{fieldErrors.payment_method}</div>}
           </div>
-          <div>
-            <div style={fieldLbl}>Notes</div>
-            <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
-          </div>
+        </div>
+
+        {/* Notes */}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={fieldLbl}>Notes</div>
+          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
         </div>
 
         {/* Receipt */}
