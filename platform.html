@@ -101,6 +101,11 @@ const VERTICALS = {
   propertyops: { label: 'PropertyOps', color: 'var(--green)' },
 }
 
+// Verticals whose app has the /<product>/support landing deployed. Add a
+// product here the moment you ship its Support.jsx route — until then the
+// button is hidden rather than opening a 404.
+const SUPPORT_READY = ['soloops']
+
 const gbp = n => (n === null || n === undefined) ? '—' : new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(n)
 const fmtNum = n => (n === null || n === undefined) ? '—' : n.toLocaleString('en-GB')
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'
@@ -185,6 +190,41 @@ function Platform() {
     setBusy(null)
     if (res && res.error) { alert('Failed: ' + res.error); return }
     await loadUsers()
+  }
+
+  // ---- support access ("View client portal") ----------------------------
+  // Opens the customer's own app as them, so we can finish a setup for them or
+  // reproduce a fault they've reported. Sessions are still recorded in
+  // platform_support_sessions — the server fills in a standard reason.
+  const [supportBusy, setSupportBusy] = useState(null) // user_id+product opening
+
+  const openClientPortal = async (u, product) => {
+    const { data: { session } } = await window.sb.auth.getSession()
+    const res = await fetch('/api/admin-impersonate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ action: 'start', user_id: u.user_id, product }),
+    }).then(r => r.json()).catch(() => ({ error: 'Network error' }))
+
+    if (!res || res.error || !res.token_hash) {
+      return res?.error || 'Could not start the session'
+    }
+
+    // Token travels in the URL fragment — fragments are never sent to a server,
+    // so it stays out of request logs and the Referer header.
+    const frag = new URLSearchParams({
+      tk: res.token_hash,
+      sid: res.session_id,
+      admin: session?.user?.email || '',
+      email: res.email || u.email || '',
+      exp: String(new Date(res.expires_at).getTime()),
+    }).toString()
+
+    window.open(`/${product}/support#${frag}`, '_blank', 'noopener')
+    return null
   }
 
   // update tier/status for one vertical
@@ -369,6 +409,25 @@ function Platform() {
                                     disabled={planBusy===u.user_id+m.product}
                                     onChange={val=>setPlan(u, m.product, { status: val })} />
                                 </div>
+                                {SUPPORT_READY.includes(m.product) ? (
+                                  <button
+                                    onClick={async (e)=>{
+                                      e.stopPropagation()
+                                      setSupportBusy(u.user_id + m.product)
+                                      const failure = await openClientPortal(u, m.product)
+                                      setSupportBusy(null)
+                                      if (failure) alert('Could not open the portal: ' + failure)
+                                    }}
+                                    disabled={u.is_disabled || supportBusy === u.user_id + m.product}
+                                    title={u.is_disabled ? 'Enable the account first' : `Open ${m.product} as ${u.email}`}
+                                    style={{ ...btnSec, width:'100%', marginTop:'10px', padding:'9px', color: u.is_disabled ? 'var(--text3)' : 'var(--orange-light)', borderColor: u.is_disabled ? 'var(--border)' : 'rgba(249,115,22,.35)', cursor: u.is_disabled ? 'not-allowed' : 'pointer', opacity: (u.is_disabled || supportBusy === u.user_id + m.product) ? 0.5 : 1 }}>
+                                    {supportBusy === u.user_id + m.product ? 'Opening…' : 'View client portal ↗'}
+                                  </button>
+                                ) : (
+                                  <div style={{ marginTop:'10px', fontSize:'11.5px', color:'var(--text3)', textAlign:'center' }}>
+                                    Portal access not enabled for {meta.label} yet
+                                  </div>
+                                )}
                               </div>
                             )
                           })}
