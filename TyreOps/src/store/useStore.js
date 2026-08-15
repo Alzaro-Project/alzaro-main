@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { supabase } from '../lib/supabase'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { supabase, SUPPORT_MODE } from '../lib/supabase'
 import * as db from '../lib/db'
 
 // ============================================================
@@ -177,7 +177,9 @@ export const useStore = create(
 
       logout: async () => {
         try {
-          await supabase.auth.signOut()
+          // In a support session, scope:'local' so signing out here can't revoke
+          // the customer's refresh token on their own devices.
+          await supabase.auth.signOut(SUPPORT_MODE ? { scope: 'local' } : undefined)
         } catch (err) {
           console.error('Logout error:', err)
         }
@@ -774,7 +776,12 @@ export const useStore = create(
 
     }),
     {
-      name: 'garageiq-store',
+      name: SUPPORT_MODE ? 'garageiq-store-support' : 'garageiq-store',
+      // Support sessions keep their store in sessionStorage: tab-scoped,
+      // gone on close, and can never contaminate a real login's store.
+      storage: createJSONStorage(() =>
+        SUPPORT_MODE ? window.sessionStorage : window.localStorage
+      ),
       // Only persist certain fields to localStorage
       partialize: (state) => ({
         user: state.user,

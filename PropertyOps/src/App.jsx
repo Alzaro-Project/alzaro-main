@@ -9,6 +9,8 @@ import {
   MaintenancePage, FinancePage, DocumentsPage, ReportsPage, SettingsPage,
 } from "./pages/Operations.jsx";
 import { AuthScreen, JoinScreen, ResetPasswordScreen } from "./pages/Auth.jsx";
+import { SUPPORT_MODE } from "./lib/supabase.js";
+import Support from "./pages/Support.jsx";
 
 const PAGES = {
   properties: PropertiesPage, compliance: CompliancePage, tenants: TenantsPage,
@@ -470,7 +472,14 @@ function App() {
     return () => { cancelled = true; };
   }, [session]);
 
-  const signOut = () => db.auth.signOut();
+  // In a support session, scope:'local' so signing out here can't revoke
+  // the customer's refresh token on their own devices.
+  const signOut = () => db.auth.signOut(SUPPORT_MODE ? { scope: 'local' } : undefined);
+
+  // /propertyops/support: landing for an admin "View client portal" tab.
+  // Must render before every other gate — the tab has no session yet, so the
+  // session gate below would otherwise bounce it to the login screen.
+  if (/\/support\/?$/.test(window.location.pathname)) return <Support />;
 
   // Recovery link takes over the whole app until the password is updated
   // (the screen signs out and redirects to /propertyops/login when done).

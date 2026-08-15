@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from './store/useStore'
+import { supabase, SUPPORT_MODE } from './lib/supabase'
+import Support from './pages/Support'
+import SupportBanner from './components/SupportBanner'
 import Sidebar from './components/Sidebar'
 import TrialGuard from './components/TrialGuard'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -121,6 +124,30 @@ function AppLayout() {
   )
 }
 
+
+// Renders in place of the login redirect when a support tab loads. The tab has
+// a valid Supabase session (redeemed by pages/Support.jsx) but the zustand
+// store is empty, so seed it from the session and let the normal gate take
+// over once `user` is set.
+function SupportBootstrap() {
+  const login = useStore(s => s.login)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const email = data.session?.user?.email
+      if (email) login(email)
+      else setFailed(true)
+    })
+  }, [login])
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', color: 'var(--text, #444)' }}>
+      {failed
+        ? 'This support session has expired — start a new one from the platform admin.'
+        : 'Opening the account…'}
+    </div>
+  )
+}
+
 export default function App() {
   const user = useStore(s => s.user)
   const loadData = useStore(s => s.loadData)
@@ -137,10 +164,15 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter basename="/tyreops">
+        {/* Renders only inside an admin support session; null otherwise. */}
+        <SupportBanner />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/*" element={user ? <AppLayout /> : <Navigate to="/login" />} />
+          <Route path="/support" element={<Support />} />
+          {/* In a support tab the store starts empty — bootstrap it from the
+              session instead of bouncing to the login screen. */}
+          <Route path="/*" element={user ? <AppLayout /> : SUPPORT_MODE ? <SupportBootstrap /> : <Navigate to="/login" />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

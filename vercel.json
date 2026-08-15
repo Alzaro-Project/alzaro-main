@@ -172,7 +172,11 @@
       "destination": "/TyreOps/dist/index.html"
     },
     {
-      "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin).+\\..+)",
+      "source": "/tyreops/support",
+      "destination": "/TyreOps/dist/index.html"
+    },
+    {
+      "source": "/tyreops/:file((?!login|register|forgot-password|reset-password|dashboard|invoices|inventory|customers|purchases|reports|vat|settings|admin|support).+\\..+)",
       "destination": "/TyreOps/dist/:file"
     },
     {
@@ -236,7 +240,11 @@
       "destination": "/GarageOps/dist/index.html"
     },
     {
-      "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|items|stock|purchases|calendar|reports|settings|admin).+\\..+)",
+      "source": "/garageops/support",
+      "destination": "/GarageOps/dist/index.html"
+    },
+    {
+      "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|items|stock|purchases|calendar|reports|settings|admin|support).+\\..+)",
       "destination": "/GarageOps/dist/:file"
     },
     {
@@ -300,7 +308,11 @@
       "destination": "/ServiceOps/dist/index.html"
     },
     {
-      "source": "/serviceops/:file((?!login|register|reset-password|dashboard|customers|properties|quotes|jobs|diary|invoicing|certificates|documents|reports|settings).+\\..+)",
+      "source": "/serviceops/support",
+      "destination": "/ServiceOps/dist/index.html"
+    },
+    {
+      "source": "/serviceops/:file((?!login|register|reset-password|dashboard|customers|properties|quotes|jobs|diary|invoicing|certificates|documents|reports|settings|support).+\\..+)",
       "destination": "/ServiceOps/dist/:file"
     },
     {
@@ -428,7 +440,11 @@
       "destination": "/PropertyOps/dist/index.html"
     },
     {
-      "source": "/propertyops/:file((?!login|register|forgot-password|reset-password|dashboard|properties|compliance|tenants|maintenance|finance|documents|reports|settings).+\\..+)",
+      "source": "/propertyops/support",
+      "destination": "/PropertyOps/dist/index.html"
+    },
+    {
+      "source": "/propertyops/:file((?!login|register|forgot-password|reset-password|dashboard|properties|compliance|tenants|maintenance|finance|documents|reports|settings|support).+\\..+)",
       "destination": "/PropertyOps/dist/:file"
     },
     {
