@@ -19,6 +19,8 @@ import Reports from './pages/Reports.jsx'
 import Settings from './pages/Settings.jsx'
 import Login from './pages/Login.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
+import Support from './pages/Support.jsx'
+import SupportBanner from './components/SupportBanner.jsx'
 
 const VALID_VIEWS = NAV.map(n => n[0])
 
@@ -625,10 +627,14 @@ function Shell() {
 export default function App() {
   return (
     <BrowserRouter basename="/soloops">
+      {/* Renders only inside an admin support session; null otherwise. */}
+      <SupportBanner />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Navigate to="/login?tab=register" replace />} />
+        {/* Must sit above /:view — that route matches any single segment. */}
+        <Route path="/support" element={<Support />} />
         <Route path="/:view" element={<Shell />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

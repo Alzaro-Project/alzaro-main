@@ -368,7 +368,11 @@
       "destination": "/SoloOps/dist/index.html"
     },
     {
-      "source": "/soloops/:file((?!login|register|reset-password|dashboard|income|clients|expenses|banking|recurring|receipts|mileage|reports|documents|tax|settings).+\\..+)",
+      "source": "/soloops/support",
+      "destination": "/SoloOps/dist/index.html"
+    },
+    {
+      "source": "/soloops/:file((?!login|register|reset-password|dashboard|income|clients|expenses|banking|recurring|receipts|mileage|reports|documents|tax|settings|support).+\\..+)",
       "destination": "/SoloOps/dist/:file"
     },
     {
