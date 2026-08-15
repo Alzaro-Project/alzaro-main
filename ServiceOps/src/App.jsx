@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { db, DB_READY } from './lib/db.js'
+import { SUPPORT_MODE } from './lib/supabase.js'
+import Support from './pages/Support.jsx'
+import SupportBanner from './components/SupportBanner.jsx'
 import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard, TIER_ORDER } from './lib/helpers.js'
 import { PageHead, Btn, useIsMobile, SearchGroup } from './components/UI.jsx'
 import TrialGuard from './components/TrialGuard.jsx'
@@ -280,7 +283,9 @@ function App() {
     });
   }, [session]);
 
-  const signOut = () => db.auth.signOut();
+  // In a support session, scope:'local' so signing out here can't revoke
+  // the customer's refresh token on their own devices.
+  const signOut = () => db.auth.signOut(SUPPORT_MODE ? { scope: 'local' } : undefined);
 
   if (session === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
@@ -319,9 +324,15 @@ function TierLocked({ feature, requiredTier, currentTier, onUpgrade }) {
 // Vite entry: wrap the existing App (which still uses pushState/pathname
 // navigation internally) in a router scoped to the /serviceops base path.
 export default function AppRoot() {
+  // /serviceops/support is the landing for an admin "View client portal" tab.
+  // It must render BEFORE App's session gate (which would show the login
+  // screen), redeem the one-time token, then reload into the dashboard.
+  const isSupport = /\/support\/?$/.test(window.location.pathname)
   return (
     <BrowserRouter basename="/serviceops">
-      <App />
+      {/* Renders only inside an admin support session; null otherwise. */}
+      <SupportBanner />
+      {isSupport ? <Support /> : <App />}
     </BrowserRouter>
   )
 }

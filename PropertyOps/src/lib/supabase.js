@@ -11,6 +11,32 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // True only when both env vars are present at build time.
 export const DB_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
+/* ------------------------------------------------------------------
+   Support access (admin "View client portal")
+
+   A support tab must not disturb any real login, so it gets its own
+   storageKey in sessionStorage: it can't overwrite alzaro-propertyops-auth,
+   it's scoped to that one tab, and it dies with the tab. The SUPPORT_FLAG
+   is written by pages/Support.jsx before it reloads the app, so by the time
+   this module runs on the next load the branch below wins over EVERYTHING —
+   including the "keep me signed in" preference underneath.
+   ------------------------------------------------------------------ */
+export const SUPPORT_FLAG = "alzaro-support-session";
+export const SUPPORT_STORAGE_KEY = "alzaro-propertyops-support-auth";
+
+function readSupportMeta() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(SUPPORT_FLAG);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export const supportMeta = readSupportMeta();
+export const SUPPORT_MODE = supportMeta !== null;
+
 // "Keep me signed in" preference. The Supabase client picks its storage ONCE
 // at construction (you can't swap it after login), so the login screen saves
 // this choice and we read it here on the next page load:
@@ -29,6 +55,26 @@ function authStorage() {
   return keep ? window.localStorage : window.sessionStorage;
 }
 
+function authConfig() {
+  if (SUPPORT_MODE) {
+    return {
+      storageKey: SUPPORT_STORAGE_KEY,
+      storage: typeof window === "undefined" ? undefined : window.sessionStorage,
+      persistSession: true,
+      // No refresh: the support session genuinely dies when the access token
+      // expires (~1 hour), so the banner countdown is a real limit.
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    };
+  }
+  return {
+    storageKey: "alzaro-propertyops-auth",
+    storage: authStorage(),
+    persistSession: true,
+    autoRefreshToken: true,
+  };
+}
+
 // Only build a real client when both keys exist. createClient(undefined, …)
 // throws at import time, which would white-screen the whole app instead of
 // falling back to the intended "demo mode" (DB_READY === false). The stub
@@ -36,12 +82,7 @@ function authStorage() {
 // stray call can't crash either.
 export const db = DB_READY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        storageKey: "alzaro-propertyops-auth",
-        storage: authStorage(),
-        persistSession: true,
-        autoRefreshToken: true,
-      },
+      auth: authConfig(),
       global: { headers: { "x-product": "propertyops" } },
     })
   : {
@@ -51,3 +92,19 @@ export const db = DB_READY
         signOut: async () => ({ error: null }),
       },
     };
+
+// A throwaway client used only by pages/Support.jsx to redeem the one-time
+// support token. It writes into the same tab-scoped slot the support client
+// reads from on the next load.
+export function createSupportClient() {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      storageKey: SUPPORT_STORAGE_KEY,
+      storage: window.sessionStorage,
+      persistSession: true,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: { headers: { "x-product": "propertyops" } },
+  });
+}
