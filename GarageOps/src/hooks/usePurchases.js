@@ -13,6 +13,55 @@ import { supabase } from '../lib/supabase'
 //   createPurchase, updatePurchase, deletePurchase
 // ============================================================
 
+// How the purchase was paid — stored in purchases.payment_method.
+// `short` is the compact label used for list badges.
+export const PAYMENT_METHODS = [
+  { value: 'business_bank_account', label: 'Business Bank Account', short: 'Bank' },
+  { value: 'business_debit_card',   label: 'Business Debit Card',   short: 'Debit card' },
+  { value: 'business_credit_card',  label: 'Business Credit Card',  short: 'Credit card' },
+  { value: 'cash',                  label: 'Cash',                  short: 'Cash' },
+  { value: 'direct_debit',          label: 'Direct Debit',          short: 'Direct debit' },
+  { value: 'other',                 label: 'Other',                 short: 'Other' },
+]
+
+// ============================================================
+// Receipt storage ('receipts' private bucket)
+// ------------------------------------------------------------
+// purchases.receipt_url stores the storage PATH (not a URL) —
+// the bucket is private, so viewing goes via a signed URL.
+// Paths are `${garageId}/...` to satisfy the bucket's RLS.
+// ============================================================
+export const RECEIPTS_BUCKET = 'receipts'
+
+export function safeFileName(name) {
+  const cleaned = (name || 'receipt').replace(/[^a-zA-Z0-9._-]+/g, '_')
+  // keep the tail so the extension survives on very long names
+  return cleaned.length > 80 ? cleaned.slice(-80) : cleaned
+}
+
+export async function uploadReceipt(garageId, file) {
+  const path = `${garageId}/${Date.now()}_${safeFileName(file.name)}`
+  const { error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined, upsert: false })
+  if (error) throw new Error(error.message || 'Receipt upload failed')
+  return path
+}
+
+export async function removeReceiptObject(path) {
+  if (!path) return
+  const { error } = await supabase.storage.from(RECEIPTS_BUCKET).remove([path])
+  if (error) throw new Error(error.message || 'Could not delete receipt file')
+}
+
+export async function getReceiptSignedUrl(path, expiresIn = 300) {
+  const { data, error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .createSignedUrl(path, expiresIn)
+  if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not open receipt')
+  return data.signedUrl
+}
+
 export function usePurchases() {
   const garageId = useStore(s => s.garageId)
   const [purchases, setPurchases] = useState([])
@@ -85,10 +134,17 @@ export function usePurchases() {
 
   // ------- DELETE -------
   const deletePurchase = useCallback(async (id) => {
+    const row = purchases.find(p => p.id === id)
     const { error: delErr } = await supabase.from('purchases').delete().eq('id', id)
     if (delErr) throw delErr
     setPurchases(prev => prev.filter(p => p.id !== id))
-  }, [])
+    // Best-effort receipt cleanup — the row is already gone, so a failed
+    // storage delete only leaves an orphaned file, never a broken purchase.
+    if (row?.receipt_url) {
+      try { await removeReceiptObject(row.receipt_url) }
+      catch (err) { console.error('deletePurchase: receipt cleanup failed:', err) }
+    }
+  }, [purchases])
 
   return {
     purchases, defaultMarkupPct, loading, error,
@@ -115,6 +171,7 @@ function buildPayload(garageId, data) {
     vat,
     gross: round2(net + vat),
     payment_status: data.payment_status || 'paid',
+    payment_method: data.payment_method || null,
     customer_id: isUuid(data.customer_id) ? data.customer_id : null,
     customer_name: data.customer_name?.trim() || null,
     vehicle_reg: data.vehicle_reg?.trim().toUpperCase() || null,
