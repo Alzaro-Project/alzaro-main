@@ -1,14 +1,18 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
-import { usePurchases } from '../hooks/usePurchases'
+import {
+  usePurchases, PAYMENT_METHODS,
+  uploadReceipt, removeReceiptObject, getReceiptSignedUrl,
+} from '../hooks/usePurchases'
 
 // ============================================================
-// Purchases — Step 2: full CRUD
+// Purchases — full CRUD + receipts
 // ------------------------------------------------------------
 // One row per item bought. Optional customer/vehicle tag for
 // job-specific purchases (these get offered at invoice time).
 // Untagged rows are general workshop spend — still count for
-// VAT. Receipt photo upload comes in a later step.
+// VAT. Receipts live in the private 'receipts' storage bucket;
+// receipt_url holds the storage path, viewing uses signed URLs.
 // ============================================================
 
 const T = {
@@ -55,6 +59,93 @@ function todayStr() {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Round half-up to 2dp. Goes via a 6dp string so binary noise like
+// 0.825 * 100 === 82.49999999999999 still rounds up to 0.83.
+function roundMoney(n) {
+  return Math.round(Number((n * 100).toFixed(6))) / 100
+}
+
+// ---------- Payment method memory ----------
+const LAST_METHOD_KEY = 'garageops_last_payment_method'
+
+function getLastPaymentMethod() {
+  try {
+    const v = localStorage.getItem(LAST_METHOD_KEY)
+    if (PAYMENT_METHODS.some(m => m.value === v)) return v
+  } catch { /* ignore — private mode etc. */ }
+  return 'business_debit_card'
+}
+
+function rememberPaymentMethod(v) {
+  try { localStorage.setItem(LAST_METHOD_KEY, v) } catch { /* ignore */ }
+}
+
+// ---------- Receipt helpers ----------
+const RECEIPT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf'
+const RECEIPT_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'pdf']
+const RECEIPT_MAX_BYTES = 10 * 1024 * 1024
+
+function receiptExt(nameOrPath) {
+  return (nameOrPath || '').split('.').pop().toLowerCase()
+}
+
+function receiptKind(nameOrPath) {
+  return receiptExt(nameOrPath) === 'pdf' ? 'pdf' : 'image'
+}
+
+// "{garageId}/1723731123123_invoice.pdf" -> "invoice.pdf"
+function receiptNameFromPath(path) {
+  const last = (path || '').split('/').pop() || ''
+  return last.replace(/^\d+_/, '') || 'receipt'
+}
+
+// ---------- Date-range filter ----------
+const DATE_FILTERS = [
+  { key: 'all',       label: 'All time' },
+  { key: 'today',     label: 'Today' },
+  { key: 'week',      label: 'This week' },
+  { key: 'month',     label: 'This month' },
+  { key: 'lastmonth', label: 'Last month' },
+  { key: 'custom',    label: 'Custom…' },
+]
+
+function dateRangeFor(key, customFrom, customTo) {
+  if (key === 'all') return null
+  if (key === 'custom') {
+    if (!customFrom && !customTo) return null
+    return { from: customFrom || null, to: customTo || null }
+  }
+  const now = new Date()
+  if (key === 'today') {
+    const t = isoDate(now)
+    return { from: t, to: t }
+  }
+  if (key === 'week') { // Monday–Sunday
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+    const sun = new Date(mon)
+    sun.setDate(mon.getDate() + 6)
+    return { from: isoDate(mon), to: isoDate(sun) }
+  }
+  if (key === 'month') {
+    return {
+      from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+      to: isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    }
+  }
+  if (key === 'lastmonth') {
+    return {
+      from: isoDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      to: isoDate(new Date(now.getFullYear(), now.getMonth(), 0)),
+    }
+  }
+  return null
+}
+
 // ============================================================
 // MAIN
 // ============================================================
@@ -64,11 +155,68 @@ export default function Purchases() {
     createPurchase, updatePurchase, deletePurchase,
   } = usePurchases()
 
+  const customers = useStore(s => s.customers) || []
+  const vehicles = useStore(s => s.vehicles) || []
+
   const [formMode, setFormMode] = useState(null) // null | 'create' | 'edit'
   const [formInitial, setFormInitial] = useState({})
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [billFilter, setBillFilter] = useState('all') // all | unbilled | billed
+  const [methodFilter, setMethodFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all') // key from DATE_FILTERS
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [viewer, setViewer] = useState(null) // { url, revoke? } — image overlay
+
+  // ---------- Receipt viewing ----------
+  const openReceiptPath = async (path) => {
+    try {
+      if (receiptKind(path) === 'pdf') {
+        // open the tab synchronously (inside the click) so popup blockers allow it
+        const w = window.open('', '_blank')
+        try {
+          const url = await getReceiptSignedUrl(path)
+          if (w) w.location = url
+          else window.open(url, '_blank', 'noopener')
+        } catch (err) {
+          if (w) w.close()
+          throw err
+        }
+      } else {
+        const url = await getReceiptSignedUrl(path)
+        setViewer({ url })
+      }
+    } catch (err) {
+      alert('Could not open receipt: ' + (err.message || err))
+    }
+  }
+  const closeViewer = () => {
+    if (viewer?.revoke) URL.revokeObjectURL(viewer.url)
+    setViewer(null)
+  }
+
+  // ---------- Autocomplete pools (distinct, most-recent first) ----------
+  const supplierSuggestions = useMemo(() => {
+    const seen = new Set(), out = []
+    purchases.forEach(p => { // purchases are date-desc, so first hit = most recent
+      const s = (p.supplier || '').trim()
+      if (s && !seen.has(s.toLowerCase())) { seen.add(s.toLowerCase()); out.push(s) }
+    })
+    return out
+  }, [purchases])
+
+  const regSuggestions = useMemo(() => {
+    const seen = new Set(), out = []
+    const add = (r) => {
+      const v = (r || '').trim().toUpperCase()
+      if (v && !seen.has(v)) { seen.add(v); out.push(v) }
+    }
+    purchases.forEach(p => add(p.vehicle_reg))
+    vehicles.forEach(v => add(v.reg))
+    customers.forEach(c => add(c.reg))
+    return out
+  }, [purchases, vehicles, customers])
 
   // ---------- Stats ----------
   const stats = useMemo(() => {
@@ -92,10 +240,17 @@ export default function Purchases() {
   // ---------- Filtering ----------
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
+    const range = dateRangeFor(dateFilter, customFrom, customTo)
     return purchases.filter(p => {
       if (catFilter !== 'all' && p.category !== catFilter) return false
       if (billFilter === 'unbilled' && p.invoice_id) return false
       if (billFilter === 'billed' && !p.invoice_id) return false
+      if (methodFilter !== 'all' && p.payment_method !== methodFilter) return false
+      if (range) {
+        const d = p.purchase_date || ''
+        if (range.from && d < range.from) return false
+        if (range.to && d > range.to) return false
+      }
       if (!q) return true
       return (
         (p.supplier || '').toLowerCase().includes(q) ||
@@ -106,7 +261,21 @@ export default function Purchases() {
         (p.invoice_id || '').toLowerCase().includes(q)
       )
     })
-  }, [purchases, search, catFilter, billFilter])
+  }, [purchases, search, catFilter, billFilter, methodFilter, dateFilter, customFrom, customTo])
+
+  const anyFilterActive =
+    search.trim() !== '' || catFilter !== 'all' || billFilter !== 'all' ||
+    methodFilter !== 'all' || dateFilter !== 'all'
+
+  const filteredTotals = useMemo(() => {
+    let net = 0, vat = 0, gross = 0
+    filtered.forEach(p => {
+      net += Number(p.net) || 0
+      vat += Number(p.vat) || 0
+      gross += Number(p.gross) || 0
+    })
+    return { net, vat, gross }
+  }, [filtered])
 
   // ---------- Handlers ----------
   const openCreate = () => {
@@ -128,9 +297,11 @@ export default function Purchases() {
         supplier_ref: data.supplier_ref || null, notes: data.notes || null,
         net, vat, gross: Math.round((net + vat) * 100) / 100,
         payment_status: data.payment_status,
+        payment_method: data.payment_method || null,
         customer_id: data.customer_id || null,
         customer_name: data.customer_name || null,
         vehicle_reg: data.vehicle_reg ? data.vehicle_reg.toUpperCase() : null,
+        receipt_url: data.receipt_url || null,
       })
     }
     setFormMode(null)
@@ -188,15 +359,45 @@ export default function Purchases() {
           <option value="all">All categories</option>
           {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
+        <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)} style={selectStyle}>
+          <option value="all">All payment methods</option>
+          {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
         <select value={billFilter} onChange={e => setBillFilter(e.target.value)} style={selectStyle}>
           <option value="all">Billed + unbilled</option>
           <option value="unbilled">Unbilled only</option>
           <option value="billed">Billed only</option>
         </select>
+        <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={selectStyle}>
+          {DATE_FILTERS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+        </select>
+        {dateFilter === 'custom' && (
+          <>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={selectStyle} title="From" />
+            <span style={{ fontSize: '11px', color: T.text3 }}>to</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={selectStyle} title="To" />
+          </>
+        )}
         <div style={{ fontSize: '11px', color: T.text3, fontFamily: 'monospace', marginLeft: 'auto' }}>
           {filtered.length} of {purchases.length}
         </div>
       </div>
+
+      {/* Filtered totals */}
+      {anyFilterActive && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap',
+          background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '10px',
+          padding: '8px 14px', marginBottom: '12px', fontSize: '12px', fontFamily: 'monospace',
+        }}>
+          <span style={{ fontSize: '10px', color: T.text3, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Filtered total</span>
+          <span>Net <strong>{money(filteredTotals.net)}</strong></span>
+          <span style={{ color: T.text3 }}>·</span>
+          <span>VAT <strong>{money(filteredTotals.vat)}</strong></span>
+          <span style={{ color: T.text3 }}>·</span>
+          <span>Gross <strong>{money(filteredTotals.gross)}</strong></span>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -223,11 +424,12 @@ export default function Purchases() {
             <div>Category</div>
             <div>Job</div>
             <div style={{ textAlign: 'right' }}>Cost</div>
+            <div style={{ textAlign: 'center' }}>Paid via</div>
             <div style={{ textAlign: 'center' }}>Status</div>
             <div />
           </div>
           {filtered.map(p => (
-            <PurchaseRow key={p.id} p={p} onEdit={openEdit} onDelete={handleDelete} />
+            <PurchaseRow key={p.id} p={p} onEdit={openEdit} onDelete={handleDelete} onViewReceipt={openReceiptPath} />
           ))}
         </div>
       )}
@@ -239,8 +441,16 @@ export default function Purchases() {
           initial={formInitial}
           onClose={() => setFormMode(null)}
           onSave={handleSave}
+          supplierSuggestions={supplierSuggestions}
+          regSuggestions={regSuggestions}
+          onViewReceiptPath={openReceiptPath}
+          onPreviewLocalImage={url => setViewer({ url, revoke: true })}
+          viewerOpen={!!viewer}
         />
       )}
+
+      {/* Receipt image overlay */}
+      {viewer && <ReceiptViewer url={viewer.url} onClose={closeViewer} />}
     </div>
   )
 }
@@ -263,14 +473,15 @@ function StatTile({ label, value, sub, color = T.text }) {
 // ============================================================
 const rowGrid = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(160px, 2fr) 110px minmax(110px, 1.2fr) 110px 90px 76px',
+  gridTemplateColumns: 'minmax(160px, 2fr) 100px minmax(110px, 1.2fr) 110px 90px 90px 100px',
   gap: '12px',
   alignItems: 'center',
 }
 
-function PurchaseRow({ p, onEdit, onDelete }) {
+function PurchaseRow({ p, onEdit, onDelete, onViewReceipt }) {
   const cat = CATEGORIES.find(c => c.key === p.category) || CATEGORIES[CATEGORIES.length - 1]
   const jobTagged = p.customer_name || p.vehicle_reg
+  const method = PAYMENT_METHODS.find(m => m.value === p.payment_method)
   return (
     <div style={{ ...rowGrid, padding: '12px 16px', borderBottom: `0.5px solid ${T.border}`, fontSize: '13px' }}>
       {/* Item / supplier */}
@@ -306,6 +517,15 @@ function PurchaseRow({ p, onEdit, onDelete }) {
         <div style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace' }}>VAT {money(p.vat)}</div>
       </div>
 
+      {/* Payment method */}
+      <div style={{ textAlign: 'center' }}>
+        {method ? (
+          <span style={pill(T.surface3, T.text2)} title={method.label}>{method.short}</span>
+        ) : (
+          <span style={{ fontSize: '11px', color: T.text3 }}>—</span>
+        )}
+      </div>
+
       {/* Billed status */}
       <div style={{ textAlign: 'center' }}>
         {p.invoice_id ? (
@@ -323,6 +543,9 @@ function PurchaseRow({ p, onEdit, onDelete }) {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+        {p.receipt_url && (
+          <button onClick={() => onViewReceipt(p.receipt_url)} style={{ ...iconBtn, color: T.teal }} title="View receipt"><i className="ti ti-receipt" /></button>
+        )}
         <button onClick={() => onEdit(p)} style={iconBtn} title="Edit"><i className="ti ti-edit" /></button>
         <button onClick={() => onDelete(p)} style={{ ...iconBtn, color: T.red }} title="Delete"><i className="ti ti-trash" /></button>
       </div>
@@ -369,7 +592,12 @@ function EmptyState({ anyAtAll, onAdd }) {
 // ============================================================
 // PURCHASE FORM (create/edit)
 // ============================================================
-function PurchaseForm({ mode, initial, onClose, onSave }) {
+function PurchaseForm({
+  mode, initial, onClose, onSave,
+  supplierSuggestions = [], regSuggestions = [],
+  onViewReceiptPath, onPreviewLocalImage, viewerOpen,
+}) {
+  const garageId = useStore(s => s.garageId)
   const customers = useStore(s => s.customers) || []
   const vehicles = useStore(s => s.vehicles) || []
 
@@ -384,13 +612,27 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
     net: initial.net ?? '',
     vat: initial.vat ?? '',
     payment_status: initial.payment_status || 'paid',
+    payment_method: initial.payment_method || getLastPaymentMethod(),
     customer_id: initial.customer_id || '',
     customer_name: initial.customer_name || '',
     vehicle_reg: initial.vehicle_reg || '',
     invoice_id: initial.invoice_id || null,
+    receipt_url: initial.receipt_url || null,
   }))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  // Receipt state — the file only uploads on Save, so a failed upload
+  // never costs the user their typed data.
+  const [receiptFile, setReceiptFile] = useState(null)
+  const [removeReceipt, setRemoveReceipt] = useState(false)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
+  const fileInputRef = useRef(null)
+
+  // Dirty check for Esc-to-close (Feature 6)
+  const [initialJson] = useState(() => JSON.stringify(form))
+  const isDirty = () => JSON.stringify(form) !== initialJson || receiptFile !== null || removeReceipt
 
   // Customer search (same pattern as the booking form)
   const [custQuery, setCustQuery] = useState(form.customer_name || '')
@@ -422,23 +664,167 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
     setCustQuery('')
   }
 
-  // Money helpers
+  // ---------- Money (net or gross entry) ----------
+  const [amountMode, setAmountMode] = useState('net') // 'net' | 'gross'
+  const [grossInput, setGrossInput] = useState('')
+  const [grossVatRate, setGrossVatRate] = useState('20') // '20' | '5' | '0'
+
   const netNum = parseFloat(form.net) || 0
   const vatNum = parseFloat(form.vat) || 0
   const gross = Math.round((netNum + vatNum) * 100) / 100
-  const setVat20 = () => setForm(f => ({ ...f, vat: (Math.round((parseFloat(f.net) || 0) * 20) / 100).toFixed(2) }))
+
+  // Net mode: one-shot quick-VAT chips
+  const setVat20 = () => setForm(f => ({ ...f, vat: roundMoney((parseFloat(f.net) || 0) * 0.2).toFixed(2) }))
+  const setVat5 = () => setForm(f => ({ ...f, vat: roundMoney((parseFloat(f.net) || 0) * 0.05).toFixed(2) }))
   const setVat0 = () => setForm(f => ({ ...f, vat: '0.00' }))
 
-  const submit = async () => {
-    setError('')
-    if (!form.supplier.trim()) { setError('Supplier is required'); return }
-    if (!form.description.trim()) { setError('Description is required — what did you buy?'); return }
-    if (!form.purchase_date) { setError('Date is required'); return }
-    if (form.net === '' || isNaN(parseFloat(form.net))) { setError('Net amount is required (enter 0 if free)'); return }
-    setSaving(true)
-    try { await onSave(form) }
-    catch (err) { setError(err.message || 'Failed to save'); setSaving(false) }
+  // Gross mode: back-calculate so net + vat always equals gross exactly
+  const applyGross = (grossStr, rate) => {
+    setGrossInput(grossStr)
+    setGrossVatRate(rate)
+    const g = parseFloat(grossStr)
+    if (!Number.isFinite(g)) { setForm(f => ({ ...f, net: '', vat: '' })); return }
+    const grossR = roundMoney(g)
+    const divisor = rate === '20' ? 1.2 : rate === '5' ? 1.05 : 1
+    const net = roundMoney(grossR / divisor)
+    const vat = roundMoney(grossR - net) // absorbs any rounding penny
+    setForm(f => ({ ...f, net: net.toFixed(2), vat: vat.toFixed(2) }))
   }
+
+  const switchAmountMode = (m) => {
+    if (m === amountMode) return
+    setAmountMode(m)
+    if (m === 'gross') {
+      // prefill from current values; don't recompute until the user edits
+      setGrossInput(gross > 0 ? gross.toFixed(2) : '')
+      const ratio = netNum > 0 ? vatNum / netNum : null
+      setGrossVatRate(
+        ratio !== null && Math.abs(ratio - 0.05) < 0.005 ? '5'
+          : netNum > 0 && vatNum === 0 ? '0'
+          : '20'
+      )
+    }
+  }
+
+  // ---------- Receipt ----------
+  const currentReceiptName = receiptFile
+    ? receiptFile.name
+    : (!removeReceipt && form.receipt_url ? receiptNameFromPath(form.receipt_url) : null)
+
+  const pickReceiptFile = () => fileInputRef.current?.click()
+
+  const onReceiptPicked = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // so re-picking the same file fires onChange again
+    if (!file) return
+    if (!RECEIPT_EXTS.includes(receiptExt(file.name))) {
+      setFieldErrors(fe => ({ ...fe, receipt: 'Use a jpg, png, webp or pdf file' }))
+      return
+    }
+    if (file.size > RECEIPT_MAX_BYTES) {
+      setFieldErrors(fe => ({ ...fe, receipt: 'File is too big — 10MB max' }))
+      return
+    }
+    setFieldErrors(fe => ({ ...fe, receipt: undefined }))
+    setReceiptFile(file)
+    setRemoveReceipt(false)
+  }
+
+  const clearReceipt = () => {
+    setReceiptFile(null)
+    if (form.receipt_url) setRemoveReceipt(true)
+    setFieldErrors(fe => ({ ...fe, receipt: undefined }))
+  }
+
+  const viewReceipt = () => {
+    if (receiptFile) {
+      const url = URL.createObjectURL(receiptFile)
+      if (receiptKind(receiptFile.name) === 'pdf') {
+        window.open(url, '_blank', 'noopener')
+        setTimeout(() => URL.revokeObjectURL(url), 60000)
+      } else {
+        onPreviewLocalImage?.(url)
+      }
+    } else if (form.receipt_url) {
+      onViewReceiptPath?.(form.receipt_url)
+    }
+  }
+
+  // ---------- Save ----------
+  const submit = async () => {
+    if (saving) return
+    setError('')
+    const errs = {}
+    if (!form.supplier.trim()) errs.supplier = 'Supplier is required'
+    if (!form.description.trim()) errs.description = 'Required — what did you buy?'
+    if (!form.purchase_date || isNaN(new Date(form.purchase_date).getTime())) errs.purchase_date = 'Enter a valid date'
+    if (amountMode === 'gross') {
+      const g = parseFloat(grossInput)
+      if (grossInput === '' || isNaN(g) || g < 0) errs.amount = 'Gross amount is required (enter 0 if free)'
+    } else {
+      const n = parseFloat(form.net)
+      if (form.net === '' || isNaN(n) || n < 0) errs.amount = 'Net amount is required (enter 0 if free)'
+    }
+    if (!form.payment_method) errs.payment_method = 'Choose a payment method'
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
+
+    setSaving(true)
+    let uploadedPath = null
+    try {
+      let receiptPath = removeReceipt ? null : (form.receipt_url || null)
+      if (receiptFile) {
+        setUploadingReceipt(true)
+        try {
+          uploadedPath = await uploadReceipt(garageId, receiptFile)
+          receiptPath = uploadedPath
+        } catch (err) {
+          setFieldErrors(fe => ({ ...fe, receipt: `Upload failed: ${err.message || err}. Your details are still here — try again or remove the file.` }))
+          setUploadingReceipt(false)
+          setSaving(false)
+          return
+        }
+        setUploadingReceipt(false)
+      }
+
+      await onSave({ ...form, receipt_url: receiptPath })
+      rememberPaymentMethod(form.payment_method)
+
+      // best-effort: the replaced/removed old file is no longer referenced
+      const oldPath = initial.receipt_url
+      if (oldPath && oldPath !== receiptPath) {
+        removeReceiptObject(oldPath).catch(err => console.error('old receipt cleanup failed:', err))
+      }
+    } catch (err) {
+      // save failed after a successful upload — don't leave an orphaned file
+      if (uploadedPath) removeReceiptObject(uploadedPath).catch(() => {})
+      setError(err.message || 'Failed to save')
+      setSaving(false)
+    }
+  }
+
+  // ---------- Keyboard: Esc closes (confirm if dirty), Ctrl/Cmd+Enter saves ----------
+  const attemptClose = () => {
+    if (saving) return
+    if (isDirty() && !window.confirm('Discard unsaved changes?')) return
+    onClose()
+  }
+
+  const keysRef = useRef(null)
+  keysRef.current = { attemptClose, submit, viewerOpen }
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = keysRef.current
+      if (e.key === 'Escape') {
+        if (!k.viewerOpen) { e.preventDefault(); k.attemptClose() } // viewer's own Esc wins while open
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        k.submit()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }} style={modalOverlay}>
@@ -466,11 +852,19 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
         <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Supplier *</div>
-            <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="e.g. Euro Car Parts" style={inputStyle} autoFocus />
+            <SuggestInput
+              value={form.supplier}
+              onChange={v => setForm(f => ({ ...f, supplier: v }))}
+              suggestions={supplierSuggestions}
+              placeholder="e.g. Euro Car Parts"
+              autoFocus
+            />
+            {fieldErrors.supplier && <div style={fieldErr}>{fieldErrors.supplier}</div>}
           </div>
           <div>
             <div style={fieldLbl}>Date *</div>
             <input type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} style={inputStyle} />
+            {fieldErrors.purchase_date && <div style={fieldErr}>{fieldErrors.purchase_date}</div>}
           </div>
         </div>
 
@@ -479,6 +873,7 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
           <div>
             <div style={fieldLbl}>What did you buy? *</div>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Front brake pads — Bosch" style={inputStyle} />
+            {fieldErrors.description && <div style={fieldErr}>{fieldErrors.description}</div>}
           </div>
           <div>
             <div style={fieldLbl}>Category</div>
@@ -490,27 +885,67 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
 
         {/* Money */}
         <div style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
-          <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-            <div>
-              <div style={fieldLbl}>Net (£) *</div>
-              <input type="number" step="0.01" min="0" value={form.net} onChange={e => setForm(f => ({ ...f, net: e.target.value }))} placeholder="0.00" style={inputStyle} />
-            </div>
-            <div>
-              <div style={fieldLbl}>VAT (£)</div>
-              <input type="number" step="0.01" min="0" value={form.vat} onChange={e => setForm(f => ({ ...f, vat: e.target.value }))} placeholder="0.00" style={inputStyle} />
-            </div>
-            <div>
-              <div style={fieldLbl}>Total</div>
-              <div style={{ ...inputStyle, background: T.surface3, fontFamily: 'monospace', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
-                {money(gross)}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace' }}>AMOUNT IS:</span>
+            <button onClick={() => switchAmountMode('net')} style={amountMode === 'net' ? chipBtnActive : chipBtn}>Net</button>
+            <button onClick={() => switchAmountMode('gross')} style={amountMode === 'gross' ? chipBtnActive : chipBtn}>Gross</button>
+          </div>
+
+          {amountMode === 'net' ? (
+            <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <div>
+                <div style={fieldLbl}>Net (£) *</div>
+                <input type="number" step="0.01" min="0" value={form.net} onChange={e => setForm(f => ({ ...f, net: e.target.value }))} placeholder="0.00" style={inputStyle} />
+              </div>
+              <div>
+                <div style={fieldLbl}>VAT (£)</div>
+                <input type="number" step="0.01" min="0" value={form.vat} onChange={e => setForm(f => ({ ...f, vat: e.target.value }))} placeholder="0.00" style={inputStyle} />
+              </div>
+              <div>
+                <div style={fieldLbl}>Total</div>
+                <div style={{ ...inputStyle, background: T.surface3, fontFamily: 'monospace', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                  {money(gross)}
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+          ) : (
+            <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <div>
+                <div style={fieldLbl}>Gross (£) *</div>
+                <input type="number" step="0.01" min="0" value={grossInput} onChange={e => applyGross(e.target.value, grossVatRate)} placeholder="0.00" style={inputStyle} />
+              </div>
+              <div>
+                <div style={fieldLbl}>Net</div>
+                <div style={{ ...inputStyle, background: T.surface3, fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>
+                  {money(form.net)}
+                </div>
+              </div>
+              <div>
+                <div style={fieldLbl}>VAT</div>
+                <div style={{ ...inputStyle, background: T.surface3, fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>
+                  {money(form.vat)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace' }}>QUICK VAT:</span>
-            <button onClick={setVat20} style={chipBtn}>20% of net</button>
-            <button onClick={setVat0} style={chipBtn}>No VAT</button>
+            {amountMode === 'net' ? (
+              <>
+                <button onClick={setVat20} style={chipBtn}>20% of net</button>
+                <button onClick={setVat5} style={chipBtn}>5% of net</button>
+                <button onClick={setVat0} style={chipBtn}>No VAT</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => applyGross(grossInput, '20')} style={grossVatRate === '20' ? chipBtnActive : chipBtn}>Includes 20%</button>
+                <button onClick={() => applyGross(grossInput, '5')} style={grossVatRate === '5' ? chipBtnActive : chipBtn}>Includes 5%</button>
+                <button onClick={() => applyGross(grossInput, '0')} style={grossVatRate === '0' ? chipBtnActive : chipBtn}>No VAT</button>
+              </>
+            )}
           </div>
+          {fieldErrors.amount && <div style={fieldErr}>{fieldErrors.amount}</div>}
         </div>
 
         {/* Job link (optional) */}
@@ -566,17 +1001,18 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
                 ))}
               </select>
             ) : (
-              <input
+              <SuggestInput
                 value={form.vehicle_reg}
-                onChange={e => setForm(f => ({ ...f, vehicle_reg: e.target.value.toUpperCase() }))}
+                onChange={v => setForm(f => ({ ...f, vehicle_reg: v.toUpperCase() }))}
+                suggestions={regSuggestions}
                 placeholder="Vehicle reg (e.g. MK21 ABC)"
-                style={{ ...inputStyle, textTransform: 'uppercase' }}
+                inputStyleExtra={{ textTransform: 'uppercase' }}
               />
             )}
           </div>
         </div>
 
-        {/* Ref / paid / notes */}
+        {/* Ref / paid */}
         <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Supplier invoice / receipt no.</div>
@@ -591,18 +1027,169 @@ function PurchaseForm({ mode, initial, onClose, onSave }) {
           </div>
         </div>
 
+        {/* Payment method / notes */}
+        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <div>
+            <div style={fieldLbl}>Payment method *</div>
+            <select value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))} style={inputStyle}>
+              {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            {fieldErrors.payment_method && <div style={fieldErr}>{fieldErrors.payment_method}</div>}
+          </div>
+          <div>
+            <div style={fieldLbl}>Notes</div>
+            <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Receipt */}
         <div style={{ marginBottom: '18px' }}>
-          <div style={fieldLbl}>Notes</div>
-          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
+          <div style={fieldLbl}>Receipt</div>
+          {currentReceiptName ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '8px', padding: '7px 12px' }}>
+              <i className="ti ti-receipt" style={{ color: T.teal, fontSize: '15px' }} aria-hidden="true" />
+              <span style={{ fontSize: '12px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentReceiptName}>
+                {currentReceiptName}
+              </span>
+              <button onClick={viewReceipt} disabled={saving} style={chipBtn}>View</button>
+              <button onClick={pickReceiptFile} disabled={saving} style={chipBtn}>Replace</button>
+              <button onClick={clearReceipt} disabled={saving} style={{ ...chipBtn, color: T.red }}>Remove</button>
+            </div>
+          ) : (
+            <button onClick={pickReceiptFile} disabled={saving} style={ghostBtn}>
+              <i className="ti ti-upload" aria-hidden="true" /> Upload receipt
+              <span style={{ fontSize: '10px', color: T.text3 }}>jpg / png / pdf</span>
+            </button>
+          )}
+          <input ref={fileInputRef} type="file" accept={RECEIPT_ACCEPT} onChange={onReceiptPicked} style={{ display: 'none' }} />
+          {fieldErrors.receipt && <div style={fieldErr}>{fieldErrors.receipt}</div>}
         </div>
 
         <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} disabled={saving} style={ghostBtn}>Cancel</button>
           <button onClick={submit} disabled={saving} style={{ ...primaryBtn, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Saving...' : (mode === 'edit' ? 'Save changes' : 'Add purchase')}
+            {uploadingReceipt ? 'Uploading receipt…' : saving ? 'Saving...' : (mode === 'edit' ? 'Save changes' : 'Add purchase')}
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================================
+// SUGGEST INPUT — free-text input with a history dropdown
+// ------------------------------------------------------------
+// Keyboard: arrows move, Enter picks, Esc closes the list
+// (without closing the modal). Typing a brand-new value is
+// always fine — the list is just a shortcut.
+// ============================================================
+function SuggestInput({ value, onChange, suggestions, placeholder, autoFocus, inputStyleExtra }) {
+  const [open, setOpen] = useState(false)
+  const [idx, setIdx] = useState(-1)
+
+  const matches = useMemo(() => {
+    const q = (value || '').toLowerCase().trim()
+    const pool = q
+      ? suggestions.filter(s => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+      : suggestions
+    return pool.slice(0, 8)
+  }, [suggestions, value])
+
+  const pick = (s) => {
+    onChange(s)
+    setOpen(false)
+    setIdx(-1)
+  }
+
+  const onKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (!open) setOpen(true)
+      setIdx(i => Math.min(i + 1, matches.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setIdx(i => Math.max(i - 1, -1))
+    } else if (e.key === 'Enter') {
+      if (open && idx >= 0 && matches[idx]) { e.preventDefault(); pick(matches[idx]) }
+      else setOpen(false)
+    } else if (e.key === 'Escape') {
+      if (open) { e.stopPropagation(); setOpen(false); setIdx(-1) } // keep the modal open
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); setIdx(-1) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        style={{ ...inputStyle, ...inputStyleExtra }}
+      />
+      {open && matches.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: '4px',
+          background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '8px',
+          maxHeight: '180px', overflowY: 'auto',
+        }}>
+          {matches.map((s, i) => (
+            <div
+              key={s}
+              onMouseDown={() => pick(s)}
+              onMouseEnter={() => setIdx(i)}
+              style={{
+                padding: '7px 12px', cursor: 'pointer', fontSize: '12px',
+                borderBottom: `0.5px solid ${T.border}`,
+                background: i === idx ? T.surface3 : 'transparent',
+              }}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// RECEIPT VIEWER — in-app image overlay (PDFs open in a tab)
+// ============================================================
+function ReceiptViewer({ url, onClose }) {
+  useEffect(() => {
+    // capture phase + stopPropagation so the purchase modal's own
+    // Esc handler doesn't fire while the viewer is on top
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+      }}
+    >
+      <button
+        onClick={onClose}
+        title="Close"
+        style={{ ...closeXBtn, position: 'absolute', top: '14px', right: '18px', color: '#fff', zIndex: 1 }}
+      >
+        <i className="ti ti-x" />
+      </button>
+      <img
+        src={url}
+        alt="Receipt"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
+      />
     </div>
   )
 }
@@ -626,6 +1213,14 @@ const chipBtn = {
   background: T.surface3, color: T.text2, border: `1px solid ${T.border2}`,
   padding: '4px 10px', borderRadius: '6px',
   fontFamily: 'inherit', fontSize: '10px', cursor: 'pointer',
+}
+const chipBtnActive = {
+  ...chipBtn,
+  background: T.red, color: '#fff', border: `1px solid ${T.red}`,
+  fontWeight: 600,
+}
+const fieldErr = {
+  fontSize: '10px', color: T.red, marginTop: '4px',
 }
 const iconBtn = {
   width: '30px', height: '30px',
