@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { supabase } from '../lib/supabase'
 
 // ============================================================
@@ -231,6 +232,7 @@ export default function Database() {
 // VEHICLE LIST — all known regs (or partial matches)
 // ============================================================
 function VehicleList({ vehicles, query, onPick }) {
+  const isMobile = useIsMobile()
   if (vehicles.length === 0) {
     return (
       <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', padding: '50px 20px', textAlign: 'center' }}>
@@ -260,14 +262,33 @@ function VehicleList({ vehicles, query, onPick }) {
         {query ? `${vehicles.length} match${vehicles.length === 1 ? '' : 'es'} — tap one to open it` : `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'} known — tap one to see its full history`}
       </div>
       <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
-        <div style={{ ...listGrid, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, fontSize: '10px', color: T.text3, fontFamily: 'monospace', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-          <div>Reg / Owner</div>
-          <div style={{ textAlign: 'center' }}>Invoices</div>
-          <div style={{ textAlign: 'center' }}>Purchases</div>
-          <div style={{ textAlign: 'center' }}>Bookings</div>
-          <div style={{ textAlign: 'right' }}>Last activity</div>
-        </div>
-        {vehicles.map(v => (
+        {!isMobile && (
+          <div style={{ ...listGrid, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, fontSize: '10px', color: T.text3, fontFamily: 'monospace', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            <div>Reg / Owner</div>
+            <div style={{ textAlign: 'center' }}>Invoices</div>
+            <div style={{ textAlign: 'center' }}>Purchases</div>
+            <div style={{ textAlign: 'center' }}>Bookings</div>
+            <div style={{ textAlign: 'right' }}>Last activity</div>
+          </div>
+        )}
+        {vehicles.map(v => isMobile ? (
+          <div
+            key={v.key}
+            onClick={() => onPick(v)}
+            style={{ padding: '12px 14px', borderBottom: `0.5px solid ${T.border}`, fontSize: '13px', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
+              <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>{v.reg}</span>
+              <span style={{ fontSize: '11px', color: T.text2, fontFamily: 'monospace', flexShrink: 0 }}>{fmtDate(v.lastActivity)}</span>
+            </div>
+            <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {v.owner?.name || 'No owner on file'}{(v.make || v.model) ? ` · ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+            </div>
+            <div style={{ fontSize: '11px', color: T.text2, fontFamily: 'monospace', marginTop: '4px' }}>
+              {v.invoices.length} inv · {v.purchases.length} purch · {v.bookings.length} book
+            </div>
+          </div>
+        ) : (
           <div
             key={v.key}
             onClick={() => onPick(v)}
@@ -393,7 +414,7 @@ function VehicleDetail({ v, navigate }) {
             <div
               key={item.key}
               onClick={item.onClick}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: `0.5px solid ${T.border}`, cursor: item.onClick ? 'pointer' : 'default', fontSize: '13px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderBottom: `0.5px solid ${T.border}`, cursor: item.onClick ? 'pointer' : 'default', fontSize: '13px', flexWrap: 'wrap' }}
               onMouseEnter={e => { if (item.onClick) e.currentTarget.style.background = T.surface2 }}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >

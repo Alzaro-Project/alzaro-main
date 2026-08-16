@@ -942,7 +942,7 @@ export default function Invoices() {
       )}
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: '4px', background: 'var(--surface2)', borderRadius: '9px', padding: '4px', marginBottom: '16px', width: 'fit-content' }}>
+      <div className="filter-tabs" style={{ display: 'flex', gap: '4px', background: 'var(--surface2)', borderRadius: '9px', padding: '4px', marginBottom: '16px', width: 'fit-content' }}>
         {['all', 'draft', 'sent', 'paid', 'overdue'].map(f => (
           <div key={f} onClick={() => setFilter(f)} style={{
             padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
@@ -1027,12 +1027,12 @@ export default function Invoices() {
       {/* New/Edit Invoice Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); setEditingInvoice(null) } }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '700px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
+          <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '700px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 700, marginBottom: '18px' }}>
               {editingInvoice ? `Edit Invoice ${editingInvoice.id}` : 'New Invoice'}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {/* Searchable Customer Dropdown */}
               <CustomerSearch 
                 customers={customers}
@@ -1047,7 +1047,7 @@ export default function Invoices() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Customer Name</label>
                 <input style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }}
@@ -1060,7 +1060,7 @@ export default function Invoices() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Invoice Date</label>
                 <input type="date" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }}
@@ -1142,8 +1142,8 @@ export default function Invoices() {
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginBottom: '8px' }}>Line Items</div>
             {lines.map(line => (
               <div key={line.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', marginBottom: '8px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                  <div>
+                <div className="inv-line-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
+                  <div className="inv-line-desc">
                     <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Description</label>
                     <ServicePicker
                       services={services}
@@ -1210,7 +1210,7 @@ export default function Invoices() {
       {/* View Invoice Modal */}
       {viewInv && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) setViewInv(null) }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '660px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
+          <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '660px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800 }}>Alzaro<span style={{ color: 'var(--accent)' }}>GarageOps</span></div>

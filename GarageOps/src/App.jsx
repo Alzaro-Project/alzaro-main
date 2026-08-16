@@ -146,6 +146,20 @@ function AppLayout() {
           
           /* Stack form grids */
           .form-grid-2 { grid-template-columns: 1fr !important; }
+          .form-grid-3 { grid-template-columns: 1fr !important; }
+
+          /* Invoice line items: description gets its own row, qty/unit/✕ share one */
+          .inv-line-grid { grid-template-columns: 1fr 1fr auto !important; row-gap: 8px; }
+          .inv-line-desc { grid-column: 1 / -1; }
+
+          /* Filter tab rows scroll sideways instead of overflowing */
+          .filter-tabs { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+          /* Hide desktop-only elements (grid column headers etc.) */
+          .hide-mobile { display: none !important; }
+
+          /* Inputs/selects big enough to tap, and no iOS zoom-on-focus */
+          input, select, textarea { font-size: 16px !important; }
           
           /* Adjust page headers */
           .page-header { flex-direction: column; align-items: flex-start !important; gap: 12px; }

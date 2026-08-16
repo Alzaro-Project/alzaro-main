@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useServices } from '../hooks/useServices'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 // ============================================================
 // Items — Services catalog
@@ -161,8 +162,8 @@ function ServicesList({ active, archived, onEdit, onArchive, onRestore, onHardDe
   }
   return (
     <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
+      {/* Header (desktop only) */}
+      <div className="hide-mobile" style={{
         display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 110px',
         gap: '12px', padding: '10px 16px',
         borderBottom: `0.5px solid ${T.border}`,
@@ -189,6 +190,37 @@ function ServicesList({ active, archived, onEdit, onArchive, onRestore, onHardDe
 }
 
 function ServiceRow({ svc, archived, onEdit, onArchive, onRestore, onHardDelete }) {
+  const isMobile = useIsMobile()
+  if (isMobile) {
+    return (
+      <div style={{ padding: '12px 14px', borderBottom: `0.5px solid ${T.border}`, fontSize: '13px', opacity: archived ? 0.5 : 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 500 }}>{svc.name}</div>
+            {svc.default_description && (
+              <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px' }}>{svc.default_description}</div>
+            )}
+            <div style={{ fontFamily: 'monospace', color: T.text2, fontSize: '11px', marginTop: '4px' }}>
+              {svc.default_duration_min} min · {money(svc.default_price)}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+            {archived ? (
+              <>
+                <button onClick={() => onRestore(svc)} style={iconBtn} title="Restore"><i className="ti ti-arrow-back-up" /></button>
+                <button onClick={() => onHardDelete(svc)} style={{ ...iconBtn, color: T.red }} title="Delete forever"><i className="ti ti-trash" /></button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => onEdit(svc)} style={iconBtn} title="Edit"><i className="ti ti-edit" /></button>
+                <button onClick={() => onArchive(svc)} style={iconBtn} title="Archive"><i className="ti ti-archive" /></button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 110px',

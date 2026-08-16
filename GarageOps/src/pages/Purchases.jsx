@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore'
+import { useIsMobile } from '../hooks/useIsMobile'
 import {
   usePurchases, PAYMENT_METHODS,
   uploadReceipt, removeReceiptObject, getReceiptSignedUrl,
@@ -166,6 +167,7 @@ export default function Purchases() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [viewer, setViewer] = useState(null) // { url, revoke? } — image overlay
+  const isMobile = useIsMobile()
 
   // Global search can deep-link here with ?q=… (e.g. a car reg)
   const location = useLocation()
@@ -402,17 +404,21 @@ export default function Purchases() {
         <EmptyState anyAtAll={purchases.length > 0} onAdd={openCreate} />
       ) : (
         <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
-          {/* Column headings (desktop) */}
-          <div style={{ ...rowGrid, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, fontSize: '10px', color: T.text3, fontFamily: 'monospace', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            <div>Reg / Supplier</div>
-            <div>Category</div>
-            <div>Item</div>
-            <div style={{ textAlign: 'right' }}>Cost</div>
-            <div style={{ textAlign: 'center' }}>Paid via</div>
-            <div style={{ textAlign: 'center' }}>Status</div>
-            <div />
-          </div>
-          {filtered.map(p => (
+          {/* Column headings (desktop only) */}
+          {!isMobile && (
+            <div style={{ ...rowGrid, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, fontSize: '10px', color: T.text3, fontFamily: 'monospace', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              <div>Reg / Supplier</div>
+              <div>Category</div>
+              <div>Item</div>
+              <div style={{ textAlign: 'right' }}>Cost</div>
+              <div style={{ textAlign: 'center' }}>Paid via</div>
+              <div style={{ textAlign: 'center' }}>Status</div>
+              <div />
+            </div>
+          )}
+          {filtered.map(p => isMobile ? (
+            <MobilePurchaseCard key={p.id} p={p} onEdit={openEdit} onDelete={handleDelete} onViewReceipt={openReceiptPath} />
+          ) : (
             <PurchaseRow key={p.id} p={p} onEdit={openEdit} onDelete={handleDelete} onViewReceipt={openReceiptPath} />
           ))}
         </div>
@@ -532,6 +538,63 @@ function PurchaseRow({ p, onEdit, onDelete, onViewReceipt }) {
         )}
         <button onClick={() => onEdit(p)} style={iconBtn} title="Edit"><i className="ti ti-edit" /></button>
         <button onClick={() => onDelete(p)} style={{ ...iconBtn, color: T.red }} title="Delete"><i className="ti ti-trash" /></button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// MOBILE CARD — stacked layout replacing the 7-column row
+// ============================================================
+function MobilePurchaseCard({ p, onEdit, onDelete, onViewReceipt }) {
+  const cat = CATEGORIES.find(c => c.key === p.category) || CATEGORIES[CATEGORIES.length - 1]
+  const jobTagged = p.customer_name || p.vehicle_reg
+  const method = PAYMENT_METHODS.find(m => m.value === p.payment_method)
+  return (
+    <div style={{ padding: '12px 14px', borderBottom: `0.5px solid ${T.border}`, fontSize: '13px' }}>
+      {/* Reg + cost */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
+        {p.vehicle_reg ? (
+          <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>{p.vehicle_reg}</span>
+        ) : (
+          <span style={{ fontWeight: 500, color: T.text3 }}>Workshop</span>
+        )}
+        <span style={{ textAlign: 'right', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{money(p.gross)}</span>
+          <span style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace', marginLeft: '6px' }}>VAT {money(p.vat)}</span>
+        </span>
+      </div>
+
+      {/* Item */}
+      <div style={{ fontSize: '12px', fontWeight: 500, marginTop: '4px' }}>{p.description}</div>
+
+      {/* Supplier · date · ref */}
+      <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px' }}>
+        {p.supplier} · {fmtDate(p.purchase_date)}{p.supplier_ref ? ` · ref ${p.supplier_ref}` : ''}
+      </div>
+
+      {/* Pills + actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: cat.color }}>
+          <i className={`ti ${cat.icon}`} style={{ fontSize: '12px' }} aria-hidden="true" /> {cat.label}
+        </span>
+        {method && <span style={pill(T.surface3, T.text2)}>{method.short}</span>}
+        {p.invoice_id ? (
+          <span style={pill('rgba(76,175,80,0.12)', T.green)} title={`On invoice ${p.invoice_id}`}>
+            <i className="ti ti-check" style={{ fontSize: '10px' }} aria-hidden="true" /> Billed
+          </span>
+        ) : jobTagged ? (
+          <span style={pill('rgba(255,179,0,0.12)', T.amber)}>Unbilled</span>
+        ) : p.payment_status === 'unpaid' ? (
+          <span style={pill('rgba(229,57,53,0.12)', T.red)}>Unpaid</span>
+        ) : null}
+        <span style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+          {p.receipt_url && (
+            <button onClick={() => onViewReceipt(p.receipt_url)} style={{ ...iconBtn, color: T.teal }} title="View receipt"><i className="ti ti-receipt" /></button>
+          )}
+          <button onClick={() => onEdit(p)} style={iconBtn} title="Edit"><i className="ti ti-edit" /></button>
+          <button onClick={() => onDelete(p)} style={{ ...iconBtn, color: T.red }} title="Delete"><i className="ti ti-trash" /></button>
+        </span>
       </div>
     </div>
   )

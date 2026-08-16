@@ -288,7 +288,7 @@ export default function Customers() {
       {/* Add/Edit Customer Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '26px' }}>
+          <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '26px' }}>
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 700, marginBottom: '18px' }}>
               {editing ? 'Edit Customer' : 'Add Customer'}
             </div>
@@ -314,7 +314,7 @@ export default function Customers() {
                 <input style={inputStyle} value={form.name} onChange={e => f('name', e.target.value)} placeholder="John Smith" />
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Email</label>
                   <input 
@@ -402,7 +402,7 @@ export default function Customers() {
       {/* Add Vehicle Modal */}
       {showVehicleModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) setShowVehicleModal(false) }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '400px', maxWidth: '100%', padding: '24px' }}>
+          <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '400px', maxWidth: '100%', padding: '24px' }}>
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '17px', fontWeight: 700, marginBottom: '16px' }}>
               Add Vehicle
             </div>
@@ -417,7 +417,7 @@ export default function Customers() {
                   placeholder="MK21 ABC" 
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Make</label>
                   <input style={inputStyle} value={vehicleForm.make} onChange={e => vf('make', e.target.value)} placeholder="Ford" />

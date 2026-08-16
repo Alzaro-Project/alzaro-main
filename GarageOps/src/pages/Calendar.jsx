@@ -382,7 +382,8 @@ function WeekView({ refDate, byDate, slotSettings, onBookingClick, onSlotClick }
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', minHeight: '480px' }}>
+    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', minHeight: '480px', minWidth: '680px' }}>
       <div style={{ borderRight: `0.5px solid ${T.border}`, borderBottom: `0.5px solid ${T.border}` }} />
       {days.map((d, i) => {
         const isToday = sameDate(d, today)
@@ -436,6 +437,7 @@ function WeekView({ refDate, byDate, slotSettings, onBookingClick, onSlotClick }
         </>
       ))}
     </div>
+  </div>
   )
 }
 
@@ -497,7 +499,7 @@ function DayView({ refDate, byDate, slotSettings, onBookingClick, onSlotClick })
 function BookingModal({ booking, onClose, onEdit, onDelete }) {
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }} style={modalOverlay}>
-      <div style={{ ...modalCard, maxWidth: '460px' }}>
+      <div className="modal-content" style={{ ...modalCard, maxWidth: '460px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.3px' }}>{booking.customer_name || 'Booking'}</div>
@@ -508,7 +510,7 @@ function BookingModal({ booking, onClose, onEdit, onDelete }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.text3, fontSize: '22px', cursor: 'pointer' }}><i className="ti ti-x" /></button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
+        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
           <Field label="Date" value={booking.booking_date} />
           <Field label="Time" value={`${fmtTime(booking.start_time)} (${booking.duration_min} min)`} />
           {booking.job_type && <Field label="Job type" value={booking.job_type} />}
@@ -628,7 +630,7 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
 
   return (
     <div onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }} style={modalOverlay}>
-      <div style={{ ...modalCard, maxWidth: '560px' }}>
+      <div className="modal-content" style={{ ...modalCard, maxWidth: '560px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
           <div style={{ fontSize: '18px', fontWeight: 700 }}>
             {mode === 'edit' ? 'Edit booking' : 'New booking'}
@@ -698,7 +700,7 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
         </div>
 
         {/* Date / Time / Duration */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+        <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Date *</div>
             <input type="date" value={form.booking_date} onChange={e => setForm(f => ({ ...f, booking_date: e.target.value }))} style={inputStyle} />
@@ -714,7 +716,7 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
         </div>
 
         {/* Job type + Status */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
             <div style={fieldLbl}>Job type</div>
             {services.length > 0 ? (
