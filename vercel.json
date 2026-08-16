@@ -220,6 +220,10 @@
       "destination": "/GarageOps/dist/index.html"
     },
     {
+      "source": "/garageops/database",
+      "destination": "/GarageOps/dist/index.html"
+    },
+    {
       "source": "/garageops/purchases",
       "destination": "/GarageOps/dist/index.html"
     },
@@ -244,7 +248,7 @@
       "destination": "/GarageOps/dist/index.html"
     },
     {
-      "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|items|stock|purchases|calendar|reports|settings|admin|support).+\\..+)",
+      "source": "/garageops/:file((?!login|register|forgot-password|reset-password|dashboard|customers|invoices|items|stock|database|purchases|calendar|reports|settings|admin|support).+\\..+)",
       "destination": "/GarageOps/dist/:file"
     },
     {

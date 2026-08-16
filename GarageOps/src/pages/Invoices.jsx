@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useStore, TIER_ORDER } from '../store/useStore'
+import { useStore } from '../store/useStore'
+import { useServices } from '../hooks/useServices'
 import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import { sendInvoiceEmail, generateInvoiceEmailHTML, generateInvoiceEmailText
@@ -297,6 +298,64 @@ function CustomerSearch({ customers, value, onChange, onAddNew }) {
               <Btn variant="primary" onClick={handleAddCustomer}>Add Customer</Btn>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// ServicePicker — description input + optional dropdown of
+// services from Items. Pick one to fill the description and
+// default price, or just type anything free-form.
+// ============================================================
+function ServicePicker({ services, value, onType, onPick }) {
+  const [open, setOpen] = useState(false)
+
+  const q = (value || '').toLowerCase().trim()
+  const matches = q
+    ? services.filter(s => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q)
+    : services
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 26px 7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+        value={value}
+        onChange={e => { onType(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Pick a service or type…"
+      />
+      <span
+        onMouseDown={e => { e.preventDefault(); setOpen(o => !o) }}
+        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: '9px', cursor: 'pointer' }}
+      >
+        {open ? '▲' : '▼'}
+      </span>
+      {open && matches.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, marginTop: '4px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+          maxHeight: '190px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+        }}>
+          <div style={{ padding: '6px 10px', fontSize: '9px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+            From Items · or type your own
+          </div>
+          {matches.map(s => (
+            <div
+              key={s.id}
+              onMouseDown={() => { onPick(s); setOpen(false) }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '8px 10px', cursor: 'pointer', fontSize: '11px', borderBottom: '1px solid var(--border)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+              {s.default_price != null && (
+                <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--text2)', flexShrink: 0 }}>£{Number(s.default_price).toFixed(2)}</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -612,8 +671,9 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
 }
 
 export default function Invoices() {
-  const { invoices, customers, skus, batches, usedTyres, tier, settings,
+  const { invoices, customers, tier, settings,
     addInvoice, updateInvoice, deleteInvoice, addCustomer } = useStore()
+  const { services } = useServices() // Items → Services catalog, feeds the line description dropdown
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -684,9 +744,7 @@ export default function Invoices() {
       .then(({ error }) => { if (error) console.error('Stamp purchases:', error) })
   }
 
-  const isSilverPlus = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver')
   const isBronze = tier === 'bronze'
-  const isGold = tier === 'gold'
 
   // When global search sends us here with a focused invoice id, open it.
   const location = useLocation()
@@ -735,7 +793,7 @@ export default function Invoices() {
     setLines(inv.lines.map((l, i) => ({
       ...l,
       id: l.id || `line-${i}-${Date.now()}`,
-      type: l.lineType === 'service' ? 'service' : 'tyre'
+      type: 'service' // legacy tyre lines render as plain description lines
     })))
     setEditingInvoice(inv)
     setShowModal(true)
@@ -766,10 +824,6 @@ export default function Invoices() {
     }))
   }
 
-  const addTyreLine = () => {
-    setLines(l => [...l, { id: Date.now(), type: 'tyre', skuId: '', batchId: '', usedId: '', desc: '', qty: 1, unit: 0, cost: 0, lineType: 'new', marginScheme: false, sizeFilter: '' }])
-  }
-
   const addServiceLine = () => {
     setLines(l => [...l, { id: Date.now(), type: 'service', desc: '', qty: 1, unit: 0, cost: 0, lineType: 'service' }])
   }
@@ -780,20 +834,11 @@ export default function Invoices() {
 
   const removeLine = (id) => setLines(l => l.filter(line => line.id !== id))
 
-  const onSkuChange = (lineId, skuId) => {
-    const sk = skus.find(s => s.id === skuId)
-    const fb = batches.filter(b => b.skuId === skuId && b.remaining > 0).sort((a, b) => new Date(a.date) - new Date(b.date))[0]
+  // Picking a service from Items fills the description and default price
+  const onServicePick = (lineId, svc) => {
     updateLine(lineId, {
-      skuId, desc: sk ? `${sk.brand} ${sk.model} (${sk.w}/${sk.p}R${sk.r})` : '',
-      unit: sk?.sell || 0, cost: fb?.cost || 0, batchId: fb?.id || '', lineType: 'new'
-    })
-  }
-
-  const onUsedChange = (lineId, usedId) => {
-    const u = usedTyres.find(u => u.id === usedId)
-    updateLine(lineId, {
-      usedId, desc: u ? `${u.brand} ${u.model} (${u.w}/${u.p}R${u.r}) — Used` : '',
-      unit: u?.sell || 0, cost: u?.cost || 0, lineType: 'used', marginScheme: true
+      desc: svc.name,
+      unit: svc.default_price != null ? Number(svc.default_price) : 0,
     })
   }
 
@@ -826,16 +871,6 @@ export default function Invoices() {
         paidAt: finalStatus === 'paid' ? new Date().toISOString() : editingInvoice.paidAt
       }
       
-      // Mark used tyres as sold if status changed to sent/paid
-      if ((finalStatus === 'sent' || finalStatus === 'paid') && editingInvoice.status === 'draft') {
-        lines.forEach(l => {
-          if (l.usedId) {
-            const u = usedTyres.find(u => u.id === l.usedId)
-            if (u) useStore.getState().updateUsedTyre(u.id, { sold: true })
-          }
-        })
-      }
-      
       updateInvoice(editingInvoice.id, updatedInv)
       stampPurchases(editingInvoice.id)
       return updatedInv
@@ -853,14 +888,6 @@ export default function Invoices() {
       paidAt: finalStatus === 'paid' ? new Date().toISOString() : null
     }
     
-    if (finalStatus === 'sent' || finalStatus === 'paid') {
-      lines.forEach(l => {
-        if (l.usedId) {
-          const u = usedTyres.find(u => u.id === l.usedId)
-          if (u) useStore.getState().updateUsedTyre(u.id, { sold: true })
-        }
-      })
-    }
     addInvoice(inv)
     stampPurchases(id)
     return inv
@@ -1113,91 +1140,35 @@ export default function Invoices() {
 
             {/* Lines */}
             <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginBottom: '8px' }}>Line Items</div>
-            {lines.map((line, i) => (
+            {lines.map(line => (
               <div key={line.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', marginBottom: '8px' }}>
-                {line.type === 'tyre' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
                   <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Tyre / Used</label>
-                        <select 
-                          style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.skuId || line.usedId || ''}
-                          onChange={e => {
-                            const val = e.target.value
-                            if (val.startsWith('used-')) {
-                              onUsedChange(line.id, val.replace('used-', ''))
-                            } else {
-                              onSkuChange(line.id, val)
-                            }
-                          }}
-                        >
-                          <option value="">— Select —</option>
-                          <optgroup label="New Tyres">
-                            {skus.map(sk => {
-                              const stock = batches.filter(b => b.skuId === sk.id && b.remaining > 0).reduce((a, b) => a + b.remaining, 0)
-                              return <option key={sk.id} value={sk.id} disabled={stock === 0}>{sk.brand} {sk.model} ({sk.w}/{sk.p}R{sk.r}) — {stock} in stock</option>
-                            })}
-                          </optgroup>
-                          {isSilverPlus && (
-                            <optgroup label="♻ Used Tyres">
-                              {usedTyres.filter(u => !u.sold).map(u => (
-                                <option key={u.id} value={`used-${u.id}`}>♻ {u.brand} {u.model} ({u.w}/{u.p}R{u.r}) — £{u.sell}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Qty</label>
-                        <input type="number" min="1" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.qty} onChange={e => updateLine(line.id, { qty: parseInt(e.target.value) || 1 })} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
-                        <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                          value={line.unit === 0 ? '' : line.unit} onChange={e => updateLine(line.id, { unit: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })} />
-                      </div>
-                      <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
-                    </div>
-                    {line.lineType === 'used' && isGold && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 8px', background: 'rgba(45,212,191,0.08)', borderRadius: '6px' }}>
-                        <input type="checkbox" checked={line.marginScheme} onChange={e => updateLine(line.id, { marginScheme: e.target.checked })} />
-                        <span style={{ fontSize: '11px', color: 'var(--teal)' }}>Apply VAT Margin Scheme (Gold)</span>
-                      </div>
-                    )}
-                    {(line.skuId || line.usedId) && (
-                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '6px', fontFamily: 'DM Mono, monospace' }}>
-                        Line total: £{(line.qty * line.unit).toFixed(2)} · FIFO cost: £{line.cost.toFixed(2)} · Margin: £{(line.qty * (line.unit - line.cost)).toFixed(2)}
-                      </div>
-                    )}
+                    <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Description</label>
+                    <ServicePicker
+                      services={services}
+                      value={line.desc}
+                      onType={v => updateLine(line.id, { desc: v })}
+                      onPick={svc => onServicePick(line.id, svc)}
+                    />
                   </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                    <div>
-                      <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Description</label>
-                      <input style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.desc} onChange={e => updateLine(line.id, { desc: e.target.value })} placeholder="Fitting & balancing" />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Qty</label>
-                      <input type="number" min="1" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.qty} onChange={e => updateLine(line.id, { qty: parseInt(e.target.value) || 1 })} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
-                      <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
-                        value={line.unit === 0 ? '' : line.unit} onChange={e => updateLine(line.id, { unit: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })} />
-                    </div>
-                    <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Qty</label>
+                    <input type="number" min="1" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                      value={line.qty} onChange={e => updateLine(line.id, { qty: parseInt(e.target.value) || 1 })} />
                   </div>
-                )}
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text2)', display: 'block', marginBottom: '3px' }}>Unit £</label>
+                    <input type="number" step="0.01" style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '7px 9px', color: 'var(--text)', fontSize: '11px', outline: 'none', width: '100%' }}
+                      value={line.unit === 0 ? '' : line.unit} onChange={e => updateLine(line.id, { unit: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <button onClick={() => removeLine(line.id)} style={{ background: 'rgba(255,95,95,0.1)', color: 'var(--red)', border: 'none', borderRadius: '6px', padding: '7px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                </div>
               </div>
             ))}
 
             <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-              <Btn sm variant="secondary" onClick={addTyreLine}>+ Tyre</Btn>
-              <Btn sm variant="secondary" onClick={addServiceLine}>+ Service</Btn>
+              <Btn sm variant="secondary" onClick={addServiceLine}>+ Add line</Btn>
             </div>
 
             {/* Totals */}

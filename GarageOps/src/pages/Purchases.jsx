@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import {
   usePurchases, PAYMENT_METHODS,
@@ -165,6 +166,13 @@ export default function Purchases() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [viewer, setViewer] = useState(null) // { url, revoke? } — image overlay
+
+  // Global search can deep-link here with ?q=… (e.g. a car reg)
+  const location = useLocation()
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q')
+    if (q) setSearch(q)
+  }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- Receipt viewing ----------
   const openReceiptPath = async (path) => {
@@ -396,9 +404,9 @@ export default function Purchases() {
         <div style={{ background: T.surface, border: `0.5px solid ${T.border}`, borderRadius: '12px', overflow: 'hidden' }}>
           {/* Column headings (desktop) */}
           <div style={{ ...rowGrid, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, fontSize: '10px', color: T.text3, fontFamily: 'monospace', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            <div>Item / Supplier</div>
+            <div>Reg / Supplier</div>
             <div>Category</div>
-            <div>Job</div>
+            <div>Item</div>
             <div style={{ textAlign: 'right' }}>Cost</div>
             <div style={{ textAlign: 'center' }}>Paid via</div>
             <div style={{ textAlign: 'center' }}>Status</div>
@@ -460,9 +468,13 @@ function PurchaseRow({ p, onEdit, onDelete, onViewReceipt }) {
   const method = PAYMENT_METHODS.find(m => m.value === p.payment_method)
   return (
     <div style={{ ...rowGrid, padding: '12px 16px', borderBottom: `0.5px solid ${T.border}`, fontSize: '13px' }}>
-      {/* Item / supplier */}
+      {/* Reg / supplier */}
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>
+        {p.vehicle_reg ? (
+          <div style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.vehicle_reg}</div>
+        ) : (
+          <div style={{ fontWeight: 500, color: T.text3 }}>Workshop</div>
+        )}
         <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {p.supplier} · {fmtDate(p.purchase_date)}{p.supplier_ref ? ` · ref ${p.supplier_ref}` : ''}
         </div>
@@ -475,15 +487,11 @@ function PurchaseRow({ p, onEdit, onDelete, onViewReceipt }) {
         </span>
       </div>
 
-      {/* Job tag */}
+      {/* Item */}
       <div style={{ minWidth: 0 }}>
-        {jobTagged ? (
-          <div>
-            <div style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer_name || '—'}</div>
-            {p.vehicle_reg && <div style={{ fontSize: '10px', color: T.text3, fontFamily: 'monospace', marginTop: '1px' }}>{p.vehicle_reg}</div>}
-          </div>
-        ) : (
-          <span style={{ fontSize: '11px', color: T.text3 }}>Workshop</span>
+        <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>
+        {p.customer_name && (
+          <div style={{ fontSize: '10px', color: T.text3, marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer_name}</div>
         )}
       </div>
 
@@ -805,6 +813,8 @@ function PurchaseForm({
               suggestions={supplierSuggestions}
               placeholder="e.g. Euro Car Parts"
               autoFocus
+              dropdown
+              dropdownHint="Previous suppliers · or type a new one"
             />
             {fieldErrors.supplier && <div style={fieldErr}>{fieldErrors.supplier}</div>}
           </div>
@@ -815,12 +825,18 @@ function PurchaseForm({
           </div>
         </div>
 
-        {/* Description + category */}
+        {/* Car registration + category */}
         <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <div>
-            <div style={fieldLbl}>What did you buy? *</div>
-            <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Front brake pads — Bosch" style={inputStyle} />
-            {fieldErrors.description && <div style={fieldErr}>{fieldErrors.description}</div>}
+            <div style={fieldLbl}>Car registration</div>
+            <SuggestInput
+              value={form.vehicle_reg}
+              onChange={v => setForm(f => ({ ...f, vehicle_reg: v.toUpperCase() }))}
+              suggestions={regSuggestions}
+              placeholder="e.g. MK21 ABC — blank = workshop"
+              inputStyleExtra={{ textTransform: 'uppercase' }}
+              dropdown
+            />
           </div>
           <div>
             <div style={fieldLbl}>Category</div>
@@ -828,6 +844,13 @@ function PurchaseForm({
               {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* Description */}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={fieldLbl}>What did you buy? *</div>
+          <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Front brake pads — Bosch" style={inputStyle} />
+          {fieldErrors.description && <div style={fieldErr}>{fieldErrors.description}</div>}
         </div>
 
         {/* Money */}
@@ -895,22 +918,10 @@ function PurchaseForm({
           {fieldErrors.amount && <div style={fieldErr}>{fieldErrors.amount}</div>}
         </div>
 
-        {/* Ref / vehicle */}
-        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-          <div>
-            <div style={fieldLbl}>Supplier invoice / receipt no.</div>
-            <input value={form.supplier_ref} onChange={e => setForm(f => ({ ...f, supplier_ref: e.target.value }))} placeholder="Optional" style={inputStyle} />
-          </div>
-          <div>
-            <div style={fieldLbl}>Vehicle</div>
-            <SuggestInput
-              value={form.vehicle_reg}
-              onChange={v => setForm(f => ({ ...f, vehicle_reg: v.toUpperCase() }))}
-              suggestions={regSuggestions}
-              placeholder="Vehicle reg (e.g. MK21 ABC)"
-              inputStyleExtra={{ textTransform: 'uppercase' }}
-            />
-          </div>
+        {/* Supplier ref */}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={fieldLbl}>Supplier invoice / receipt no.</div>
+          <input value={form.supplier_ref} onChange={e => setForm(f => ({ ...f, supplier_ref: e.target.value }))} placeholder="Optional" style={inputStyle} />
         </div>
 
         {/* Paid / payment method */}
@@ -978,7 +989,7 @@ function PurchaseForm({
 // (without closing the modal). Typing a brand-new value is
 // always fine — the list is just a shortcut.
 // ============================================================
-function SuggestInput({ value, onChange, suggestions, placeholder, autoFocus, inputStyleExtra }) {
+function SuggestInput({ value, onChange, suggestions, placeholder, autoFocus, inputStyleExtra, dropdown, dropdownHint }) {
   const [open, setOpen] = useState(false)
   const [idx, setIdx] = useState(-1)
 
@@ -1022,14 +1033,27 @@ function SuggestInput({ value, onChange, suggestions, placeholder, autoFocus, in
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        style={{ ...inputStyle, ...inputStyleExtra }}
+        style={{ ...inputStyle, ...(dropdown ? { paddingRight: '28px' } : {}), ...inputStyleExtra }}
       />
+      {dropdown && (
+        <span
+          onMouseDown={e => { e.preventDefault(); setOpen(o => !o) }}
+          style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: T.text3, fontSize: '9px', cursor: 'pointer', userSelect: 'none' }}
+        >
+          {open ? '▲' : '▼'}
+        </span>
+      )}
       {open && matches.length > 0 && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: '4px',
           background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '8px',
           maxHeight: '180px', overflowY: 'auto',
         }}>
+          {dropdown && dropdownHint && (
+            <div style={{ padding: '6px 12px', fontSize: '9px', color: T.text3, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: `0.5px solid ${T.border}`, background: T.surface3 }}>
+              {dropdownHint}
+            </div>
+          )}
           {matches.map((s, i) => (
             <div
               key={s}

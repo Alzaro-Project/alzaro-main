@@ -15,7 +15,7 @@ const NAV = [
   { path: '/invoices',  icon: 'ti-file-text',        label: 'Invoices',  min: 'basic' },
   { path: '/customers', icon: 'ti-users',            label: 'Customers', min: 'basic' },
   { path: '/items',     icon: 'ti-package',          label: 'Items',     min: 'basic' },
-  { path: '/stock',     icon: 'ti-stack-2',          label: 'Stock',     min: 'basic' },
+  { path: '/database',  icon: 'ti-database',         label: 'Database',  min: 'basic' },
   { path: '/purchases', icon: 'ti-shopping-cart',    label: 'Purchases', min: 'basic' },
   { path: '/calendar',  icon: 'ti-calendar',         label: 'Calendar',  min: 'basic' },
   { path: '/reports',   icon: 'ti-receipt-tax',      label: 'VAT & Reports', min: 'silver' },

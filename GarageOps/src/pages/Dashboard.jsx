@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import WelcomeBanner from '../components/WelcomeBanner'
+import GlobalSearch from '../components/GlobalSearch'
 
 // ============================================================
 // Dashboard — GarageOps v2
@@ -58,11 +59,6 @@ const btnPrimary = {
   padding: '11px 16px', borderRadius: '10px',
   fontFamily: 'inherit', fontWeight: 500, fontSize: '12px',
   cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px',
-}
-const searchBox = {
-  flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px',
-  background: 'var(--surface2)', border: '1px solid var(--border)',
-  padding: '10px 13px', borderRadius: '10px',
 }
 const tileSub = { fontSize: '11px', color: 'var(--text2)', marginTop: '4px' }
 const toggleBtn = (on) => ({
@@ -201,7 +197,6 @@ export default function Dashboard() {
   const hasGold = TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('gold')
   const period = dashPeriod || 'today'
   const [salesType, setSalesType] = useState('paid') // 'paid' | 'invoiced'
-  const [search, setSearch] = useState('')
 
   // -------- SALES TILE --------
   const sales = useMemo(() => {
@@ -289,14 +284,8 @@ export default function Dashboard() {
         <button onClick={() => navigate('/invoices')} style={btnPrimary}>
           <i className="ti ti-plus" aria-hidden="true" /> New invoice
         </button>
-        <div style={searchBox}>
-          <i className="ti ti-search" style={{ color: 'var(--text3)' }} aria-hidden="true" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search customers, invoices, car reg..."
-            style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'inherit', fontSize: '13px', width: '100%' }}
-          />
+        <div style={{ flex: 1, minWidth: '180px' }}>
+          <GlobalSearch placeholder="Search customers, invoices, car reg..." />
         </div>
       </div>
 
