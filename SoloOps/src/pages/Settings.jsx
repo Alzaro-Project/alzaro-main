@@ -49,6 +49,12 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
     } catch (e) { return 'business' }
   })()
   const [tab, setTab] = React.useState(initialTab)
+  // Keep the hash in step with the tab, so a refresh (or a shared link)
+  // reopens the same tab instead of dumping back to Business. replaceState
+  // avoids polluting Back-button history with every tab click.
+  React.useEffect(() => {
+    try { window.history.replaceState(null, '', '#' + tab) } catch (e) {}
+  }, [tab])
 
   // Business
   const [name, setName] = React.useState('')
