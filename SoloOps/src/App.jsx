@@ -4,7 +4,7 @@ import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, loadItems, deleteInvoice, updateInvoice,
   deleteExpense,
-  updateUser, loadSettings, getMember, joinProduct, getStaffMapping,
+  updateUser, loadSettings, getMember, joinProduct, getStaffMapping, loadCategories,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
@@ -66,6 +66,9 @@ function Shell() {
   const [editExpense, setEditExpense] = useState(null)
   const [incFilter, setIncFilter] = useState('all')
   const [incSearch, setIncSearch] = useState('')
+  const [expSearch, setExpSearch] = useState('')
+  const [expFilter, setExpFilter] = useState('all')
+  const [categories, setCategories] = useState([])
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
@@ -135,8 +138,8 @@ function Shell() {
         setMember(mem || null)
         // Fall through to the shared data loads — RLS scopes them to the
         // owner's rows for this staff login.
-        const [invR, expR, milR, cliR, itmR] = await Promise.all([
-          loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(),
+        const [invR, expR, milR, cliR, itmR, catR] = await Promise.all([
+          loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(), loadCategories(),
         ])
         if (invR.error || expR.error || milR.error || cliR.error) {
           setLoadError(true); setLoading(false); return
@@ -144,6 +147,7 @@ function Shell() {
         setInvoices(invR.data || []); setExpenses(expR.data || [])
         setMileage(milR.data || []); setClients(cliR.data || [])
         setItems(itmR.error ? [] : (itmR.data || []))
+        setCategories(catR.data || [])
         setLoading(false)
         return
       }
@@ -183,8 +187,8 @@ function Shell() {
       }
       setMember(mem || null)
     }
-    const [invR, expR, milR, cliR, itmR] = await Promise.all([
-      loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(),
+    const [invR, expR, milR, cliR, itmR, catR] = await Promise.all([
+      loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(), loadCategories(),
     ])
     // Items are deliberately NOT part of the hard-fail check: if the
     // soloops_items migration hasn't run yet, the rest of the app must still
@@ -199,6 +203,7 @@ function Shell() {
     setMileage(milR.data || [])
     setClients(cliR.data || [])
     setItems(itmR.error ? [] : (itmR.data || []))
+    setCategories(catR.data || [])
     setLoading(false)
   }
   // Reload only when the logged-in USER changes (real login/logout),
@@ -304,6 +309,7 @@ function Shell() {
   const profit = revenue - totalExp
   const taxable = Math.max(0, profit - Number(allowance||0))
   const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
+
 
   // Which sections can this login see? Owners: everything. Staff: only the
   // sections the owner ticked — and never Settings (billing, SMTP, plan).
@@ -565,15 +571,35 @@ function Shell() {
           })()}
 
           {view==='items' && (
-            <Items uid={uid} items={items} clients={clients} invoices={invoices} expenses={expenses} onChange={loadAll} flash={flash} />
+            <Items uid={uid} items={items} clients={clients} invoices={invoices} expenses={expenses} categories={categories} onChange={loadAll} flash={flash} />
           )}
 
-          {view==='expenses' && (
+          {view==='expenses' && (() => {
+            const q = expSearch.trim().toLowerCase()
+            const cats = ['all', ...[...new Set(fExpenses.map(e=>e.category).filter(Boolean))].sort()]
+            const rows = fExpenses.filter(e =>
+              (expFilter==='all' || e.category===expFilter) &&
+              (!q || (`${e.merchant||''} ${e.category||''} ${e.notes||''}`).toLowerCase().includes(q))
+            )
+            return (
+            <div>
+              <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'14px' }}>
+                {cats.map(c => (
+                  <button key={c} onClick={()=>setExpFilter(c)} style={{
+                    background: expFilter===c ? 'var(--surface2)' : 'transparent',
+                    color: expFilter===c ? 'var(--text)' : 'var(--text3)',
+                    border:'1px solid '+(expFilter===c?'var(--border-light)':'transparent'),
+                    borderRadius:'10px', padding:'7px 16px', fontSize:'13px', fontWeight:700,
+                    textTransform: c==='all' ? 'capitalize' : 'none', cursor:'pointer'
+                  }}>{c==='all' ? 'All' : c}</button>
+                ))}
+              </div>
+              <input style={{ ...inp, marginBottom:'16px' }} placeholder="Search merchant, category, notes…" value={expSearch} onChange={e=>setExpSearch(e.target.value)} />
             <div style={card}>
-              {fExpenses.length===0 ? <Empty msg="No expenses yet. Click “+ Expense” to add one." />
+              {rows.length===0 ? <Empty msg={fExpenses.length===0 ? "No expenses yet. Click “+ Expense” to add one." : "No expenses match this filter."} />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
-                <tbody>{fExpenses.map(e => (
+                <tbody>{rows.map(e => (
                   <tr key={e.id}>
                     <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span onClick={()=>setViewReceipt(e)} title="View receipt" style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px', cursor:'pointer' }}>receipt</span>}{e.notes && <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'2px' }}>{e.notes}</div>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
@@ -587,7 +613,9 @@ function Shell() {
                   </tr>))}</tbody>
               </table>}
             </div>
-          )}
+            </div>
+            )
+          })()}
 
           {view==='receipts' && (
             <Receipts uid={uid} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
@@ -653,7 +681,7 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} edit={editExpense} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} categories={categories} edit={editExpense} />}
       {modal==='send' && sendInvoice && (
         <SendInvoice
           invoice={sendInvoice}
