@@ -192,13 +192,23 @@ export default async function handler(req, res) {
   if (!staffUser) {
     // Brand-new person: create + email them an invite that lands on the
     // set-a-password page.
-    const host = req.headers['x-forwarded-host'] || req.headers.host
-    const redirectTo = `https://${host}/soloops/reset-password`
+    // Pinned, not derived from the request host: on www.alzaro.co.uk or a
+    // Vercel preview the derived URL wouldn't match the Supabase redirect
+    // allow-list, and Supabase would quietly fall back to the Site URL.
+    const redirectTo =
+      process.env.SOLOOPS_INVITE_REDIRECT ||
+      'https://alzaro.co.uk/soloops/reset-password'
     try {
-      const r = await serviceFetch('/auth/v1/invite', {
-        method: 'POST',
-        body: JSON.stringify({ email, redirect_to: redirectTo }),
-      })
+      // redirect_to MUST be a query parameter — GoTrue ignores it in the body
+      // and silently falls back to the project's Site URL, which dumps the
+      // invitee on the marketing homepage with no way to set a password.
+      const r = await serviceFetch(
+        `/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ email, redirect_to: redirectTo }),
+        }
+      )
       const j = await r.json().catch(() => null)
       if (!r.ok || !j?.id) {
         console.error('staff: invite failed', r.status, j)
