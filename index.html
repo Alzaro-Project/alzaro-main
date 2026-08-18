@@ -1239,13 +1239,18 @@
       // this login has no product_members row of its own (staff borrow the
       // owner's workspace). Without this, staff land here and see everything
       // locked with no way in. Errors keep the membership-only grid.
-      sb.from('soloops_staff').select('id').eq('staff_user_id', user.id)
-        .in('status', ['invited','active']).limit(1)
-        .then(function(sr){
-          if (sr && sr.data && sr.data.length && UNLOCKED.indexOf(map['soloops']) < 0) map['soloops'] = 'staff';
-          finishGrid(map);
-        })
-        .catch(function(){ finishGrid(map); });
+      var STAFF_TABLES = [['soloops', 'soloops_staff'], ['propertyops', 'prop_staff']];
+      Promise.all(STAFF_TABLES.map(function(st){
+        return sb.from(st[1]).select('id').eq('staff_user_id', user.id)
+          .in('status', ['invited','active']).limit(1)
+          .then(function(sr){ return (sr && sr.data && sr.data.length) ? st[0] : null; })
+          .catch(function(){ return null; });
+      })).then(function(hits){
+        hits.forEach(function(slug){
+          if (slug && UNLOCKED.indexOf(map[slug]) < 0) map[slug] = 'staff';
+        });
+        finishGrid(map);
+      }).catch(function(){ finishGrid(map); });
     }).catch(function(){ /* keep the all-locked grid if the query fails */ });
   }
 
