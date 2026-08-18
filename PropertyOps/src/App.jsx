@@ -10,6 +10,7 @@ import {
 } from "./pages/Operations.jsx";
 import { AuthScreen, JoinScreen, ResetPasswordScreen } from "./pages/Auth.jsx";
 import { SUPPORT_MODE } from "./lib/supabase.js";
+import { getStaffMapping, STAFF_PERMS } from "./lib/staff.js";
 import Support from "./pages/Support.jsx";
 
 const PAGES = {
@@ -18,7 +19,7 @@ const PAGES = {
   reports: ReportsPage, settings: SettingsPage,
 };
 
-function Dashboard({ user, signOut }) {
+function Dashboard({ user, signOut, staff }) {
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
   const [active, setActive] = useState(() => {
@@ -30,6 +31,18 @@ function Dashboard({ user, signOut }) {
     } catch (e) { return "dashboard"; }
   });
   const [range, setRange] = useState("This Month");
+
+  // Staff visibility: owners see everything; staff only the sections the
+  // owner ticked — never Settings. RLS enforces the same map in the database;
+  // this only shapes the UI. Must stay above any early return (hooks rule).
+  const staffAllows = (id) => !staff || (id !== "settings" && staff.permissions?.[id] === true);
+  const staffHome = staff ? ((NAV.find((n) => staffAllows(n.id)) || {}).id || null) : null;
+  useEffect(() => {
+    // navigate() is declared below with const, but this callback only runs
+    // after render, long after it's initialised — safe closure.
+    if (staff && !staffAllows(active) && staffHome) navigate(staffHome);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, active]);
   // Dates for the "Custom" range tab (yyyy-mm-dd; blank side = open-ended).
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
   const [light, setLight] = useState(() => {
@@ -222,6 +235,14 @@ function Dashboard({ user, signOut }) {
   const goTo = navigate;
 
   // resolved sidebar identity
+  if (staff && !staffHome) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "var(--txt-2)", fontSize: 13 }}>
+        Your access to this portfolio has no sections enabled yet — ask the account owner to tick some in Settings → Users.
+      </div>
+    );
+  }
+
   const badge = tierBadge(biz.tier);
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "")) : "…";
 
@@ -308,7 +329,7 @@ function Dashboard({ user, signOut }) {
         </div>
         {/* nav */}
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 0", flex: 1 }}>
-          {NAV.map((n) => {
+          {NAV.filter((n) => staffAllows(n.id)).map((n) => {
             const on = n.id === active;
             const locked = !tierAllows(n.min);
             return (
@@ -323,7 +344,9 @@ function Dashboard({ user, signOut }) {
           })}
         </nav>
         <div style={{ borderTop: "0.5px solid var(--line)", padding: "12px 16px" }}>
-          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : ""}</div>
+          <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {user ? user.email : ""}{staff && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", color: "var(--brand)", border: "1px solid var(--brand)", borderRadius: 5, padding: "1px 5px" }}>Staff</span>}
+          </div>
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7, color: "var(--txt-2)", fontSize: 12 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14, color: "var(--amber)" }} />
             <span>{light ? "Dark Mode" : "Light Mode"}</span>
@@ -425,6 +448,10 @@ function Dashboard({ user, signOut }) {
 function App() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [member, setMember] = useState(undefined);   // undefined = checking, true/false
+  // Staff seat on someone else's portfolio: { owner_id, permissions } | null.
+  // Own membership always wins — this is only consulted when there's no
+  // propertyops membership row for the login itself.
+  const [staff, setStaff] = useState(null);
   // Password-recovery mode: true when the user arrives via the Supabase reset
   // link (/propertyops/reset-password, or a PASSWORD_RECOVERY auth event).
   // While true, ONLY the reset screen renders — the recovery session must not
@@ -452,7 +479,7 @@ function App() {
         .select("id").eq("user_id", session.user.id).eq("product", "propertyops").maybeSingle();
       if (cancelled) return;
       if (error) { console.error("Membership check:", error); setMember(false); return; }
-      if (data) { setMember(true); return; }
+      if (data) { setStaff(null); setMember(true); return; }
       // No membership row — if they originally registered via PropertyOps,
       // create it silently (covers pre-existing users and fresh signups).
       if (session.user.user_metadata?.product === "propertyops") {
@@ -466,6 +493,12 @@ function App() {
         if (insErr) console.error("Auto-join:", insErr);
         return;
       }
+      // No membership of their own — staff seat? Then they're in, working
+      // inside the OWNER's portfolio (getStaffMapping fails open to null, so
+      // a missing prop_staff table just falls through to the trial offer).
+      const m = await getStaffMapping(session.user.id);
+      if (cancelled) return;
+      if (m) { setStaff(m); setMember(true); return; }
       setMember(false); // came from another Alzaro product — offer the trial
     };
     check();
@@ -493,9 +526,13 @@ function App() {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!member) return <JoinScreen user={session.user} onJoined={() => setMember(true)} signOut={signOut} />;
+  // Workspace user: whose rows every page reads and writes. The id is the
+  // owner's in staff mode (RLS grants staff those rows); email stays the
+  // staff member's own so the sidebar shows who is actually signed in.
+  const wsUser = staff ? { ...session.user, id: staff.owner_id } : session.user;
   return (
-    <TrialGuard user={session.user}>
-      <Dashboard user={session.user} signOut={signOut} />
+    <TrialGuard user={wsUser}>
+      <Dashboard user={wsUser} signOut={signOut} staff={staff} />
     </TrialGuard>
   );
 }
