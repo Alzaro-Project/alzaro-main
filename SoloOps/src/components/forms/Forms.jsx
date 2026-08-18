@@ -2,10 +2,23 @@ import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule, uploadFile, insertDocument, updateExpenseReceipt } from '../../lib/db.js'
 
+// "How was it paid" options, shared by expenses and income. Values are what
+// lands in the DB (stable, snake_case); labels are what people see.
+const PAY_METHODS = [
+  ['', 'Not recorded'],
+  ['cash', 'Cash'],
+  ['card', 'Card'],
+  ['bank_transfer', 'Bank transfer'],
+  ['direct_debit', 'Direct debit'],
+  ['cheque', 'Cheque'],
+  ['other', 'Other'],
+]
+
 export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [notes,setNotes]=useState(edit?.notes||'')
+  const [paidMethod,setPaidMethod]=useState(edit?.paid_method||'')
   const [receiptFile,setReceiptFile]=useState(null)
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
@@ -49,14 +62,16 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
       // Edit is a plain update — no rule learning or client creation, which are
       // onboarding side-effects meant for brand-new expenses.
       const { error } = await updateExpense(edit.id, {
-        merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, notes:noteVal
+        merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, notes:noteVal,
+        paid_method: paidMethod || null
       })
       if(error){ setErr(error.message); setBusy(false); return }
       await attachReceipt(edit.id)
       onSaved(); return
     }
     const { data: created, error } = await insertExpense({
-      user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual', notes:noteVal
+      user_id:uid, merchant:merchant.trim(), category, amount:Number(amount), spent_on:date, source:'manual', notes:noteVal,
+      paid_method: paidMethod || null
     })
     if(error){ setErr(error.message); setBusy(false); return }
     await attachReceipt(created?.id)
@@ -85,6 +100,11 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
     )}
     <Field label="Amount">
       <input style={inp} type="number" placeholder="£0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+    </Field>
+    <Field label="How was it paid?" hint="optional">
+      <select style={inp} value={paidMethod} onChange={e=>setPaidMethod(e.target.value)}>
+        {PAY_METHODS.map(([v,label])=><option key={v} value={v}>{label}</option>)}
+      </select>
     </Field>
     <Field label="Receipt" hint="optional">
       <label style={{...inp, display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', color: receiptFile?'var(--text)':'var(--text3)' }}>
@@ -128,6 +148,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,
   const [date,setDate]=useState(edit?.issue_date || new Date().toISOString().slice(0,10))
   const [dueDate,setDueDate]=useState(edit?.due_date || '')
   const [notes,setNotes]=useState(edit?.notes || '')
+  const [paidMethod,setPaidMethod]=useState(edit?.paid_method||'')
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
 
   // VAT (only relevant if the business is VAT-registered)
@@ -216,6 +237,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,
       status, issue_date:date, due_date:dueDate||null,
       vat_rate: vatRegistered ? (isFlat ? flatRate : Number(vatRate)||0) : 0,
       notes: notes.trim()||null,
+      paid_method: paidMethod || null,
     }
 
     let invId = edit?.id
@@ -344,6 +366,11 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,
     <Field label="Status">
       <select style={inp} value={status} onChange={e=>setStatus(e.target.value)}>
         <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
+      </select>
+    </Field>
+    <Field label="How was it paid?" hint="optional — e.g. once it's marked paid">
+      <select style={inp} value={paidMethod} onChange={e=>setPaidMethod(e.target.value)}>
+        {PAY_METHODS.map(([v,label])=><option key={v} value={v}>{label}</option>)}
       </select>
     </Field>
     <Field label="Notes" hint="optional, shown on invoice" style={{ marginBottom:0 }}>
