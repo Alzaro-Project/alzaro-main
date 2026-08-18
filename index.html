@@ -1169,7 +1169,7 @@
   var SUPABASE_URL = 'https://cxsaeftacozyphuejuxo.supabase.co';
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4c2FlZnRhY296eXBodWVqdXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODExNTEsImV4cCI6MjA4OTQ1NzE1MX0.hqx-0ZfG3MOHPg_fwVhPGh2CJAWqJd3GqPssWpRKDEo';
   var BUILD = 'alz·1.0.0';
-  var UNLOCKED = ['gold','trial','active'];
+  var UNLOCKED = ['gold','trial','active','staff'];
 
   // verticals in number-key order 1..5 — routes are unchanged (/tyreops etc.)
   var VERTICALS = [
@@ -1221,18 +1221,31 @@
     bindKeys();
 
     // real membership read
-    sb.from('product_members').select('product,status').eq('user_id', user.id).then(function(r){
-      var rows = (r && r.data) ? r.data : [];
-      var map = {};
-      rows.forEach(function(row){
-        if (row && row.product) map[String(row.product).toLowerCase()] = String(row.status || '').toLowerCase();
-      });
+    function finishGrid(map){
       renderGrid(map);
       var owned = VERTICALS.filter(function(v){ return UNLOCKED.indexOf(map[v.slug]) > -1; }).length;
       var sub = document.getElementById('ccSub');
       sub.textContent = owned
         ? ('You have ' + owned + ' active workspace' + (owned === 1 ? '' : 's') + '. Press a number key or click to enter.')
         : 'No active workspaces yet — choose a platform below to get started.';
+    }
+    sb.from('product_members').select('product,status').eq('user_id', user.id).then(function(r){
+      var rows = (r && r.data) ? r.data : [];
+      var map = {};
+      rows.forEach(function(row){
+        if (row && row.product) map[String(row.product).toLowerCase()] = String(row.status || '').toLowerCase();
+      });
+      // Staff seats: a soloops_staff row means SoloOps is usable even though
+      // this login has no product_members row of its own (staff borrow the
+      // owner's workspace). Without this, staff land here and see everything
+      // locked with no way in. Errors keep the membership-only grid.
+      sb.from('soloops_staff').select('id').eq('staff_user_id', user.id)
+        .in('status', ['invited','active']).limit(1)
+        .then(function(sr){
+          if (sr && sr.data && sr.data.length && UNLOCKED.indexOf(map['soloops']) < 0) map['soloops'] = 'staff';
+          finishGrid(map);
+        })
+        .catch(function(){ finishGrid(map); });
     }).catch(function(){ /* keep the all-locked grid if the query fails */ });
   }
 
@@ -1240,6 +1253,7 @@
     if (status === 'gold')   return '<span class="cc-badge gold"><span class="d"></span>Gold</span>';
     if (status === 'trial')  return '<span class="cc-badge trial"><span class="d"></span>Trial</span>';
     if (status === 'active') return '<span class="cc-badge active"><span class="d"></span>Active</span>';
+    if (status === 'staff')  return '<span class="cc-badge active"><span class="d"></span>Staff</span>';
     return '<span class="cc-badge"><span class="d"></span>Locked</span>';
   }
 
