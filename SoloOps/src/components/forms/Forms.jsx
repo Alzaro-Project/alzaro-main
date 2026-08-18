@@ -14,7 +14,18 @@ const PAY_METHODS = [
   ['other', 'Other'],
 ]
 
-export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
+// Built-ins + the owner's custom categories, deduped, with Other kept last so
+// the catch-all stays at the bottom where people expect it.
+export function mergeCategories(custom) {
+  const names = (custom || []).map(c => (c.name || '').trim()).filter(Boolean)
+  const base = CATEGORIES.filter(c => c !== 'Other')
+  const merged = [...base]
+  names.forEach(n => { if (!merged.some(m => m.toLowerCase() === n.toLowerCase())) merged.push(n) })
+  merged.push('Other')
+  return merged
+}
+
+export function ExpenseForm({onClose,onSaved,uid,expenses,categories,edit}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [notes,setNotes]=useState(edit?.notes||'')
@@ -90,7 +101,11 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,edit}) {
     </Field>
     <Field label="Category">
       <select style={inp} value={category} onChange={e=>setCategory(e.target.value)}>
-        {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+        {mergeCategories(categories).map(c=><option key={c} value={c}>{c}</option>)}
+        {/* An edited expense may carry a category that's since been deleted —
+            keep it selectable so opening the form doesn't silently change it. */}
+        {edit?.category && !mergeCategories(categories).includes(edit.category) &&
+          <option value={edit.category}>{edit.category}</option>}
       </select>
     </Field>
     {category==='Other' && (
