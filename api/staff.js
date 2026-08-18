@@ -27,7 +27,9 @@ const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // Staff seats per tier. Owner is not counted — this is EXTRA users.
-const STAFF_SEATS = { basic: 0, bronze: 0, silver: 0, gold: 2 }
+// Keep the tier LIST in step with migrations/011_staff_silver.sql (the RLS
+// gate) and the counts with TIER_SEATS in pages/Settings.jsx (the UI copy).
+const STAFF_SEATS = { basic: 0, bronze: 0, silver: 2, gold: 4 }
 
 const PERM_KEYS = ['dashboard', 'income', 'items', 'expenses', 'receipts', 'reports']
 
@@ -156,7 +158,7 @@ export default async function handler(req, res) {
     const m = rows[0]
     const seats = m && ['trial', 'active'].includes(m.status) ? (STAFF_SEATS[m.tier] || 0) : 0
     if (seats < 1) {
-      return res.status(403).json({ error: 'Adding users needs an active Gold plan' })
+      return res.status(403).json({ error: 'Adding users needs an active Silver or Gold plan' })
     }
 
     // Seat limit: count existing staff rows.
