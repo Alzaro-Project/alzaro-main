@@ -3,6 +3,18 @@ import { createPortal } from 'react-dom'
 
 // ---------- constants ----------
 export const CATEGORIES = ['Fuel','Travel','Software','Marketing','Equipment','Insurance','Utilities','Professional Services','Office Costs','Other']
+// "How was it paid" options for expenses and income. Values are what lands in
+// the DB; labels are what people see. Shared by the forms and both tables.
+export const PAY_METHODS = [
+  ['', 'Not recorded'],
+  ['cash', 'Cash'],
+  ['card', 'Card'],
+  ['bank_transfer', 'Bank transfer'],
+  ['direct_debit', 'Direct debit'],
+  ['cheque', 'Cheque'],
+  ['other', 'Other'],
+]
+export const PAY_LABEL = Object.fromEntries(PAY_METHODS.map(([v, l]) => [v, l]))
 export const CAT_COLORS = { Software:'#f97316', Fuel:'#f59e0b', Marketing:'#3b82f6', Equipment:'#22c55e', Travel:'#eab308', Insurance:'#a78bfa', Utilities:'#38bdf8', 'Professional Services':'#fb7185', 'Office Costs':'#94a3b8', Other:'#68635d' }
 
 export const NAV = [
