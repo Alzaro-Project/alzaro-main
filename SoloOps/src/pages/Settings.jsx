@@ -784,10 +784,12 @@ function UsersTab({ tier, memberStatus, flash }) {
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
 
-  const isGold = tier === 'gold' && ['trial', 'active'].includes(memberStatus || '')
-  // Keep in step with STAFF_SEATS in api/staff.js — that's the real limit;
-  // this only decides whether the add form is offered.
-  const SEATS = 2
+  // Keep in step with STAFF_SEATS in api/staff.js (the real limit) and the
+  // tier list in migrations/011_staff_silver.sql (the RLS gate).
+  const TIER_SEATS = { silver: 2, gold: 4 }
+  const SEATS = TIER_SEATS[tier] || 0
+  const eligible = SEATS > 0 && ['trial', 'active'].includes(memberStatus || '')
+  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : ''
   const seatsLeft = rows === null ? 0 : Math.max(0, SEATS - rows.length)
 
   const reload = React.useCallback(async () => {
@@ -813,8 +815,8 @@ function UsersTab({ tier, memberStatus, flash }) {
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setErr(j.error || 'Could not add the user'); return }
       flash(j.invited
-        ? 'Invite sent — they set a password from the email, then sign in'
-        : 'Added — they can sign in with their existing Alzaro login')
+        ? 'Access given — invite email sent so they can set a password'
+        : 'Access given — they can sign in with their existing Alzaro login')
       setEmail(''); setPerms({ income: true })
       await reload()
     } catch (e) {
@@ -824,14 +826,14 @@ function UsersTab({ tier, memberStatus, flash }) {
     }
   }
 
-  if (!isGold) {
+  if (!eligible) {
     return (
       <div style={{ ...card, maxWidth: '560px' }}>
         <div style={{ fontSize: '17px', fontWeight: 800, marginBottom: '8px' }}>Add your team</div>
         <div style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.6 }}>
-          Gold includes two extra users: invite staff with their own logins and
-          choose exactly which sections they can use — just invoices, say, while your
-          reports and settings stay yours. Upgrade on the{' '}
+          Silver includes 2 extra users and Gold includes 4: invite staff with their
+          own logins and choose exactly which sections they can use — just invoices,
+          say, while your reports and settings stay yours. Upgrade on the{' '}
           <a href="#billing" onClick={(e) => { e.preventDefault(); window.location.hash = 'billing'; window.location.reload() }}
              style={{ color: 'var(--orange-light)', fontWeight: 700 }}>Billing tab</a>{' '}
           to unlock it.
@@ -845,9 +847,9 @@ function UsersTab({ tier, memberStatus, flash }) {
       <div style={card}>
         <div style={{ fontSize: '17px', fontWeight: 800, marginBottom: '4px' }}>Users</div>
         <div style={{ color: 'var(--text2)', fontSize: '13.5px', marginBottom: '16px' }}>
-          Your Gold plan includes {SEATS} staff seats ({seatsLeft} left). Staff sign in with
-          their own email and password and only see the sections you tick — never
-          Settings or Billing.
+          Your {tierLabel} plan includes {SEATS} staff seats ({seatsLeft} left). Staff sign
+          in with their own email and password and only see the sections you tick —
+          never Settings or Billing.
         </div>
 
         {rows === null && <div style={{ color: 'var(--text3)', fontSize: '13.5px' }}>Loading…</div>}
