@@ -71,7 +71,9 @@ function Shell() {
   const [categories, setCategories] = useState([])
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('soloops-theme') || 'dark' } catch (e) { return 'dark' }
+    // Light is the default; dark only when the person chose it. Anyone who
+    // already picked dark keeps it — this only changes the no-preference case.
+    try { return localStorage.getItem('soloops-theme') || 'light' } catch (e) { return 'light' }
   })
   const [viewReceipt, setViewReceipt] = useState(null)
   const [mobileNav, setMobileNav] = useState(false)
