@@ -1,6 +1,6 @@
 import React from 'react'
 import { card, inp, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
-import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession } from '../lib/db.js'
+import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail } from '../lib/db.js'
 
 const TABS = [
   { key: 'business', label: '🏢 Business' },
@@ -8,6 +8,7 @@ const TABS = [
   { key: 'payment',  label: '🏦 Payment' },
   { key: 'email',    label: '📧 Email' },
   { key: 'billing',  label: '💳 Billing' },
+  { key: 'users',    label: '👥 Users' },
 ]
 
 // Host/port/security per provider — picking one fills the fields below.
@@ -36,7 +37,7 @@ const PASS_HELP = {
   custom:    { text: 'For Gmail, Outlook and most providers, this is an "app password", not your normal login password. Pick your provider above for a direct link.', url: '', label: '' },
 }
 
-export default function Settings({ session, signOut, flash, onBizChange }) {
+export default function Settings({ session, member, signOut, flash, onBizChange }) {
   const uid = session.user.id
 
   // Allow deep-linking to a specific tab via URL hash, e.g. /settings#billing
@@ -637,6 +638,8 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
       )}
 
       {/* BILLING TAB */}
+      {tab === 'users' && <UsersTab tier={member?.tier} memberStatus={member?.status} flash={flash} />}
+
       {tab === 'billing' && (
         <>
           <div data-card style={card}>
@@ -713,6 +716,239 @@ export default function Settings({ session, signOut, flash, onBizChange }) {
             <button onClick={signOut} style={btnSec}>Sign out</button>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Users tab — Gold multi-user. The owner adds one staff member by email and
+// ticks which sections they can use. The real enforcement is RLS (see
+// migrations/008_soloops_staff.sql); these checkboxes are the control panel.
+// ---------------------------------------------------------------------------
+const STAFF_PERMS = [
+  ['dashboard', 'Dashboard',   'Totals and charts (sees income & expense figures)'],
+  ['income',    'Income',      'Create, edit and send invoices'],
+  ['items',     'Items/Clients','Manage the item and client lists'],
+  ['expenses',  'Expenses',    'Record and edit expenses'],
+  ['receipts',  'Receipts',    'Upload receipts and match them to expenses'],
+  ['reports',   'Reports/Tax', 'Read-only reports over income and expenses'],
+]
+
+function UsersTab({ tier, memberStatus, flash }) {
+  const [rows, setRows] = React.useState(null)      // null = loading
+  const [email, setEmail] = React.useState('')
+  const [perms, setPerms] = React.useState({ income: true })
+  const [busy, setBusy] = React.useState(false)
+  const [err, setErr] = React.useState('')
+
+  const isGold = tier === 'gold' && ['trial', 'active'].includes(memberStatus || '')
+  // Keep in step with STAFF_SEATS in api/staff.js — that's the real limit;
+  // this only decides whether the add form is offered.
+  const SEATS = 2
+  const seatsLeft = rows === null ? 0 : Math.max(0, SEATS - rows.length)
+
+  const reload = React.useCallback(async () => {
+    const { data, error } = await listStaff()
+    setRows(error ? [] : (data || []))
+  }, [])
+  React.useEffect(() => { reload() }, [reload])
+
+  const add = async () => {
+    setErr('')
+    if (!email.trim()) { setErr('Enter their email address.'); return }
+    setBusy(true)
+    try {
+      const session = await getSession()
+      const r = await fetch('/api/staff', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ email: email.trim(), permissions: perms }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(j.error || 'Could not add the user'); return }
+      flash(j.invited
+        ? 'Invite sent — they set a password from the email, then sign in'
+        : 'Added — they can sign in with their existing Alzaro login')
+      setEmail(''); setPerms({ income: true })
+      await reload()
+    } catch (e) {
+      setErr('Network error — try again')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const togglePerm = async (row, key) => {
+    const next = { ...(row.permissions || {}), [key]: !(row.permissions?.[key] === true) }
+    // Optimistic update; RLS only lets the owner touch their own rows.
+    setRows(rs => rs.map(r => r.id === row.id ? { ...r, permissions: next } : r))
+    const { error } = await updateStaffPermissions(row.id, next)
+    if (error) { flash('Could not save — reloading'); reload() }
+  }
+
+  const remove = async (row) => {
+    if (!window.confirm(`Remove ${row.staff_email}? They lose access immediately.`)) return
+    const { error } = await removeStaff(row.id)
+    if (error) { flash('Could not remove — try again'); return }
+    flash('Removed')
+    reload()
+  }
+
+  if (!isGold) {
+    return (
+      <div style={{ ...card, maxWidth: '560px' }}>
+        <div style={{ fontSize: '17px', fontWeight: 800, marginBottom: '8px' }}>Add your team</div>
+        <div style={{ color: 'var(--text2)', fontSize: '14px', lineHeight: 1.6 }}>
+          Gold includes two extra users: invite staff with their own logins and
+          choose exactly which sections they can use — just invoices, say, while your
+          reports and settings stay yours. Upgrade on the{' '}
+          <a href="#billing" onClick={(e) => { e.preventDefault(); window.location.hash = 'billing'; window.location.reload() }}
+             style={{ color: 'var(--orange-light)', fontWeight: 700 }}>Billing tab</a>{' '}
+          to unlock it.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '16px', maxWidth: '720px' }}>
+      <div style={card}>
+        <div style={{ fontSize: '17px', fontWeight: 800, marginBottom: '4px' }}>Users</div>
+        <div style={{ color: 'var(--text2)', fontSize: '13.5px', marginBottom: '16px' }}>
+          Your Gold plan includes {SEATS} staff seats ({seatsLeft} left). Staff sign in with
+          their own email and password and only see the sections you tick — never
+          Settings or Billing.
+        </div>
+
+        {rows === null && <div style={{ color: 'var(--text3)', fontSize: '13.5px' }}>Loading…</div>}
+
+        {rows !== null && seatsLeft > 0 && (
+          <div style={{ display: 'grid', gap: '12px', paddingBottom: rows.length ? '20px' : 0, marginBottom: rows.length ? '20px' : 0, borderBottom: rows.length ? '1px solid var(--border)' : 'none' }}>
+            <div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text2)', marginBottom: '6px' }}>Their email</div>
+              <input style={inp} type="email" placeholder="name@example.com" value={email}
+                     onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text2)', marginBottom: '6px' }}>What they can use</div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {STAFF_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '13.5px' }}>
+                    <input type="checkbox" checked={perms[k] === true}
+                           onChange={() => setPerms(p => ({ ...p, [k]: !(p[k] === true) }))}
+                           style={{ marginTop: '2px' }} />
+                    <span><strong>{label}</strong>
+                      <span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {err && <div style={{ color: 'var(--red)', fontSize: '13px' }}>{err}</div>}
+            <button style={{ ...btnPri, width: 'fit-content' }} disabled={busy} onClick={add}>
+              {busy ? 'Adding…' : 'Add user'}
+            </button>
+          </div>
+        )}
+
+        {rows !== null && rows.map(row => (
+          <div key={row.id} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '14.5px' }}>{row.staff_email}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
+                  {row.status === 'invited' ? 'Invited — sets a password from the email, then signs in' : 'Active'}
+                </div>
+              </div>
+              <button style={{ ...btnSec, color: 'var(--red)' }} onClick={() => remove(row)}>Remove</button>
+            </div>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {STAFF_PERMS.map(([k, label, blurb]) => (
+                <label key={k} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '13.5px' }}>
+                  <input type="checkbox" checked={row.permissions?.[k] === true}
+                         onChange={() => togglePerm(row, k)} style={{ marginTop: '2px' }} />
+                  <span><strong>{label}</strong>
+                    <span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+                </label>
+              ))}
+            </div>
+            <StaffPassword row={row} flash={flash} />
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '12px', lineHeight: 1.5 }}>
+              Changes apply on their next page load. Removing them cuts access immediately.
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Password controls for one staff row. Two cases:
+//  • We created their account (invite) — the owner may set a new password
+//    directly, e.g. when a staff member is locked out.
+//  • They joined with an Alzaro login they already owned — the owner must NOT
+//    be able to take that account over, so the only option is emailing THEM a
+//    reset link.
+function StaffPassword({ row, flash }) {
+  const [pw, setPw] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+  const [err, setErr] = React.useState('')
+
+  const setPassword = async () => {
+    setErr('')
+    if (pw.length < 8) { setErr('At least 8 characters.'); return }
+    setBusy(true)
+    try {
+      const session = await getSession()
+      const r = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ action: 'set_password', staff_id: row.id, password: pw }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(j.error || 'Could not set the password'); return }
+      setPw('')
+      flash('Password updated — tell them the new one')
+    } catch (e) {
+      setErr('Network error — try again')
+    } finally { setBusy(false) }
+  }
+
+  const sendReset = async () => {
+    setBusy(true)
+    try {
+      const redirect = window.location.origin + '/soloops/reset-password'
+      const { error } = await resetPasswordForEmail(row.staff_email, redirect)
+      if (error) { flash('Could not send the reset email'); return }
+      flash(`Reset email sent to ${row.staff_email}`)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>Password</div>
+      {row.created_via_invite ? (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input style={{ ...inp, width: '220px' }} type="password" placeholder="New password (min 8 chars)"
+                 value={pw} onChange={e => setPw(e.target.value)}
+                 onKeyDown={e => { if (e.key === 'Enter') setPassword() }} />
+          <button style={btnSec} disabled={busy} onClick={setPassword}>
+            {busy ? 'Saving…' : 'Set password'}
+          </button>
+          {err && <span style={{ color: 'var(--red)', fontSize: '12.5px' }}>{err}</span>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button style={btnSec} disabled={busy} onClick={sendReset}>
+            {busy ? 'Sending…' : 'Send password reset email'}
+          </button>
+          <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
+            They joined with an Alzaro login they already had, so only they can change its password.
+          </span>
+        </div>
       )}
     </div>
   )
