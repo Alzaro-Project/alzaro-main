@@ -188,6 +188,22 @@ export default async function handler(req, res) {
     console.error('staff: user lookup threw', err)
   }
 
+  // Business name for the invite email ("<name> has added you…"). Settings is
+  // the source of truth; soloops_access covers owners who never saved settings.
+  let bizName = ''
+  try {
+    const r = await serviceFetch(
+      `/rest/v1/soloops_settings?user_id=eq.${owner.id}&select=business_name&limit=1`
+    )
+    bizName = ((r.ok ? await r.json() : [])[0]?.business_name || '').trim()
+    if (!bizName) {
+      const a = await serviceFetch(
+        `/rest/v1/soloops_access?user_id=eq.${owner.id}&select=business_name&limit=1`
+      )
+      bizName = ((a.ok ? await a.json() : [])[0]?.business_name || '').trim()
+    }
+  } catch (e) { /* name is a nicety — never block the invite on it */ }
+
   let status = 'active'
   if (!staffUser) {
     // Brand-new person: create + email them an invite that lands on the
@@ -206,7 +222,14 @@ export default async function handler(req, res) {
         `/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`,
         {
           method: 'POST',
-          body: JSON.stringify({ email, redirect_to: redirectTo }),
+          // `data` lands in user_metadata and is readable by the email template
+          // as {{ .Data.* }} — that's how the invite says WHICH product and
+          // WHOSE workspace, since templates are otherwise project-wide.
+          body: JSON.stringify({
+            email,
+            redirect_to: redirectTo,
+            data: { invited_to: 'Alzaro SoloOps', workspace_name: bizName },
+          }),
         }
       )
       const j = await r.json().catch(() => null)
