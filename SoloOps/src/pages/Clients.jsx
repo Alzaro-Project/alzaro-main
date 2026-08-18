@@ -63,7 +63,9 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
 
   const lbl = { fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }
 
-  const TABS = [['all','All'],['customer','Customers'],['supplier','Suppliers'],['both','Both']]
+  // 'Both' is not a tab: a client who is both appears under Customers AND
+  // Suppliers (the filter below already treats kind='both' that way).
+  const TABS = [['all','All'],['customer','Customers'],['supplier','Suppliers']]
   const q = search.trim().toLowerCase()
   const rows = (clients||[]).filter(c => {
     const k = c.kind || 'customer'
@@ -165,7 +167,11 @@ export default function Clients({ uid, clients, invoices, expenses, onChange, fl
           <select style={{...inp,marginTop:'12px'}} value={form.kind} onChange={e=>setForm({...form,kind:e.target.value})}>
             <option value="customer">Customer (you invoice them)</option>
             <option value="supplier">Supplier (you buy from them)</option>
-            <option value="both">Both</option>
+            {/* Not offered as a choice any more, but a client can still BECOME
+                both automatically (invoiced AND bought from). Keep the value
+                selectable when editing such a client so opening the form
+                doesn't silently demote them to customer-only. */}
+            {form.kind === 'both' && <option value="both">Customer + Supplier (automatic)</option>}
           </select>
           <input style={{...inp,marginTop:'12px'}} placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
           <input style={{...inp,marginTop:'12px'}} placeholder="Phone" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} />
