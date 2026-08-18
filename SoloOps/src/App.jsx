@@ -4,7 +4,7 @@ import {
   getSession, onAuthChange, signOut as dbSignOut, getAccess,
   loadInvoices, loadExpenses, loadMileage, loadClients, loadItems, deleteInvoice, updateInvoice,
   deleteExpense,
-  updateUser, loadSettings, getMember, joinProduct,
+  updateUser, loadSettings, getMember, joinProduct, getStaffMapping,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
@@ -51,6 +51,9 @@ function Shell() {
   // Subscription membership row (product_members, product='soloops').
   // undefined = not loaded yet (gate rendering); null = no row.
   const [member, setMember] = useState(undefined)
+  // Staff mode: set when this login is a staff seat on someone else's Gold
+  // workspace — { owner_id, permissions } or null for a normal owner.
+  const [staff, setStaff] = useState(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   // Set when a data load fails transiently (network/5xx). Distinct from "no
@@ -107,6 +110,43 @@ function Shell() {
     const sess = await getSession()
     const uid = sess?.user?.id
     if (uid) {
+      // Staff seat? Then this login works inside the OWNER's workspace: reads
+      // and writes land on the owner's data (RLS grants them), tier gating
+      // follows the owner's plan, and this user has no soloops_access row of
+      // their own — so this check must run before the no-access bounce below.
+      // getStaffMapping fails open to null (e.g. migration not run yet).
+      const mapping = await getStaffMapping(uid)
+      setStaff(mapping)
+      if (mapping) {
+        const ws = mapping.owner_id
+        const { data: access, error: accessErr } = await getAccess(ws)
+        if (accessErr) { setLoadError(true); setLoading(false); return }
+        let nm = access?.business_name || ''
+        try {
+          const st = await loadSettings(ws)   // read-only for staff (RLS)
+          if (st) setSettings(st)
+          if (st && st.business_name) nm = st.business_name
+        } catch (_) {}
+        setBizName(nm)
+        // The OWNER's tier drives gating; staff never joinProduct (that would
+        // start a personal SoloOps trial on a staff-only login).
+        const { data: mem, error: memErr } = await getMember(ws)
+        if (memErr) { setLoadError(true); setLoading(false); return }
+        setMember(mem || null)
+        // Fall through to the shared data loads — RLS scopes them to the
+        // owner's rows for this staff login.
+        const [invR, expR, milR, cliR, itmR] = await Promise.all([
+          loadInvoices(), loadExpenses(), loadMileage(), loadClients(), loadItems(),
+        ])
+        if (invR.error || expR.error || milR.error || cliR.error) {
+          setLoadError(true); setLoading(false); return
+        }
+        setInvoices(invR.data || []); setExpenses(expR.data || [])
+        setMileage(milR.data || []); setClients(cliR.data || [])
+        setItems(itmR.error ? [] : (itmR.data || []))
+        setLoading(false)
+        return
+      }
       const { data: access, error: accessErr } = await getAccess(uid)
       if (accessErr) {
         // Transient failure (network/5xx/expired-mid-request) — do NOT sign out
@@ -265,6 +305,17 @@ function Shell() {
   const taxable = Math.max(0, profit - Number(allowance||0))
   const estTax = Math.max(0, taxable * (Number(taxRate||0)/100) + taxable * (Number(nicRate||0)/100))
 
+  // Which sections can this login see? Owners: everything. Staff: only the
+  // sections the owner ticked — and never Settings (billing, SMTP, plan).
+  // The database enforces the same map through RLS; this only shapes the UI.
+  const staffAllows = (k) => !staff || (k !== 'settings' && staff.permissions?.[k] === true)
+  const staffHome = staff ? (NAV.find(([k]) => staffAllows(k))?.[0] || null) : null
+  useEffect(() => {
+    if (staff && !staffAllows(view)) {
+      if (staffHome) navigate('/' + staffHome, { replace: true })
+    }
+  }, [staff, view])
+
   if (session === undefined)
     return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
 
@@ -295,7 +346,15 @@ function Shell() {
   if (member === undefined)
     return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text2)'}}>Loading…</div>
 
-  const uid = session.user.id
+  // Workspace id: whose rows we read and write. Own id for owners; the
+  // owner's id for staff — every page and form receives this as `uid`, so
+  // staff-created records land in the owner's workspace automatically.
+  const uid = staff?.owner_id || session.user.id
+
+  if (staff && !staffHome)
+    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px',textAlign:'center',color:'var(--text2)'}}>
+      Your access to this workspace has no sections enabled yet — ask the account owner to tick some in Settings → Users.
+    </div>
 
   // Subscription tier + gating. Source of truth: product_members (synced by the
   // Stripe webhook). Fail closed to 'basic' if there's no row yet. join_product
@@ -380,7 +439,7 @@ function Shell() {
         </div>
 
         <div className="solo-nav" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'4px', margin:'0 -4px', padding:'0 4px' }}>
-          {NAV.map(([k,label,,min,icon]) => {
+          {NAV.filter(([k]) => staffAllows(k)).map(([k,label,,min,icon]) => {
             const locked = !tierAllows(min)
             const active = view===k
             return (
@@ -418,7 +477,10 @@ function Shell() {
         </div>
 
         <div className="solo-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap', padding:'18px 28px', borderBottom:'1px solid var(--border)' }}>
-          <h1 style={{ fontSize:'20px', fontWeight:800 }}>{NAV.find(n=>n[0]===view)[1]}</h1>
+          <h1 style={{ fontSize:'20px', fontWeight:800, display:'flex', alignItems:'center', gap:'10px' }}>
+            {NAV.find(n=>n[0]===view)[1]}
+            {staff && <span title={'Staff access to '+(bizName||'this workspace')} style={{ fontSize:'10.5px', fontWeight:800, letterSpacing:'.5px', textTransform:'uppercase', color:'var(--orange-light)', background:'var(--orange-subtle)', border:'1px solid rgba(249,115,22,.35)', borderRadius:'6px', padding:'3px 8px' }}>Staff</span>}
+          </h1>
           <div className="solo-header-actions" style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
             {['income','expenses'].includes(view) && <>
               {tierAllows('bronze') && <button style={btnSec} onClick={()=>setModal('expense')}>+ Expense</button>}
@@ -584,7 +646,7 @@ function Shell() {
           )}
 
           {view==='settings' && (
-            <Settings session={session} signOut={signOut} flash={flash} onBizChange={(n)=>setBizName(n)} />
+            <Settings session={session} member={member} signOut={signOut} flash={flash} onBizChange={(n)=>setBizName(n)} />
           )}
 
           </>}

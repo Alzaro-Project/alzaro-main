@@ -138,6 +138,30 @@ export default async function handler(req, res) {
     }
     // --- End auth check ---
 
+    // --- Multi-user: a staff caller sends on behalf of their OWNER ---
+    // Staff have no settings/SMTP of their own; every workspace read below is
+    // keyed by userId, so swap it for the owner's id. Read with the CALLER's
+    // token: RLS only returns a row if they really are active staff with the
+    // income permission, so this can't be spoofed with an arbitrary owner id.
+    try {
+      const sUrl =
+        `${supabaseUrl}/rest/v1/soloops_staff` +
+        `?staff_user_id=eq.${encodeURIComponent(userId)}` +
+        `&status=in.(invited,active)&select=owner_id,permissions&limit=1`
+      const sRes = await fetch(sUrl, { headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${token}` } })
+      if (sRes.ok) {
+        const rows = await sRes.json().catch(() => [])
+        const m = Array.isArray(rows) ? rows[0] : null
+        if (m?.owner_id) {
+          if (m.permissions?.income !== true) {
+            return res.status(403).json({ error: 'Your access does not include sending invoices' })
+          }
+          userId = m.owner_id
+        }
+      }
+    } catch (e) { /* table may not exist yet — caller stays an owner */ }
+
+
     // --- Authorization: caller must hold an active product_members row ---
     // Closes the open-relay: a valid-token-but-not-a-customer account (or a
     // suspended one) can NOT send — least of all from the shared Alzaro domain.

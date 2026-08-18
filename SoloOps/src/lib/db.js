@@ -259,3 +259,36 @@ export async function loadSettings(uid) {
 export async function saveSettings(record) {
   return sb.from('soloops_settings').upsert(record, { onConflict: 'user_id' })
 }
+
+// ---------- staff (multi-user: Gold owner + staff seats) ----------
+// Is THIS login a staff member of someone's workspace? Errors fail open to
+// "not staff" ON PURPOSE: if the soloops_staff migration hasn't run yet, every
+// login must still boot as a normal owner (deploy code before SQL).
+export async function getStaffMapping(uid) {
+  try {
+    const { data, error } = await sb
+      .from('soloops_staff')
+      .select('id, owner_id, permissions, status')
+      .eq('staff_user_id', uid)
+      .in('status', ['invited', 'active'])
+      .limit(1)
+      .maybeSingle()
+    if (error) return null
+    return data || null
+  } catch (e) {
+    return null
+  }
+}
+// Owner's view of their staff rows (RLS: owner_id = auth.uid()).
+export async function listStaff() {
+  return sb
+    .from('soloops_staff')
+    .select('id, staff_email, permissions, status, created_via_invite, created_at')
+    .order('created_at', { ascending: true })
+}
+export async function updateStaffPermissions(id, permissions) {
+  return sb.from('soloops_staff').update({ permissions }).eq('id', id)
+}
+export async function removeStaff(id) {
+  return sb.from('soloops_staff').delete().eq('id', id)
+}
