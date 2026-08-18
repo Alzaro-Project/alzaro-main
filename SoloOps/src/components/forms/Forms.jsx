@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
+import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, PAY_METHODS, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule, uploadFile, insertDocument, updateExpenseReceipt } from '../../lib/db.js'
-
-// "How was it paid" options, shared by expenses and income. Values are what
-// lands in the DB (stable, snake_case); labels are what people see.
-const PAY_METHODS = [
-  ['', 'Not recorded'],
-  ['cash', 'Cash'],
-  ['card', 'Card'],
-  ['bank_transfer', 'Bank transfer'],
-  ['direct_debit', 'Direct debit'],
-  ['cheque', 'Cheque'],
-  ['other', 'Other'],
-]
 
 // Built-ins + the owner's custom categories, deduped, with Other kept last so
 // the catch-all stays at the bottom where people expect it.
