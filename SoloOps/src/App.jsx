@@ -9,7 +9,7 @@ import {
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
 import ReceiptViewer from './components/ReceiptViewer.jsx'
-import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check } from './components/UI.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check, PAY_LABEL } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
@@ -548,11 +548,12 @@ function Shell() {
                 <div style={{ fontSize:'11px', fontWeight:800, letterSpacing:'.08em', color:'var(--text3)', marginBottom:'14px' }}>INCOME LIST</div>
                 {rows.length===0 ? <Empty msg={fInvoices.length===0 ? "No income yet. Click “+ Income” to add one." : "No income matches this filter."} />
                 : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead><Th cols={['Reference','Client','Issued','Total','Status','Actions']} /></thead>
+                  <thead><Th cols={['Reference','Client','Issued','Total','Paid via','Status','Actions']} /></thead>
                   <tbody>{rows.map(i => (
                     <tr key={i.id}>
                       <Td mono>{i.number||'—'}</Td><Td>{i.client_name||'—'}</Td>
                       <Td muted>{fmtDate(i.issue_date)}</Td><Td mono right>{gbp(i.total)}</Td>
+                      <Td muted>{PAY_LABEL[i.paid_method] && i.paid_method ? PAY_LABEL[i.paid_method] : '—'}</Td>
                       <Td><Status s={i.status}/></Td>
                       <Td right>
                         <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
@@ -598,12 +599,13 @@ function Shell() {
             <div style={card}>
               {rows.length===0 ? <Empty msg={fExpenses.length===0 ? "No expenses yet. Click “+ Expense” to add one." : "No expenses match this filter."} />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><Th cols={['Date','Merchant','Category','Amount','Actions']} /></thead>
+                <thead><Th cols={['Date','Merchant','Category','Amount','Paid via','Actions']} /></thead>
                 <tbody>{rows.map(e => (
                   <tr key={e.id}>
                     <Td muted mono>{fmtDate(e.spent_on)}</Td><Td>{e.merchant} {e.has_receipt && <span onClick={()=>setViewReceipt(e)} title="View receipt" style={{ fontSize:'10.5px', color:'var(--green)', border:'1px solid rgba(34,197,94,.4)', borderRadius:'20px', padding:'1px 7px', marginLeft:'6px', cursor:'pointer' }}>receipt</span>}{e.notes && <div style={{ fontSize:'11.5px', color:'var(--text3)', marginTop:'2px' }}>{e.notes}</div>}</Td>
                     <Td><span style={{ background:'var(--surface3)', padding:'4px 11px', borderRadius:'7px', fontSize:'12px', color:'var(--text2)' }}>{e.category}</span></Td>
                     <Td mono right>{gbp(e.amount)}</Td>
+                    <Td muted>{PAY_LABEL[e.paid_method] && e.paid_method ? PAY_LABEL[e.paid_method] : '—'}</Td>
                     <Td right>
                       <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
                         <button style={actBtn} onClick={()=>onEditExpense(e)}>Edit</button>
