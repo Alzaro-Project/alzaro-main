@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { signIn, signUp, getAccess, createAccess, resetPasswordForEmail, signOut } from '../lib/db.js'
+import { signIn, signUp, getAccess, createAccess, resetPasswordForEmail, signOut, getStaffMapping } from '../lib/db.js'
 import { inp, grad } from '../components/UI.jsx'
 
 export default function Login() {
@@ -34,6 +34,13 @@ export default function Login() {
 
       const { data: access } = await getAccess(data.user.id)
       if (!access) {
+        // Staff seat? They have no workspace of their OWN by design — they
+        // work inside their owner's. Without this check they'd be offered a
+        // personal SoloOps trial here, and starting one would bolt an empty
+        // workspace onto a staff-only login. Straight to the dashboard; the
+        // app boot resolves staff mode from the same mapping.
+        const mapping = await getStaffMapping(data.user.id)
+        if (mapping) { goDash(); return }
         if (data.user.user_metadata?.product === 'soloops') {
           // Check the insert: if it fails, going to the dashboard just bounces
           // straight back here (loadAll finds no access row) with no message.
