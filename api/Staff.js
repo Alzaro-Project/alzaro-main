@@ -1,6 +1,6 @@
 // /api/staff.js
 // ============================================================================
-// SoloOps multi-user: adds a staff member to a Gold owner's workspace.
+// Multi-user staff for every vertical: adds a staff member to an owner's workspace.
 //
 // Only ADD lives here — it needs the service role (email → auth user lookup,
 // invite email for brand-new people) plus the two rules the client must not
@@ -27,11 +27,35 @@ const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // Staff seats per tier. Owner is not counted — this is EXTRA users.
-// Keep the tier LIST in step with migrations/011_staff_silver.sql (the RLS
-// gate) and the counts with TIER_SEATS in pages/Settings.jsx (the UI copy).
-const STAFF_SEATS = { basic: 0, bronze: 0, silver: 2, gold: 4 }
-
-const PERM_KEYS = ['dashboard', 'income', 'items', 'expenses', 'receipts', 'reports']
+// One endpoint, every vertical. Per-product wiring lives here; the tier list
+// must match each product's RLS staff functions (011 for soloops, 012 for
+// propertyops) and the seat counts must match that product's Users tab copy.
+// Callers send { product } in the body; missing/unknown falls back to soloops
+// so the already-shipped SoloOps UI keeps working unchanged.
+const PRODUCTS = {
+  soloops: {
+    label: 'Alzaro SoloOps',
+    staffTable: 'soloops_staff',
+    permKeys: ['dashboard', 'income', 'items', 'expenses', 'receipts', 'reports'],
+    seats: { basic: 0, bronze: 0, silver: 2, gold: 4 },
+    redirectPath: '/soloops/reset-password',
+    // where to look for the workspace name for the invite email, in order
+    nameSources: [
+      { table: 'soloops_settings', column: 'business_name' },
+      { table: 'soloops_access', column: 'business_name' },
+    ],
+  },
+  propertyops: {
+    label: 'Alzaro PropertyOps',
+    staffTable: 'prop_staff',
+    permKeys: ['dashboard', 'properties', 'tenants', 'finance', 'maintenance', 'compliance', 'documents', 'reports'],
+    seats: { basic: 0, bronze: 0, silver: 2, gold: 4 },
+    redirectPath: '/propertyops/reset-password',
+    nameSources: [
+      { table: 'prop_settings', column: 'company_name' },
+    ],
+  },
+}
 
 function bearer(req) {
   const raw = req.headers.authorization || req.headers.Authorization || ''
@@ -84,6 +108,8 @@ export default async function handler(req, res) {
   }
 
   const body = typeof req.body === 'string' ? safeJson(req.body) : req.body || {}
+  const productKey = PRODUCTS[String(body.product || '').toLowerCase()] ? String(body.product).toLowerCase() : 'soloops'
+  const P = PRODUCTS[productKey]
 
   // ---- action: set_password -------------------------------------------------
   // Owner sets a new password for a staff account THEY created via invite.
@@ -99,7 +125,7 @@ export default async function handler(req, res) {
       // The mapping row is the authority: owner must match the caller, and the
       // target auth id comes from the row — never from the client.
       const r = await serviceFetch(
-        `/rest/v1/soloops_staff?id=eq.${staffId}` +
+        `/rest/v1/${P.staffTable}?id=eq.${staffId}` +
           `&select=owner_id,staff_user_id,created_via_invite&limit=1`
       )
       const row = (r.ok ? await r.json() : [])[0]
@@ -119,7 +145,7 @@ export default async function handler(req, res) {
         return res.status(502).json({ error: 'Could not set the password' })
       }
       // A set password means they can log in — mark active.
-      await serviceFetch(`/rest/v1/soloops_staff?id=eq.${staffId}`, {
+      await serviceFetch(`/rest/v1/${P.staffTable}?id=eq.${staffId}`, {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ status: 'active' }),
@@ -142,7 +168,7 @@ export default async function handler(req, res) {
 
   // Whitelist the permission keys; everything arrives as strict booleans.
   const permissions = {}
-  for (const k of PERM_KEYS) permissions[k] = body.permissions?.[k] === true
+  for (const k of P.permKeys) permissions[k] = body.permissions?.[k] === true
   if (!Object.values(permissions).some(Boolean)) {
     return res.status(400).json({ error: 'Tick at least one section for them to use' })
   }
@@ -151,19 +177,19 @@ export default async function handler(req, res) {
   // client-side lock on the Users tab is cosmetic.
   try {
     const r = await serviceFetch(
-      `/rest/v1/product_members?user_id=eq.${owner.id}&product=eq.soloops` +
+      `/rest/v1/product_members?user_id=eq.${owner.id}&product=eq.${productKey}` +
         `&select=tier,status&limit=1`
     )
     const rows = r.ok ? await r.json() : []
     const m = rows[0]
-    const seats = m && ['trial', 'active'].includes(m.status) ? (STAFF_SEATS[m.tier] || 0) : 0
+    const seats = m && ['trial', 'active'].includes(m.status) ? (P.seats[m.tier] || 0) : 0
     if (seats < 1) {
       return res.status(403).json({ error: 'Adding users needs an active Silver or Gold plan' })
     }
 
     // Seat limit: count existing staff rows.
     const c = await serviceFetch(
-      `/rest/v1/soloops_staff?owner_id=eq.${owner.id}&select=id`,
+      `/rest/v1/${P.staffTable}?owner_id=eq.${owner.id}&select=id`,
       { headers: { Prefer: 'count=exact', Range: '0-0' } }
     )
     const total = Number((c.headers.get('content-range') || '/0').split('/')[1] || 0)
@@ -194,15 +220,12 @@ export default async function handler(req, res) {
   // the source of truth; soloops_access covers owners who never saved settings.
   let bizName = ''
   try {
-    const r = await serviceFetch(
-      `/rest/v1/soloops_settings?user_id=eq.${owner.id}&select=business_name&limit=1`
-    )
-    bizName = ((r.ok ? await r.json() : [])[0]?.business_name || '').trim()
-    if (!bizName) {
-      const a = await serviceFetch(
-        `/rest/v1/soloops_access?user_id=eq.${owner.id}&select=business_name&limit=1`
+    for (const src of P.nameSources) {
+      const r = await serviceFetch(
+        `/rest/v1/${src.table}?user_id=eq.${owner.id}&select=${src.column}&limit=1`
       )
-      bizName = ((a.ok ? await a.json() : [])[0]?.business_name || '').trim()
+      bizName = ((r.ok ? await r.json() : [])[0]?.[src.column] || '').trim()
+      if (bizName) break
     }
   } catch (e) { /* name is a nicety — never block the invite on it */ }
 
@@ -213,9 +236,7 @@ export default async function handler(req, res) {
     // Pinned, not derived from the request host: on www.alzaro.co.uk or a
     // Vercel preview the derived URL wouldn't match the Supabase redirect
     // allow-list, and Supabase would quietly fall back to the Site URL.
-    const redirectTo =
-      process.env.SOLOOPS_INVITE_REDIRECT ||
-      'https://alzaro.co.uk/soloops/reset-password'
+    const redirectTo = 'https://alzaro.co.uk' + P.redirectPath
     try {
       // redirect_to MUST be a query parameter — GoTrue ignores it in the body
       // and silently falls back to the project's Site URL, which dumps the
@@ -230,7 +251,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             email,
             redirect_to: redirectTo,
-            data: { invited_to: 'Alzaro SoloOps', workspace_name: bizName },
+            data: { invited_to: P.label, workspace_name: bizName },
           }),
         }
       )
@@ -254,7 +275,7 @@ export default async function handler(req, res) {
   // Create the mapping. The unique (owner_id, staff_email) constraint turns a
   // double-add into a clean 409.
   try {
-    const r = await serviceFetch('/rest/v1/soloops_staff', {
+    const r = await serviceFetch(`/rest/v1/${P.staffTable}`, {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
@@ -268,7 +289,7 @@ export default async function handler(req, res) {
     })
     const rows = await r.json().catch(() => null)
     if (!r.ok) {
-      const dup = JSON.stringify(rows || '').includes('soloops_staff_owner_email_uniq')
+      const dup = JSON.stringify(rows || '').includes('_owner_email_uniq')
       console.error('staff: mapping insert failed', r.status, rows)
       return res.status(dup ? 409 : 500).json({
         error: dup ? 'That person is already on your account' : 'Could not add the user',
