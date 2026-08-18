@@ -292,3 +292,23 @@ export async function updateStaffPermissions(id, permissions) {
 export async function removeStaff(id) {
   return sb.from('soloops_staff').delete().eq('id', id)
 }
+
+// ---------- custom expense categories ----------
+// Fails open to [] when the migration hasn't run: the built-in category list
+// must keep working regardless of deploy order.
+export async function loadCategories() {
+  try {
+    const { data, error } = await sb
+      .from('soloops_categories').select('id, name').order('name')
+    if (error) return { data: [], error: null }
+    return { data: data || [], error: null }
+  } catch (e) {
+    return { data: [], error: null }
+  }
+}
+export async function insertCategory(row) {
+  return sb.from('soloops_categories').insert(row)
+}
+export async function deleteCategory(id) {
+  return sb.from('soloops_categories').delete().eq('id', id)
+}
