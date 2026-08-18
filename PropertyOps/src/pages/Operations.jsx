@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Btn, ConfirmDialog, DetailBox, DetailRow, Metric, PageHead, Pill, ReportPreview, Table, Td, useConfirm } from "../components/UI.jsx";
 import { REPORTS, buildReport, gbp, ukDate, propLabel, toneVar, usePropertyList, useIsMobile, effectiveStatus, outstandingOf, paidOf, friendlyError } from "../lib/helpers.js";
 import { DB_READY, db } from "../lib/supabase.js";
+import { STAFF_PERMS, listStaff, updateStaffPermissions, removeStaff } from "../lib/staff.js";
 
 // Reusable centered popup for quick-add forms (tenant/property in Finance).
 // Locks the page scroll behind it and centres on desktop / bottom-sheet on
@@ -1407,6 +1408,7 @@ export function SettingsPage({ user }) {
     { key: "vat", label: "VAT", icon: "ti-receipt" },
     { key: "security", label: "Security", icon: "ti-lock" },
     { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
+    { key: "users", label: "Users", icon: "ti-users" },
   ];
 
   // Apply a loaded settings row to the form state. Kept as a helper so both the
@@ -2029,6 +2031,8 @@ export function SettingsPage({ user }) {
         </div>
       )}
 
+      {tab === "users" && <UsersTab user={user} />}
+
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
@@ -2063,6 +2067,280 @@ export function SettingsPage({ user }) {
             </span>
             <span style={{ fontSize: 11, color: "var(--txt-3)" }}>Update payment details or cancel anytime via the secure billing portal.</span>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ==========================================================================
+   USERS TAB — multi-user staff seats (Silver: 2, Gold: 4).
+   The owner adds staff by email and ticks which sections each can use.
+   Real enforcement is RLS (migrations/012_propertyops_staff.sql); this tab
+   is the control panel. Mirrors the SoloOps Users tab.
+   ========================================================================== */
+function EyeIcon({ off }) {
+  return off ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+// Real buttons — the shared <Btn> is a display-only span with no onClick.
+function UBtn({ children, onClick, disabled, ghost, danger }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, fontSize: 12.5, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: disabled ? "wait" : "pointer", whiteSpace: "nowrap", flexShrink: 0,
+        background: ghost ? "var(--panel-2)" : "var(--brand)", color: danger ? "var(--red, #ef4444)" : ghost ? "var(--txt)" : "#fff",
+        border: "0.5px solid " + (ghost ? "var(--line)" : "var(--brand)"), opacity: disabled ? 0.6 : 1 }}>
+      {children}
+    </button>
+  );
+}
+
+function UsersTab({ user }) {
+  const inp = { width: "100%", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 11px", color: "var(--txt)", fontSize: 13, outline: "none", boxSizing: "border-box" };
+  const cardSt = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" };
+  const chip = { fontSize: 11.5, fontWeight: 700, color: "var(--brand)", background: "var(--brand-soft, rgba(79,70,229,0.1))", border: "1px solid var(--brand)", borderRadius: 999, padding: "3px 10px" };
+
+  const [tierInfo, setTierInfo] = useState(null); // { tier, status } | null while loading
+  const [rows, setRows] = useState(null);
+  const [email, setEmail] = useState("");
+  const [perms, setPerms] = useState({ properties: true });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // Keep in step with PRODUCTS.propertyops.seats in api/staff.js (the real
+  // limit) and the tier list in migrations/012 (the RLS gate).
+  const TIER_SEATS = { silver: 2, gold: 4 };
+
+  const reload = async () => {
+    const { data, error } = await listStaff();
+    setRows(error ? [] : data || []);
+  };
+  useEffect(() => {
+    db.from("product_members").select("tier,status").eq("user_id", user.id).eq("product", "propertyops").maybeSingle()
+      .then(({ data }) => setTierInfo(data || {}));
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const SEATS = TIER_SEATS[(tierInfo?.tier || "").toLowerCase()] || 0;
+  const eligible = SEATS > 0 && ["trial", "active"].includes((tierInfo?.status || "").toLowerCase());
+  const tierLabel = tierInfo?.tier ? tierInfo.tier.charAt(0).toUpperCase() + tierInfo.tier.slice(1) : "";
+  const seatsLeft = rows === null ? 0 : Math.max(0, SEATS - rows.length);
+
+  const flash = (m) => { setNotice(m); setTimeout(() => setNotice(""), 4000); };
+
+  const add = async () => {
+    setErr("");
+    if (!email.trim()) { setErr("Enter their email address."); return; }
+    setBusy(true);
+    try {
+      const { data: sess } = await db.auth.getSession();
+      const r = await fetch("/api/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ product: "propertyops", email: email.trim(), permissions: perms }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(j.error || "Could not add the user"); return; }
+      flash(j.invited ? "Access given — invite email sent so they can set a password" : "Access given — they can sign in with their existing Alzaro login");
+      setEmail(""); setPerms({ properties: true });
+      await reload();
+    } catch (e) { setErr("Network error — try again"); }
+    finally { setBusy(false); }
+  };
+
+  if (tierInfo === null || rows === null) return <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+
+  if (!eligible) {
+    return (
+      <div style={{ ...cardSt, maxWidth: 560 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Add your team</div>
+        <div style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.6 }}>
+          Silver includes 2 extra users and Gold includes 4: invite staff with their own
+          logins and choose exactly which sections they can use — just maintenance, say,
+          while your finances and settings stay yours. Upgrade on the Subscription tab to unlock it.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 14, maxWidth: 760 }}>
+      {notice && <div style={{ background: "var(--brand-soft, rgba(79,70,229,0.1))", border: "1px solid var(--brand)", color: "var(--txt)", borderRadius: 8, padding: "9px 13px", fontSize: 12.5 }}>{notice}</div>}
+      <div style={cardSt}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>Users</div>
+        <div style={{ color: "var(--txt-2)", fontSize: 12.5, marginBottom: 14 }}>
+          Your {tierLabel} plan includes {SEATS} staff seats ({seatsLeft} left). Staff sign in with their
+          own email and password and only see the sections you tick — never Settings.
+        </div>
+
+        {seatsLeft > 0 && (
+          <div style={{ display: "grid", gap: 11, paddingBottom: rows.length ? 16 : 0, marginBottom: rows.length ? 16 : 0, borderBottom: rows.length ? "0.5px solid var(--line)" : "none" }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--txt-2)", marginBottom: 5 }}>Their email</div>
+              <input style={inp} type="email" placeholder="name@example.com" value={email}
+                     onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--txt-2)", marginBottom: 5 }}>What they can use</div>
+              <div style={{ display: "grid", gap: 7 }}>
+                {STAFF_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
+                    <input type="checkbox" checked={perms[k] === true}
+                           onChange={() => setPerms((p) => ({ ...p, [k]: !(p[k] === true) }))}
+                           style={{ marginTop: 2 }} />
+                    <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {err && <div style={{ color: "var(--red, #ef4444)", fontSize: 12.5 }}>{err}</div>}
+            <UBtn onClick={add} disabled={busy}>{busy ? "Adding…" : "Add user"}</UBtn>
+          </div>
+        )}
+
+        {rows.map((row) => (
+          <StaffCard key={row.id} row={row} flash={flash} onChanged={reload} inp={inp} chip={chip} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StaffCard({ row, flash, onChanged, inp, chip }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(row.permissions || {});
+  const [saving, setSaving] = useState(false);
+
+  const enabled = STAFF_PERMS.filter(([k]) => row.permissions?.[k] === true).map(([, label]) => label);
+
+  const saveEdit = async () => {
+    setSaving(true);
+    const { error } = await updateStaffPermissions(row.id, draft);
+    setSaving(false);
+    if (error) { flash("Could not save — try again"); return; }
+    setEditing(false); flash("Access updated"); onChanged();
+  };
+  const remove = async () => {
+    if (!window.confirm(`Remove ${row.staff_email}? They lose access immediately.`)) return;
+    const { error } = await removeStaff(row.id);
+    if (error) { flash("Could not remove — try again"); return; }
+    flash("Removed"); onChanged();
+  };
+
+  return (
+    <div style={{ border: "0.5px solid var(--line)", borderRadius: 10, padding: 14, marginBottom: 11 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5, overflowWrap: "anywhere" }}>{row.staff_email}</div>
+          <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginTop: 2 }}>
+            {row.status === "invited" ? "Invited — hasn't set a password yet" : "Active"}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 7, flexShrink: 0 }}>
+          {!editing && <UBtn ghost onClick={() => { setDraft({ ...(row.permissions || {}) }); setEditing(true); }}>Edit</UBtn>}
+          <UBtn ghost danger onClick={remove}>Remove</UBtn>
+        </div>
+      </div>
+
+      {!editing && (
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 11 }}>
+          {enabled.length
+            ? enabled.map((label) => <span key={label} style={chip}>{label}</span>)
+            : <span style={{ fontSize: 12, color: "var(--txt-3)" }}>No sections enabled — they can sign in but see nothing. Hit Edit to give them access.</span>}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "grid", gap: 7 }}>
+            {STAFF_PERMS.map(([k, label, blurb]) => (
+              <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
+                <input type="checkbox" checked={draft[k] === true}
+                       onChange={() => setDraft((d) => ({ ...d, [k]: !(d[k] === true) }))} style={{ marginTop: 2 }} />
+                <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 7, marginTop: 12 }}>
+            <UBtn onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</UBtn>
+            <UBtn ghost onClick={() => setEditing(false)} disabled={saving}>Cancel</UBtn>
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--txt-3)", marginTop: 9 }}>Changes apply on their next page load.</div>
+        </div>
+      )}
+
+      <StaffPassword row={row} flash={flash} onChanged={onChanged} inp={inp} />
+    </div>
+  );
+}
+
+function StaffPassword({ row, flash, onChanged, inp }) {
+  const [pw, setPw] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const setPassword = async () => {
+    setErr("");
+    if (pw.length < 8) { setErr("At least 8 characters."); return; }
+    setBusy(true);
+    try {
+      const { data: sess } = await db.auth.getSession();
+      const r = await fetch("/api/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ product: "propertyops", action: "set_password", staff_id: row.id, password: pw }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(j.error || "Could not set the password"); return; }
+      setPw(""); flash("Password updated — tell them the new one"); onChanged();
+    } catch (e) { setErr("Network error — try again"); }
+    finally { setBusy(false); }
+  };
+
+  const sendReset = async () => {
+    setBusy(true);
+    try {
+      const { error } = await db.auth.resetPasswordForEmail(row.staff_email, {
+        redirectTo: window.location.origin + "/propertyops/reset-password",
+      });
+      if (error) { flash("Could not send the reset email"); return; }
+      flash(`Reset email sent to ${row.staff_email}`);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid var(--line)" }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--txt-2)", marginBottom: 7 }}>Password</div>
+      {row.created_via_invite ? (
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", width: 230, maxWidth: "100%" }}>
+            <input style={{ ...inp, paddingRight: 36 }} type={show ? "text" : "password"} placeholder="New password (min 8 chars)"
+                   value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setPassword(); }}
+                   autoComplete="new-password" />
+            <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"}
+                    style={{ position: "absolute", right: 7, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", padding: 3, cursor: "pointer", color: "var(--txt-3)", display: "flex", alignItems: "center" }}>
+              <EyeIcon off={show} />
+            </button>
+          </div>
+          <UBtn ghost onClick={setPassword} disabled={busy}>{busy ? "Saving…" : "Set password"}</UBtn>
+          {err && <span style={{ color: "var(--red, #ef4444)", fontSize: 12 }}>{err}</span>}
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+          <UBtn ghost onClick={sendReset} disabled={busy}>{busy ? "Sending…" : "Send password reset email"}</UBtn>
+          <span style={{ fontSize: 11.5, color: "var(--txt-3)" }}>They joined with an Alzaro login they already had, so only they can change its password.</span>
         </div>
       )}
     </div>
