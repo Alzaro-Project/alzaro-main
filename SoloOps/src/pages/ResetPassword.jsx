@@ -6,6 +6,7 @@ import { inp, grad } from '../components/UI.jsx'
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [ready, setReady] = useState(false)
+  const [accountEmail, setAccountEmail] = useState('')
   const [checking, setChecking] = useState(true)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -17,10 +18,11 @@ export default function ResetPassword() {
     let sub
     const check = async () => {
       const session = await getSession()
-      if (session) { setReady(true) }
+      if (session) { setReady(true); setAccountEmail(session.user?.email || '') }
       else {
         sub = onAuthChange((event, s) => {
           if (s || event === 'PASSWORD_RECOVERY') setReady(true)
+          if (s?.user?.email) setAccountEmail(s.user.email)
         })
       }
       setChecking(false)
@@ -51,7 +53,12 @@ export default function ResetPassword() {
         <div style={{ fontFamily:'Manrope, sans-serif', fontSize:'32px', fontWeight:800, textAlign:'center', marginBottom:'6px', letterSpacing:'-0.5px' }}>
           Alzaro <span style={{ color:'var(--orange)' }}>SoloOps</span>
         </div>
-        <div style={{ textAlign:'center', color:'var(--text2)', fontSize:'13px', marginBottom:'24px' }}>Set a new password</div>
+        <div style={{ textAlign:'center', color:'var(--text2)', fontSize:'13px', marginBottom: accountEmail ? '6px' : '24px' }}>Set a new password</div>
+        {accountEmail && (
+          <div style={{ textAlign:'center', fontSize:'13px', marginBottom:'24px' }}>
+            for <strong style={{ color:'var(--text)' }}>{accountEmail}</strong>
+          </div>
+        )}
 
         {error && <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--red)', marginBottom:'14px' }}>{error}</div>}
         {success && <div style={{ background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--green)', marginBottom:'14px' }}>✓ {success}</div>}
