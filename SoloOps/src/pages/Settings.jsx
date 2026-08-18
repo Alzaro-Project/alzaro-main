@@ -722,18 +722,60 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
 }
 
 // ---------------------------------------------------------------------------
-// Users tab — Gold multi-user. The owner adds one staff member by email and
-// ticks which sections they can use. The real enforcement is RLS (see
-// migrations/008_soloops_staff.sql); these checkboxes are the control panel.
+// Users tab — Gold multi-user. The owner adds staff by email and picks which
+// sections each can use. The real enforcement is RLS (see
+// migrations/008_soloops_staff.sql); this tab is the control panel.
 // ---------------------------------------------------------------------------
 const STAFF_PERMS = [
-  ['dashboard', 'Dashboard',   'Totals and charts (sees income & expense figures)'],
-  ['income',    'Income',      'Create, edit and send invoices'],
+  ['dashboard', 'Dashboard',    'Totals and charts (sees income & expense figures)'],
+  ['income',    'Income',       'Create, edit and send invoices'],
   ['items',     'Items/Clients','Manage the item and client lists'],
-  ['expenses',  'Expenses',    'Record and edit expenses'],
-  ['receipts',  'Receipts',    'Upload receipts and match them to expenses'],
-  ['reports',   'Reports/Tax', 'Read-only reports over income and expenses'],
+  ['expenses',  'Expenses',     'Record and edit expenses'],
+  ['receipts',  'Receipts',     'Upload receipts and match them to expenses'],
+  ['reports',   'Reports/Tax',  'Read-only reports over income and expenses'],
 ]
+
+// Eye / eye-off. Inline SVG so there's no dependency on an icon font being
+// loaded on this page.
+function EyeIcon({ off }) {
+  return off ? (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  ) : (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+// Password input with a show/hide toggle inside the field.
+function PasswordInput({ value, onChange, onEnter, placeholder }) {
+  const [show, setShow] = React.useState(false)
+  return (
+    <div style={{ position: 'relative', width: '240px', maxWidth: '100%' }}>
+      <input
+        style={{ ...inp, width: '100%', paddingRight: '40px' }}
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && onEnter) onEnter() }}
+        autoComplete="new-password"
+      />
+      <button
+        type="button"
+        onClick={() => setShow(v => !v)}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        title={show ? 'Hide password' : 'Show password'}
+        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text3)', display: 'flex', alignItems: 'center' }}
+      >
+        <EyeIcon off={show} />
+      </button>
+    </div>
+  )
+}
 
 function UsersTab({ tier, memberStatus, flash }) {
   const [rows, setRows] = React.useState(null)      // null = loading
@@ -780,22 +822,6 @@ function UsersTab({ tier, memberStatus, flash }) {
     } finally {
       setBusy(false)
     }
-  }
-
-  const togglePerm = async (row, key) => {
-    const next = { ...(row.permissions || {}), [key]: !(row.permissions?.[key] === true) }
-    // Optimistic update; RLS only lets the owner touch their own rows.
-    setRows(rs => rs.map(r => r.id === row.id ? { ...r, permissions: next } : r))
-    const { error } = await updateStaffPermissions(row.id, next)
-    if (error) { flash('Could not save — reloading'); reload() }
-  }
-
-  const remove = async (row) => {
-    if (!window.confirm(`Remove ${row.staff_email}? They lose access immediately.`)) return
-    const { error } = await removeStaff(row.id)
-    if (error) { flash('Could not remove — try again'); return }
-    flash('Removed')
-    reload()
   }
 
   if (!isGold) {
@@ -855,33 +881,94 @@ function UsersTab({ tier, memberStatus, flash }) {
         )}
 
         {rows !== null && rows.map(row => (
-          <div key={row.id} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '14.5px' }}>{row.staff_email}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
-                  {row.status === 'invited' ? 'Invited — sets a password from the email, then signs in' : 'Active'}
-                </div>
-              </div>
-              <button style={{ ...btnSec, color: 'var(--red)' }} onClick={() => remove(row)}>Remove</button>
-            </div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              {STAFF_PERMS.map(([k, label, blurb]) => (
-                <label key={k} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '13.5px' }}>
-                  <input type="checkbox" checked={row.permissions?.[k] === true}
-                         onChange={() => togglePerm(row, k)} style={{ marginTop: '2px' }} />
-                  <span><strong>{label}</strong>
-                    <span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
-                </label>
-              ))}
-            </div>
-            <StaffPassword row={row} flash={flash} />
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '12px', lineHeight: 1.5 }}>
-              Changes apply on their next page load. Removing them cuts access immediately.
-            </div>
-          </div>
+          <StaffCard key={row.id} row={row} flash={flash} onChanged={reload} />
         ))}
       </div>
+    </div>
+  )
+}
+
+// One staff member: permission summary with an Edit mode, plus password tools.
+function StaffCard({ row, flash, onChanged }) {
+  const [editing, setEditing] = React.useState(false)
+  const [draft, setDraft] = React.useState(row.permissions || {})
+  const [saving, setSaving] = React.useState(false)
+
+  const enabled = STAFF_PERMS.filter(([k]) => row.permissions?.[k] === true).map(([, label]) => label)
+
+  const startEdit = () => { setDraft({ ...(row.permissions || {}) }); setEditing(true) }
+  const cancelEdit = () => { setEditing(false) }
+  const saveEdit = async () => {
+    setSaving(true)
+    const { error } = await updateStaffPermissions(row.id, draft)
+    setSaving(false)
+    if (error) { flash('Could not save — try again'); return }
+    setEditing(false)
+    flash('Access updated')
+    onChanged()
+  }
+
+  const remove = async () => {
+    if (!window.confirm(`Remove ${row.staff_email}? They lose access immediately.`)) return
+    const { error } = await removeStaff(row.id)
+    if (error) { flash('Could not remove — try again'); return }
+    flash('Removed')
+    onChanged()
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: '14.5px', overflowWrap: 'anywhere' }}>{row.staff_email}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
+            {row.status === 'invited' ? "Invited — hasn't set a password yet" : 'Active'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          {!editing && <button style={btnSec} onClick={startEdit}>Edit</button>}
+          <button style={{ ...btnSec, color: 'var(--red)' }} onClick={remove}>Remove</button>
+        </div>
+      </div>
+
+      {!editing && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '12px' }}>
+          {enabled.length ? enabled.map(label => (
+            <span key={label} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--orange-light)', background: 'var(--orange-subtle)', border: '1px solid rgba(249,115,22,.3)', borderRadius: '999px', padding: '4px 11px' }}>
+              {label}
+            </span>
+          )) : (
+            <span style={{ fontSize: '12.5px', color: 'var(--text3)' }}>
+              No sections enabled — they can sign in but see nothing. Hit Edit to give them access.
+            </span>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ marginTop: '14px' }}>
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {STAFF_PERMS.map(([k, label, blurb]) => (
+              <label key={k} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '13.5px' }}>
+                <input type="checkbox" checked={draft[k] === true}
+                       onChange={() => setDraft(d => ({ ...d, [k]: !(d[k] === true) }))}
+                       style={{ marginTop: '2px' }} />
+                <span><strong>{label}</strong>
+                  <span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+            <button style={btnPri} disabled={saving} onClick={saveEdit}>{saving ? 'Saving…' : 'Save'}</button>
+            <button style={btnSec} disabled={saving} onClick={cancelEdit}>Cancel</button>
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '10px' }}>
+            Changes apply on their next page load.
+          </div>
+        </div>
+      )}
+
+      <StaffPassword row={row} flash={flash} onChanged={onChanged} />
     </div>
   )
 }
@@ -892,7 +979,7 @@ function UsersTab({ tier, memberStatus, flash }) {
 //  • They joined with an Alzaro login they already owned — the owner must NOT
 //    be able to take that account over, so the only option is emailing THEM a
 //    reset link.
-function StaffPassword({ row, flash }) {
+function StaffPassword({ row, flash, onChanged }) {
   const [pw, setPw] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
@@ -912,6 +999,7 @@ function StaffPassword({ row, flash }) {
       if (!r.ok) { setErr(j.error || 'Could not set the password'); return }
       setPw('')
       flash('Password updated — tell them the new one')
+      onChanged() // server flips invited -> active; refresh so the label follows
     } catch (e) {
       setErr('Network error — try again')
     } finally { setBusy(false) }
@@ -932,9 +1020,7 @@ function StaffPassword({ row, flash }) {
       <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px' }}>Password</div>
       {row.created_via_invite ? (
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input style={{ ...inp, width: '220px' }} type="password" placeholder="New password (min 8 chars)"
-                 value={pw} onChange={e => setPw(e.target.value)}
-                 onKeyDown={e => { if (e.key === 'Enter') setPassword() }} />
+          <PasswordInput value={pw} onChange={setPw} onEnter={setPassword} placeholder="New password (min 8 chars)" />
           <button style={btnSec} disabled={busy} onClick={setPassword}>
             {busy ? 'Saving…' : 'Set password'}
           </button>
