@@ -49,7 +49,7 @@ export default function ReceiptViewer({ expense, onClose }) {
           : state.noFile ? (
             <div style={{ padding:'40px', textAlign:'center', color:'var(--text3)', fontSize:'13.5px', lineHeight:1.7 }}>
               This expense is marked as having a receipt{expense.receipt_name ? <> (&ldquo;{expense.receipt_name}&rdquo;)</> : null}, but no file was uploaded when it was attached.<br/>
-              To store the actual file, go to the Receipts tab, choose the file, and attach it to this expense again.
+              To store the actual file, find this expense on the Expenses page and use its Receipt button to attach it again.
             </div>
           )
           : state.isImage ? <img src={state.url} alt={state.name} style={{ maxWidth:'100%', maxHeight:'78vh', objectFit:'contain' }} />
