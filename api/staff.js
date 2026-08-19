@@ -70,6 +70,16 @@ const PRODUCTS = {
       { table: 'product_members', column: 'company_name', extra: '&product=eq.garageops' },
     ],
   },
+  serviceops: {
+    label: 'Alzaro ServiceOps',
+    staffTable: 'svc_staff',
+    permKeys: ['dashboard', 'invoicing', 'quotes', 'customers', 'diary', 'certificates', 'reports'],
+    seats: { basic: 0, bronze: 0, silver: 2, gold: 4 },
+    redirectPath: '/serviceops/reset-password',
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.serviceops' },
+    ],
+  },
   propertyops: {
     label: 'Alzaro PropertyOps',
     staffTable: 'prop_staff',
