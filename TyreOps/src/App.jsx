@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from './store/useStore'
+import StaffRouteGuard from './components/StaffRouteGuard'
 import { supabase, SUPPORT_MODE } from './lib/supabase'
 import Support from './pages/Support'
 import SupportBanner from './components/SupportBanner'
@@ -54,6 +55,8 @@ function AppLayout() {
 
   return (
     <TrialGuard>
+      {/* Bounces staff off pages the owner hasn't ticked (typed URLs included) */}
+      <StaffRouteGuard />
       {isMobile && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, height: '56px',

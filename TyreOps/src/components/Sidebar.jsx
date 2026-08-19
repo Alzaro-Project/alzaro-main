@@ -33,7 +33,19 @@ function applyTheme(theme) {
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, tier, logout, settings } = useStore()
+  const { user, tier, logout, settings, staff } = useStore()
+
+  // Staff visibility: owners see everything; staff only what the owner ticked.
+  // Settings is never shown to staff; Recently Deleted rides along with any of
+  // the data sections it can restore into. RLS enforces the same map server-side.
+  const staffAllows = (path) => {
+    if (!staff) return true
+    const perms = staff.permissions || {}
+    if (path === '/settings') return false
+    if (path === '/recently-deleted') return ['invoices', 'inventory', 'customers'].some(k => perms[k] === true)
+    const key = path.replace('/', '').replace('follow-ups', 'followups')
+    return perms[key] === true
+  }
 
   const tierStyle = TIER_CLASSES[tier] || TIER_CLASSES.bronze
 
@@ -103,7 +115,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
           />
         </div>
 
-        {NAV.map(item => {
+        {NAV.filter(item => staffAllows(item.path)).map(item => {
           const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
           return (
             <NavItem
