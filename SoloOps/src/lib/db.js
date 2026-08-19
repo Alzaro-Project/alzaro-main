@@ -294,20 +294,36 @@ export async function removeStaff(id) {
 }
 
 // ---------- custom expense categories ----------
+// Two kinds of row live here:
+//   hidden = false → an OWN category, added to the built-in list
+//   hidden = true  → a built-in category the owner switched off (the row is a
+//                    tombstone; the name still shows on expenses already using
+//                    it, it just stops being offered in the dropdowns)
 // Fails open to [] when the migration hasn't run: the built-in category list
-// must keep working regardless of deploy order.
+// must keep working regardless of deploy order. `hidden` is selected
+// defensively — if the column isn't there yet the first query errors and we
+// retry without it, so the app works either side of the migration.
 export async function loadCategories() {
   try {
     const { data, error } = await sb
+      .from('soloops_categories').select('id, name, hidden').order('name')
+    if (!error) return { data: data || [], error: null }
+    const { data: legacy, error: legacyErr } = await sb
       .from('soloops_categories').select('id, name').order('name')
-    if (error) return { data: [], error: null }
-    return { data: data || [], error: null }
+    if (legacyErr) return { data: [], error: null }
+    return { data: (legacy || []).map(c => ({ ...c, hidden: false })), error: null }
   } catch (e) {
     return { data: [], error: null }
   }
 }
 export async function insertCategory(row) {
   return sb.from('soloops_categories').insert(row)
+}
+// Switch a BUILT-IN category off by writing a tombstone row. Nothing is
+// deleted: expenses already filed under it keep the name exactly as saved.
+// Restoring it is just deleteCategory() on the tombstone.
+export async function hideCategory(uid, name) {
+  return sb.from('soloops_categories').insert({ user_id: uid, name, hidden: true })
 }
 export async function deleteCategory(id) {
   return sb.from('soloops_categories').delete().eq('id', id)
