@@ -326,7 +326,7 @@ export default function Dashboard({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignContent: 'start' }}>
           <DashCard label="Clients" value={clients.length} delta="Total on file" hint="View clients →" index={7} onClick={() => setView('items')} />
           <DashCard label="Invoices" value={pInvoices.length} delta={periodLabel} hint="View income →" index={8} onClick={() => setView('income')} />
-          <DashCard label="Receipts" value={pExpenses.filter(e => e.has_receipt).length} delta={`of ${pExpenses.length} expenses`} hint="View receipts →" color="var(--blue)" index={9} onClick={() => setView('receipts')} />
+          <DashCard label="Receipts" value={pExpenses.filter(e => e.has_receipt).length} delta={`of ${pExpenses.length} expenses`} hint="View expenses →" color="var(--blue)" index={9} onClick={() => setView('expenses')} />
           <DashCard label="Taxable profit" value={gbp(taxable)} delta={`after £${Number(allowance || 0).toLocaleString()} allowance`} hint="View tax →" color="var(--amber)" index={10} onClick={() => setView('tax')} />
         </div>
       </div>
