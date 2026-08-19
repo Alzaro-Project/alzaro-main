@@ -62,6 +62,8 @@ export const useStore = create(
       // AUTH STATE
       // --------------------------------------------------------
       user: null,
+      // Staff seat on someone else's garage: { id, owner_id, permissions } | null
+      staff: null,
       tier: 'gold',
       garageId: null,
       garageStatus: null,
@@ -109,7 +111,17 @@ export const useStore = create(
       // start (page refresh), so data isn't lost when the page reloads.
       loadData: async (email) => {
         try {
-          const data = await db.loadAllGarageData(email)
+          let data = await db.loadAllGarageData(email)
+
+          // No garage of their own — staff seat on someone else's? Then load
+          // the OWNER's garage; RLS scopes every read/write to what the owner
+          // ticked. Own garage always wins when both exist.
+          if (!data) {
+            data = await db.loadAllGarageDataAsStaff()
+            if (data) set({ staff: data.staff })
+          } else {
+            set({ staff: null })
+          }
 
           // MULTI-PRODUCT — loadAllGarageData fetches this email's TyreOps
           // garage specifically. Null means no TyreOps membership yet; the
@@ -186,6 +198,7 @@ export const useStore = create(
         // Clear all state
         set({
           user: null,
+          staff: null,
           tier: 'gold',
           garageId: null,
           garageStatus: null,
@@ -785,6 +798,7 @@ export const useStore = create(
       // Only persist certain fields to localStorage
       partialize: (state) => ({
         user: state.user,
+        staff: state.staff,
         tier: state.tier,
         garageId: state.garageId,
         settings: state.settings,

@@ -472,6 +472,49 @@ export async function loadAllGarageData(email) {
   }
 }
 
+// Staff variant of the boot loader: no garage on this email, but the login
+// may hold a staff seat on someone else's garage. Resolve the OWNER's member
+// row through the staff mapping (RLS grants staff that read) and load the
+// same data shape loadAllGarageData produces. Fails open to null.
+export async function loadAllGarageDataAsStaff() {
+  try {
+    const { getStaffMapping } = await import('./staff.js')
+    const { data: auth } = await supabase.auth.getUser()
+    const uid = auth?.user?.id
+    if (!uid) return null
+    const mapping = await getStaffMapping(uid)
+    if (!mapping) return null
+
+    const { data: member, error } = await supabase
+      .from('product_members').select('*')
+      .eq('user_id', mapping.owner_id).eq('product', PRODUCT).maybeSingle()
+    if (error || !member) return null
+    const settings = await fetchSettings(member.user_id)
+    const garage = mergeGarage(member, settings)
+    if (!garage) return null
+
+    const [skus, batches, usedTyres, customers, invoices] = await Promise.all([
+      getSKUs(garage.id),
+      getBatches(garage.id),
+      getUsedTyres(garage.id),
+      getCustomers(garage.id),
+      getInvoices(garage.id),
+    ])
+    return {
+      garage,
+      skus,
+      batches: batches.map(b => ({ ...b, skuId: b.sku_id, remaining: b.remaining, invoiceUrl: b.invoice_url, damaged: b.damaged || 0 })),
+      usedTyres,
+      customers,
+      invoices,
+      staff: { id: mapping.id, owner_id: mapping.owner_id, permissions: mapping.permissions || {} },
+    }
+  } catch (err) {
+    console.error('Staff data load failed:', err)
+    return null
+  }
+}
+
 // ============================================================
 // RECYCLE BIN  (soft-delete restore / permanent delete)
 // ============================================================

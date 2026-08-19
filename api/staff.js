@@ -45,6 +45,19 @@ const PRODUCTS = {
       { table: 'soloops_access', column: 'business_name' },
     ],
   },
+  tyreops: {
+    label: 'Alzaro TyreOps',
+    staffTable: 'garage_staff',
+    // garage_staff is shared with garageops — every query/insert is product-scoped
+    staffFilter: '&product=eq.tyreops',
+    staffInsertExtra: { product: 'tyreops' },
+    permKeys: ['dashboard', 'invoices', 'inventory', 'purchases', 'customers', 'followups', 'vat'],
+    seats: { basic: 0, bronze: 0, silver: 2, gold: 4 },
+    redirectPath: '/tyreops/reset-password',
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.tyreops' },
+    ],
+  },
   propertyops: {
     label: 'Alzaro PropertyOps',
     staffTable: 'prop_staff',
@@ -125,7 +138,7 @@ export default async function handler(req, res) {
       // The mapping row is the authority: owner must match the caller, and the
       // target auth id comes from the row — never from the client.
       const r = await serviceFetch(
-        `/rest/v1/${P.staffTable}?id=eq.${staffId}` +
+        `/rest/v1/${P.staffTable}?id=eq.${staffId}${P.staffFilter || ''}` +
           `&select=owner_id,staff_user_id,created_via_invite&limit=1`
       )
       const row = (r.ok ? await r.json() : [])[0]
@@ -189,7 +202,7 @@ export default async function handler(req, res) {
 
     // Seat limit: count existing staff rows.
     const c = await serviceFetch(
-      `/rest/v1/${P.staffTable}?owner_id=eq.${owner.id}&select=id`,
+      `/rest/v1/${P.staffTable}?owner_id=eq.${owner.id}${P.staffFilter || ''}&select=id`,
       { headers: { Prefer: 'count=exact', Range: '0-0' } }
     )
     const total = Number((c.headers.get('content-range') || '/0').split('/')[1] || 0)
@@ -222,7 +235,7 @@ export default async function handler(req, res) {
   try {
     for (const src of P.nameSources) {
       const r = await serviceFetch(
-        `/rest/v1/${src.table}?user_id=eq.${owner.id}&select=${src.column}&limit=1`
+        `/rest/v1/${src.table}?user_id=eq.${owner.id}${src.extra || ''}&select=${src.column}&limit=1`
       )
       bizName = ((r.ok ? await r.json() : [])[0]?.[src.column] || '').trim()
       if (bizName) break
@@ -279,6 +292,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
+        ...(P.staffInsertExtra || {}),
         owner_id: owner.id,
         staff_user_id: staffUser.id,
         staff_email: email,
