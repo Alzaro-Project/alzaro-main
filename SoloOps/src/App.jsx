@@ -5,6 +5,7 @@ import {
   loadInvoices, loadExpenses, loadMileage, loadClients, loadItems, deleteInvoice, updateInvoice,
   deleteExpense,
   updateUser, loadSettings, getMember, joinProduct, getStaffMapping, loadCategories,
+  uploadFile, insertDocument, updateExpenseReceipt,
 } from './lib/db.js'
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
@@ -14,7 +15,6 @@ import { ExpenseForm, InvoiceForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
 import Items from './pages/Items.jsx'
-import Receipts from './pages/Receipts.jsx'
 import Reports from './pages/Reports.jsx'
 import Settings from './pages/Settings.jsx'
 import Login from './pages/Login.jsx'
@@ -27,14 +27,22 @@ const VALID_VIEWS = NAV.map(n => n[0])
 function Shell() {
   const navigate = useNavigate()
   const { view: routeView } = useParams()
-  // Clients now lives inside the Items page — keep old /clients links working.
-  const aliased = routeView === 'clients' ? 'items' : routeView === 'tax' ? 'reports' : routeView
+  // Clients now lives inside the Items page, and Receipts inside Expenses —
+  // keep old /clients and /receipts links working.
+  const aliased = routeView === 'clients' ? 'items'
+    : routeView === 'tax' ? 'reports'
+    : routeView === 'receipts' ? 'expenses'
+    : routeView
   const view = VALID_VIEWS.includes(aliased) ? aliased : 'dashboard'
   // An unknown view (/soloops/<garbage>) still renders the dashboard; correct
   // the URL to match rather than leaving a stale/invalid path in the bar.
   useEffect(() => {
-    if (routeView && !VALID_VIEWS.includes(routeView)) navigate('/dashboard', { replace: true })
-  }, [routeView, navigate])
+    // Correct the URL to whatever actually rendered: the alias target for an
+    // old link (/clients → /items, /receipts → /expenses), the dashboard for
+    // genuine garbage. Previously every alias was bounced to the dashboard,
+    // which defeated the point of keeping the old links alive.
+    if (routeView && !VALID_VIEWS.includes(routeView)) navigate('/' + view, { replace: true })
+  }, [routeView, view, navigate])
   const setView = (v) => navigate(`/${v}`)
 
   const [session, setSession] = useState(undefined)
@@ -68,6 +76,10 @@ function Shell() {
   const [incSearch, setIncSearch] = useState('')
   const [expSearch, setExpSearch] = useState('')
   const [expFilter, setExpFilter] = useState('all')
+  // Receipt filter on the Expenses page: 'all' | 'with' | 'without'. This is
+  // what the old Receipts tab was really for — finding the gaps before filing.
+  const [expReceipt, setExpReceipt] = useState('all')
+  const [attaching, setAttaching] = useState(null)
   const [categories, setCategories] = useState([])
   const [toast, setToast] = useState('')
   const [theme, setTheme] = useState(() => {
@@ -268,6 +280,28 @@ function Shell() {
     if(error){ flash('Delete failed'); return }
     loadAll(); flash('Expense deleted')
   }
+  // Attach a receipt to an existing expense, straight from its row. This
+  // replaces the old Receipts tab's guess-by-amount matching: you pick the
+  // expense yourself, so there's nothing to get wrong.
+  const onAttachReceipt = async (exp, file) => {
+    if (!file || !exp?.id) return
+    setAttaching(exp.id)
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const storagePath = `${uid}/${crypto.randomUUID()}-${safe}`
+      const { error: upErr } = await uploadFile(storagePath, file)
+      if (upErr) throw upErr
+      const { error: docErr } = await insertDocument({
+        user_id: uid, type:'Receipt', name:file.name,
+        storage_path:storagePath, size_bytes:file.size, expense_id:exp.id
+      })
+      if (docErr) throw docErr
+      const { error } = await updateExpenseReceipt(exp.id, file.name)
+      if (error) throw error
+      loadAll(); flash('Receipt attached')
+    } catch (err) { flash(err?.message || 'Could not attach the receipt') }
+    setAttaching(null)
+  }
   const signOut = async () => { await dbSignOut(); window.location.href = '/soloops/login' }
 
   const [taxRate, setTaxRate] = useState(session?.user?.user_metadata?.tax_rate ?? 20)
@@ -302,9 +336,16 @@ function Shell() {
     }
     return yearFilter==='all' || yOf(d)===yearFilter
   }
+  // The REPORTING PERIOD slice. Deliberately scoped to the Reports/Tax page
+  // only: the Income and Expenses lists always show everything, so a range
+  // picked over on Reports can't silently hide rows on another page.
   const fInvoices = invoices.filter(i=>inYear(i.issue_date))
   const fExpenses = expenses.filter(e=>inYear(e.spent_on))
   const fMileage  = mileage.filter(m=>inYear(m.journey_date))
+  const periodLabel = yearFilter === 'all' ? 'All time'
+    : yearFilter === 'custom'
+      ? (rangeFrom || rangeTo ? `${rangeFrom ? fmtDate(rangeFrom) : 'the start'} – ${rangeTo ? fmtDate(rangeTo) : 'today'}` : 'Custom range')
+      : yearFilter
 
   const revenue = fInvoices.filter(i => i.status === 'paid').reduce((s,i)=>s+Number(i.total||0),0)
   const totalExp = fExpenses.reduce((s,e)=>s+Number(e.amount||0),0)
@@ -521,7 +562,7 @@ function Shell() {
           {view==='income' && (() => {
             const TABS = ['all','draft','sent','paid','overdue']
             const q = incSearch.trim().toLowerCase()
-            const rows = fInvoices.filter(i =>
+            const rows = invoices.filter(i =>
               (incFilter==='all' || i.status===incFilter) &&
               (!q || (`${i.client_name||''} ${i.number||''}`).toLowerCase().includes(q))
             )
@@ -548,7 +589,7 @@ function Shell() {
 
               <div style={card}>
                 <div style={{ fontSize:'11px', fontWeight:800, letterSpacing:'.08em', color:'var(--text3)', marginBottom:'14px' }}>INCOME LIST</div>
-                {rows.length===0 ? <Empty msg={fInvoices.length===0 ? "No income yet. Click “+ Income” to add one." : "No income matches this filter."} />
+                {rows.length===0 ? <Empty msg={invoices.length===0 ? "No income yet. Click “+ Income” to add one." : "No income matches this filter."} />
                 : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                   <thead><Th cols={['Reference','Client','Issued','Total','Paid via','Status','Actions']} /></thead>
                   <tbody>{rows.map(i => (
@@ -579,13 +620,25 @@ function Shell() {
 
           {view==='expenses' && (() => {
             const q = expSearch.trim().toLowerCase()
-            const cats = ['all', ...[...new Set(fExpenses.map(e=>e.category).filter(Boolean))].sort()]
-            const rows = fExpenses.filter(e =>
+            const cats = ['all', ...[...new Set(expenses.map(e=>e.category).filter(Boolean))].sort()]
+            const missing = expenses.filter(e => !e.has_receipt).length
+            const rows = expenses.filter(e =>
               (expFilter==='all' || e.category===expFilter) &&
+              (expReceipt==='all' || (expReceipt==='with' ? !!e.has_receipt : !e.has_receipt)) &&
               (!q || (`${e.merchant||''} ${e.category||''} ${e.notes||''}`).toLowerCase().includes(q))
             )
             return (
             <div>
+              <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'12px', alignItems:'center' }}>
+                {[['all','All receipts'],['with','Has receipt'],['without',`Missing receipt${missing?` (${missing})`:''}`]].map(([v,label]) => (
+                  <button key={v} onClick={()=>setExpReceipt(v)} style={{
+                    background: expReceipt===v ? 'var(--orange-subtle)' : 'transparent',
+                    color: expReceipt===v ? 'var(--orange-light)' : 'var(--text3)',
+                    border:'1px solid '+(expReceipt===v?'rgba(249,115,22,.35)':'var(--border)'),
+                    borderRadius:'999px', padding:'6px 14px', fontSize:'12.5px', fontWeight:700, cursor:'pointer'
+                  }}>{label}</button>
+                ))}
+              </div>
               <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'14px' }}>
                 {cats.map(c => (
                   <button key={c} onClick={()=>setExpFilter(c)} style={{
@@ -599,7 +652,7 @@ function Shell() {
               </div>
               <input style={{ ...inp, marginBottom:'16px' }} placeholder="Search merchant, category, notes…" value={expSearch} onChange={e=>setExpSearch(e.target.value)} />
             <div style={card}>
-              {rows.length===0 ? <Empty msg={fExpenses.length===0 ? "No expenses yet. Click “+ Expense” to add one." : "No expenses match this filter."} />
+              {rows.length===0 ? <Empty msg={expenses.length===0 ? "No expenses yet. Click “+ Expense” to add one." : "No expenses match this filter."} />
               : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><Th cols={['Date','Merchant','Category','Amount','Paid via','Actions']} /></thead>
                 <tbody>{rows.map(e => (
@@ -610,6 +663,14 @@ function Shell() {
                     <Td muted>{PAY_LABEL[e.paid_method] && e.paid_method ? PAY_LABEL[e.paid_method] : '—'}</Td>
                     <Td right>
                       <div style={{ display:'flex', gap:'6px', justifyContent:'flex-end' }}>
+                        {e.has_receipt
+                          ? <button style={actBtn} onClick={()=>setViewReceipt(e)}>View receipt</button>
+                          : <label style={{ ...actBtn, display:'inline-flex', alignItems:'center', opacity: attaching===e.id ? .6 : 1 }} title="Attach a receipt to this expense">
+                              {attaching===e.id ? 'Uploading…' : '📎 Receipt'}
+                              <input type="file" accept="image/*,.pdf" disabled={attaching===e.id}
+                                onChange={ev=>{ const f=ev.target.files?.[0]; ev.target.value=''; if(f) onAttachReceipt(e, f) }}
+                                style={{ display:'none' }} />
+                            </label>}
                         <button style={actBtn} onClick={()=>onEditExpense(e)}>Edit</button>
                         <button style={actBtnDanger} onClick={()=>onDeleteExpense(e)}>Delete</button>
                       </div>
@@ -621,13 +682,10 @@ function Shell() {
             )
           })()}
 
-          {view==='receipts' && (
-            <Receipts uid={uid} expenses={expenses} onMatched={()=>{loadAll();flash('Receipt attached')}} />
-          )}
-
           {view==='reports' && (
             <>
-            <Reports invoices={fInvoices} expenses={fExpenses} mileage={fMileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance} />
+            <Reports invoices={fInvoices} expenses={fExpenses} mileage={fMileage} canGold={tierAllows('gold')} taxRate={taxRate} nicRate={nicRate} allowance={allowance}
+              period={{ yearFilter, setYearFilter, rangeFrom, setRangeFrom, rangeTo, setRangeTo, availableYears, periodLabel }} />
             {tierAllows('gold') ? (
               <div style={{ marginTop:'16px' }}>
             <div style={{ background:'var(--amber-soft, rgba(245,158,11,0.1))', border:'1px solid rgba(245,158,11,0.3)', borderRadius:'12px', padding:'14px 18px', marginBottom:'16px', fontSize:'13px', color:'var(--text2)', lineHeight:1.6 }}>
@@ -636,7 +694,7 @@ function Shell() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
               <div style={card}>
                 <div style={{fontWeight:700, marginBottom:'4px'}}>Estimated tax</div>
-                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Using your own rates — adjust below</div>
+                <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'16px'}}>Using your own rates — adjust below · <span style={{color:'var(--orange-light)'}}>{periodLabel}</span></div>
                 <Line label="Taxable profit (after allowance)" v={gbp(taxable)} />
                 <Line label={`Income tax (est. @ ${taxRate}%)`} v={gbp(taxable*(Number(taxRate||0)/100))} />
                 <Line label={`National Insurance (est. @ ${nicRate}%)`} v={gbp(taxable*(Number(nicRate||0)/100))} />
@@ -685,7 +743,7 @@ function Shell() {
         </div>
       </div>
 
-      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} categories={categories} edit={editExpense} />}
+      {modal==='expense' && <ExpenseForm onClose={()=>{setModal(null);setEditExpense(null)}} onSaved={(r)=>{const wasEdit=editExpense;setModal(null);setEditExpense(null);loadAll();flash(wasEdit?'Expense updated':(r&&r.addedClient?`Expense added · ${r.addedClient} added to Clients`:'Expense added'))}} uid={uid} expenses={expenses} categories={categories} clients={clients} edit={editExpense} />}
       {modal==='send' && sendInvoice && (
         <SendInvoice
           invoice={sendInvoice}
