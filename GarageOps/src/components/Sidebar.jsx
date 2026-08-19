@@ -32,7 +32,15 @@ const TIER_STYLE = {
 export default function Sidebar({ onNavigate, isMobile }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, tier, logout, settings, theme, toggleTheme, garageStatus, trialEnds } = useStore()
+  const { user, tier, logout, settings, theme, toggleTheme, garageStatus, trialEnds, staff } = useStore()
+
+  // Staff visibility: owners see everything; staff only what the owner ticked.
+  // Settings never. RLS enforces the same map server-side.
+  const staffAllows = (path) => {
+    if (!staff) return true
+    if (path === '/settings') return false
+    return (staff.permissions || {})[path.replace('/', '')] === true
+  }
 
   const isDark = theme !== 'light'
   const ts = TIER_STYLE[tier] || TIER_STYLE.bronze
@@ -117,7 +125,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
 
       {/* Nav */}
       <div style={{ flex: 1, padding: '6px 0', overflowY: 'auto' }}>
-        {NAV.map(item => {
+        {NAV.filter(item => staffAllows(item.path)).map(item => {
           const locked = TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(item.min)
           return (
             <NavItem

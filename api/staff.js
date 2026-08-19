@@ -58,6 +58,18 @@ const PRODUCTS = {
       { table: 'product_members', column: 'company_name', extra: '&product=eq.tyreops' },
     ],
   },
+  garageops: {
+    label: 'Alzaro GarageOps',
+    staffTable: 'garage_staff',
+    staffFilter: '&product=eq.garageops',
+    staffInsertExtra: { product: 'garageops' },
+    permKeys: ['dashboard', 'invoices', 'customers', 'items', 'database', 'purchases', 'calendar', 'reports'],
+    seats: { basic: 0, bronze: 0, silver: 2, gold: 4 },
+    redirectPath: '/garageops/reset-password',
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.garageops' },
+    ],
+  },
   propertyops: {
     label: 'Alzaro PropertyOps',
     staffTable: 'prop_staff',

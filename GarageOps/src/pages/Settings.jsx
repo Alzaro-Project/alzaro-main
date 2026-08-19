@@ -34,6 +34,7 @@ const TABS = [
   { key: 'email',        label: 'Email',        icon: 'ti-mail' },
   { key: 'vat',          label: 'VAT',          icon: 'ti-receipt-tax' },
   { key: 'subscription', label: 'Subscription', icon: 'ti-credit-card' },
+  { key: 'users',        label: 'Users',        icon: 'ti-users' },
 ]
 
 const TIERS = [
@@ -559,6 +560,8 @@ export default function Settings() {
         )}
 
         {/* ==================== SUBSCRIPTION TAB ==================== */}
+        {activeTab === 'users' && <UsersTab />}
+
         {activeTab === 'subscription' && (
           <SubscriptionTab tier={tier} setTier={setTier} />
         )}
@@ -872,4 +875,257 @@ const inputStyle = {
   background: T.surface2, border: `1px solid ${T.border2}`, borderRadius: '8px',
   padding: '9px 12px', color: T.text, fontSize: '13px',
   fontFamily: 'inherit', outline: 'none',
+}
+/* ============================================================
+   USERS TAB — multi-user staff seats (Silver: 2, Gold: 4).
+   Owner adds staff by email and picks sections. Enforcement is
+   RLS (migrations/013_garage_staff.sql); this is the control
+   panel. Mirrors SoloOps/PropertyOps.
+   ============================================================ */
+import { STAFF_PERMS, listStaff, updateStaffPermissions, removeStaff } from '../lib/staff.js'
+
+function UEye({ off }) {
+  return off ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+const uInp = { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 11px', color: 'var(--text)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }
+const uBtn = (ghost, danger) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 700, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', background: ghost ? 'var(--surface)' : 'var(--accent)', color: danger ? '#ef4444' : ghost ? 'var(--text)' : '#fff', border: '1px solid ' + (ghost ? 'var(--border)' : 'var(--accent)') })
+const uChip = { fontSize: '11.5px', fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)', borderRadius: '999px', padding: '3px 10px' }
+
+function UsersTab() {
+  const { tier, garageStatus } = useStore()
+  const [rows, setRows] = useState(null)
+  const [email, setEmail] = useState('')
+  const [perms, setPerms] = useState({ invoices: true })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [notice, setNotice] = useState('')
+
+  // Keep in step with PRODUCTS.tyreops.seats in api/staff.js (the real limit)
+  // and the tier list in migrations/013_garage_staff.sql (the RLS gate).
+  const TIER_SEATS = { silver: 2, gold: 4 }
+  const SEATS = TIER_SEATS[(tier || '').toLowerCase()] || 0
+  const eligible = SEATS > 0 && ['trial', 'active'].includes((garageStatus || '').toLowerCase())
+  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : ''
+  const seatsLeft = rows === null ? 0 : Math.max(0, SEATS - rows.length)
+
+  const reload = async () => {
+    const { data, error } = await listStaff()
+    setRows(error ? [] : data || [])
+  }
+  useEffect(() => { reload() }, [])
+
+  const flash = (m) => { setNotice(m); setTimeout(() => setNotice(''), 4000) }
+
+  const add = async () => {
+    setErr('')
+    if (!email.trim()) { setErr('Enter their email address.'); return }
+    setBusy(true)
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const r = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess?.session?.access_token || ''}` },
+        body: JSON.stringify({ product: 'garageops', email: email.trim(), permissions: perms }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(j.error || 'Could not add the user'); return }
+      flash(j.invited ? 'Access given — invite email sent so they can set a password' : 'Access given — they can sign in with their existing Alzaro login')
+      setEmail(''); setPerms({ invoices: true })
+      await reload()
+    } catch (e) { setErr('Network error — try again') }
+    finally { setBusy(false) }
+  }
+
+  if (rows === null) return <div style={{ color: 'var(--text3)', fontSize: '13px' }}>Loading…</div>
+
+  if (!eligible) {
+    return (
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px', maxWidth: '560px' }}>
+        <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '8px' }}>Add your team</div>
+        <div style={{ color: 'var(--text2)', fontSize: '13px', lineHeight: 1.6 }}>
+          Silver includes 2 extra users and Gold includes 4: invite staff with their own
+          logins and choose exactly which sections they can use — just invoices, say,
+          while your reports and settings stay yours. Upgrade on the Subscription tab to unlock it.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '14px', maxWidth: '760px' }}>
+      {notice && <div style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)', color: 'var(--text)', borderRadius: '8px', padding: '9px 13px', fontSize: '12.5px' }}>{notice}</div>}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px' }}>
+        <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '3px' }}>Users</div>
+        <div style={{ color: 'var(--text2)', fontSize: '12.5px', marginBottom: '14px' }}>
+          Your {tierLabel} plan includes {SEATS} staff seats ({seatsLeft} left). Staff sign in with their
+          own email and password and only see the sections you tick — never Settings.
+        </div>
+
+        {seatsLeft > 0 && (
+          <div style={{ display: 'grid', gap: '11px', paddingBottom: rows.length ? '16px' : 0, marginBottom: rows.length ? '16px' : 0, borderBottom: rows.length ? '1px solid var(--border)' : 'none' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '5px' }}>Their email</div>
+              <input style={uInp} type="email" placeholder="name@example.com" value={email}
+                     onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add() }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '5px' }}>What they can use</div>
+              <div style={{ display: 'grid', gap: '7px' }}>
+                {STAFF_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '12.5px' }}>
+                    <input type="checkbox" checked={perms[k] === true}
+                           onChange={() => setPerms(p => ({ ...p, [k]: !(p[k] === true) }))} style={{ marginTop: '2px' }} />
+                    <span><strong>{label}</strong><span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {err && <div style={{ color: '#ef4444', fontSize: '12.5px' }}>{err}</div>}
+            <button style={{ ...uBtn(false), width: 'fit-content', border: 'none' }} disabled={busy} onClick={add}>{busy ? 'Adding…' : 'Add user'}</button>
+          </div>
+        )}
+
+        {rows.map(row => <UStaffCard key={row.id} row={row} flash={flash} onChanged={reload} />)}
+      </div>
+    </div>
+  )
+}
+
+function UStaffCard({ row, flash, onChanged }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(row.permissions || {})
+  const [saving, setSaving] = useState(false)
+  const enabled = STAFF_PERMS.filter(([k]) => row.permissions?.[k] === true).map(([, label]) => label)
+
+  const saveEdit = async () => {
+    setSaving(true)
+    const { error } = await updateStaffPermissions(row.id, draft)
+    setSaving(false)
+    if (error) { flash('Could not save — try again'); return }
+    setEditing(false); flash('Access updated'); onChanged()
+  }
+  const remove = async () => {
+    if (!window.confirm(`Remove ${row.staff_email}? They lose access immediately.`)) return
+    const { error } = await removeStaff(row.id)
+    if (error) { flash('Could not remove — try again'); return }
+    flash('Removed'); onChanged()
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginBottom: '11px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: '13.5px', overflowWrap: 'anywhere' }}>{row.staff_email}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text3)', marginTop: '2px' }}>
+            {row.status === 'invited' ? "Invited — hasn't set a password yet" : 'Active'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '7px', flexShrink: 0 }}>
+          {!editing && <button style={uBtn(true)} onClick={() => { setDraft({ ...(row.permissions || {}) }); setEditing(true) }}>Edit</button>}
+          <button style={uBtn(true, true)} onClick={remove}>Remove</button>
+        </div>
+      </div>
+
+      {!editing && (
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '11px' }}>
+          {enabled.length
+            ? enabled.map(label => <span key={label} style={uChip}>{label}</span>)
+            : <span style={{ fontSize: '12px', color: 'var(--text3)' }}>No sections enabled — they can sign in but see nothing. Hit Edit to give them access.</span>}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ marginTop: '12px' }}>
+          <div style={{ display: 'grid', gap: '7px' }}>
+            {STAFF_PERMS.map(([k, label, blurb]) => (
+              <label key={k} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '12.5px' }}>
+                <input type="checkbox" checked={draft[k] === true}
+                       onChange={() => setDraft(d => ({ ...d, [k]: !(d[k] === true) }))} style={{ marginTop: '2px' }} />
+                <span><strong>{label}</strong><span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '7px', marginTop: '12px' }}>
+            <button style={{ ...uBtn(false), border: 'none' }} disabled={saving} onClick={saveEdit}>{saving ? 'Saving…' : 'Save'}</button>
+            <button style={uBtn(true)} disabled={saving} onClick={() => setEditing(false)}>Cancel</button>
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text3)', marginTop: '9px' }}>Changes apply on their next page load.</div>
+        </div>
+      )}
+
+      <UStaffPassword row={row} flash={flash} onChanged={onChanged} />
+    </div>
+  )
+}
+
+function UStaffPassword({ row, flash, onChanged }) {
+  const [pw, setPw] = useState('')
+  const [show, setShow] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const setPassword = async () => {
+    setErr('')
+    if (pw.length < 8) { setErr('At least 8 characters.'); return }
+    setBusy(true)
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const r = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess?.session?.access_token || ''}` },
+        body: JSON.stringify({ product: 'garageops', action: 'set_password', staff_id: row.id, password: pw }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(j.error || 'Could not set the password'); return }
+      setPw(''); flash('Password updated — tell them the new one'); onChanged()
+    } catch (e) { setErr('Network error — try again') }
+    finally { setBusy(false) }
+  }
+
+  const sendReset = async () => {
+    setBusy(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(row.staff_email, {
+        redirectTo: window.location.origin + '/garageops/reset-password',
+      })
+      if (error) { flash('Could not send the reset email'); return }
+      flash(`Reset email sent to ${row.staff_email}`)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '7px' }}>Password</div>
+      {row.created_via_invite ? (
+        <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: '230px', maxWidth: '100%' }}>
+            <input style={{ ...uInp, paddingRight: '36px' }} type={show ? 'text' : 'password'} placeholder="New password (min 8 chars)"
+                   value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') setPassword() }}
+                   autoComplete="new-password" />
+            <button type="button" onClick={() => setShow(v => !v)} aria-label={show ? 'Hide password' : 'Show password'}
+                    style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: '3px', cursor: 'pointer', color: 'var(--text3)', display: 'flex', alignItems: 'center' }}>
+              <UEye off={show} />
+            </button>
+          </div>
+          <button style={uBtn(true)} disabled={busy} onClick={setPassword}>{busy ? 'Saving…' : 'Set password'}</button>
+          {err && <span style={{ color: '#ef4444', fontSize: '12px' }}>{err}</span>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '9px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button style={uBtn(true)} disabled={busy} onClick={sendReset}>{busy ? 'Sending…' : 'Send password reset email'}</button>
+          <span style={{ fontSize: '11.5px', color: 'var(--text3)' }}>They joined with an Alzaro login they already had, so only they can change its password.</span>
+        </div>
+      )}
+    </div>
+  )
 }

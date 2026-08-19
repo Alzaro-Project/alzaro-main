@@ -844,6 +844,44 @@ export async function deleteMotReminder(id) {
 //   labour_rates, jobs, mot_reminders, customers, invoices)
 // Shared tables (customers, invoices) are loaded in both cases.
 // ============================================================
+// Staff variant of the boot loader: no garage on this email, but the login
+// may hold a staff seat on someone else's garage. Resolve the OWNER's member
+// row through the staff mapping (RLS grants staff that read) and return the
+// same shape the garageops branch of loadAllGarageData produces. Fails open.
+export async function loadAllGarageDataAsStaff() {
+  try {
+    const { getStaffMapping } = await import('./staff.js')
+    const { data: auth } = await supabase.auth.getUser()
+    const uid = auth?.user?.id
+    if (!uid) return null
+    const mapping = await getStaffMapping(uid)
+    if (!mapping) return null
+
+    const { data: member, error } = await supabase
+      .from('product_members').select('*')
+      .eq('user_id', mapping.owner_id).eq('product', PRODUCT).maybeSingle()
+    if (error || !member) return null
+    const settings = await fetchSettings(member.user_id)
+    const garage = mergeGarage(member, settings)
+    if (!garage) return null
+
+    const [customers, invoices, vehicles, services, parts, partBatches, labourRates, jobs, motReminders] = await Promise.all([
+      getCustomers(garage.id), getInvoices(garage.id), getVehicles(garage.id),
+      getServices(garage.id), getParts(garage.id), getPartBatches(garage.id),
+      getLabourRates(garage.id), getJobs(garage.id), getMotReminders(garage.id),
+    ])
+    return {
+      garage, product: PRODUCT,
+      customers, invoices, vehicles, services, parts, partBatches, labourRates, jobs, motReminders,
+      skus: [], batches: [], usedTyres: [],
+      staff: { id: mapping.id, owner_id: mapping.owner_id, permissions: mapping.permissions || {} },
+    }
+  } catch (err) {
+    console.error('Staff data load failed:', err)
+    return null
+  }
+}
+
 export async function loadAllGarageData(email, product = 'garageops') {
   try {
     const garage = await getGarageForProduct(email, product)
