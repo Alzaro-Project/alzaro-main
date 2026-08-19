@@ -736,8 +736,7 @@ const STAFF_PERMS = [
   ['dashboard', 'Dashboard',    'Totals and charts (sees income & expense figures)'],
   ['income',    'Income',       'Create, edit and send invoices'],
   ['items',     'Items/Clients','Manage the item and client lists'],
-  ['expenses',  'Expenses',     'Record and edit expenses'],
-  ['receipts',  'Receipts',     'Upload receipts and match them to expenses'],
+  ['expenses',  'Expenses',     'Record and edit expenses, and attach receipts'],
   ['reports',   'Reports/Tax',  'Read-only reports over income and expenses'],
 ]
 
