@@ -17,9 +17,12 @@ export const PAY_METHODS = [
 export const PAY_LABEL = Object.fromEntries(PAY_METHODS.map(([v, l]) => [v, l]))
 export const CAT_COLORS = { Software:'#f97316', Fuel:'#f59e0b', Marketing:'#3b82f6', Equipment:'#22c55e', Travel:'#eab308', Insurance:'#a78bfa', Utilities:'#38bdf8', 'Professional Services':'#fb7185', 'Office Costs':'#94a3b8', Other:'#68635d' }
 
+// Receipts is no longer its own section: attaching, viewing and chasing missing
+// receipts all happen on the Expenses page now. /receipts still resolves (see
+// the alias in App.jsx) so old bookmarks keep working.
 export const NAV = [
   ['dashboard','Dashboard','📊','basic','ti-layout-dashboard'], ['income','Income','📄','basic','ti-file-invoice'], ['items','Items/Clients','📦','basic','ti-package'], ['expenses','Expenses','💷','bronze','ti-receipt-2'],
-  ['receipts','Receipts','🧾','bronze','ti-receipt'], ['reports','Reports/Tax','📈','silver','ti-chart-bar'], ['settings','Settings','🔧','basic','ti-settings']
+  ['reports','Reports/Tax','📈','silver','ti-chart-bar'], ['settings','Settings','🔧','basic','ti-settings']
 ]
 
 export const TIER_ORDER = ['basic','bronze','silver','gold']
@@ -166,12 +169,20 @@ export function Check({ok,t}) {
 
 export function Modal({title,children,onClose,width}) {
   const ref = React.useRef(null)
+  // Keep the LATEST onClose in a ref so the focus effect below can be
+  // mount-only. Callers routinely pass an inline arrow (onClose={()=>setX(null)}),
+  // which is a brand-new function identity on every render — with onClose as a
+  // dependency, every keystroke tore the effect down (restoring focus to
+  // whatever was focused before the modal opened) and re-ran it (focusing the
+  // dialog wrapper), so the caret jumped out of the input after each letter.
+  const onCloseRef = React.useRef(onClose)
+  React.useEffect(() => { onCloseRef.current = onClose })
   React.useEffect(() => {
     const el = ref.current
     const prev = document.activeElement
     el?.focus()
     const onKey = (e) => {
-      if (e.key === 'Escape') { onClose?.(); return }
+      if (e.key === 'Escape') { onCloseRef.current?.(); return }
       if (e.key === 'Tab' && el) {
         const f = el.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')
         if (!f.length) return
@@ -183,7 +194,7 @@ export function Modal({title,children,onClose,width}) {
     }
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('keydown', onKey); if (prev && prev.focus) prev.focus() }
-  }, [onClose])
+  }, [])
   return createPortal(
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:300, padding:'20px' }}>
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
