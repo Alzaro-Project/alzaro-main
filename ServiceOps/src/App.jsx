@@ -7,6 +7,7 @@ import SupportBanner from './components/SupportBanner.jsx'
 import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard, TIER_ORDER } from './lib/helpers.js'
 import { PageHead, Btn, useIsMobile, SearchGroup } from './components/UI.jsx'
 import TrialGuard from './components/TrialGuard.jsx'
+import { getStaffMapping, STAFF_PERMS, PAGE_PERM } from './lib/staff.js'
 import { DashboardPage, CertificatesPage, DocumentsPage, ReportsPage, SettingsPage } from './pages/Records.jsx'
 import { CustomersPage, CustomerDetail, PropertiesPage } from './pages/CustomersProperties.jsx'
 import { QuotesPage, JobsPage, DiaryPage, InvoicingPage } from './pages/JobsQuotesInvoicing.jsx'
@@ -19,7 +20,7 @@ const PAGES = {
 };
 
 
-function Dashboard({ user, signOut }) {
+function Dashboard({ user, signOut, staff }) {
   const pageFromUrl = () => {
     const seg = (window.location.pathname.split("/serviceops/")[1] || "").replace(/\/$/, "");
     const known = ["dashboard", "customers", "properties", "quotes", "jobs", "diary", "invoicing", "certificates", "documents", "reports", "settings"];
@@ -46,6 +47,7 @@ function Dashboard({ user, signOut }) {
     return () => { cancelled = true; };
   }, [user]);
   const displayName = biz.loaded ? (biz.name || (user ? (user.email || "").split("@")[0] : "Your Business")) : "…";
+  const staffChip = staff ? <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", color: "var(--brand)", border: "1px solid var(--brand)", borderRadius: 5, padding: "1px 5px", verticalAlign: "middle" }}>Staff</span> : null;
   const tierLabel = (biz.tier || "BASIC").toUpperCase();
   const TIER_COL = {
     basic:    { bg: "rgba(107,114,128,0.1)", color: "#6b7280", border: "rgba(107,114,128,0.25)" },
@@ -71,7 +73,25 @@ function Dashboard({ user, signOut }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const navItems = NAV;
+  // Staff visibility: owners see everything; staff only ticked sections and
+  // never Settings. Off-nav pages (properties/jobs/documents) map onto nav
+  // permissions via PAGE_PERM. RLS enforces the same map in the database.
+  const staffAllows = (id) => {
+    if (!staff) return true;
+    if (id === "settings") return false;
+    const key = PAGE_PERM[id] || id;
+    return (staff.permissions || {})[key] === true;
+  };
+  const staffHome = staff ? ((NAV.find((n) => staffAllows(n.id)) || {}).id || null) : null;
+  useEffect(() => {
+    if (staff && !staffAllows(active) && staffHome) {
+      setActive(staffHome);
+      try { window.history.replaceState({ page: staffHome }, "", "/serviceops/" + staffHome); } catch (e) {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, active]);
+
+  const navItems = NAV.filter((n) => staffAllows(n.id));
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
@@ -143,7 +163,7 @@ function Dashboard({ user, signOut }) {
           <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
         </div>
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}{staffChip}</div>
           <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
         </div>
         <div style={{ padding: "12px 12px 0", flexShrink: 0 }}>
@@ -255,6 +275,8 @@ function Dashboard({ user, signOut }) {
 function App() {
   const [session, setSession] = useState(undefined);
   const [member, setMember] = useState(undefined); // undefined = checking, true/false = known
+  // Staff seat on someone else's business: { owner_id, permissions } | null.
+  const [staff, setStaff] = useState(null);
 
   useEffect(() => {
     if (!DB_READY) { setSession(null); return; }
@@ -267,8 +289,10 @@ function App() {
   useEffect(() => {
     if (!session || !DB_READY) { setMember(undefined); return; }
     db.from("product_members").select("id").eq("user_id", session.user.id).eq("product", "serviceops").maybeSingle().then(async ({ data, error }) => {
+      // Staff seat check happens on the no-membership path below; own
+      // membership always wins.
       if (error) { console.error("Membership check:", error); setMember(false); return; }
-      if (data) { setMember(true); return; }
+      if (data) { setStaff(null); setMember(true); return; }
       // registered via the ServiceOps register page? auto-activate silently
       const meta = session.user.user_metadata || {};
       if (meta.product === "serviceops") {
@@ -278,6 +302,10 @@ function App() {
         setMember(!insErr);
         if (insErr) console.error("Auto-join:", insErr);
       } else {
+        // No membership of their own — staff seat? getStaffMapping fails open
+        // to null (e.g. migration 015 not run yet), so this can't break boot.
+        const m = await getStaffMapping(session.user.id);
+        if (m) { setStaff(m); setMember(true); return; }
         setMember(false);
       }
     });
@@ -295,10 +323,81 @@ function App() {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
   }
   if (!member) return <ActivateScreen user={session.user} signOut={signOut} />;
+  // Workspace user: whose rows every page reads and writes. The id is the
+  // owner's in staff mode (RLS grants staff those rows); email stays the
+  // staff member's own so the header shows who is actually signed in.
+  const wsUser = staff ? { ...session.user, id: staff.owner_id } : session.user;
   return (
-    <TrialGuard user={session.user}>
-      <Dashboard user={session.user} signOut={signOut} />
+    <TrialGuard user={wsUser}>
+      <Dashboard user={wsUser} signOut={signOut} staff={staff} />
     </TrialGuard>
+  );
+}
+
+// Set-a-password screen for /serviceops/reset-password. Waits for the session
+// the emailed link creates, then updates the password and heads to the app.
+function SetPasswordScreen() {
+  const [ready, setReady] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let sub;
+    (async () => {
+      const { data } = await db.auth.getSession();
+      if (data?.session) { setReady(true); setEmail(data.session.user?.email || ""); }
+      else {
+        const res = db.auth.onAuthStateChange((_e, s) => {
+          if (s) { setReady(true); setEmail(s.user?.email || ""); }
+        });
+        sub = res.data?.subscription;
+      }
+    })();
+    return () => { try { sub && sub.unsubscribe(); } catch (e) {} };
+  }, []);
+
+  const submit = async () => {
+    setErr("");
+    if (pw.length < 8) { setErr("At least 8 characters."); return; }
+    if (pw !== confirm) { setErr("Passwords don't match."); return; }
+    setBusy(true);
+    const { error } = await db.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) { setErr(error.message || "Could not set the password — the link may have expired."); return; }
+    window.location.replace("/serviceops/dashboard");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 380, background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 16, padding: "32px 28px" }}>
+        <div className="font-head" style={{ fontSize: 20, fontWeight: 700, textAlign: "center", marginBottom: 4 }}>Set a password</div>
+        <div style={{ textAlign: "center", color: "var(--txt-2)", fontSize: 12.5, marginBottom: 22 }}>
+          {ready ? (email ? <>for <strong style={{ color: "var(--txt)" }}>{email}</strong></> : "for your account") : "Checking your link…"}
+        </div>
+        {ready ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            <input style={{ width: "100%", background: "var(--bg)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "11px 12px", color: "var(--txt)", fontSize: 13.5, outline: "none", boxSizing: "border-box" }}
+                   type="password" placeholder="New password (min 8 characters)" value={pw}
+                   onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} autoComplete="new-password" />
+            <input style={{ width: "100%", background: "var(--bg)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "11px 12px", color: "var(--txt)", fontSize: 13.5, outline: "none", boxSizing: "border-box" }}
+                   type="password" placeholder="Confirm password" value={confirm}
+                   onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} autoComplete="new-password" />
+            {err && <div style={{ color: "#ef4444", fontSize: 12.5 }}>{err}</div>}
+            <div onClick={busy ? undefined : submit}
+                 style={{ background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14, textAlign: "center", padding: "12px", borderRadius: 10, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Saving…" : "Set password"}
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: "var(--txt-3)", fontSize: 12.5, textAlign: "center" }}>
+            This page needs to be opened from the link in your email. If the link has expired, ask for a new invite or password reset.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -328,11 +427,15 @@ export default function AppRoot() {
   // It must render BEFORE App's session gate (which would show the login
   // screen), redeem the one-time token, then reload into the dashboard.
   const isSupport = /\/support\/?$/.test(window.location.pathname)
+  // /serviceops/reset-password: landing for staff invites and password-reset
+  // emails. The emailed token signs the visitor in (detectSessionInUrl); this
+  // screen turns that one-time session into a real password.
+  const isReset = /\/reset-password\/?$/.test(window.location.pathname)
   return (
     <BrowserRouter basename="/serviceops">
       {/* Renders only inside an admin support session; null otherwise. */}
       <SupportBanner />
-      {isSupport ? <Support /> : <App />}
+      {isSupport ? <Support /> : isReset ? <SetPasswordScreen /> : <App />}
     </BrowserRouter>
   )
 }
