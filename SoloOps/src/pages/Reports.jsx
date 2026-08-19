@@ -1,9 +1,62 @@
 import React from 'react'
-import { card, btnPri, btnSec, Modal } from '../components/UI.jsx'
+import { card, btnPri, btnSec, Modal, DateField, fmtDate } from '../components/UI.jsx'
 
-export default function Reports({ invoices, expenses, mileage, canGold = false, taxRate = 20, nicRate = 9, allowance = 12570 }) {
+// Which slice of the data every report on this page is built from. Scoped to
+// Reports/Tax — the Income and Expenses lists are never filtered by it.
+function PeriodBar({ period }) {
+  const { yearFilter, setYearFilter, rangeFrom, setRangeFrom, rangeTo, setRangeTo, availableYears } = period
+  const chip = (active) => ({
+    background: active ? 'var(--orange-subtle)' : 'transparent',
+    color: active ? 'var(--orange-light)' : 'var(--text3)',
+    border: '1px solid ' + (active ? 'rgba(249,115,22,.35)' : 'var(--border)'),
+    borderRadius: '999px', padding: '6px 14px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer'
+  })
+  const invalid = rangeFrom && rangeTo && rangeFrom > rangeTo
+  return (
+    <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '.08em', color: 'var(--text3)', marginBottom: '10px' }}>REPORTING PERIOD</div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button style={chip(yearFilter === 'all')} onClick={() => setYearFilter('all')}>All time</button>
+        {(availableYears || []).map(y => (
+          <button key={y} style={chip(yearFilter === y)} onClick={() => setYearFilter(y)}>{y}</button>
+        ))}
+        <button style={chip(yearFilter === 'custom')} onClick={() => setYearFilter('custom')}>Custom range</button>
+      </div>
+      {yearFilter === 'custom' && (
+        <div className="solo-2col" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginTop: '14px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>From</div>
+            <DateField value={rangeFrom} onChange={setRangeFrom} />
+          </div>
+          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>To</div>
+            <DateField value={rangeTo} onChange={setRangeTo} />
+          </div>
+          {(rangeFrom || rangeTo) && (
+            <button style={btnSec} onClick={() => { setRangeFrom(''); setRangeTo('') }}>Clear</button>
+          )}
+        </div>
+      )}
+      {yearFilter === 'custom' && (
+        <div style={{ fontSize: '12px', color: invalid ? 'var(--red)' : 'var(--text3)', marginTop: '10px' }}>
+          {invalid
+            ? 'The “from” date is after the “to” date — no rows will match.'
+            : (rangeFrom || rangeTo)
+              ? `Showing ${rangeFrom ? fmtDate(rangeFrom) : 'everything up to'} ${rangeFrom && rangeTo ? '–' : ''} ${rangeTo ? fmtDate(rangeTo) : (rangeFrom ? 'onwards' : '')}`.replace(/\s+/g, ' ')
+              : 'Leave a side blank for open-ended — e.g. From 06/04/2025 with no To means “since then”.'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function Reports({ invoices, expenses, mileage, canGold = false, taxRate = 20, nicRate = 9, allowance = 12570, period }) {
   const [msg, setMsg] = React.useState('')
   const [preview, setPreview] = React.useState(null) // { name, filename, rows }
+  const periodLabel = period?.periodLabel || 'All time'
+  // Stamp the period into every export so a CSV can't be mistaken for the
+  // whole year once it's out of the app and sat in an accountant's inbox.
+  const periodRow = ['Period', periodLabel]
 
   const download = (filename, rows) => {
     const csv = rows.map(r => r.map(c => {
@@ -33,7 +86,7 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
 
   const reports = [
     { id:'profit', name:'Profit & loss', desc:'Revenue, expenses, net profit', build: () => {
-      const rows = [['Profit & Loss Report'],['Generated', new Date().toLocaleDateString('en-GB')],[],
+      const rows = [['Profit & Loss Report'],['Generated', new Date().toLocaleDateString('en-GB')],periodRow,[],
         ['Revenue (paid invoices)', totalRev.toFixed(2)],
         ['Total expenses', totalExp.toFixed(2)],
         ['Net profit', (totalRev-totalExp).toFixed(2)]]
@@ -43,7 +96,7 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
       const rev = Object.fromEntries(groupBy(paid, i=>ym(i.issue_date), i=>i.total))
       const exp = Object.fromEntries(groupBy(expenses, e=>ym(e.spent_on), e=>e.amount))
       const months = [...new Set([...Object.keys(rev),...Object.keys(exp)])].sort()
-      const rows = [['Month','Revenue','Expenses','Profit'],
+      const rows = [periodRow,[],['Month','Revenue','Expenses','Profit'],
         ...months.map(m => [m, (rev[m]||0).toFixed(2), (exp[m]||0).toFixed(2), ((rev[m]||0)-(exp[m]||0)).toFixed(2)])]
       return ['soloops-monthly.csv', rows]
     }},
@@ -51,7 +104,7 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
       const rev = Object.fromEntries(groupBy(paid, i=>yr(i.issue_date)+' '+quarter(i.issue_date), i=>i.total))
       const exp = Object.fromEntries(groupBy(expenses, e=>yr(e.spent_on)+' '+quarter(e.spent_on), e=>e.amount))
       const qs = [...new Set([...Object.keys(rev),...Object.keys(exp)])].sort()
-      const rows = [['Quarter','Revenue','Expenses','Profit'],
+      const rows = [periodRow,[],['Quarter','Revenue','Expenses','Profit'],
         ...qs.map(q => [q, (rev[q]||0).toFixed(2), (exp[q]||0).toFixed(2), ((rev[q]||0)-(exp[q]||0)).toFixed(2)])]
       return ['soloops-quarterly.csv', rows]
     }},
@@ -59,20 +112,20 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
       const rev = Object.fromEntries(groupBy(paid, i=>yr(i.issue_date), i=>i.total))
       const exp = Object.fromEntries(groupBy(expenses, e=>yr(e.spent_on), e=>e.amount))
       const ys = [...new Set([...Object.keys(rev),...Object.keys(exp)])].sort()
-      const rows = [['Year','Revenue','Expenses','Profit'],
+      const rows = [periodRow,[],['Year','Revenue','Expenses','Profit'],
         ...ys.map(y => [y, (rev[y]||0).toFixed(2), (exp[y]||0).toFixed(2), ((rev[y]||0)-(exp[y]||0)).toFixed(2)])]
       return ['soloops-annual.csv', rows]
     }},
     { id:'expense', name:'Expense report', desc:'All expenses by category', build: () => {
       const byCat = groupBy(expenses, e=>e.category||'Other', e=>e.amount)
-      const rows = [['Expense Report by Category'],[],['Category','Total'],
+      const rows = [['Expense Report by Category'],periodRow,[],['Category','Total'],
         ...byCat.map(([c,v]) => [c, v.toFixed(2)]),[],
         ['Line items'],['Date','Merchant','Category','Amount'],
         ...expenses.map(e => [e.spent_on, e.merchant, e.category, Number(e.amount).toFixed(2)])]
       return ['soloops-expenses.csv', rows]
     }},
     { id:'income', name:'Income report', desc:'All invoices & payments', build: () => {
-      const rows = [['Income Report'],[],['Invoice','Client','Issued','Status','Total'],
+      const rows = [['Income Report'],periodRow,[],['Invoice','Client','Issued','Status','Total'],
         ...invoices.map(i => [i.number||'', i.client_name||'', i.issue_date||'', i.status||'', Number(i.total).toFixed(2)]),[],
         ['Total invoiced', sum(invoices,i=>i.total).toFixed(2)],
         ['Total paid', totalRev.toFixed(2)]]
@@ -91,7 +144,7 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
       const incomeTax = Math.max(0, taxable * (rate/100))
       const nic = Math.max(0, taxable * (nRate/100))
       const rows = [['Tax Summary (ESTIMATE ONLY — not tax advice)'],
-        ['Generated', new Date().toLocaleDateString('en-GB')],[],
+        ['Generated', new Date().toLocaleDateString('en-GB')],periodRow,[],
         ['Revenue (paid)', totalRev.toFixed(2)],
         ['Allowable expenses', totalExp.toFixed(2)],
         ['Mileage claim', (sum(mileage,m=>m.claim)).toFixed(2)],
@@ -131,6 +184,7 @@ export default function Reports({ invoices, expenses, mileage, canGold = false, 
         }}>⬇ Accountant export pack</button>}
       </div>
       <div style={{fontSize:'12.5px', color:'var(--text3)', marginBottom:'18px'}}>Generate and download reports from your data (CSV — opens in Excel/Sheets).{canGold && ' The accountant pack zips them all together.'}</div>
+      {period && <PeriodBar period={period} />}
       {msg && <div style={{ background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'var(--green)', marginBottom:'14px' }}>✓ {msg}</div>}
       <div className="solo-report-grid" style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'12px' }}>
         {visibleReports.map(r => (
