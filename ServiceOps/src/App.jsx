@@ -7,6 +7,7 @@ import SupportBanner from './components/SupportBanner.jsx'
 import { NAV, RANGES, gbp, toneVar, inp, fld, emptyCard, TIER_ORDER } from './lib/helpers.js'
 import { PageHead, Btn, useIsMobile, SearchGroup } from './components/UI.jsx'
 import TrialGuard from './components/TrialGuard.jsx'
+import VersionBadge from './components/VersionBadge.jsx'
 import { getStaffMapping, STAFF_PERMS, PAGE_PERM } from './lib/staff.js'
 import { DashboardPage, CertificatesPage, DocumentsPage, ReportsPage, SettingsPage } from './pages/Records.jsx'
 import { CustomersPage, CustomerDetail, PropertiesPage } from './pages/CustomersProperties.jsx'
@@ -162,6 +163,7 @@ function Dashboard({ user, signOut, staff }) {
           <div className="font-head" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
           <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
         </div>
+        <VersionBadge />
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}{staffChip}</div>
           <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>

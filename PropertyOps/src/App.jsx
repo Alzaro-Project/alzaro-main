@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, DB_READY } from "./lib/supabase.js";
 import TrialGuard from "./components/TrialGuard.jsx";
+import VersionBadge from "./components/VersionBadge.jsx";
 import { NAV, RANGES, gbp, toneVar, tierBadge, useIsMobile, TIER_ORDER, effectiveStatus } from "./lib/helpers.js";
 import {
   DashboardPage, PropertiesPage, CompliancePage, TenantsPage,
@@ -272,6 +273,7 @@ function Dashboard({ user, signOut, staff }) {
           <div className="brand" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
           <div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Property Operations Pro</div>
         </div>
+        <VersionBadge />
         {/* business name + tier badge */}
         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--line)" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>

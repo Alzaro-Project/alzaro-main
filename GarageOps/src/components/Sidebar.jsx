@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import GlobalSearch from './GlobalSearch'
+import VersionBadge from './VersionBadge.jsx'
 
 // ============================================================
 // Sidebar — GarageOps v2
@@ -75,14 +76,17 @@ export default function Sidebar({ onNavigate, isMobile }) {
     }}>
       {/* Logo — hidden on mobile (shown in app header) */}
       {!isMobile && (
-        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text)' }}>
-            Alzaro<span style={{ color: 'var(--red)' }}>GarageOps</span>
+        <>
+          <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--text)' }}>
+              Alzaro<span style={{ color: 'var(--red)' }}>GarageOps</span>
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'monospace', marginTop: '4px', letterSpacing: '0.3px' }}>
+              Garage management pro
+            </div>
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'monospace', marginTop: '4px', letterSpacing: '0.3px' }}>
-            Garage management pro
-          </div>
-        </div>
+          <VersionBadge />
+        </>
       )}
 
       {/* Garage info + tier */}

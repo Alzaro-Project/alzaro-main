@@ -21,6 +21,7 @@ import Login from './pages/Login.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
 import Support from './pages/Support.jsx'
 import SupportBanner from './components/SupportBanner.jsx'
+import VersionBadge from './components/VersionBadge.jsx'
 
 const VALID_VIEWS = NAV.map(n => n[0])
 
@@ -433,6 +434,7 @@ function Shell() {
       <aside className="solo-sidebar" style={{ background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'22px 16px', position:'sticky', top:0, height:'100vh', display:'flex', flexDirection:'column', gap:'4px' }}>
         <div style={{ fontSize:'20px', fontWeight:800, letterSpacing:'-0.5px', padding:'6px 12px 4px', flexShrink:0 }}>Alzaro <span style={{color:'var(--orange)'}}>SoloOps</span></div>
         <div style={{ fontSize:'11px', color:'var(--text3)', padding:'0 12px 14px', flexShrink:0 }}>Self-employed accounts</div>
+        <VersionBadge />
 
         {(() => {
           const TIER_META = {
