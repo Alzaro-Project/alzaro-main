@@ -2,18 +2,106 @@ import React, { useState, useEffect } from 'react'
 import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, PAY_METHODS, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule, uploadFile, insertDocument, updateExpenseReceipt } from '../../lib/db.js'
 
-// Built-ins + the owner's custom categories, deduped, with Other kept last so
-// the catch-all stays at the bottom where people expect it.
+// Built-ins + the owner's own categories, minus any built-in they've switched
+// off, deduped, with Other kept last so the catch-all stays at the bottom where
+// people expect it. Other is deliberately never removable: it's the fallback
+// every form defaults to, so losing it would leave new expenses with no
+// category at all.
 export function mergeCategories(custom) {
-  const names = (custom || []).map(c => (c.name || '').trim()).filter(Boolean)
-  const base = CATEGORIES.filter(c => c !== 'Other')
-  const merged = [...base]
+  const rows = custom || []
+  const hidden = new Set(rows.filter(c => c.hidden).map(c => (c.name || '').trim().toLowerCase()))
+  const names = rows.filter(c => !c.hidden).map(c => (c.name || '').trim()).filter(Boolean)
+  const merged = CATEGORIES.filter(c => c !== 'Other' && !hidden.has(c.toLowerCase()))
   names.forEach(n => { if (!merged.some(m => m.toLowerCase() === n.toLowerCase())) merged.push(n) })
   merged.push('Other')
   return merged
 }
 
-export function ExpenseForm({onClose,onSaved,uid,expenses,categories,edit}) {
+// Supplier / merchant picker for the expense form.
+//
+// A plain <select> was considered and rejected: most expenses are one-offs
+// (parking, a bag of screws) and forcing a supplier record to exist first would
+// make logging them slower than it is today. So this is a combobox — the saved
+// suppliers from Clients drop down on focus and filter as you type, but any
+// free text is still accepted and still auto-creates the supplier on save.
+function MerchantPicker({ value, onChange, suppliers, pastMerchants }) {
+  const [open, setOpen] = React.useState(false)
+  const [active, setActive] = React.useState(-1)
+  const box = React.useRef(null)
+
+  // Saved suppliers first (they're the real records), then merchants that only
+  // appear on past expenses, so typing history still helps without duplicating.
+  const supplierNames = suppliers.map(s => s.name).filter(Boolean)
+  const seen = new Set(supplierNames.map(n => n.toLowerCase()))
+  const options = [
+    ...suppliers.map(s => ({ name: s.name, saved: true, sub: s.email || s.phone || '' })),
+    ...pastMerchants.filter(m => !seen.has(m.toLowerCase())).map(m => ({ name: m, saved: false, sub: '' })),
+  ]
+  const q = (value || '').trim().toLowerCase()
+  const shown = q ? options.filter(o => o.name.toLowerCase().includes(q)) : options
+
+  // Close on a click anywhere outside the picker.
+  React.useEffect(() => {
+    if (!open) return
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  // Escape closes the LIST, not the whole modal. Captured at the document so it
+  // runs before Modal's own bubble-phase Escape handler and can stop it.
+  React.useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [open])
+
+  const pick = (name) => { onChange(name); setOpen(false); setActive(-1) }
+
+  const onKeyDown = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive(i => Math.min(i + 1, shown.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter' && open && active >= 0 && shown[active]) { e.preventDefault(); pick(shown[active].name) }
+  }
+
+  return (
+    <div ref={box} style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          style={{ ...inp, paddingRight: '34px' }}
+          placeholder="e.g. Adobe UK"
+          value={value}
+          autoComplete="off"
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+          onChange={e => { onChange(e.target.value); setOpen(true); setActive(-1) }}
+        />
+        <button type="button" tabIndex={-1} aria-label="Show suppliers"
+          onClick={() => setOpen(o => !o)}
+          style={{ position: 'absolute', right: '2px', top: '2px', bottom: '2px', width: '30px', background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '11px' }}>▼</button>
+      </div>
+      {open && shown.length > 0 && (
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: '10px', boxShadow: '0 12px 32px rgba(0,0,0,.45)', maxHeight: '210px', overflowY: 'auto' }}>
+          {shown.map((o, i) => (
+            <div key={o.name} onMouseDown={e => { e.preventDefault(); pick(o.name) }} onMouseEnter={() => setActive(i)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '9px 12px', cursor: 'pointer', fontSize: '13.5px', background: i === active ? 'var(--surface2)' : 'transparent', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {o.name}
+                {o.sub && <span style={{ color: 'var(--text3)', fontSize: '11.5px', marginLeft: '8px' }}>{o.sub}</span>}
+              </span>
+              <span style={{ flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.4px', color: o.saved ? 'var(--orange-light)' : 'var(--text3)' }}>
+                {o.saved ? 'Supplier' : 'Past'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edit}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [notes,setNotes]=useState(edit?.notes||'')
@@ -21,6 +109,12 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,edit}) {
   const [receiptFile,setReceiptFile]=useState(null)
   const [busy,setBusy]=useState(false); const [err,setErr]=useState('')
   const pastMerchants = [...new Set((expenses||[]).map(e=>e.merchant).filter(Boolean))].sort()
+  // Suppliers from Clients — kind 'supplier' or 'both'. Customers are excluded:
+  // they belong on the income side, and a client who is genuinely both is
+  // already marked 'both' by ensureClient.
+  const suppliers = (clients||[])
+    .filter(c => ['supplier','both'].includes(c.kind||'customer'))
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
 
   const suggest = async (m) => {
     setMerchant(m)
@@ -32,7 +126,8 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,edit}) {
 
   // Upload the chosen receipt, link it to the expense, and mark the expense.
   // Best-effort: if this fails the expense itself is already saved, so we
-  // don't block the save — the receipt can be attached from the Receipts tab.
+  // don't block the save — the receipt can be attached later from the expense's
+  // own row on the Expenses page.
   const attachReceipt = async (expenseId) => {
     if (!receiptFile || !expenseId) return
     try {
@@ -83,9 +178,8 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,edit}) {
   }
   return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <Field label="Supplier / merchant">
-      <input style={inp} list="past-merchants" placeholder="e.g. Adobe UK" value={merchant} onChange={e=>suggest(e.target.value)} />
-      <datalist id="past-merchants">{pastMerchants.map(m=><option key={m} value={m} />)}</datalist>
+    <Field label="Supplier / merchant" hint={suppliers.length ? 'pick a supplier or type a new one' : undefined}>
+      <MerchantPicker value={merchant} onChange={suggest} suppliers={suppliers} pastMerchants={pastMerchants} />
     </Field>
     <Field label="Category">
       <select style={inp} value={category} onChange={e=>setCategory(e.target.value)}>
