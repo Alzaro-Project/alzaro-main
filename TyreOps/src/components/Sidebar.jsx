@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useStore, TIER_ORDER } from '../store/useStore'
 import GlobalSearch from './GlobalSearch'
+import VersionBadge from './VersionBadge.jsx'
 
 const NAV = [
   { path: '/dashboard', icon: '📊', label: 'Dashboard', min: 'basic' },
@@ -79,14 +80,17 @@ export default function Sidebar({ onNavigate, isMobile }) {
     }}>
       {/* Logo */}
       {!isMobile && (
-        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700 }}>
-            Alzaro<span style={{ color: 'var(--accent)' }}>TyreOps</span>
+        <>
+          <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700 }}>
+              Alzaro<span style={{ color: 'var(--accent)' }}>TyreOps</span>
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
+              Tyre Management Pro
+            </div>
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
-            Tyre Management Pro
-          </div>
-        </div>
+          <VersionBadge />
+        </>
       )}
 
       {/* Garage Info */}
