@@ -85,7 +85,6 @@ export default function Sidebar({ onNavigate, isMobile }) {
               Garage management pro
             </div>
           </div>
-          <VersionBadge />
         </>
       )}
 
@@ -179,6 +178,7 @@ export default function Sidebar({ onNavigate, isMobile }) {
         <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {user?.email}
         </div>
+        <VersionBadge footer />
         <button onClick={() => logout()} className="go-footer-btn" style={{
           width: '100%',
           background: 'transparent',
