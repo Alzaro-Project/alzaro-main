@@ -89,7 +89,6 @@ export default function Sidebar({ onNavigate, isMobile }) {
               Tyre Management Pro
             </div>
           </div>
-          <VersionBadge />
         </>
       )}
 
@@ -139,6 +138,8 @@ export default function Sidebar({ onNavigate, isMobile }) {
         <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {user?.email}
         </div>
+
+        <VersionBadge footer />
 
         {/* Theme Toggle */}
         <button
