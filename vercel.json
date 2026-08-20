@@ -5,7 +5,7 @@
       "schedule": "0 9 * * *"
     }
   ],
-  "buildCommand": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build && cd ../PropertyOps && npm install && npm run build && cd ../SoloOps && npm install && npm run build && cd ../Accountant && npm install && npm run build",
+  "buildCommand": "npm run build:apps",
   "outputDirectory": ".",
   "redirects": [
     {

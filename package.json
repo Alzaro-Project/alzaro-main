@@ -5,5 +5,8 @@
     "nodemailer": "^6.9.16",
     "pdf-lib": "^1.17.1",
     "stripe": "^22.3.0"
+  },
+  "scripts": {
+    "build:apps": "cd TyreOps && npm install && npm run build && cd ../GarageOps && npm install && npm run build && cd ../ServiceOps && npm install && npm run build && cd ../PropertyOps && npm install && npm run build && cd ../SoloOps && npm install && npm run build && cd ../Accountant && npm install && npm run build"
   }
 }
