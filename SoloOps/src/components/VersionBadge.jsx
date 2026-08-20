@@ -8,14 +8,22 @@ const TYPE_META = {
   patch: { label: 'Fix',     color: '#9ca3af',  bg: 'rgba(148,163,184,.12)', border: 'rgba(148,163,184,.3)' },
 }
 
-export default function VersionBadge() {
+export default function VersionBadge({ footer = false }) {
   const [open, setOpen] = React.useState(false)
+  // Two placements: the original top slot (under the brand) and a compact
+  // `footer` variant that sits centered in the sidebar footer between the
+  // email and the Dark mode button.
+  const topStyle = { alignSelf:'flex-start', margin:'10px 0 0 16px', background:'var(--surface2, rgba(0,0,0,.04))',
+    color:'var(--text3)', border:'1px solid var(--border, var(--line))', borderRadius:'999px',
+    padding:'2px 10px', fontSize:'10.5px', fontWeight:700, fontFamily:'monospace', cursor:'pointer' }
+  const footerStyle = { alignSelf:'center', margin:'0 0 8px', background:'transparent',
+    color:'var(--text3)', border:'none', borderRadius:'999px',
+    padding:'2px 8px', fontSize:'10.5px', fontWeight:700, fontFamily:'monospace', cursor:'pointer',
+    letterSpacing:'.3px', flexShrink:0 }
   return (
     <>
       <button onClick={() => setOpen(true)} title="What's new"
-        style={{ alignSelf:'flex-start', margin:'10px 0 0 16px', background:'var(--surface2, rgba(0,0,0,.04))',
-          color:'var(--text3)', border:'1px solid var(--border, var(--line))', borderRadius:'999px',
-          padding:'2px 10px', fontSize:'10.5px', fontWeight:700, fontFamily:'monospace', cursor:'pointer' }}>
+        style={footer ? footerStyle : topStyle}>
         v{VERSION}
       </button>
       {open && (
