@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, gbp, Th, Td, Empty, ErrBox, CATEGORIES } from '../components/UI.jsx'
+import { card, inp, noScroll, btnPri, btnSec, gbp, Th, Td, Empty, ErrBox, CATEGORIES } from '../components/UI.jsx'
 import { insertCategory, deleteCategory, hideCategory } from '../lib/db.js'
 import { mergeCategories } from '../components/forms/Forms.jsx'
 import { insertItem, updateItem, deleteItem } from '../lib/db.js'
@@ -63,7 +63,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash, categorie
         {isIncome ? (
           <div style={{ flex: '0 1 100px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Price (£ each)</div>
-            <input style={inp} type="number" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} />
+            <input style={inp} type="number" {...noScroll} placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} />
           </div>
         ) : (
           <>
@@ -77,7 +77,7 @@ function ItemSection({ kind, title, blurb, rows, uid, onChange, flash, categorie
             </div>
             <div style={{ flex: '0 1 100px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '5px' }}>Amount (£)</div>
-              <input style={inp} type="number" placeholder="—" value={amount} onChange={e => setAmount(e.target.value)} />
+              <input style={inp} type="number" {...noScroll} placeholder="—" value={amount} onChange={e => setAmount(e.target.value)} />
             </div>
           </>
         )}
