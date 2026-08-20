@@ -590,7 +590,7 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
 
           <div style={field}>
             <div style={lbl}>Password {smtpSaved && <span style={{ fontWeight:500, color:'var(--text3)' }}>— leave blank to keep the saved one</span>}</div>
-            <input style={inp} type="password" value={smtpPass} onChange={e=>{setSmtpPass(e.target.value); setSmtpTest(null)}} placeholder={smtpSaved ? '••••••••  (saved)' : 'App password'} autoComplete="new-password" />
+            <PasswordInput width="100%" value={smtpPass} onChange={v=>{setSmtpPass(v); setSmtpTest(null)}} placeholder={smtpSaved ? '••••••••  (saved)' : 'App password'} />
             {PASS_HELP[smtpProvider] && (
               <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px', lineHeight:1.5 }}>
                 {PASS_HELP[smtpProvider].text}
@@ -759,10 +759,10 @@ function EyeIcon({ off }) {
 }
 
 // Password input with a show/hide toggle inside the field.
-function PasswordInput({ value, onChange, onEnter, placeholder }) {
+function PasswordInput({ value, onChange, onEnter, placeholder, width = '240px' }) {
   const [show, setShow] = React.useState(false)
   return (
-    <div style={{ position: 'relative', width: '240px', maxWidth: '100%' }}>
+    <div style={{ position: 'relative', width, maxWidth: '100%' }}>
       <input
         style={{ ...inp, width: '100%', paddingRight: '40px' }}
         type={show ? 'text' : 'password'}
