@@ -236,6 +236,9 @@ export default async function handler(req, res) {
         permissions,
         status,
         created_via_invite: createdViaInvite,
+        // Snapshot for the portal's client list (column added in 016; PostgREST
+        // rejects unknown columns, so 016 must be run with 015 before invites).
+        client_name: bizName || null,
       }),
     })
     const rows = ins.ok ? await ins.json() : null
