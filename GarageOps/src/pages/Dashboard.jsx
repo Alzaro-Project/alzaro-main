@@ -25,11 +25,13 @@ const PERIODS = [
 function money(n) { return `£${(Number(n) || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
 
 function invoiceTotal(inv) {
+  // Uses the invoice's stored vat_rate (old invoices default to 20)
+  const rate = (inv.vatRate != null ? Number(inv.vatRate) : 20) / 100
   return (inv.lines || []).reduce((sum, l) => {
     const lineTotal = (l.qty || 0) * (l.unit || 0)
     const vat = l.lineType === 'used' && l.marginScheme
       ? (l.qty || 0) * ((l.unit || 0) - (l.cost || 0)) * 0.2
-      : (inv.vatScheme === 'standard' ? lineTotal * 0.2 : 0)
+      : (inv.vatScheme === 'standard' ? lineTotal * rate : 0)
     return sum + lineTotal + vat
   }, 0)
 }

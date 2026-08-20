@@ -172,6 +172,7 @@ function buildPayload(garageId, data) {
     gross: round2(net + vat),
     payment_status: data.payment_status || 'paid',
     payment_method: data.payment_method || null,
+    mileage: toIntOrNull(data.mileage),
     customer_id: isUuid(data.customer_id) ? data.customer_id : null,
     customer_name: data.customer_name?.trim() || null,
     vehicle_reg: data.vehicle_reg?.trim().toUpperCase() || null,
@@ -183,6 +184,13 @@ function buildPayload(garageId, data) {
 function toNum(v) {
   const n = parseFloat(v)
   return Number.isFinite(n) ? round2(n) : 0
+}
+
+// Whole-number mileage or null (blank / invalid / negative → null)
+function toIntOrNull(v) {
+  if (v === '' || v == null) return null
+  const n = parseInt(v, 10)
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
 function isUuid(v) {

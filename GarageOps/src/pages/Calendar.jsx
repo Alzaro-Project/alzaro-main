@@ -3,6 +3,8 @@ import { useStore } from '../store/useStore'
 import { useBookings } from '../hooks/useBookings'
 import { useServices } from '../hooks/useServices'
 import { useDayNotes } from '../hooks/useDayNotes'
+import RegCombobox from '../components/RegCombobox'
+import { useKnownRegs } from '../hooks/useKnownRegs'
 
 // ============================================================
 // Calendar — GarageOps v2 (Step 2: full CRUD)
@@ -557,6 +559,7 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
   const customers = useStore(s => s.customers) || []
   const vehicles  = useStore(s => s.vehicles)  || []
   const { services } = useServices()
+  const knownRegs = useKnownRegs() // customer vehicles + purchase regs, deduped
 
   const [form, setForm] = useState(() => ({
     id: initial.id || null,
@@ -690,11 +693,12 @@ function BookingForm({ mode, initial, slotSettings, onClose, onSave }) {
               ))}
             </select>
           ) : (
-            <input
+            <RegCombobox
               value={form.vehicle_reg}
-              onChange={e => setForm(f => ({ ...f, vehicle_reg: e.target.value.toUpperCase() }))}
+              onChange={v => setForm(f => ({ ...f, vehicle_reg: v }))}
+              suggestions={knownRegs}
               placeholder="Vehicle reg (e.g. MK21 ABC)"
-              style={{ ...inputStyle, textTransform: 'uppercase' }}
+              inputStyle={inputStyle}
             />
           )}
         </div>

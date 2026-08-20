@@ -1,17 +1,38 @@
-import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useState, useEffect, Fragment } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { PageHeader, Card, Btn, Badge } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
+import RegLink from '../components/RegLink'
+import RegCombobox from '../components/RegCombobox'
+import { useKnownRegs } from '../hooks/useKnownRegs'
+
+const INVOICE_STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red' }
+
+// Invoice total inc. VAT — mirrors the invoice editor's maths,
+// using each invoice's stored vat_rate (old invoices default to 20)
+function customerInvoiceTotal(inv) {
+  const rate = (inv.vatRate != null ? Number(inv.vatRate) : 20) / 100
+  return (inv.lines || []).reduce((sum, l) => {
+    const lineTotal = (l.qty || 0) * (l.unit || 0)
+    const vat = l.lineType === 'used' && l.marginScheme
+      ? (l.qty || 0) * ((l.unit || 0) - (l.cost || 0)) * 0.2
+      : (inv.vatScheme === 'standard' ? lineTotal * rate : 0)
+    return sum + lineTotal + vat
+  }, 0)
+}
 
 export default function Customers() {
   const { customers, invoices, addCustomer, updateCustomer, deleteCustomer } = useStore()
+  const navigate = useNavigate()
+  const knownRegs = useKnownRegs() // customer vehicles + purchase regs, deduped
   const [showModal, setShowModal] = useState(false)
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [search, setSearch] = useState('')
   const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [expandedId, setExpandedId] = useState(null) // customer whose invoices are open
   
   const [form, setForm] = useState({ name: '', email: '', phone: '', vehicles: [] })
   const [vehicleForm, setVehicleForm] = useState({ reg: '', make: '', model: '' })
@@ -230,9 +251,19 @@ export default function Customers() {
                 // Include old format vehicle if exists
                 const allVehicles = vehicles.length ? vehicles : (c.reg ? [{ reg: c.reg, model: c.vehicle }] : [])
                 
+                const isExpanded = expandedId === c.id
                 return (
-                  <tr key={c.id} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
-                    <td style={{ padding: '10px', fontWeight: 600 }}>{c.name}</td>
+                  <Fragment key={c.id}>
+                  <tr
+                    onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')}
+                    onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}
+                  >
+                    <td style={{ padding: '10px', fontWeight: 600 }}>
+                      <span style={{ display: 'inline-block', width: '16px', color: 'var(--text3)', fontSize: '10px', transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>▶</span>
+                      {c.name}
+                    </td>
                     <td style={{ padding: '10px' }}>
                       <div style={{ fontSize: '11px', color: 'var(--text2)' }}>
                         {c.email && <div>📧 {c.email}</div>}
@@ -245,7 +276,7 @@ export default function Customers() {
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                           {allVehicles.map((v, i) => (
-                            <span key={i} style={{
+                            <RegLink key={i} reg={v.reg} style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
@@ -255,29 +286,65 @@ export default function Customers() {
                               fontFamily: 'DM Mono, monospace',
                               background: 'var(--surface3)',
                               border: '1px solid var(--border)',
+                              textDecoration: 'none',
                             }}>
                               🚗 {v.reg}
                               {v.model && <span style={{ color: 'var(--text3)' }}>({v.make} {v.model})</span>}
-                            </span>
+                            </RegLink>
                           ))}
                         </div>
                       )}
                     </td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>{custInvs.length}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>£{spent.toFixed(2)}</td>
-                    <td style={{ padding: '10px' }}>
+                    <td style={{ padding: '10px' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: '3px' }}>
                         <Btn sm variant="ghost" onClick={() => openEdit(c)}>Edit</Btn>
-                        <Btn sm variant="danger" onClick={() => { 
+                        <Btn sm variant="danger" onClick={() => {
                           if (custInvs.length > 0) {
                             alert(`Cannot delete ${c.name} - they have ${custInvs.length} invoice(s). Delete the invoices first.`)
                             return
                           }
-                          if (confirm('Delete customer?')) deleteCustomer(c.id) 
+                          if (confirm('Delete customer?')) deleteCustomer(c.id)
                         }}>✕</Btn>
                       </div>
                     </td>
                   </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '0 10px 12px 26px', background: 'var(--surface2)' }}>
+                        {custInvs.length === 0 ? (
+                          <div style={{ padding: '12px 6px', fontSize: '11px', color: 'var(--text3)' }}>
+                            No invoices for {c.name} yet
+                          </div>
+                        ) : (
+                          <div style={{ padding: '8px 0 0' }}>
+                            <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', padding: '4px 6px' }}>
+                              Invoices ({custInvs.length})
+                            </div>
+                            {custInvs.map(inv => (
+                              <div
+                                key={inv.id}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  navigate(`/invoices?focus=${encodeURIComponent(inv.id)}`, { state: { focusInvoiceId: inv.id } })
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '7px 6px', borderTop: '1px solid var(--border)', cursor: 'pointer', flexWrap: 'wrap' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface3)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                              >
+                                <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--accent)', fontSize: '11px' }}>{inv.id}</span>
+                                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: 'var(--text2)' }}>{inv.date || '—'}</span>
+                                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', fontWeight: 600, marginLeft: 'auto' }}>£{customerInvoiceTotal(inv).toFixed(2)}</span>
+                                <Badge variant={INVOICE_STATUS_BADGE[inv.status] || 'gray'}>{inv.status}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -410,11 +477,12 @@ export default function Customers() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Registration *</label>
-                <input 
-                  style={{ ...inputStyle, textTransform: 'uppercase' }} 
-                  value={vehicleForm.reg} 
-                  onChange={e => vf('reg', e.target.value)} 
-                  placeholder="MK21 ABC" 
+                <RegCombobox
+                  value={vehicleForm.reg}
+                  onChange={v => vf('reg', v)}
+                  suggestions={knownRegs}
+                  placeholder="MK21 ABC"
+                  inputStyle={inputStyle}
                 />
               </div>
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

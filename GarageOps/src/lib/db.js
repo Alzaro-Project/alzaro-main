@@ -309,6 +309,7 @@ export async function getInvoices(garageId) {
     ...inv,
     custId: inv.cust_id, custName: inv.cust_name, custEmail: inv.cust_email,
     vatScheme: inv.vat_scheme,
+    vatRate: inv.vat_rate != null ? Number(inv.vat_rate) : 20,
     paymentMethod: inv.payment_method,
     paidAt: inv.paid_at,
     lines: (lines || []).filter(l => l.invoice_id === inv.id).map(l => ({
@@ -324,6 +325,7 @@ export async function insertInvoice(garageId, inv) {
     cust_name: inv.custName, cust_email: inv.custEmail, reg: inv.reg,
     date: inv.date, due: inv.due, status: inv.status,
     vat_scheme: inv.vatScheme, notes: inv.notes,
+    vat_rate: inv.vatRate != null ? Number(inv.vatRate) : 20,
     payment_method: inv.paymentMethod || null,
     paid_at: inv.paidAt || null
   })
@@ -348,7 +350,9 @@ export async function updateInvoice(id, updates) {
   if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod
   if (updates.paidAt !== undefined) dbUpdates.paid_at = updates.paidAt
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes
-  
+  if (updates.vatRate !== undefined) dbUpdates.vat_rate = Number(updates.vatRate)
+
+  if (!Object.keys(dbUpdates).length) return
   const { error } = await supabase.from('invoices').update(dbUpdates).eq('id', id)
   if (error) throw error
 }
