@@ -181,9 +181,15 @@ function Clients() {
 
   const load = useCallback(async () => {
     // RLS (accountant_links_acct_select) scopes this to rows pointing at us.
+    const { data: u } = await sb.auth.getUser()
+    // Only links where I'm the ACCOUNTANT. RLS also (correctly) lets a CLIENT
+    // read their own links, so without this filter someone signing into the
+    // portal with their business login would see themselves listed as if they
+    // were the accountant.
     const { data, error } = await sb
       .from('accountant_links')
       .select('id, client_id, product, client_name, permissions, status, created_at')
+      .eq('accountant_user_id', u?.user?.id || '00000000-0000-0000-0000-000000000000')
       .order('created_at', { ascending: true })
     setLinks(error ? [] : (data || []))
   }, [])
@@ -298,10 +304,12 @@ function ClientBooks() {
   useEffect(() => {
     if (!session) return
     ;(async () => {
+      const { data: u } = await sb.auth.getUser()
       const { data, error } = await sb
         .from('accountant_links')
         .select('id, client_id, product, client_name, permissions, status')
         .eq('id', linkId)
+        .eq('accountant_user_id', u?.user?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle()
       if (error || !data) { setLink(null); return }
       setLink(data)
