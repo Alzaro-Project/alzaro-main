@@ -163,7 +163,6 @@ function Dashboard({ user, signOut, staff }) {
           <div className="font-head" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>ServiceOps</span></div>
           <div className="mono" style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Field Service Pro</div>
         </div>
-        <VersionBadge />
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}{staffChip}</div>
           <div className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: tierStyle.bg, color: tierStyle.color, border: `1px solid ${tierStyle.border}`, textTransform: "uppercase" }}><i className="ti ti-crown" style={{ fontSize: 12 }} />{tierLabel}</div>
@@ -192,6 +191,7 @@ function Dashboard({ user, signOut, staff }) {
         </nav>
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", flexShrink: 0 }}>
           <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user ? user.email : ""}</div>
+          <VersionBadge footer />
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px", cursor: "pointer", marginBottom: 6, color: "var(--txt-2)", fontSize: 12 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14 }} />
             <span>{light ? "Dark Mode" : "Light Mode"}</span>
