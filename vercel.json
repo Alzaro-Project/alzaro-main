@@ -480,6 +480,10 @@
       "destination": "/Accountant/dist/index.html"
     },
     {
+      "source": "/accountant/clients/:id",
+      "destination": "/Accountant/dist/index.html"
+    },
+    {
       "source": "/accountant/:file((?!login|reset-password|clients).+\\..+)",
       "destination": "/Accountant/dist/:file"
     }
