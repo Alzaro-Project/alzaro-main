@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { inp, btnPri, Modal, ErrBox, DateField, CATEGORIES, PAY_METHODS, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
+import { inp, noScroll, btnPri, Modal, ErrBox, DateField, CATEGORIES, PAY_METHODS, isEmailish, Field, FormSection, gbp } from '../UI.jsx'
 import { insertExpense, updateExpense, insertInvoice, updateInvoice, insertInvoiceLines, deleteInvoiceLines, loadInvoiceLines, insertMileage, updateMileage, ensureClient, loadRules, upsertRule, uploadFile, insertDocument, updateExpenseReceipt } from '../../lib/db.js'
 
 // Built-ins + the owner's own categories, minus any built-in they've switched
@@ -196,7 +196,7 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edi
       </Field>
     )}
     <Field label="Amount">
-      <input style={inp} type="number" placeholder="£0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+      <input style={inp} type="number" {...noScroll} placeholder="£0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
     </Field>
     <Field label="How was it paid?" hint="optional">
       <select style={inp} value={paidMethod} onChange={e=>setPaidMethod(e.target.value)}>
@@ -420,8 +420,8 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,
     {lines.map((l,i)=>(
       <div key={i} className="solo-lineitem" style={{ display:'flex', gap:'6px', marginBottom:'6px', alignItems:'flex-start' }}>
         <input style={{...inp, flex:1}} placeholder="Description" value={l.description} onChange={e=>setLine(i,'description',e.target.value)} />
-        <input style={{...inp, width:'52px', textAlign:'center'}} type="number" placeholder="Qty" value={l.qty} onChange={e=>setLine(i,'qty',e.target.value)} />
-        <input style={{...inp, width:'82px'}} type="number" placeholder="£ each" value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)} />
+        <input style={{...inp, width:'52px', textAlign:'center'}} type="number" {...noScroll} placeholder="Qty" value={l.qty} onChange={e=>setLine(i,'qty',e.target.value)} />
+        <input style={{...inp, width:'82px'}} type="number" {...noScroll} placeholder="£ each" value={l.unit_price} onChange={e=>setLine(i,'unit_price',e.target.value)} />
         <button onClick={()=>removeLine(i)} title="Remove" style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text3)', width:'40px', minWidth:'40px', cursor:'pointer', fontSize:'16px', lineHeight:'38px' }}>×</button>
       </div>
     ))}
@@ -436,7 +436,7 @@ export function InvoiceForm({onClose,onSaved,uid,invoices,clients,edit,settings,
     {/* VAT (only if registered) */}
     {vatRegistered && !isFlat && (
       <Field label="VAT rate %" style={{ marginTop:'14px' }}>
-        <input style={inp} type="number" value={vatRate} onChange={e=>setVatRate(e.target.value)} placeholder="20" />
+        <input style={inp} type="number" {...noScroll} value={vatRate} onChange={e=>setVatRate(e.target.value)} placeholder="20" />
       </Field>
     )}
     {vatRegistered && isFlat && (
@@ -529,7 +529,7 @@ export function MileageForm({onClose,onSaved,uid,mileage,edit}) {
       <input style={inp} placeholder="e.g. client visit" value={purpose} onChange={e=>setPurpose(e.target.value)} />
     </Field>
     <Field label="Miles" style={{ marginBottom:'4px' }}>
-      <input style={inp} type="number" placeholder="0" value={miles} onChange={e=>setMiles(e.target.value)} />
+      <input style={inp} type="number" {...noScroll} placeholder="0" value={miles} onChange={e=>setMiles(e.target.value)} />
     </Field>
     <button style={{...btnPri, width:'100%', marginTop:'18px', opacity:busy?.7:1}} disabled={busy} onClick={save}>{busy?'Saving…':(edit?'Update journey':'Save journey')}</button>
   </Modal>

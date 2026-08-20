@@ -10,7 +10,7 @@ import {
 import TrialGuard from './components/TrialGuard.jsx'
 import SendInvoice from './components/SendInvoice.jsx'
 import ReceiptViewer from './components/ReceiptViewer.jsx'
-import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check, PAY_LABEL } from './components/UI.jsx'
+import { NAV, TIER_ORDER, gbp, fmtDate, card, inp, noScroll, btnPri, btnSec, KPI, Empty, Th, Td, Status, Line, Check, PAY_LABEL } from './components/UI.jsx'
 import { ExpenseForm, InvoiceForm } from './components/forms/Forms.jsx'
 
 import Dashboard from './pages/Dashboard.jsx'
@@ -709,15 +709,15 @@ function Shell() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'14px' }}>
                   <div>
                     <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Income tax %</div>
-                    <input style={inp} type="number" value={taxRate} onChange={e=>setTaxRate(e.target.value)} />
+                    <input style={inp} type="number" {...noScroll} value={taxRate} onChange={e=>setTaxRate(e.target.value)} />
                   </div>
                   <div>
                     <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>NIC %</div>
-                    <input style={inp} type="number" value={nicRate} onChange={e=>setNicRate(e.target.value)} />
+                    <input style={inp} type="number" {...noScroll} value={nicRate} onChange={e=>setNicRate(e.target.value)} />
                   </div>
                   <div style={{ gridColumn:'1/-1' }}>
                     <div style={{ fontSize:'12px', color:'var(--text3)', marginBottom:'5px' }}>Tax-free allowance (£)</div>
-                    <input style={inp} type="number" value={allowance} onChange={e=>setAllowance(e.target.value)} />
+                    <input style={inp} type="number" {...noScroll} value={allowance} onChange={e=>setAllowance(e.target.value)} />
                   </div>
                 </div>
                 <button style={btnSec} onClick={async()=>{ if(Number(taxRate)<0||Number(nicRate)<0||Number(allowance)<0){ flash('Rates and allowance cannot be negative'); return } const { error } = await updateUser({ data:{ tax_rate:Number(taxRate), nic_rate:Number(nicRate), tax_allowance:Number(allowance) } }); flash(error ? 'Could not save your rates — please try again' : 'Tax rates saved') }}>Save my rates</button>

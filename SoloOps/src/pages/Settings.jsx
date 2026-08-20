@@ -1,5 +1,5 @@
 import React from 'react'
-import { card, inp, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
+import { card, inp, noScroll, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
 import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail } from '../lib/db.js'
 
 const TABS = [
@@ -501,7 +501,7 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
               {vatScheme === 'flat_rate' && (
                 <div style={field}>
                   <div style={lbl}>Flat rate %</div>
-                  <input style={inp} type="number" step="0.1" value={flatRate} onChange={e=>setFlatRate(e.target.value)} placeholder="16.5" />
+                  <input style={inp} type="number" {...noScroll} step="0.1" value={flatRate} onChange={e=>setFlatRate(e.target.value)} placeholder="16.5" />
                 </div>
               )}
             </>

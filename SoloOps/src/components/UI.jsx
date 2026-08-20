@@ -41,6 +41,11 @@ export const fmtDate = (iso) => {
 // ---------- shared inline styles ----------
 export const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }
 export const inp = { background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'8px', padding:'11px 14px', color:'var(--text)', fontSize:'14px', outline:'none', width:'100%' }
+// Stops the mouse wheel from changing a number input's value. Browsers treat a
+// focused number field's scroll as increment/decrement, so scrolling the page
+// while the caret sits in an amount silently edits it. Blurring on wheel kills
+// that without blocking page scroll. Spread onto every number input.
+export const noScroll = { onWheel: (e) => e.currentTarget.blur() }
 export const grad = 'linear-gradient(135deg, var(--orange), var(--amber))'
 export const btnPri = { background:grad, color:'#000', fontWeight:700, fontSize:'14px', padding:'10px 16px', borderRadius:'10px', border:'none', cursor:'pointer' }
 export const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:700, fontSize:'13px', padding:'9px 14px', borderRadius:'10px', border:'1px solid var(--border-light)', cursor:'pointer' }
