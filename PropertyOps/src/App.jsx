@@ -273,7 +273,6 @@ function Dashboard({ user, signOut, staff }) {
           <div className="brand" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
           <div style={{ fontSize: 10, color: "var(--txt-3)", marginTop: 2 }}>Property Operations Pro</div>
         </div>
-        <VersionBadge />
         {/* business name + tier badge */}
         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--line)" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--txt)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={displayName}>{displayName}</div>
@@ -349,6 +348,7 @@ function Dashboard({ user, signOut, staff }) {
           <div style={{ fontSize: 10, color: "var(--txt-3)", marginBottom: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {user ? user.email : ""}{staff && <span style={{ marginLeft: 6, fontSize: 8.5, fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", color: "var(--brand)", border: "1px solid var(--brand)", borderRadius: 5, padding: "1px 5px" }}>Staff</span>}
           </div>
+          <VersionBadge footer />
           <div onClick={toggleTheme} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 11px", cursor: "pointer", marginBottom: 7, color: "var(--txt-2)", fontSize: 12 }}>
             <i className={`ti ${light ? "ti-moon" : "ti-sun"}`} style={{ fontSize: 14, color: "var(--amber)" }} />
             <span>{light ? "Dark Mode" : "Light Mode"}</span>
