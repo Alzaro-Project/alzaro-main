@@ -186,6 +186,13 @@ export default async function handler(req, res) {
 
   let status = 'active'
   let createdViaInvite = false
+  let notifyExisting = false
+  if (acctUser) {
+    // Email already has an Alzaro login: no Supabase invite goes out, so
+    // without this the accountant gets access silently and may never know.
+    // Send a courtesy notification AFTER the link row commits (below).
+    notifyExisting = true
+  }
   if (!acctUser) {
     // Brand-new accountant: create + email an invite that lands on the
     // portal's set-a-password page. Pinned host, not derived from the request
@@ -251,9 +258,46 @@ export default async function handler(req, res) {
       }
       return res.status(502).json({ error: 'Could not save the link' })
     }
+    // Courtesy notification for already-registered accountants (new ones get
+    // the Supabase invite email instead). Fire-and-forget via Resend, same as
+    // the platform's purchase/trial emails: a mail hiccup must never fail the
+    // link that's already committed.
+    if (notifyExisting) {
+      try { await sendAccessNotification(email, bizName, P.label) }
+      catch (e) { console.error('accountant: notify email failed (link still created)', e) }
+    }
     return res.status(200).json({ ok: true, link: rows[0], existing_user: !createdViaInvite })
   } catch (err) {
     console.error('accountant: insert threw', err)
     return res.status(500).json({ error: 'Could not save the link' })
   }
+}
+
+// Tells an ALREADY-REGISTERED accountant they've been granted access (brand-new
+// accountants get Supabase's invite email instead, so they're covered).
+// Resend, from the platform address — same channel as purchase confirmations.
+async function sendAccessNotification(to, bizName, productLabel) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) { console.error('accountant notify: RESEND_API_KEY not set; skipping'); return }
+  const who = bizName || 'One of your clients'
+  const subject = `${who} has given you access to their books on Alzaro`
+  const url = 'https://alzaro.co.uk/accountant'
+  const text =
+    `${who} has given you view-only access to their ${productLabel} books.\n\n` +
+    `Sign in with your existing Alzaro login at ${url}\n\n` +
+    `You can look through their income, expenses and reports, but nothing can be changed from the accountant portal.\n\n` +
+    `— Alzaro`
+  const html =
+    `<div style="font-family:sans-serif;max-width:520px">` +
+    `<h2 style="margin:0 0 12px">${who} has shared their books with you</h2>` +
+    `<p>You now have <b>view-only</b> access to their ${productLabel} records on Alzaro.</p>` +
+    `<p><a href="${url}" style="display:inline-block;background:#f59e0b;color:#151515;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px">Open the accountant portal</a></p>` +
+    `<p style="color:#666;font-size:13px">Sign in with your existing Alzaro login. You can view income, expenses and reports — nothing can be changed from the portal.</p>` +
+    `</div>`
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'Alzaro <invoices@alzaro.co.uk>', to, subject, text, html }),
+  })
+  if (!r.ok) console.error('accountant notify: resend responded', r.status, await r.text().catch(() => ''))
 }
