@@ -293,6 +293,31 @@ export async function removeStaff(id) {
   return sb.from('soloops_staff').delete().eq('id', id)
 }
 
+// ---------- accountant link (view-only access for the client's accountant) ----
+// Creation goes through /api/accountant (service role: membership check +
+// invite email). These helpers run under RLS: the client can see, retune the
+// visibility of, and revoke their own link — nothing else.
+export async function getAccountantLink() {
+  try {
+    const { data, error } = await sb
+      .from('accountant_links')
+      .select('id, accountant_email, permissions, status, created_at')
+      .eq('product', 'soloops')
+      .limit(1)
+      .maybeSingle()
+    if (error) return null   // fails open pre-migration, same as staff
+    return data || null
+  } catch (e) {
+    return null
+  }
+}
+export async function updateAccountantPermissions(id, permissions) {
+  return sb.from('accountant_links').update({ permissions }).eq('id', id)
+}
+export async function revokeAccountant(id) {
+  return sb.from('accountant_links').delete().eq('id', id)
+}
+
 // ---------- custom expense categories ----------
 // Two kinds of row live here:
 //   hidden = false → an OWN category, added to the built-in list
