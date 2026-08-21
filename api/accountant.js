@@ -33,9 +33,9 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 // Per-product wiring. permKeys must match the keys the vertical's Settings
 // panel offers AND the arrays used in that vertical's accountant RLS policies
 // (015 for soloops; later migrations for the rest).
-// Stage 1 ships SoloOps; the others activate as their RLS stages land — an
-// entry here without its migration would create links that grant nothing,
-// so keep this list in lockstep with the migrations.
+// All five verticals are wired here. Each product's accountant RLS grants live
+// in migrations/015_accountant_links.sql (all-tiers, all-verticals build) —
+// keep permKeys in lockstep with that file and with the vertical's Settings UI.
 const PRODUCTS = {
   soloops: {
     label: 'Alzaro SoloOps',
@@ -43,6 +43,39 @@ const PRODUCTS = {
     nameSources: [
       { table: 'soloops_settings', column: 'business_name' },
       { table: 'soloops_access', column: 'business_name' },
+    ],
+  },
+  tyreops: {
+    label: 'Alzaro TyreOps',
+    // reporting key for TyreOps is 'vat' (VAT Report), not 'reports'
+    permKeys: ['dashboard', 'invoices', 'inventory', 'purchases', 'customers', 'followups', 'vat'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.tyreops' },
+      { table: 'product_settings', column: 'business_name' },
+    ],
+  },
+  garageops: {
+    label: 'Alzaro GarageOps',
+    permKeys: ['dashboard', 'invoices', 'customers', 'items', 'database', 'purchases', 'calendar', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.garageops' },
+      { table: 'product_settings', column: 'business_name' },
+    ],
+  },
+  serviceops: {
+    label: 'Alzaro ServiceOps',
+    permKeys: ['dashboard', 'invoicing', 'quotes', 'customers', 'diary', 'certificates', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.serviceops' },
+      { table: 'svc_settings', column: 'company_name' },
+    ],
+  },
+  propertyops: {
+    label: 'Alzaro PropertyOps',
+    permKeys: ['dashboard', 'properties', 'tenants', 'finance', 'maintenance', 'compliance', 'documents', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.propertyops' },
+      { table: 'prop_settings', column: 'company_name' },
     ],
   },
 }
