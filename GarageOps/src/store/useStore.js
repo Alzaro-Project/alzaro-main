@@ -643,6 +643,10 @@ export const useStore = create(
           try {
             if (Object.keys(updates).length === 1 && updates.status) {
               await db.updateInvoiceStatus(id, updates.status)
+            } else {
+              // Persist the header fields db.updateInvoice knows about
+              // (status, payment method, paid date, notes, VAT rate)
+              await db.updateInvoice(id, updates)
             }
           } catch (err) {
             console.error('Failed to update invoice:', err)

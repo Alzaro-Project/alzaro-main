@@ -4,6 +4,9 @@ import { useStore } from '../store/useStore'
 import { useServices } from '../hooks/useServices'
 import { PageHeader, Card, Badge, Btn } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
+import RegLink from '../components/RegLink'
+import RegCombobox from '../components/RegCombobox'
+import { useKnownRegs } from '../hooks/useKnownRegs'
 import { sendInvoiceEmail, generateInvoiceEmailHTML, generateInvoiceEmailText
 } from '../lib/email'
 import { supabase } from '../lib/supabase'
@@ -12,7 +15,10 @@ const STATUS_BADGE = { draft: 'gray', sent: 'blue', paid: 'green', overdue: 'red
 const PAYMENT_METHODS = ['pending', 'cash', 'card', 'bank_transfer']
 const PAYMENT_LABELS = { pending: '⏳ Pending', cash: '💵 Cash', card: '💳 Card', bank_transfer: '🏦 Bank Transfer' }
 
-function calcVAT(lines, scheme, flatRate, tier) {
+// vatRate is the invoice's stored rate (20 / 5 / 0). Old invoices
+// without one default to 20 via the column default + the param default.
+function calcVAT(lines, scheme, flatRate, tier, vatRate = 20) {
+  const rate = (vatRate != null && Number.isFinite(Number(vatRate)) ? Number(vatRate) : 20) / 100
   let vat = 0
   lines.forEach(l => {
     const lt = l.qty * l.unit
@@ -20,7 +26,7 @@ function calcVAT(lines, scheme, flatRate, tier) {
     if (l.lineType === 'used' && l.marginScheme && tier === 'gold') {
       vat += margin * 0.2
     } else if (scheme === 'standard') {
-      vat += lt * 0.2
+      vat += lt * rate
     } else if (scheme === 'flatrate') {
       vat += lt * (flatRate / 100)
     }
@@ -462,7 +468,7 @@ function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
     const attemptSend = async () => {
       try {
         const subtotal = invoice.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-        const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold')
+        const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold', invoice.vatRate)
         const totals = { subtotal, vat, total: subtotal + vat }
 
         // Generate email content first
@@ -682,7 +688,8 @@ export default function Invoices() {
   const [payingInv, setPayingInv] = useState(null) // For payment modal
   const [sendingInv, setSendingInv] = useState(null) // For email sending modal
   const [lines, setLines] = useState([])
-  const [form, setForm] = useState({ custId: '', custName: '', custEmail: '', reg: '', date: '', due: '', notes: '', paymentMethod: 'pending' })
+  const [form, setForm] = useState({ custId: '', custName: '', custEmail: '', reg: '', date: '', due: '', notes: '', paymentMethod: 'pending', vatRate: 20 })
+  const knownRegs = useKnownRegs() // customer vehicles + purchase regs, deduped
 
   // ============================================================
   // Unbilled purchases — offered when raising/editing an invoice
@@ -772,7 +779,7 @@ export default function Invoices() {
       return
     }
     const today = new Date().toISOString().split('T')[0]
-    setForm({ custId: '', custName: '', custEmail: '', reg: '', date: today, due: today, notes: '', paymentMethod: 'pending' })
+    setForm({ custId: '', custName: '', custEmail: '', reg: '', date: today, due: today, notes: '', paymentMethod: 'pending', vatRate: 20 })
     setLines([])
     setEditingInvoice(null)
     setShowModal(true)
@@ -788,7 +795,8 @@ export default function Invoices() {
       date: inv.date || '',
       due: inv.due || '',
       notes: inv.notes || '',
-      paymentMethod: inv.paymentMethod || 'pending'
+      paymentMethod: inv.paymentMethod || 'pending',
+      vatRate: inv.vatRate != null ? Number(inv.vatRate) : 20,
     })
     setLines(inv.lines.map((l, i) => ({
       ...l,
@@ -843,7 +851,7 @@ export default function Invoices() {
   }
 
   const sub = lines.reduce((a, l) => a + l.qty * l.unit, 0)
-  const vat = calcVAT(lines, settings.vatScheme, settings.flatRate, tier)
+  const vat = calcVAT(lines, settings.vatScheme, settings.flatRate, tier, form.vatRate)
   const total = sub + vat
 
   const saveInv = (status) => {
@@ -919,7 +927,7 @@ export default function Invoices() {
   // Legacy Gmail compose fallback
   const sendGmailFallback = (inv) => {
     const s = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-    const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier)
+    const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier, inv.vatRate)
     const body = `Dear ${inv.custName},\n\nInvoice ${inv.id} from ${settings.name}\nDate: ${inv.date} | Due: ${inv.due}\nReg: ${inv.reg || 'N/A'}\n\nItems:\n${inv.lines.map(l => `- ${l.desc} x${l.qty} @ £${l.unit.toFixed(2)} = £${(l.qty * l.unit).toFixed(2)}`).join('\n')}\n\nSubtotal: £${s.toFixed(2)}\nVAT: £${v.toFixed(2)}\nTOTAL: £${(s + v).toFixed(2)}\n\nThank you,\n${settings.name}\n${settings.phone}`
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inv.custEmail || '')}&su=${encodeURIComponent(`Invoice ${inv.id} from ${settings.name}`)}&body=${encodeURIComponent(body)}`, '_blank')
   }
@@ -969,12 +977,14 @@ export default function Invoices() {
                 <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text3)', padding: '24px' }}>No invoices found</td></tr>
               ) : filtered.map(inv => {
                 const s = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-                const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier)
+                const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier, inv.vatRate)
                 return (
                   <tr key={inv.id} style={{ cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>{inv.id}</td>
                     <td style={{ padding: '10px', fontWeight: 600 }}>{inv.custName}</td>
-                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{inv.reg || '—'}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>
+                      {inv.reg ? <RegLink reg={inv.reg} /> : '—'}
+                    </td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{inv.date}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{s.toFixed(2)}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>£{v.toFixed(2)}</td>
@@ -1042,8 +1052,13 @@ export default function Invoices() {
               />
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: '4px' }}>Vehicle Reg</label>
-                <input style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%', textTransform: 'uppercase' }}
-                  value={form.reg} onChange={e => setForm(f => ({ ...f, reg: e.target.value.toUpperCase() }))} placeholder="MK21 ABC" />
+                <RegCombobox
+                  value={form.reg}
+                  onChange={v => setForm(f => ({ ...f, reg: v }))}
+                  suggestions={knownRegs}
+                  placeholder="MK21 ABC"
+                  inputStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }}
+                />
               </div>
             </div>
 
@@ -1171,10 +1186,33 @@ export default function Invoices() {
               <Btn sm variant="secondary" onClick={addServiceLine}>+ Add line</Btn>
             </div>
 
+            {/* VAT rate selector — same quick-VAT pattern as Purchases */}
+            {settings.vatScheme === 'standard' && (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace' }}>VAT:</span>
+                {[[20, '20%'], [5, '5%'], [0, 'No VAT']].map(([r, lbl]) => (
+                  <button
+                    key={r}
+                    onClick={() => setForm(f => ({ ...f, vatRate: r }))}
+                    style={{
+                      background: form.vatRate === r ? 'var(--accent)' : 'var(--surface3)',
+                      color: form.vatRate === r ? '#fff' : 'var(--text2)',
+                      border: `1px solid ${form.vatRate === r ? 'var(--accent)' : 'var(--border)'}`,
+                      padding: '4px 10px', borderRadius: '6px',
+                      fontFamily: 'inherit', fontSize: '10px', cursor: 'pointer',
+                      fontWeight: form.vatRate === r ? 600 : 400,
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Totals */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
               <div style={{ width: '240px' }}>
-                {[['Subtotal', `£${sub.toFixed(2)}`], [`VAT (${settings.vatScheme === 'standard' ? '20%' : settings.vatScheme})`, `£${vat.toFixed(2)}`], ['Total', `£${total.toFixed(2)}`]].map(([l, v], i) => (
+                {[['Subtotal', `£${sub.toFixed(2)}`], [`VAT (${settings.vatScheme === 'standard' ? (form.vatRate === 0 ? 'none' : `${form.vatRate}%`) : settings.vatScheme})`, `£${vat.toFixed(2)}`], ['Total', `£${total.toFixed(2)}`]].map(([l, v], i) => (
                   <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: i === 2 ? '14px' : '12px', fontWeight: i === 2 ? 700 : 400, color: i === 0 || i === 1 ? 'var(--text2)' : 'var(--text)', borderTop: i === 2 ? '1px solid var(--border)' : 'none', marginTop: i === 2 ? '4px' : 0 }}>
                     <span>{l}</span><span style={{ fontFamily: 'DM Mono, monospace' }}>{v}</span>
                   </div>
@@ -1249,7 +1287,7 @@ export default function Invoices() {
             </table>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
               <div style={{ width: '220px' }}>
-                {(() => { const s = viewInv.lines.reduce((a, l) => a + l.qty * l.unit, 0); const v = calcVAT(viewInv.lines, viewInv.vatScheme, settings.flatRate, tier); return [['Subtotal', s], ['VAT', v], ['Total', s + v]].map(([l, val], i) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: i === 2 ? '14px' : '12px', fontWeight: i === 2 ? 700 : 400, color: i < 2 ? 'var(--text2)' : 'var(--text)', borderTop: i === 2 ? '1px solid var(--border)' : 'none' }}><span>{l}</span><span style={{ fontFamily: 'DM Mono, monospace' }}>£{val.toFixed(2)}</span></div>) })()}
+                {(() => { const s = viewInv.lines.reduce((a, l) => a + l.qty * l.unit, 0); const v = calcVAT(viewInv.lines, viewInv.vatScheme, settings.flatRate, tier, viewInv.vatRate); return [['Subtotal', s], ['VAT', v], ['Total', s + v]].map(([l, val], i) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: i === 2 ? '14px' : '12px', fontWeight: i === 2 ? 700 : 400, color: i < 2 ? 'var(--text2)' : 'var(--text)', borderTop: i === 2 ? '1px solid var(--border)' : 'none' }}><span>{l}</span><span style={{ fontFamily: 'DM Mono, monospace' }}>£{val.toFixed(2)}</span></div>) })()}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

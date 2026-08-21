@@ -6,6 +6,7 @@ import {
   usePurchases, PAYMENT_METHODS,
   uploadReceipt, removeReceiptObject, getReceiptSignedUrl,
 } from '../hooks/usePurchases'
+import RegLink from '../components/RegLink'
 
 // ============================================================
 // Purchases — full CRUD + receipts
@@ -292,6 +293,7 @@ export default function Purchases() {
         supplier: data.supplier, purchase_date: data.purchase_date,
         description: data.description, category: data.category,
         supplier_ref: data.supplier_ref || null, notes: data.notes || null,
+        mileage: (() => { const n = parseInt(data.mileage, 10); return Number.isFinite(n) && n >= 0 ? n : null })(),
         net, vat, gross: Math.round((net + vat) * 100) / 100,
         payment_status: data.payment_status,
         payment_method: data.payment_method || null,
@@ -477,7 +479,12 @@ function PurchaseRow({ p, onEdit, onDelete, onViewReceipt }) {
       {/* Reg / supplier */}
       <div style={{ minWidth: 0 }}>
         {p.vehicle_reg ? (
-          <div style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.vehicle_reg}</div>
+          <div style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <RegLink reg={p.vehicle_reg} />
+            {p.mileage != null && (
+              <span style={{ fontWeight: 400, fontSize: '10px', color: T.text3, marginLeft: '6px' }}>{Number(p.mileage).toLocaleString('en-GB')} mi</span>
+            )}
+          </div>
         ) : (
           <div style={{ fontWeight: 500, color: T.text3 }}>Workshop</div>
         )}
@@ -555,7 +562,12 @@ function MobilePurchaseCard({ p, onEdit, onDelete, onViewReceipt }) {
       {/* Reg + cost */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
         {p.vehicle_reg ? (
-          <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>{p.vehicle_reg}</span>
+          <span style={{ fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+            <RegLink reg={p.vehicle_reg} />
+            {p.mileage != null && (
+              <span style={{ fontWeight: 400, fontSize: '10px', color: T.text3, marginLeft: '6px' }}>{Number(p.mileage).toLocaleString('en-GB')} mi</span>
+            )}
+          </span>
         ) : (
           <span style={{ fontWeight: 500, color: T.text3 }}>Workshop</span>
         )}
@@ -657,6 +669,7 @@ function PurchaseForm({
     category: initial.category || 'parts',
     supplier_ref: initial.supplier_ref || '',
     notes: initial.notes || '',
+    mileage: initial.mileage ?? '',
     net: initial.net ?? '',
     vat: initial.vat ?? '',
     payment_status: initial.payment_status || 'paid',
@@ -909,11 +922,23 @@ function PurchaseForm({
           </div>
         </div>
 
-        {/* Description */}
-        <div style={{ marginBottom: '12px' }}>
-          <div style={fieldLbl}>What did you buy? *</div>
-          <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Front brake pads — Bosch" style={inputStyle} />
-          {fieldErrors.description && <div style={fieldErr}>{fieldErrors.description}</div>}
+        {/* Description + mileage */}
+        <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <div>
+            <div style={fieldLbl}>What did you buy? *</div>
+            <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Front brake pads — Bosch" style={inputStyle} />
+            {fieldErrors.description && <div style={fieldErr}>{fieldErrors.description}</div>}
+          </div>
+          <div>
+            <div style={fieldLbl}>Mileage</div>
+            <input
+              type="number" min="0" step="1"
+              value={form.mileage}
+              onChange={e => setForm(f => ({ ...f, mileage: e.target.value.replace(/[^\d]/g, '') }))}
+              placeholder="Optional"
+              style={inputStyle}
+            />
+          </div>
         </div>
 
         {/* Money */}
