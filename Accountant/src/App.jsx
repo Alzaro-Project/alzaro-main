@@ -353,6 +353,7 @@ function ClientBooks() {
   if (link.product === 'tyreops') return <TyreOpsBooks link={link} onBack={() => navigate('/clients')} />
   if (link.product === 'garageops') return <GarageOpsBooks link={link} onBack={() => navigate('/clients')} />
   if (link.product === 'serviceops') return <ServiceOpsBooks link={link} onBack={() => navigate('/clients')} />
+  if (link.product === 'propertyops') return <PropertyOpsBooks link={link} onBack={() => navigate('/clients')} />
 
   const perms = link.permissions || {}
   const TABS = [
@@ -2134,6 +2135,448 @@ function ServiceOpsBooks({ link, onBack }) {
               <button style={repBtn} onClick={exportInvoices}>Invoices (CSV)</button>
               <button style={repBtn} onClick={exportSummary}>Summary (CSV)</button>
             </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+// =============================================================================
+// PropertyOps books — read-only, USER-scoped (prop_* tables keyed by user_id;
+// the repo's own RLS SQL confirms user_id scoping and that it does NOT depend on
+// the x-product header). So query directly by link.client_id, like SoloOps.
+//
+// Finance is rent payments with a stored `amount` (and optional `paid_amount`).
+// The helpers below are byte-for-byte replicas of PropertyOps' src/lib/helpers.js
+// (paidOf / outstandingOf / effectiveStatus) so arrears and collected figures
+// match the client's Finance page, and propBuildReport mirrors that file's
+// buildReport so the Reports tab exports the same CSVs the client can.
+// Every query is SELECT-only and fails open.
+// =============================================================================
+const PROP_DOC_BUCKET = 'documents'
+
+const propPaidOf = (p) => {
+  const total = +(p?.amount) || 0
+  const raw = p?.paid_amount
+  const entered = !(raw === undefined || raw === null || raw === '') && +raw > 0
+  if (entered) return Math.max(0, +raw)
+  return String(p?.status || '').toLowerCase() === 'paid' ? total : 0
+}
+const propOutstandingOf = (p) => Math.max(0, (+(p?.amount) || 0) - propPaidOf(p))
+const propEffectiveStatus = (p) => {
+  const s = String(p?.status || '').toLowerCase()
+  const total = +(p?.amount) || 0
+  const paid = propPaidOf(p)
+  if (total > 0 && paid >= total) return 'Paid'
+  if (total <= 0 && s === 'paid') return 'Paid'
+  if (s === 'overdue') return 'Overdue'
+  const base = s === 'sent' ? 'Sent' : 'Pending'
+  if (p?.due_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const due = new Date(p.due_date); due.setHours(0, 0, 0, 0)
+    if (!isNaN(due) && due < today) return 'Overdue'
+  }
+  if (paid > 0 && total > paid) return 'Part paid'
+  return base
+}
+const propUkDate = (v) => {
+  if (!v) return '—'
+  const s = String(v)
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`
+  const d = new Date(s)
+  if (isNaN(d)) return s
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+}
+
+// Replica of PropertyOps helpers.js buildReport (£ with no decimals, same rows).
+function propBuildReport(name, d) {
+  const gbpc = (n) => '£' + (n || 0).toLocaleString('en-GB')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  switch (name) {
+    case 'Rent statement':
+    case 'Landlord statement':
+      return { cols: ['Tenant', 'Property', 'Amount', 'Due date', 'Status'], rows: d.pays.map((p) => [p.tenant, p.property, gbpc(p.amount), propUkDate(p.due_date), p.status]) }
+    case 'Arrears report':
+      return { cols: ['Tenant', 'Property', 'Amount', 'Due date'], rows: d.pays.filter((p) => propEffectiveStatus(p) === 'Overdue').map((p) => [p.tenant, p.property, gbpc(p.amount), propUkDate(p.due_date)]) }
+    case 'Profit & loss':
+    case 'Tax-year summary': {
+      const collected = d.pays.filter((p) => p.status === 'Paid').reduce((s, p) => s + (p.amount || 0), 0)
+      const due = d.pays.reduce((s, p) => s + (p.amount || 0), 0)
+      const maintCost = d.maint.reduce((s, m) => s + (+m.cost || 0), 0)
+      const net = collected - maintCost
+      return { cols: ['Line', 'Amount'], rows: [['Rent collected', gbpc(collected)], ['Rent due (all)', gbpc(due)], ['Outstanding', gbpc(due - collected)], ['Maintenance expenses', '-' + gbpc(maintCost)], ['Net (collected − expenses)', gbpc(net)], ['Properties', d.props.length]] }
+    }
+    case 'Compliance audit':
+      return { cols: ['Type', 'Property', 'Reference', 'Expiry date'], rows: d.comp.map((c) => [c.type, c.property || '—', c.reference || '—', propUkDate(c.expiry_date)]) }
+    case 'Expiring certificates':
+      return { cols: ['Type', 'Property', 'Expiry date', 'Days left'], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 90).sort((a, b) => a.dd - b.dd).map((c) => [c.type, c.property || '—', propUkDate(c.expiry_date), c.dd]) }
+    case 'Overdue & at-risk':
+      return { cols: ['Type', 'Property', 'Expiry date', 'Status'], rows: d.comp.map((c) => ({ ...c, dd: c.expiry_date ? Math.round((new Date(c.expiry_date) - today) / 864e5) : null })).filter((c) => c.dd !== null && c.dd <= 30).map((c) => [c.type, c.property || '—', propUkDate(c.expiry_date), c.dd < 0 ? 'Expired' : c.dd <= 7 ? 'Urgent' : 'Due soon']) }
+    case 'Occupancy report':
+      return { cols: ['Property', 'Area', 'Type', 'Status', 'Rent'], rows: d.props.map((p) => [p.address || p.addr, p.area || '—', p.type || '—', p.status, gbpc(p.rent)]) }
+    case 'Tenancy renewals':
+      return { cols: ['Tenant', 'Property', 'Tenancy ends'], rows: d.tenants.map((t) => [t.name, t.property || '—', propUkDate(t.tenancy_end)]) }
+    case 'Maintenance summary':
+      return { cols: ['Job', 'Property', 'Priority', 'Status', 'Contractor', 'Cost'], rows: d.maint.map((m) => [m.title, m.property || '—', m.priority, m.status, m.contractor || '—', gbpc(+m.cost || 0)]) }
+    case 'Spend by category': {
+      const byp = {}
+      d.maint.forEach((m) => { const k = m.property || 'Unassigned'; byp[k] = (byp[k] || 0) + (+m.cost || 0) })
+      const total = Object.values(byp).reduce((s, n) => s + n, 0)
+      const rows = Object.entries(byp).sort((a, b) => b[1] - a[1]).map(([k, n]) => [k, gbpc(n)])
+      rows.push(['Total', gbpc(total)])
+      return { cols: ['Property', 'Maintenance spend'], rows }
+    }
+    case 'Contractor performance': {
+      const byc = {}
+      d.maint.forEach((m) => { const c = m.contractor || 'Unassigned'; byc[c] = (byc[c] || 0) + 1 })
+      return { cols: ['Contractor', 'Jobs'], rows: Object.entries(byc).map(([c, n]) => [c, n]) }
+    }
+    default:
+      return null
+  }
+}
+
+const PROP_REPORT_GROUPS = [
+  ['Financial', ['Rent statement', 'Arrears report', 'Landlord statement', 'Profit & loss', 'Tax-year summary']],
+  ['Compliance', ['Compliance audit', 'Expiring certificates', 'Overdue & at-risk']],
+  ['Portfolio & tenancy', ['Occupancy report', 'Tenancy renewals']],
+  ['Operations', ['Maintenance summary', 'Spend by category', 'Contractor performance']],
+]
+
+function PropertyOpsBooks({ link, onBack }) {
+  const perms = link.permissions || {}
+  const cid = link.client_id
+  const [ready, setReady] = useState(false)
+  const [tab, setTab] = useState(null)
+  const [properties, setProperties] = useState([])
+  const [tenants, setTenants] = useState([])
+  const [payments, setPayments] = useState([])
+  const [maintenance, setMaintenance] = useState([])
+  const [compliance, setCompliance] = useState([])
+  const [documents, setDocuments] = useState([])
+  const [note, setNote] = useState('')
+  const [fileBusy, setFileBusy] = useState(null)
+
+  const TABS = [
+    ['dashboard', 'Overview'], ['properties', 'Properties'], ['tenants', 'Tenants'],
+    ['finance', 'Finance'], ['maintenance', 'Maintenance'], ['compliance', 'Compliance'],
+    ['documents', 'Documents'], ['reports', 'Reports'],
+  ].filter(([k]) => perms[k] === true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const p = perms
+      // Properties underpin labels across tabs + the dashboard count, so load
+      // them whenever any tab is shown.
+      let propMap = {}
+      try {
+        const { data } = await sb.from('prop_properties')
+          .select('id, address, area, type, status, rent').eq('user_id', cid).order('created_at', { ascending: false })
+        if (alive) setProperties(data || [])
+        ;(data || []).forEach(pr => { propMap[pr.id] = pr.address })
+      } catch { /* fail open */ }
+      const label = (row) => row.property || propMap[row.property_id] || ''
+
+      if (p.finance === true || p.dashboard === true || p.reports === true) {
+        try {
+          const { data } = await sb.from('prop_payments')
+            .select('id, tenant, property, property_id, amount, paid_amount, due_date, billing_date, invoice_no, status')
+            .eq('user_id', cid).order('due_date', { ascending: false })
+          if (alive) setPayments((data || []).map(r => ({ ...r, property: label(r) })))
+        } catch { /* fail open */ }
+      }
+      if (p.tenants === true || p.dashboard === true || p.reports === true) {
+        try {
+          const { data } = await sb.from('prop_tenants')
+            .select('id, name, property_id, email, phone, tenancy_start, tenancy_end, deposit_amount, deposit_protected, rent_status')
+            .eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setTenants((data || []).map(r => ({ ...r, property: label(r) })))
+        } catch { /* fail open */ }
+      }
+      if (p.maintenance === true || p.reports === true) {
+        try {
+          const { data } = await sb.from('prop_maintenance')
+            .select('id, title, property_id, priority, contractor, status, cost')
+            .eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setMaintenance((data || []).map(r => ({ ...r, property: label(r) })))
+        } catch { /* fail open */ }
+      }
+      if (p.compliance === true || p.reports === true) {
+        try {
+          const { data } = await sb.from('prop_compliance')
+            .select('id, type, property_id, reference, start_date, expiry_date')
+            .eq('user_id', cid).order('expiry_date', { ascending: true })
+          if (alive) setCompliance((data || []).map(r => ({ ...r, property: label(r) })))
+        } catch { /* fail open */ }
+      }
+      if (p.documents === true) {
+        try {
+          const { data } = await sb.from('prop_documents')
+            .select('id, name, category, file_path, size_kb, property_id')
+            .eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setDocuments((data || []).map(r => ({ ...r, property: label(r) })))
+        } catch { /* fail open */ }
+      }
+      if (alive) { setTab(TABS[0]?.[0] || null); setReady(true) }
+    })()
+    return () => { alive = false }
+  }, [link])
+
+  // ---- finance KPIs (byte-for-byte the client's Finance page) ----
+  const collected = payments.reduce((s, p) => s + propPaidOf(p), 0)
+  const overdue = payments.filter(p => propEffectiveStatus(p) === 'Overdue').reduce((s, p) => s + propOutstandingOf(p), 0)
+  const pending = payments.filter(p => ['Pending', 'Sent', 'Part paid'].includes(propEffectiveStatus(p))).reduce((s, p) => s + propOutstandingOf(p), 0)
+  const outstanding = overdue + pending
+
+  const th = { textAlign: 'left', fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, padding: '8px 10px', borderBottom: `1px solid ${C.border}` }
+  const td = { fontSize: '13px', padding: '9px 10px', borderBottom: `1px solid ${C.border}`, verticalAlign: 'top' }
+  const numTd = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const kpi = (label, val) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '16px 18px', minWidth: '160px', flex: '1 1 160px' }}>
+      <div style={{ fontSize: '11px', color: C.text3, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 800, marginTop: '6px' }}>{val}</div>
+    </div>
+  )
+  const tableCard = (minWidth, children) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '14px', overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth }}>{children}</table>
+    </div>
+  )
+  const empty = (cols, msg) => <tr><td style={td} colSpan={cols}><span style={{ color: C.text3 }}>{msg}</span></td></tr>
+  const payStatusColor = (s) => s === 'Paid' ? C.green : s === 'Overdue' ? C.red : C.text2
+
+  const viewDoc = async (doc) => {
+    setNote('')
+    setFileBusy(doc.id)
+    try {
+      if (!doc.file_path) { setNote('No file is attached to this document.'); return }
+      const { data: s, error } = await sb.storage.from(PROP_DOC_BUCKET).createSignedUrl(doc.file_path, 600)
+      if (error || !s?.signedUrl) { setNote('Could not open the file — it may have been removed.'); return }
+      window.open(s.signedUrl, '_blank', 'noopener')
+    } finally {
+      setFileBusy(null)
+    }
+  }
+
+  const reportData = { pays: payments, maint: maintenance, props: properties, comp: compliance, tenants }
+  const downloadReport = (name) => {
+    const rep = propBuildReport(name, reportData)
+    if (!rep) { setNote('That report isn’t available.'); return }
+    dlCsv(`${name.replace(/[^a-zA-Z0-9-]/g, '_')}.csv`, [rep.cols, ...rep.rows])
+  }
+  const repBtn = { background: C.accent, color: '#151515', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer' }
+
+  if (!ready) {
+    return <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text3 }}>Loading…</div>
+  }
+
+  return (
+    <div style={page}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.text2, fontSize: '13px', cursor: 'pointer', padding: 0 }}>← Clients</button>
+          <div style={{ fontWeight: 800, fontSize: '16px' }}>{link.client_name || 'Client'}</div>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.accent, border: `1px solid ${C.accent}44`, background: `${C.accent}1a`, borderRadius: '20px', padding: '2px 9px' }}>{PRODUCT_LABEL[link.product] || link.product}</span>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.text3, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '2px 9px' }}>View only</span>
+        </div>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '0 20px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {TABS.map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} style={{
+              background: tab === k ? `${C.accent}1a` : 'transparent',
+              color: tab === k ? C.accent : C.text3,
+              border: `1px solid ${tab === k ? C.accent + '55' : C.border}`,
+              borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+            }}>{label}</button>
+          ))}
+        </div>
+      </header>
+
+      <main style={{ maxWidth: '980px', margin: '0 auto', padding: '24px 20px' }}>
+        {TABS.length === 0 && (
+          <div style={{ color: C.text2, fontSize: '13.5px' }}>
+            No sections are shared with you yet — ask your client to tick some in their Settings.
+          </div>
+        )}
+
+        {note && <div style={{ color: C.text2, fontSize: '12.5px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '14px' }}>{note}</div>}
+
+        {tab === 'dashboard' && (
+          <div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '22px' }}>
+              {kpi('Properties', String(properties.length))}
+              {kpi('Tenants', String(tenants.length))}
+              {kpi('Collected', gbp(collected))}
+              {kpi('Outstanding', gbp(outstanding))}
+            </div>
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              Collected and outstanding match the client's Finance page (rent received vs owed). The Reports tab exports the full portfolio reports.
+            </div>
+          </div>
+        )}
+
+        {tab === 'properties' && tableCard('620px', (
+          <>
+            <thead><tr>
+              <th style={th}>Address</th><th style={th}>Area</th><th style={th}>Type</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Rent</th>
+            </tr></thead>
+            <tbody>
+              {properties.length === 0 && empty(5, 'No properties.')}
+              {properties.map(pr => (
+                <tr key={pr.id}>
+                  <td style={td}>{pr.address || '—'}</td>
+                  <td style={td}>{pr.area || '—'}</td>
+                  <td style={td}>{pr.type || '—'}</td>
+                  <td style={td}>{pr.status || '—'}</td>
+                  <td style={numTd}>{pr.rent != null ? gbp(pr.rent) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'tenants' && tableCard('760px', (
+          <>
+            <thead><tr>
+              <th style={th}>Name</th><th style={th}>Property</th><th style={th}>Email</th><th style={th}>Phone</th>
+              <th style={th}>Tenancy start</th><th style={th}>Tenancy end</th><th style={th}>Rent status</th>
+            </tr></thead>
+            <tbody>
+              {tenants.length === 0 && empty(7, 'No tenants.')}
+              {tenants.map(t => (
+                <tr key={t.id}>
+                  <td style={td}>{t.name || '—'}</td>
+                  <td style={td}>{t.property || '—'}</td>
+                  <td style={td}>{t.email || '—'}</td>
+                  <td style={td}>{t.phone || '—'}</td>
+                  <td style={td}>{t.tenancy_start ? fmtD(t.tenancy_start) : '—'}</td>
+                  <td style={td}>{t.tenancy_end ? fmtD(t.tenancy_end) : '—'}</td>
+                  <td style={td}>{t.rent_status || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'finance' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {kpi('Collected', gbp(collected))}
+              {kpi('Outstanding', gbp(outstanding))}
+              {kpi('Overdue', gbp(overdue))}
+            </div>
+            {tableCard('760px', (
+              <>
+                <thead><tr>
+                  <th style={th}>Tenant</th><th style={th}>Property</th><th style={th}>Due</th><th style={th}>Status</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Amount</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Outstanding</th>
+                </tr></thead>
+                <tbody>
+                  {payments.length === 0 && empty(7, 'No payments.')}
+                  {payments.map(p => {
+                    const es = propEffectiveStatus(p)
+                    return (
+                      <tr key={p.id}>
+                        <td style={td}>{p.tenant || '—'}</td>
+                        <td style={td}>{p.property || '—'}</td>
+                        <td style={td}>{p.due_date ? fmtD(p.due_date) : '—'}</td>
+                        <td style={td}><span style={{ fontSize: '10.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px', color: payStatusColor(es) }}>{es}</span></td>
+                        <td style={numTd}>{gbp(p.amount)}</td>
+                        <td style={{ ...numTd, color: C.text2 }}>{gbp(propPaidOf(p))}</td>
+                        <td style={{ ...numTd, fontWeight: 700, color: propOutstandingOf(p) ? C.text : C.text3 }}>{gbp(propOutstandingOf(p))}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </>
+            ))}
+          </div>
+        )}
+
+        {tab === 'maintenance' && tableCard('680px', (
+          <>
+            <thead><tr>
+              <th style={th}>Job</th><th style={th}>Property</th><th style={th}>Priority</th><th style={th}>Contractor</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Cost</th>
+            </tr></thead>
+            <tbody>
+              {maintenance.length === 0 && empty(6, 'No maintenance jobs.')}
+              {maintenance.map(m => (
+                <tr key={m.id}>
+                  <td style={td}>{m.title || '—'}</td>
+                  <td style={td}>{m.property || '—'}</td>
+                  <td style={td}>{m.priority || '—'}</td>
+                  <td style={td}>{m.contractor || '—'}</td>
+                  <td style={td}>{m.status || '—'}</td>
+                  <td style={numTd}>{m.cost != null ? gbp(m.cost) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'compliance' && tableCard('620px', (
+          <>
+            <thead><tr>
+              <th style={th}>Type</th><th style={th}>Property</th><th style={th}>Reference</th><th style={th}>Start</th><th style={th}>Expiry</th>
+            </tr></thead>
+            <tbody>
+              {compliance.length === 0 && empty(5, 'No certificates.')}
+              {compliance.map(c => (
+                <tr key={c.id}>
+                  <td style={td}>{c.type || '—'}</td>
+                  <td style={td}>{c.property || '—'}</td>
+                  <td style={td}>{c.reference || '—'}</td>
+                  <td style={td}>{c.start_date ? fmtD(c.start_date) : '—'}</td>
+                  <td style={td}>{c.expiry_date ? fmtD(c.expiry_date) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'documents' && tableCard('620px', (
+          <>
+            <thead><tr>
+              <th style={th}>Name</th><th style={th}>Category</th><th style={th}>Property</th>
+              <th style={{ ...th, textAlign: 'right' }}>Size</th><th style={{ ...th, textAlign: 'right' }}>File</th>
+            </tr></thead>
+            <tbody>
+              {documents.length === 0 && empty(5, 'No documents.')}
+              {documents.map(dc => (
+                <tr key={dc.id}>
+                  <td style={td}>{dc.name || '—'}</td>
+                  <td style={td}>{dc.category || '—'}</td>
+                  <td style={td}>{dc.property || '—'}</td>
+                  <td style={numTd}>{dc.size_kb != null ? `${dc.size_kb} KB` : '—'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    {dc.file_path
+                      ? <button onClick={() => viewDoc(dc)} disabled={fileBusy === dc.id}
+                          style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.accent}55`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: fileBusy === dc.id ? .6 : 1 }}>
+                          {fileBusy === dc.id ? 'Opening…' : 'View'}
+                        </button>
+                      : <span style={{ color: C.text3, fontSize: '12px' }}>—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'reports' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              CSV downloads — the same portfolio reports your client can export, computed over all current records.
+            </div>
+            {PROP_REPORT_GROUPS.map(([cat, names]) => (
+              <div key={cat}>
+                <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, marginBottom: '8px' }}>{cat}</div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {names.map(n => <button key={n} style={repBtn} onClick={() => downloadReport(n)}>{n}</button>)}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>
