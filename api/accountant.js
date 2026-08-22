@@ -45,6 +45,39 @@ const PRODUCTS = {
       { table: 'soloops_access', column: 'business_name' },
     ],
   },
+  tyreops: {
+    label: 'Alzaro TyreOps',
+    // reporting key for TyreOps is 'vat' (VAT Report), not 'reports'
+    permKeys: ['dashboard', 'invoices', 'inventory', 'purchases', 'customers', 'followups', 'vat'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.tyreops' },
+      { table: 'product_settings', column: 'business_name' },
+    ],
+  },
+  garageops: {
+    label: 'Alzaro GarageOps',
+    permKeys: ['dashboard', 'invoices', 'customers', 'items', 'database', 'purchases', 'calendar', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.garageops' },
+      { table: 'product_settings', column: 'business_name' },
+    ],
+  },
+  serviceops: {
+    label: 'Alzaro ServiceOps',
+    permKeys: ['dashboard', 'invoicing', 'quotes', 'customers', 'diary', 'certificates', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.serviceops' },
+      { table: 'svc_settings', column: 'company_name' },
+    ],
+  },
+  propertyops: {
+    label: 'Alzaro PropertyOps',
+    permKeys: ['dashboard', 'properties', 'tenants', 'finance', 'maintenance', 'compliance', 'documents', 'reports'],
+    nameSources: [
+      { table: 'product_members', column: 'company_name', extra: '&product=eq.propertyops' },
+      { table: 'prop_settings', column: 'company_name' },
+    ],
+  },
 }
 
 function safeJson(s) { try { return JSON.parse(s) } catch { return {} } }
