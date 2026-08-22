@@ -33,9 +33,9 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 // Per-product wiring. permKeys must match the keys the vertical's Settings
 // panel offers AND the arrays used in that vertical's accountant RLS policies
 // (015 for soloops; later migrations for the rest).
-// All five verticals are wired here. Each product's accountant RLS grants live
-// in migrations/015_accountant_links.sql (all-tiers, all-verticals build) —
-// keep permKeys in lockstep with that file and with the vertical's Settings UI.
+// Stage 1 ships SoloOps; the others activate as their RLS stages land — an
+// entry here without its migration would create links that grant nothing,
+// so keep this list in lockstep with the migrations.
 const PRODUCTS = {
   soloops: {
     label: 'Alzaro SoloOps',
@@ -43,39 +43,6 @@ const PRODUCTS = {
     nameSources: [
       { table: 'soloops_settings', column: 'business_name' },
       { table: 'soloops_access', column: 'business_name' },
-    ],
-  },
-  tyreops: {
-    label: 'Alzaro TyreOps',
-    // reporting key for TyreOps is 'vat' (VAT Report), not 'reports'
-    permKeys: ['dashboard', 'invoices', 'inventory', 'purchases', 'customers', 'followups', 'vat'],
-    nameSources: [
-      { table: 'product_members', column: 'company_name', extra: '&product=eq.tyreops' },
-      { table: 'product_settings', column: 'business_name' },
-    ],
-  },
-  garageops: {
-    label: 'Alzaro GarageOps',
-    permKeys: ['dashboard', 'invoices', 'customers', 'items', 'database', 'purchases', 'calendar', 'reports'],
-    nameSources: [
-      { table: 'product_members', column: 'company_name', extra: '&product=eq.garageops' },
-      { table: 'product_settings', column: 'business_name' },
-    ],
-  },
-  serviceops: {
-    label: 'Alzaro ServiceOps',
-    permKeys: ['dashboard', 'invoicing', 'quotes', 'customers', 'diary', 'certificates', 'reports'],
-    nameSources: [
-      { table: 'product_members', column: 'company_name', extra: '&product=eq.serviceops' },
-      { table: 'svc_settings', column: 'company_name' },
-    ],
-  },
-  propertyops: {
-    label: 'Alzaro PropertyOps',
-    permKeys: ['dashboard', 'properties', 'tenants', 'finance', 'maintenance', 'compliance', 'documents', 'reports'],
-    nameSources: [
-      { table: 'product_members', column: 'company_name', extra: '&product=eq.propertyops' },
-      { table: 'prop_settings', column: 'company_name' },
     ],
   },
 }
@@ -220,11 +187,35 @@ export default async function handler(req, res) {
   let status = 'active'
   let createdViaInvite = false
   let notifyExisting = false
+  let recoveryLink = null
   if (acctUser) {
     // Email already has an Alzaro login: no Supabase invite goes out, so
     // without this the accountant gets access silently and may never know.
     // Send a courtesy notification AFTER the link row commits (below).
+    // We ALSO mint a recovery link now, so the email can offer a
+    // "set / reset password" button — an existing user who doesn't remember
+    // their password (common for accountants who were once a trial customer)
+    // otherwise hits "Invalid login credentials" with no way forward.
     notifyExisting = true
+    try {
+      const redirectTo = 'https://alzaro.co.uk/accountant/reset-password'
+      const r = await serviceFetch(
+        `/auth/v1/admin/generate_link`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'recovery', email, redirect_to: redirectTo }),
+        }
+      )
+      const j = await r.json().catch(() => null)
+      // Raw REST puts action_link on the object; the SDK nests under .properties.
+      recoveryLink = j?.action_link || j?.properties?.action_link || null
+      if (!r.ok || !recoveryLink) {
+        console.error('accountant: recovery link failed', r.status, j)
+        // Non-fatal: fall back to the plain portal link below.
+      }
+    } catch (e) {
+      console.error('accountant: recovery link threw', e)
+    }
   }
   if (!acctUser) {
     // Brand-new accountant: create + email an invite that lands on the
@@ -296,7 +287,7 @@ export default async function handler(req, res) {
     // the platform's purchase/trial emails: a mail hiccup must never fail the
     // link that's already committed.
     if (notifyExisting) {
-      try { await sendAccessNotification(email, bizName, P.label) }
+      try { await sendAccessNotification(email, bizName, P.label, recoveryLink) }
       catch (e) { console.error('accountant: notify email failed (link still created)', e) }
     }
     return res.status(200).json({ ok: true, link: rows[0], existing_user: !createdViaInvite })
@@ -309,23 +300,31 @@ export default async function handler(req, res) {
 // Tells an ALREADY-REGISTERED accountant they've been granted access (brand-new
 // accountants get Supabase's invite email instead, so they're covered).
 // Resend, from the platform address — same channel as purchase confirmations.
-async function sendAccessNotification(to, bizName, productLabel) {
+async function sendAccessNotification(to, bizName, productLabel, recoveryLink) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) { console.error('accountant notify: RESEND_API_KEY not set; skipping'); return }
   const who = bizName || 'One of your clients'
   const subject = `${who} has given you access to their books on Alzaro`
-  const url = 'https://alzaro.co.uk/accountant'
+  const portalUrl = 'https://alzaro.co.uk/accountant'
+  // Prefer the recovery link (sets OR resets the password, then lands on the
+  // portal). Fall back to the plain sign-in page only if link minting failed.
+  const primaryUrl = recoveryLink || portalUrl
+  const primaryLabel = recoveryLink ? 'Set up your portal login' : 'Open the accountant portal'
+  const passwordNote = recoveryLink
+    ? `The button sets your portal password (or resets it if you already have one), then takes you straight in.`
+    : `Sign in with your existing Alzaro login.`
   const text =
     `${who} has given you view-only access to their ${productLabel} books.\n\n` +
-    `Sign in with your existing Alzaro login at ${url}\n\n` +
+    `${primaryLabel}: ${primaryUrl}\n\n` +
+    `${passwordNote}\n\n` +
     `You can look through their income, expenses and reports, but nothing can be changed from the accountant portal.\n\n` +
     `— Alzaro`
   const html =
     `<div style="font-family:sans-serif;max-width:520px">` +
     `<h2 style="margin:0 0 12px">${who} has shared their books with you</h2>` +
     `<p>You now have <b>view-only</b> access to their ${productLabel} records on Alzaro.</p>` +
-    `<p><a href="${url}" style="display:inline-block;background:#f59e0b;color:#151515;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px">Open the accountant portal</a></p>` +
-    `<p style="color:#666;font-size:13px">Sign in with your existing Alzaro login. You can view income, expenses and reports — nothing can be changed from the portal.</p>` +
+    `<p><a href="${primaryUrl}" style="display:inline-block;background:#f59e0b;color:#151515;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px">${primaryLabel}</a></p>` +
+    `<p style="color:#666;font-size:13px">${passwordNote} You can view income, expenses and reports — nothing can be changed from the portal.</p>` +
     `</div>`
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
