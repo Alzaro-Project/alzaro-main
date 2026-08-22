@@ -12,3 +12,31 @@ export const db = supabase
 export const DB_READY = Boolean(
   import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
 )
+
+// ============================================================
+// ACCOUNTANT LINK  (view-only access for the client's accountant)
+// ============================================================
+// Creation goes through /api/accountant (service role: membership check +
+// invite email). These helpers run under RLS: the client can see, retune the
+// visibility of, and revoke their own link — nothing else. Mirror of the
+// SoloOps/TyreOps/GarageOps helpers, product-scoped to 'serviceops'.
+export async function getAccountantLink() {
+  try {
+    const { data, error } = await db
+      .from("accountant_links")
+      .select("id, accountant_email, permissions, status, created_at")
+      .eq("product", "serviceops")
+      .limit(1)
+      .maybeSingle()
+    if (error) return null   // fails open pre-migration, same as staff
+    return data || null
+  } catch (e) {
+    return null
+  }
+}
+export async function updateAccountantPermissions(id, permissions) {
+  return db.from("accountant_links").update({ permissions }).eq("id", id)
+}
+export async function revokeAccountant(id) {
+  return db.from("accountant_links").delete().eq("id", id)
+}

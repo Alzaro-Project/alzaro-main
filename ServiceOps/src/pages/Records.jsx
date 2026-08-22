@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { db, DB_READY } from '../lib/db.js'
+import { db, DB_READY, getAccountantLink, updateAccountantPermissions, revokeAccountant } from '../lib/db.js'
 import { STAFF_PERMS, listStaff, updateStaffPermissions, removeStaff } from '../lib/staff.js'
 import { REPORTS, gbp, toneVar, inp, fld, formCard, demoBanner, errBanner, emptyCard } from '../lib/helpers.js'
 import { PageHead, Btn, Metric, Panel, DashCard, TiltPanel, Pill, rowActions, useConfirm, useCustomers, useProperties, CustomerPropertyPicker, useIsMobile } from '../components/UI.jsx'
@@ -799,6 +799,7 @@ function SettingsPage({ user }) {
     { key: "vat", label: "VAT", icon: "ti-receipt" },
     { key: "subscription", label: "Subscription", icon: "ti-credit-card" },
     { key: "users", label: "Users", icon: "ti-users" },
+    { key: "accountant", label: "Accountant", icon: "ti-book" },
   ];
 
   const SMTP_PRESETS = {
@@ -1132,6 +1133,8 @@ function SettingsPage({ user }) {
 
       {tab === "users" && <UsersTab user={user} />}
 
+      {tab === "accountant" && <AccountantTab user={user} />}
+
       {tab === "subscription" && (
         <div>
           <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Subscription &amp; plans</div>
@@ -1444,6 +1447,170 @@ function StaffPassword({ row, flash, onChanged, inp }) {
           <span style={{ fontSize: 11.5, color: "var(--txt-3)" }}>They joined with an Alzaro login they already had, so only they can change its password.</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ==========================================================================
+   ACCOUNTANT TAB — view-only books access for the client's accountant.
+   Mirrors the SoloOps/TyreOps/GarageOps AccountantTab in ServiceOps' own
+   theming. Any trial/active tier can invite — no seat gate (this differs from
+   the Users tab). Keys match api/accountant.js PRODUCTS.serviceops and the
+   accountant RLS in migration 015.
+   ========================================================================== */
+// key, label, blurb — the seven visibility toggles an accountant can be granted.
+const ACCT_PERMS = [
+  ["dashboard",    "Dashboard",    "Business totals"],
+  ["invoicing",    "Invoicing",    "Invoices and payments"],
+  ["quotes",       "Quotes",       "Quotes"],
+  ["customers",    "Customers",    "Customers and their properties"],
+  ["diary",        "Diary",        "Bookings and the diary"],
+  ["certificates", "Certificates", "Certificates and documents"],
+  ["reports",      "Reports",      "Financial reports"],
+];
+
+function AccountantTab({ user }) {
+  const inp = { width: "100%", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 11px", color: "var(--txt)", fontSize: 13, outline: "none", boxSizing: "border-box" };
+  const cardSt = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "16px 18px" };
+  const chip = { fontSize: 11.5, fontWeight: 700, color: "var(--brand)", background: "var(--brand-soft, rgba(79,70,229,0.1))", border: "1px solid var(--brand)", borderRadius: 999, padding: "3px 10px" };
+
+  const [status, setStatus] = useState(null);  // membership status | null while loading
+  const [link, setLink] = useState(undefined); // undefined=loading, null=none
+  const [email, setEmail] = useState("");
+  // Default: everything visible — they were invited to see the books.
+  const [perms, setPerms] = useState({ dashboard: true, invoicing: true, quotes: true, customers: true, diary: true, certificates: true, reports: true });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const flash = (m) => { setNotice(m); setTimeout(() => setNotice(""), 4000); };
+  const reload = async () => { setLink(await getAccountantLink()); };
+  useEffect(() => {
+    db.from("product_members").select("status").eq("user_id", user.id).eq("product", "serviceops").maybeSingle()
+      .then(({ data }) => setStatus((data?.status || "").toLowerCase()))
+      .catch(() => setStatus(""));
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const eligible = ["trial", "active"].includes(status || "");
+
+  const invite = async () => {
+    setErr("");
+    if (!email.trim()) { setErr("Enter their email address."); return; }
+    setBusy(true);
+    try {
+      const { data: sess } = await db.auth.getSession();
+      const r = await fetch("/api/accountant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ product: "serviceops", email: email.trim(), permissions: perms }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(j.error || "Could not send the invite"); return; }
+      flash(j.existing_user
+        ? "Accountant linked — they can sign in to the portal with their existing login"
+        : "Invite sent — they’ll get an email to set up their portal login");
+      setEmail("");
+      await reload();
+    } catch (e) {
+      setErr("Network error — try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePerm = async (k) => {
+    if (!link) { setPerms((p) => ({ ...p, [k]: !p[k] })); return; }
+    const next = { ...link.permissions, [k]: !(link.permissions?.[k] === true) };
+    const { error } = await updateAccountantPermissions(link.id, next);
+    if (error) { flash("Could not update visibility"); return; }
+    setLink({ ...link, permissions: next });
+  };
+
+  const revoke = async () => {
+    if (!window.confirm(`Remove ${link.accountant_email}’s access? They’ll no longer be able to see any of your books. You can invite them (or someone else) again any time.`)) return;
+    const { error } = await revokeAccountant(link.id);
+    if (error) { flash("Could not remove access"); return; }
+    flash("Accountant access removed");
+    await reload();
+  };
+
+  if (status === null || link === undefined) return <div style={{ color: "var(--txt-3)", fontSize: 13 }}>Loading…</div>;
+
+  return (
+    <div style={{ display: "grid", gap: 14, maxWidth: 760 }}>
+      {notice && <div style={{ background: "var(--brand-soft, rgba(79,70,229,0.1))", border: "1px solid var(--brand)", color: "var(--txt)", borderRadius: 8, padding: "9px 13px", fontSize: 12.5 }}>{notice}</div>}
+      <div style={cardSt}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>My accountant</div>
+        <div style={{ color: "var(--txt-2)", fontSize: 12.5, marginBottom: 14, lineHeight: 1.55 }}>
+          Give your accountant a <b>view-only</b> window on your books. They sign in to a separate
+          accountant portal and can look but never change anything. You choose what they see below,
+          and you can adjust or remove their access at any time.
+        </div>
+
+        {!eligible && (
+          <div style={{ fontSize: 12.5, color: "var(--txt-2)", background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "14px 16px" }}>
+            Your subscription needs to be active to link an accountant.
+          </div>
+        )}
+
+        {eligible && !link && (
+          <div style={{ display: "grid", gap: 11 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--txt-2)", marginBottom: 5 }}>Accountant’s email</div>
+              <input style={inp} type="email" placeholder="accountant@example.co.uk" value={email}
+                     onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") invite(); }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--txt-2)", marginBottom: 5 }}>What they can see</div>
+              <div style={{ display: "grid", gap: 7 }}>
+                {ACCT_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
+                    <input type="checkbox" checked={perms[k] === true} onChange={() => togglePerm(k)} style={{ marginTop: 2 }} />
+                    <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {err && <div style={{ color: "var(--red, #ef4444)", fontSize: 12.5 }}>{err}</div>}
+            <UBtn onClick={invite} disabled={busy}>{busy ? "Sending…" : "Invite accountant"}</UBtn>
+          </div>
+        )}
+
+        {eligible && link && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, wordBreak: "break-all" }}>{link.accountant_email}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase",
+                color: link.status === "active" ? "var(--green)" : "var(--brand)",
+                background: link.status === "active" ? "var(--green-soft, rgba(34,197,94,0.12))" : "var(--brand-soft, rgba(79,70,229,0.1))",
+                border: `1px solid ${link.status === "active" ? "var(--green)" : "var(--brand)"}`,
+                borderRadius: 20, padding: "2px 9px" }}>
+                {link.status === "active" ? "Active" : "Invited"}
+              </span>
+              <span style={{ ...chip, color: "var(--txt-3)", background: "transparent", border: "0.5px solid var(--line)" }}>View only</span>
+            </div>
+            {link.status !== "active" && (
+              <div style={{ fontSize: 12, color: "var(--txt-3)", marginBottom: 10 }}>
+                They’ve been emailed a link to set up their portal login.
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, color: "var(--txt-3)", margin: "14px 0 8px" }}>What they can see — changes apply immediately</div>
+            <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
+              {ACCT_PERMS.map(([k, label, blurb]) => (
+                <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
+                  <input type="checkbox" checked={link.permissions?.[k] === true} onChange={() => togglePerm(k)} style={{ marginTop: 2 }} />
+                  <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
+                </label>
+              ))}
+            </div>
+
+            <UBtn ghost danger onClick={revoke}>Remove access</UBtn>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
