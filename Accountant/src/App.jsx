@@ -352,6 +352,7 @@ function ClientBooks() {
   // component.
   if (link.product === 'tyreops') return <TyreOpsBooks link={link} onBack={() => navigate('/clients')} />
   if (link.product === 'garageops') return <GarageOpsBooks link={link} onBack={() => navigate('/clients')} />
+  if (link.product === 'serviceops') return <ServiceOpsBooks link={link} onBack={() => navigate('/clients')} />
 
   const perms = link.permissions || {}
   const TABS = [
@@ -1707,6 +1708,431 @@ function GarageOpsBooks({ link, onBack }) {
               <button style={repBtn} onClick={exportProfit}>Profit &amp; loss</button>
               <button style={repBtn} onClick={exportVat}>VAT summary</button>
               <button style={repBtn} onClick={exportCustomers}>Customer report</button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+// =============================================================================
+// ServiceOps books — read-only, USER-scoped (svc_* tables keyed by user_id, so
+// query directly by link.client_id, same as SoloOps — no account_id hop).
+//
+// Money is a single stored `amount` per invoice/quote (VAT-inclusive gross);
+// there are no line items or VAT schemes here. The Invoicing KPIs replicate
+// ServiceOps' InvoicingPage exactly: Collected (Paid), Outstanding (Sent +
+// Overdue), Overdue, and VAT-included estimate = round(collected − collected/1.2).
+// ServiceOps' own Reports page shows sample/preview data only, so the portal's
+// Reports tab instead surfaces the REAL invoice figures over a period + CSV.
+// Every query is SELECT-only and fails open.
+// =============================================================================
+const SVC_DOC_BUCKET = 'svc-documents'
+
+function svcDateRange(preset, customFrom, customTo) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  switch (preset) {
+    case 'month': return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today }
+    case 'quarter': { const qm = Math.floor(today.getMonth() / 3) * 3; return { from: new Date(today.getFullYear(), qm, 1), to: today } }
+    case 'year': return { from: new Date(today.getFullYear(), 0, 1), to: today }
+    case 'custom': return { from: customFrom ? new Date(customFrom) : null, to: customTo ? new Date(customTo) : null }
+    default: return { from: null, to: null } // 'all'
+  }
+}
+
+// Collected / Outstanding / Overdue / VAT — byte-for-byte ServiceOps'
+// InvoicingPage computation over a set of invoices (amount is VAT-inclusive).
+function svcInvoiceStats(list) {
+  const collected = list.filter(v => v.status === 'Paid').reduce((s, v) => s + (Number(v.amount) || 0), 0)
+  const overdue = list.filter(v => v.status === 'Overdue').reduce((s, v) => s + (Number(v.amount) || 0), 0)
+  const sent = list.filter(v => v.status === 'Sent').reduce((s, v) => s + (Number(v.amount) || 0), 0)
+  const outstanding = sent + overdue
+  const vat = Math.round(collected - collected / 1.2)
+  return { collected, overdue, sent, outstanding, vat }
+}
+
+function ServiceOpsBooks({ link, onBack }) {
+  const perms = link.permissions || {}
+  const cid = link.client_id
+  const [ready, setReady] = useState(false)
+  const [tab, setTab] = useState(null)
+  const [invoices, setInvoices] = useState([])
+  const [quotes, setQuotes] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [properties, setProperties] = useState([])
+  const [bookings, setBookings] = useState([])
+  const [certs, setCerts] = useState([])
+  const [note, setNote] = useState('')
+  const [fileBusy, setFileBusy] = useState(null)
+
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
+  const TABS = [
+    ['dashboard', 'Overview'], ['invoicing', 'Invoicing'], ['quotes', 'Quotes'],
+    ['customers', 'Customers'], ['diary', 'Diary'], ['certificates', 'Certificates'], ['reports', 'Reports'],
+  ].filter(([k]) => perms[k] === true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const p = perms
+      const needInvoices = p.invoicing === true || p.dashboard === true || p.reports === true
+      if (needInvoices) {
+        try {
+          const { data } = await sb.from('svc_invoices')
+            .select('id, ref, customer, site, amount, status, due_date, created_at')
+            .eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setInvoices(data || [])
+        } catch { /* fail open */ }
+      }
+      if (p.quotes === true) {
+        try {
+          const { data } = await sb.from('svc_quotes')
+            .select('id, ref, customer, site, amount, status, quote_date')
+            .eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setQuotes(data || [])
+        } catch { /* fail open */ }
+      }
+      if (p.customers === true) {
+        try {
+          const { data: c } = await sb.from('svc_customers')
+            .select('id, name, type, contact, email, area').eq('user_id', cid).order('name')
+          if (alive) setCustomers(c || [])
+        } catch { /* fail open */ }
+        try {
+          const { data: pr } = await sb.from('svc_properties')
+            .select('id, customer, address, postcode, prop_type').eq('user_id', cid).order('created_at', { ascending: false })
+          if (alive) setProperties(pr || [])
+        } catch { /* fail open */ }
+      }
+      if (p.diary === true) {
+        try {
+          const { data } = await sb.from('svc_bookings')
+            .select('id, title, customer, site, engineer, priority, booking_date, booking_time, status')
+            .eq('user_id', cid).order('booking_date', { ascending: false })
+          if (alive) setBookings(data || [])
+        } catch { /* fail open */ }
+      }
+      if (p.certificates === true) {
+        try {
+          const { data } = await sb.from('svc_certificates')
+            .select('id, cert_type, customer, site, ref, issue_date, expiry_date, file_path, file_name')
+            .eq('user_id', cid).order('expiry_date', { ascending: true })
+          if (alive) setCerts(data || [])
+        } catch { /* fail open */ }
+      }
+      if (alive) { setTab(TABS[0]?.[0] || null); setReady(true) }
+    })()
+    return () => { alive = false }
+  }, [link])
+
+  const stats = svcInvoiceStats(invoices)
+
+  // Reports period filter (by invoice created_at date)
+  const { from: dFrom, to: dTo } = svcDateRange(datePreset, customFrom, customTo)
+  const inRange = (v) => {
+    if (!dFrom && !dTo) return true
+    const d = new Date(v.created_at || v.due_date)
+    if (isNaN(d)) return false
+    if (dFrom && d < dFrom) return false
+    if (dTo) { const end = new Date(dTo); end.setHours(23, 59, 59, 999); if (d > end) return false }
+    return true
+  }
+  const repInvoices = invoices.filter(inRange)
+  const repStats = svcInvoiceStats(repInvoices)
+  const rangeLabel = datePreset === 'all' ? 'All time'
+    : datePreset === 'custom' ? (customFrom && customTo ? `${customFrom}–${customTo}` : 'custom range')
+    : datePreset.charAt(0).toUpperCase() + datePreset.slice(1)
+
+  const th = { textAlign: 'left', fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, padding: '8px 10px', borderBottom: `1px solid ${C.border}` }
+  const td = { fontSize: '13px', padding: '9px 10px', borderBottom: `1px solid ${C.border}`, verticalAlign: 'top' }
+  const numTd = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const kpi = (label, val) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '16px 18px', minWidth: '160px', flex: '1 1 160px' }}>
+      <div style={{ fontSize: '11px', color: C.text3, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 800, marginTop: '6px' }}>{val}</div>
+    </div>
+  )
+  const tableCard = (minWidth, children) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '14px', overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth }}>{children}</table>
+    </div>
+  )
+  const empty = (cols, msg) => <tr><td style={td} colSpan={cols}><span style={{ color: C.text3 }}>{msg}</span></td></tr>
+  const statusColor = (s) => s === 'Paid' ? C.green : s === 'Overdue' ? C.red : C.text2
+
+  const viewCert = async (c) => {
+    setNote('')
+    setFileBusy(c.id)
+    try {
+      if (!c.file_path) { setNote('No file was attached to this certificate.'); return }
+      const { data: s, error } = await sb.storage.from(SVC_DOC_BUCKET).createSignedUrl(c.file_path, 600)
+      if (error || !s?.signedUrl) { setNote('Could not open the file — it may have been removed.'); return }
+      window.open(s.signedUrl, '_blank', 'noopener')
+    } finally {
+      setFileBusy(null)
+    }
+  }
+
+  const repBtn = { background: C.accent, color: '#151515', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer' }
+  const exportInvoices = () => {
+    const rows = [['Reference', 'Customer', 'Site', 'Status', 'Due', 'Amount'],
+      ...repInvoices.map(v => [v.ref || '', v.customer || '', v.site || '', v.status || '', v.due_date || '', (Number(v.amount) || 0).toFixed(2)])]
+    dlCsv(`invoices-${rangeLabel.replace(/[^a-zA-Z0-9-]/g, '_')}.csv`, rows)
+  }
+  const exportSummary = () => {
+    const rows = [
+      ['Invoice summary'], ['Client', link.client_name || ''], ['Period', rangeLabel], [],
+      ['Metric', 'Amount'],
+      ['Collected (paid)', repStats.collected.toFixed(2)],
+      ['Outstanding (sent + overdue)', repStats.outstanding.toFixed(2)],
+      ['Overdue', repStats.overdue.toFixed(2)],
+      ['VAT included in collected (est. @20%)', repStats.vat.toFixed(2)],
+    ]
+    dlCsv(`invoice-summary-${rangeLabel.replace(/[^a-zA-Z0-9-]/g, '_')}.csv`, rows)
+  }
+
+  if (!ready) {
+    return <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text3 }}>Loading…</div>
+  }
+
+  return (
+    <div style={page}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.text2, fontSize: '13px', cursor: 'pointer', padding: 0 }}>← Clients</button>
+          <div style={{ fontWeight: 800, fontSize: '16px' }}>{link.client_name || 'Client'}</div>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.accent, border: `1px solid ${C.accent}44`, background: `${C.accent}1a`, borderRadius: '20px', padding: '2px 9px' }}>{PRODUCT_LABEL[link.product] || link.product}</span>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.text3, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '2px 9px' }}>View only</span>
+        </div>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '0 20px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {TABS.map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} style={{
+              background: tab === k ? `${C.accent}1a` : 'transparent',
+              color: tab === k ? C.accent : C.text3,
+              border: `1px solid ${tab === k ? C.accent + '55' : C.border}`,
+              borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+            }}>{label}</button>
+          ))}
+        </div>
+      </header>
+
+      <main style={{ maxWidth: '980px', margin: '0 auto', padding: '24px 20px' }}>
+        {TABS.length === 0 && (
+          <div style={{ color: C.text2, fontSize: '13.5px' }}>
+            No sections are shared with you yet — ask your client to tick some in their Settings.
+          </div>
+        )}
+
+        {note && <div style={{ color: C.text2, fontSize: '12.5px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '14px' }}>{note}</div>}
+
+        {tab === 'dashboard' && (
+          <div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '22px' }}>
+              {kpi('Collected', gbp(stats.collected))}
+              {kpi('Outstanding', gbp(stats.outstanding))}
+              {kpi('Overdue', gbp(stats.overdue))}
+              {kpi('VAT (est.)', gbp(stats.vat))}
+            </div>
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              Figures match the client's Invoicing page. Amounts are VAT-inclusive; the VAT estimate assumes 20% included. The Reports tab lets you filter by period and export.
+            </div>
+          </div>
+        )}
+
+        {tab === 'invoicing' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {kpi('Collected', gbp(stats.collected))}
+              {kpi('Outstanding', gbp(stats.outstanding))}
+              {kpi('Overdue', gbp(stats.overdue))}
+              {kpi('VAT (est.)', gbp(stats.vat))}
+            </div>
+            {tableCard('640px', (
+              <>
+                <thead><tr>
+                  <th style={th}>Reference</th><th style={th}>Customer</th><th style={th}>Site</th>
+                  <th style={th}>Status</th><th style={th}>Due</th><th style={{ ...th, textAlign: 'right' }}>Amount</th>
+                </tr></thead>
+                <tbody>
+                  {invoices.length === 0 && empty(6, 'No invoices.')}
+                  {invoices.map(v => (
+                    <tr key={v.id}>
+                      <td style={td}>{v.ref || '—'}</td>
+                      <td style={td}>{v.customer || '—'}</td>
+                      <td style={td}>{v.site || '—'}</td>
+                      <td style={td}><span style={{ fontSize: '10.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px', color: statusColor(v.status) }}>{v.status || '—'}</span></td>
+                      <td style={td}>{v.due_date ? fmtD(v.due_date) : '—'}</td>
+                      <td style={{ ...numTd, fontWeight: 700 }}>{gbp(v.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </>
+            ))}
+          </div>
+        )}
+
+        {tab === 'quotes' && tableCard('600px', (
+          <>
+            <thead><tr>
+              <th style={th}>Reference</th><th style={th}>Customer</th><th style={th}>Site</th>
+              <th style={th}>Status</th><th style={th}>Date</th><th style={{ ...th, textAlign: 'right' }}>Amount</th>
+            </tr></thead>
+            <tbody>
+              {quotes.length === 0 && empty(6, 'No quotes.')}
+              {quotes.map(q => (
+                <tr key={q.id}>
+                  <td style={td}>{q.ref || '—'}</td>
+                  <td style={td}>{q.customer || '—'}</td>
+                  <td style={td}>{q.site || '—'}</td>
+                  <td style={td}>{q.status || '—'}</td>
+                  <td style={td}>{q.quote_date ? fmtD(q.quote_date) : '—'}</td>
+                  <td style={{ ...numTd, fontWeight: 700 }}>{gbp(q.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'customers' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Customers</div>
+              {tableCard('620px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Name</th><th style={th}>Type</th><th style={th}>Phone</th><th style={th}>Email</th><th style={th}>Region</th>
+                  </tr></thead>
+                  <tbody>
+                    {customers.length === 0 && empty(5, 'No customers.')}
+                    {customers.map(c => (
+                      <tr key={c.id}>
+                        <td style={td}>{c.name || '—'}</td>
+                        <td style={td}>{c.type || '—'}</td>
+                        <td style={td}>{c.contact || '—'}</td>
+                        <td style={td}>{c.email || '—'}</td>
+                        <td style={td}>{c.area || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Properties</div>
+              {tableCard('560px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Customer</th><th style={th}>Address</th><th style={th}>Postcode</th><th style={th}>Type</th>
+                  </tr></thead>
+                  <tbody>
+                    {properties.length === 0 && empty(4, 'No properties.')}
+                    {properties.map(pr => (
+                      <tr key={pr.id}>
+                        <td style={td}>{pr.customer || '—'}</td>
+                        <td style={td}>{pr.address || '—'}</td>
+                        <td style={td}>{pr.postcode || '—'}</td>
+                        <td style={td}>{pr.prop_type || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'diary' && tableCard('680px', (
+          <>
+            <thead><tr>
+              <th style={th}>Date</th><th style={th}>Time</th><th style={th}>Title</th>
+              <th style={th}>Customer</th><th style={th}>Site</th><th style={th}>Engineer</th><th style={th}>Priority</th>
+            </tr></thead>
+            <tbody>
+              {bookings.length === 0 && empty(7, 'No bookings.')}
+              {bookings.map(b => (
+                <tr key={b.id}>
+                  <td style={td}>{b.booking_date ? fmtD(b.booking_date) : '—'}</td>
+                  <td style={td}>{b.booking_time || '—'}</td>
+                  <td style={td}>{b.title || '—'}</td>
+                  <td style={td}>{b.customer || '—'}</td>
+                  <td style={td}>{b.site || '—'}</td>
+                  <td style={td}>{b.engineer || '—'}</td>
+                  <td style={td}>{b.priority || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'certificates' && tableCard('720px', (
+          <>
+            <thead><tr>
+              <th style={th}>Type</th><th style={th}>Customer</th><th style={th}>Site</th><th style={th}>Ref</th>
+              <th style={th}>Issued</th><th style={th}>Expires</th><th style={{ ...th, textAlign: 'right' }}>File</th>
+            </tr></thead>
+            <tbody>
+              {certs.length === 0 && empty(7, 'No certificates.')}
+              {certs.map(c => (
+                <tr key={c.id}>
+                  <td style={td}>{c.cert_type || '—'}</td>
+                  <td style={td}>{c.customer || '—'}</td>
+                  <td style={td}>{c.site || '—'}</td>
+                  <td style={td}>{c.ref || '—'}</td>
+                  <td style={td}>{c.issue_date ? fmtD(c.issue_date) : '—'}</td>
+                  <td style={td}>{c.expiry_date ? fmtD(c.expiry_date) : '—'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    {c.file_path
+                      ? <button onClick={() => viewCert(c)} disabled={fileBusy === c.id}
+                          style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.accent}55`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: fileBusy === c.id ? .6 : 1 }}>
+                          {fileBusy === c.id ? 'Opening…' : 'View'}
+                        </button>
+                      : <span style={{ color: C.text3, fontSize: '12px' }}>—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'reports' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {[['all', 'All time'], ['month', 'This Month'], ['quarter', 'This Quarter'], ['year', 'This Year'], ['custom', 'Custom']].map(([k, lbl]) => (
+                <button key={k} onClick={() => setDatePreset(k)} style={{
+                  background: datePreset === k ? `${C.accent}1a` : 'transparent',
+                  color: datePreset === k ? C.accent : C.text3,
+                  border: `1px solid ${datePreset === k ? C.accent + '55' : C.border}`,
+                  borderRadius: '8px', padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                }}>{lbl}</button>
+              ))}
+            </div>
+            {datePreset === 'custom' && (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div><div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>From</div>
+                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} /></div>
+                <div><div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>To</div>
+                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} /></div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {kpi('Collected', gbp(repStats.collected))}
+              {kpi('Outstanding', gbp(repStats.outstanding))}
+              {kpi('Overdue', gbp(repStats.overdue))}
+              {kpi('VAT (est.)', gbp(repStats.vat))}
+            </div>
+
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              Real figures from the client's invoices over {rangeLabel.toLowerCase()} (amounts are VAT-inclusive; VAT estimated at 20% of the paid total).
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button style={repBtn} onClick={exportInvoices}>Invoices (CSV)</button>
+              <button style={repBtn} onClick={exportSummary}>Summary (CSV)</button>
             </div>
           </div>
         )}
