@@ -348,8 +348,10 @@ function ClientBooks() {
   if (link === null) return <Navigate to="/clients" replace />
 
   // Per-vertical books view. SoloOps stays inline below (byte-identical);
-  // TyreOps is account-scoped with computed VAT, so it has its own component.
+  // TyreOps/GarageOps are account-scoped with computed VAT, so each has its own
+  // component.
   if (link.product === 'tyreops') return <TyreOpsBooks link={link} onBack={() => navigate('/clients')} />
+  if (link.product === 'garageops') return <GarageOpsBooks link={link} onBack={() => navigate('/clients')} />
 
   const perms = link.permissions || {}
   const TABS = [
@@ -1064,6 +1066,647 @@ function TyreOpsBooks({ link, onBack }) {
               }} style={{ background: C.accent, color: '#151515', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer' }}>
                 Download VAT return (CSV)
               </button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+// =============================================================================
+// GarageOps books — read-only, account-scoped.
+//
+// GarageOps shares the account_id scoping and the invoices/invoice_lines/
+// customers tables with TyreOps, and adds its own: parts, services,
+// labour_rates (Items); vehicles, jobs (Database); part_batches (Purchases);
+// jobs by booked date (Calendar). Resolve the client's product_members.id +
+// tier first, then query by account_id. Every query is SELECT-only and fails
+// open.
+//
+// Money replicas (kept faithful to each client screen):
+//   * calcGarageInvoiceVat / garageInvoiceTotal — mirror GarageOps'
+//     Invoices.jsx calcVAT (per-invoice vatScheme AND per-invoice vatRate).
+//   * dashGarageInvoiceTotal — mirrors Dashboard.jsx invoiceTotal for the
+//     Overview KPIs (no flat-rate branch there, on purpose).
+//   * the Reports tab mirrors Reports.jsx: Revenue (ex VAT) / Cost of Sales /
+//     Gross Profit / Margin over a date range, plus the same CSV exports
+//     (Sales, P&L, VAT Summary, Customers) computed identically — including
+//     that page's deliberately simplified flat-20% VAT summary.
+// =============================================================================
+
+// Invoice-list VAT + total — byte-for-byte GarageOps' Invoices.jsx calcVAT
+// (uses the invoice's stored vatRate; margin scheme uses margin × 0.2).
+function calcGarageInvoiceVat(lines, scheme, flatRate, tier, vatRate = 20) {
+  const rate = (vatRate != null && Number.isFinite(Number(vatRate)) ? Number(vatRate) : 20) / 100
+  let vat = 0
+  ;(lines || []).forEach(l => {
+    const lt = l.qty * l.unit
+    const margin = l.qty * (l.unit - (l.cost || 0))
+    if (l.lineType === 'used' && l.marginScheme && tier === 'gold') vat += margin * 0.2
+    else if (scheme === 'standard') vat += lt * rate
+    else if (scheme === 'flatrate') vat += lt * (flatRate / 100)
+  })
+  return vat
+}
+const garageInvoiceTotal = (inv, flatRate, tier) =>
+  invoiceSubtotal(inv.lines) + calcGarageInvoiceVat(inv.lines, inv.vatScheme, flatRate, tier, inv.vatRate)
+
+// Overview KPI total — mirrors GarageOps Dashboard.jsx invoiceTotal exactly
+// (standard uses the stored rate; margin uses margin × 0.2; anything else adds
+// no VAT — note there is no flat-rate branch here, matching the client).
+function dashGarageInvoiceTotal(inv) {
+  const rate = (inv.vatRate != null ? Number(inv.vatRate) : 20) / 100
+  return (inv.lines || []).reduce((sum, l) => {
+    const lineTotal = (l.qty || 0) * (l.unit || 0)
+    const vat = l.lineType === 'used' && l.marginScheme
+      ? (l.qty || 0) * ((l.unit || 0) - (l.cost || 0)) * 0.2
+      : (inv.vatScheme === 'standard' ? lineTotal * rate : 0)
+    return sum + lineTotal + vat
+  }, 0)
+}
+
+// Replica of GarageOps Reports.jsx getDateRange (inclusive [from, to]).
+function garageDateRange(preset, customFrom, customTo) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  switch (preset) {
+    case 'today': return { from: today, to: today }
+    case 'week': { const s = new Date(today); s.setDate(today.getDate() - today.getDay()); return { from: s, to: today } }
+    case 'month': return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today }
+    case 'quarter': { const qm = Math.floor(today.getMonth() / 3) * 3; return { from: new Date(today.getFullYear(), qm, 1), to: today } }
+    case 'year': return { from: new Date(today.getFullYear(), 0, 1), to: today }
+    case 'custom': return { from: customFrom ? new Date(customFrom) : today, to: customTo ? new Date(customTo) : today }
+    default: return { from: today, to: today }
+  }
+}
+
+function GarageOpsBooks({ link, onBack }) {
+  const perms = link.permissions || {}
+  const [ready, setReady] = useState(false)
+  const [tab, setTab] = useState(null)
+  const [tier, setTier] = useState(null)
+  const [flatRate, setFlatRate] = useState(8.5)
+  const [invoices, setInvoices] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [parts, setParts] = useState([])
+  const [partBatches, setPartBatches] = useState([])
+  const [services, setServices] = useState([])
+  const [labourRates, setLabourRates] = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [jobs, setJobs] = useState([])
+  const [note, setNote] = useState('')
+  const [fileBusy, setFileBusy] = useState(null)
+
+  // Reports tab date range
+  const [datePreset, setDatePreset] = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
+  const TABS = [
+    ['dashboard', 'Overview'], ['invoices', 'Invoices'], ['customers', 'Customers'],
+    ['items', 'Items'], ['database', 'Database'], ['purchases', 'Purchases'],
+    ['calendar', 'Calendar'], ['reports', 'Reports'],
+  ].filter(([k]) => perms[k] === true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      let accountId = null, memberTier = null
+      try {
+        const { data: m } = await sb.from('product_members')
+          .select('id, tier').eq('user_id', link.client_id).eq('product', 'garageops').maybeSingle()
+        accountId = m?.id || null
+        memberTier = m?.tier || null
+      } catch { /* fail open */ }
+      if (!alive) return
+      setTier(memberTier)
+      setTab(TABS[0]?.[0] || null)
+      if (!accountId) { setReady(true); return }
+
+      try {
+        const { data: s } = await sb.from('product_settings')
+          .select('flat_rate').eq('user_id', link.client_id).eq('product', 'garageops').maybeSingle()
+        if (alive && s?.flat_rate != null) setFlatRate(Number(s.flat_rate))
+      } catch { /* keep default */ }
+
+      const p = perms
+      const needInvoices = p.invoices === true || p.dashboard === true || p.reports === true
+      const needCustomers = p.customers === true || p.reports === true
+      const needPartBatches = p.items === true || p.purchases === true
+      const needJobs = p.database === true || p.calendar === true
+
+      if (needInvoices) {
+        try {
+          const { data: invs } = await sb.from('invoices')
+            .select('id, cust_id, cust_name, cust_email, reg, date, due, status, vat_scheme, vat_rate, payment_method, paid_at')
+            .eq('account_id', accountId).order('date', { ascending: false })
+          const ids = (invs || []).map(i => i.id)
+          const linesByInv = {}
+          if (ids.length) {
+            const { data: lines } = await sb.from('invoice_lines')
+              .select('invoice_id, line_desc, qty, unit, cost, batch_id, used_id, line_type, margin_scheme')
+              .in('invoice_id', ids)
+            ;(lines || []).forEach(l => {
+              ;(linesByInv[l.invoice_id] || (linesByInv[l.invoice_id] = [])).push({
+                desc: l.line_desc, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0, cost: Number(l.cost) || 0,
+                batchId: l.batch_id, usedId: l.used_id, lineType: l.line_type, marginScheme: l.margin_scheme === true,
+              })
+            })
+          }
+          const mapped = (invs || []).map(i => ({
+            id: i.id, custId: i.cust_id, custName: i.cust_name, custEmail: i.cust_email, reg: i.reg,
+            date: i.date, due: i.due, status: i.status, vatScheme: i.vat_scheme,
+            vatRate: i.vat_rate != null ? Number(i.vat_rate) : 20,
+            paymentMethod: i.payment_method, paidAt: i.paid_at, lines: linesByInv[i.id] || [],
+          }))
+          if (alive) setInvoices(mapped)
+        } catch { /* fail open */ }
+      }
+
+      if (needCustomers) {
+        try {
+          const { data: c } = await sb.from('customers')
+            .select('id, name, email, phone, reg, vehicle').eq('account_id', accountId).order('name')
+          if (alive) setCustomers(c || [])
+        } catch { /* fail open */ }
+      }
+
+      if (p.items === true) {
+        try {
+          const { data: pr } = await sb.from('parts')
+            .select('id, part_number, name, category, brand, sell_price').eq('account_id', accountId).order('name')
+          if (alive) setParts((pr || []).map(x => ({ ...x, partNumber: x.part_number, sellPrice: x.sell_price })))
+        } catch { /* fail open */ }
+        try {
+          const { data: sv } = await sb.from('services')
+            .select('id, name, category, default_duration_min, default_price').eq('account_id', accountId).order('name')
+          if (alive) setServices((sv || []).map(x => ({ ...x, durationMin: x.default_duration_min, defaultPrice: x.default_price })))
+        } catch { /* fail open */ }
+        try {
+          const { data: lr } = await sb.from('labour_rates')
+            .select('id, name, hourly_rate, is_default').eq('account_id', accountId).order('name')
+          if (alive) setLabourRates((lr || []).map(x => ({ ...x, hourlyRate: x.hourly_rate, isDefault: x.is_default })))
+        } catch { /* fail open */ }
+      }
+
+      if (needPartBatches) {
+        try {
+          const { data: b } = await sb.from('part_batches')
+            .select('id, part_id, date, qty, remaining, cost, supplier, ref, invoice_url')
+            .eq('account_id', accountId).order('date', { ascending: false })
+          if (alive) setPartBatches((b || []).map(x => ({ ...x, partId: x.part_id, cost: Number(x.cost) || 0, invoiceUrl: x.invoice_url })))
+        } catch { /* fail open */ }
+      }
+
+      if (p.database === true) {
+        try {
+          const { data: v } = await sb.from('vehicles')
+            .select('id, customer_id, reg, make, model, year, colour, fuel_type, mot_due, tax_due')
+            .eq('account_id', accountId).order('reg')
+          if (alive) setVehicles((v || []).map(x => ({ ...x, fuelType: x.fuel_type, motDue: x.mot_due, taxDue: x.tax_due })))
+        } catch { /* fail open */ }
+      }
+
+      if (needJobs) {
+        try {
+          const { data: j } = await sb.from('jobs')
+            .select('id, cust_name, reg, status, booked_date, complete_date, mileage_in, mileage_out')
+            .eq('account_id', accountId).order('booked_date', { ascending: false })
+          if (alive) setJobs((j || []).map(x => ({ ...x, custName: x.cust_name, bookedDate: x.booked_date, completeDate: x.complete_date, mileageIn: x.mileage_in, mileageOut: x.mileage_out })))
+        } catch { /* fail open */ }
+      }
+
+      if (alive) setReady(true)
+    })()
+    return () => { alive = false }
+  }, [link])
+
+  // ---- derived: Overview KPIs (dashInvoiceTotal, faithful to the client dash) ----
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0)
+  const revenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + dashGarageInvoiceTotal(i), 0)
+  const outstanding = invoices.filter(i => i.status !== 'paid' && i.status !== 'draft').reduce((s, i) => s + dashGarageInvoiceTotal(i), 0)
+  const overdue = invoices.filter(i => i.status !== 'paid' && i.status !== 'draft' && i.due && new Date(i.due) < today0).reduce((s, i) => s + dashGarageInvoiceTotal(i), 0)
+
+  // Stock-on-hand per part (sum of remaining across its batches)
+  const stockByPart = {}
+  partBatches.forEach(b => { if (b.partId) stockByPart[b.partId] = (stockByPart[b.partId] || 0) + (Number(b.remaining) || 0) })
+
+  // ---- Reports (mirror Reports.jsx) ----
+  const { from: dateFrom, to: dateTo } = garageDateRange(datePreset, customFrom, customTo)
+  const repInvoices = invoices.filter(inv => {
+    if (inv.status === 'draft') return false
+    const d = new Date(inv.date)
+    return d >= dateFrom && d <= dateTo
+  })
+  const repRevenue = repInvoices.reduce((s, inv) => s + inv.lines.reduce((a, l) => a + l.qty * l.unit, 0), 0)
+  const repCost = repInvoices.reduce((s, inv) => s + inv.lines.reduce((a, l) => a + l.qty * (l.cost || 0), 0), 0)
+  const repProfit = repRevenue - repCost
+  const repMargin = repRevenue > 0 ? Math.round((repProfit / repRevenue) * 100) : 0
+  const rangeLabel = `${dateFrom.toLocaleDateString('en-GB')}–${dateTo.toLocaleDateString('en-GB')}`
+
+  const exportSales = () => {
+    const rows = [['Invoice #', 'Date', 'Customer', 'Vehicle Reg', 'Items', 'Subtotal', 'VAT', 'Total', 'Status', 'Payment Method']]
+    repInvoices.forEach(inv => {
+      const subtotal = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
+      const v = subtotal * 0.2
+      rows.push([inv.id, inv.date, inv.custName, inv.reg || '', inv.lines.length, subtotal.toFixed(2), v.toFixed(2), (subtotal + v).toFixed(2), inv.status, inv.paymentMethod || 'N/A'])
+    })
+    dlCsv(`Sales_Report_${rangeLabel}.csv`, rows)
+  }
+  const exportProfit = () => {
+    const rows = [['Invoice #', 'Date', 'Customer', 'Revenue', 'Cost', 'Gross Profit', 'Margin %']]
+    repInvoices.forEach(inv => {
+      const rev = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
+      const cost = inv.lines.reduce((a, l) => a + l.qty * (l.cost || 0), 0)
+      const profit = rev - cost
+      const m = rev > 0 ? Math.round((profit / rev) * 100) : 0
+      rows.push([inv.id, inv.date, inv.custName, rev.toFixed(2), cost.toFixed(2), profit.toFixed(2), `${m}%`])
+    })
+    rows.push(['TOTAL', '', '', repRevenue.toFixed(2), repCost.toFixed(2), repProfit.toFixed(2), `${repMargin}%`])
+    dlCsv(`Profit_Loss_Report_${rangeLabel}.csv`, rows)
+  }
+  const exportVat = () => {
+    let outputVAT = 0, inputVAT = 0
+    repInvoices.forEach(inv => inv.lines.forEach(l => {
+      const lineTotal = l.qty * l.unit
+      outputVAT += lineTotal * 0.2
+      if (l.lineType === 'new' && l.cost) inputVAT += l.qty * l.cost * 0.2
+    }))
+    const rows = [
+      ['Category', 'Amount'],
+      ['Total Sales (ex VAT)', repRevenue.toFixed(2)],
+      ['Output VAT (20%)', outputVAT.toFixed(2)],
+      ['Stock Cost Sold', repCost.toFixed(2)],
+      ['Input VAT Reclaimable', inputVAT.toFixed(2)],
+      ['Net VAT Due', (outputVAT - inputVAT).toFixed(2)],
+    ]
+    dlCsv(`VAT_Summary_Report_${rangeLabel}.csv`, rows)
+  }
+  const exportCustomers = () => {
+    const rows = [['Name', 'Email', 'Phone', 'Vehicles', 'Total Invoices', 'Total Spent', 'Last Invoice']]
+    customers.map(c => {
+      const custInvs = invoices.filter(inv => inv.custId === c.id || inv.custName === c.name)
+      const totalSpent = custInvs.reduce((sum, inv) => sum + inv.lines.reduce((a, l) => a + l.qty * l.unit, 0), 0)
+      const lastInv = custInvs.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+      const veh = c.vehicles?.map(v => v.reg).join(', ') || c.reg || ''
+      return [c.name, c.email || '', c.phone || '', veh, custInvs.length, totalSpent, lastInv?.date || 'Never']
+    }).sort((a, b) => b[5] - a[5]).forEach(r => rows.push([r[0], r[1], r[2], r[3], r[4], Number(r[5]).toFixed(2), r[6]]))
+    dlCsv(`Customer_Report_${rangeLabel}.csv`, rows)
+  }
+
+  const th = { textAlign: 'left', fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, padding: '8px 10px', borderBottom: `1px solid ${C.border}` }
+  const td = { fontSize: '13px', padding: '9px 10px', borderBottom: `1px solid ${C.border}`, verticalAlign: 'top' }
+  const numTd = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+  const kpi = (label, val) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '16px 18px', minWidth: '160px', flex: '1 1 160px' }}>
+      <div style={{ fontSize: '11px', color: C.text3, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 800, marginTop: '6px' }}>{val}</div>
+    </div>
+  )
+  const tableCard = (minWidth, children) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '14px', overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth }}>{children}</table>
+    </div>
+  )
+  const empty = (cols, msg) => <tr><td style={td} colSpan={cols}><span style={{ color: C.text3 }}>{msg}</span></td></tr>
+
+  const viewPurchaseFile = async (b) => {
+    setNote('')
+    setFileBusy(b.id)
+    try {
+      let path = b.invoiceUrl
+      if (!path) { setNote('No purchase invoice file was saved for this batch.'); return }
+      const marker = '/purchase-invoices/'
+      const idx = path.indexOf(marker)
+      if (idx !== -1) path = path.slice(idx + marker.length)
+      const { data: s, error } = await sb.storage.from('purchase-invoices').createSignedUrl(path, 300)
+      if (error || !s?.signedUrl) { setNote('Could not open the invoice file — it may have been removed.'); return }
+      window.open(s.signedUrl, '_blank', 'noopener')
+    } finally {
+      setFileBusy(null)
+    }
+  }
+
+  const repBtn = { background: C.accent, color: '#151515', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 800, cursor: 'pointer' }
+
+  if (!ready) {
+    return <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text3 }}>Loading…</div>
+  }
+
+  return (
+    <div style={page}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.text2, fontSize: '13px', cursor: 'pointer', padding: 0 }}>← Clients</button>
+          <div style={{ fontWeight: 800, fontSize: '16px' }}>{link.client_name || 'Client'}</div>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.accent, border: `1px solid ${C.accent}44`, background: `${C.accent}1a`, borderRadius: '20px', padding: '2px 9px' }}>{PRODUCT_LABEL[link.product] || link.product}</span>
+          <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: C.text3, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '2px 9px' }}>View only</span>
+        </div>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '0 20px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {TABS.map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} style={{
+              background: tab === k ? `${C.accent}1a` : 'transparent',
+              color: tab === k ? C.accent : C.text3,
+              border: `1px solid ${tab === k ? C.accent + '55' : C.border}`,
+              borderRadius: '999px', padding: '6px 16px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+            }}>{label}</button>
+          ))}
+        </div>
+      </header>
+
+      <main style={{ maxWidth: '980px', margin: '0 auto', padding: '24px 20px' }}>
+        {TABS.length === 0 && (
+          <div style={{ color: C.text2, fontSize: '13.5px' }}>
+            No sections are shared with you yet — ask your client to tick some in their Settings.
+          </div>
+        )}
+
+        {note && <div style={{ color: C.text2, fontSize: '12.5px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '14px' }}>{note}</div>}
+
+        {tab === 'dashboard' && (
+          <div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '22px' }}>
+              {kpi('Revenue (paid)', gbp(revenue))}
+              {kpi('Outstanding', gbp(outstanding))}
+              {kpi('Overdue', gbp(overdue))}
+              {kpi('Invoices', String(invoices.length))}
+            </div>
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              Totals use each invoice's computed total, matching the client's dashboard. The Reports tab holds period reports and the VAT summary.
+            </div>
+          </div>
+        )}
+
+        {tab === 'invoices' && tableCard('720px', (
+          <>
+            <thead><tr>
+              <th style={th}>Invoice</th><th style={th}>Customer</th><th style={th}>Reg</th><th style={th}>Date</th>
+              <th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Subtotal</th>
+              <th style={{ ...th, textAlign: 'right' }}>VAT</th><th style={{ ...th, textAlign: 'right' }}>Total</th>
+            </tr></thead>
+            <tbody>
+              {invoices.length === 0 && empty(8, 'No invoices.')}
+              {invoices.map(i => {
+                const sub = invoiceSubtotal(i.lines)
+                const v = calcGarageInvoiceVat(i.lines, i.vatScheme, flatRate, tier, i.vatRate)
+                return (
+                  <tr key={i.id}>
+                    <td style={td}>{i.id}</td>
+                    <td style={td}>{i.custName || '—'}</td>
+                    <td style={td}>{i.reg || '—'}</td>
+                    <td style={td}>{fmtD(i.date)}</td>
+                    <td style={td}><span style={{ fontSize: '10.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px', color: i.status === 'paid' ? C.green : i.status === 'overdue' ? C.red : C.text2 }}>{i.status}</span></td>
+                    <td style={numTd}>{gbp(sub)}</td>
+                    <td style={{ ...numTd, color: C.text2 }}>{gbp(v)}</td>
+                    <td style={{ ...numTd, fontWeight: 700 }}>{gbp(sub + v)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'customers' && tableCard('680px', (
+          <>
+            <thead><tr>
+              <th style={th}>Name</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Reg</th><th style={th}>Vehicle</th>
+            </tr></thead>
+            <tbody>
+              {customers.length === 0 && empty(5, 'No customers.')}
+              {customers.map(c => (
+                <tr key={c.id}>
+                  <td style={td}>{c.name || '—'}</td>
+                  <td style={td}>{c.email || '—'}</td>
+                  <td style={td}>{c.phone || '—'}</td>
+                  <td style={td}>{c.reg || '—'}</td>
+                  <td style={td}>{c.vehicle || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'items' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Parts</div>
+              {tableCard('620px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Part no.</th><th style={th}>Name</th><th style={th}>Category</th><th style={th}>Brand</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Sell</th><th style={{ ...th, textAlign: 'right' }}>In stock</th>
+                  </tr></thead>
+                  <tbody>
+                    {parts.length === 0 && empty(6, 'No parts.')}
+                    {parts.map(pt => (
+                      <tr key={pt.id}>
+                        <td style={td}>{pt.partNumber || '—'}</td>
+                        <td style={td}>{pt.name || '—'}</td>
+                        <td style={td}>{pt.category || '—'}</td>
+                        <td style={td}>{pt.brand || '—'}</td>
+                        <td style={numTd}>{pt.sellPrice != null ? gbp(pt.sellPrice) : '—'}</td>
+                        <td style={numTd}>{stockByPart[pt.id] || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Services</div>
+              {tableCard('520px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Name</th><th style={th}>Category</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Duration</th><th style={{ ...th, textAlign: 'right' }}>Price</th>
+                  </tr></thead>
+                  <tbody>
+                    {services.length === 0 && empty(4, 'No services.')}
+                    {services.map(s => (
+                      <tr key={s.id}>
+                        <td style={td}>{s.name || '—'}</td>
+                        <td style={td}>{s.category || '—'}</td>
+                        <td style={numTd}>{s.durationMin != null ? `${s.durationMin} min` : '—'}</td>
+                        <td style={numTd}>{s.defaultPrice != null ? gbp(s.defaultPrice) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Labour rates</div>
+              {tableCard('420px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Name</th><th style={{ ...th, textAlign: 'right' }}>Hourly rate</th><th style={th}>Default</th>
+                  </tr></thead>
+                  <tbody>
+                    {labourRates.length === 0 && empty(3, 'No labour rates.')}
+                    {labourRates.map(r => (
+                      <tr key={r.id}>
+                        <td style={td}>{r.name || '—'}</td>
+                        <td style={numTd}>{r.hourlyRate != null ? gbp(r.hourlyRate) : '—'}</td>
+                        <td style={td}>{r.isDefault ? 'Yes' : 'No'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'database' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Vehicles</div>
+              {tableCard('680px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Reg</th><th style={th}>Make</th><th style={th}>Model</th><th style={th}>Year</th>
+                    <th style={th}>Fuel</th><th style={th}>MOT due</th><th style={th}>Tax due</th>
+                  </tr></thead>
+                  <tbody>
+                    {vehicles.length === 0 && empty(7, 'No vehicles.')}
+                    {vehicles.map(v => (
+                      <tr key={v.id}>
+                        <td style={td}>{v.reg || '—'}</td>
+                        <td style={td}>{v.make || '—'}</td>
+                        <td style={td}>{v.model || '—'}</td>
+                        <td style={td}>{v.year || '—'}</td>
+                        <td style={td}>{v.fuelType || '—'}</td>
+                        <td style={td}>{v.motDue ? fmtD(v.motDue) : '—'}</td>
+                        <td style={td}>{v.taxDue ? fmtD(v.taxDue) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '8px' }}>Jobs / workshop history</div>
+              {tableCard('680px', (
+                <>
+                  <thead><tr>
+                    <th style={th}>Customer</th><th style={th}>Reg</th><th style={th}>Status</th>
+                    <th style={th}>Booked</th><th style={th}>Completed</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Miles in</th><th style={{ ...th, textAlign: 'right' }}>Miles out</th>
+                  </tr></thead>
+                  <tbody>
+                    {jobs.length === 0 && empty(7, 'No jobs.')}
+                    {jobs.map(j => (
+                      <tr key={j.id}>
+                        <td style={td}>{j.custName || '—'}</td>
+                        <td style={td}>{j.reg || '—'}</td>
+                        <td style={td}>{j.status || '—'}</td>
+                        <td style={td}>{j.bookedDate ? fmtD(j.bookedDate) : '—'}</td>
+                        <td style={td}>{j.completeDate ? fmtD(j.completeDate) : '—'}</td>
+                        <td style={numTd}>{j.mileageIn != null ? j.mileageIn : '—'}</td>
+                        <td style={numTd}>{j.mileageOut != null ? j.mileageOut : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'purchases' && tableCard('760px', (
+          <>
+            <thead><tr>
+              <th style={th}>Date</th><th style={th}>Supplier</th><th style={th}>Ref</th>
+              <th style={{ ...th, textAlign: 'right' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Cost/ea</th>
+              <th style={{ ...th, textAlign: 'right' }}>Total cost</th><th style={{ ...th, textAlign: 'right' }}>VAT (20%)</th>
+              <th style={{ ...th, textAlign: 'right' }}>Invoice</th>
+            </tr></thead>
+            <tbody>
+              {partBatches.length === 0 && empty(8, 'No purchases recorded.')}
+              {partBatches.map(b => {
+                const qty = Number(b.qty) || 0
+                const totalCost = qty * (Number(b.cost) || 0)
+                return (
+                  <tr key={b.id}>
+                    <td style={td}>{fmtD(b.date)}</td>
+                    <td style={td}>{b.supplier || '—'}</td>
+                    <td style={td}>{b.ref || '—'}</td>
+                    <td style={numTd}>{qty}</td>
+                    <td style={numTd}>{gbp(b.cost)}</td>
+                    <td style={numTd}>{gbp(totalCost)}</td>
+                    <td style={{ ...numTd, color: C.green }}>{gbp(totalCost * 0.2)}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      {b.invoiceUrl
+                        ? <button onClick={() => viewPurchaseFile(b)} disabled={fileBusy === b.id}
+                            style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.accent}55`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: fileBusy === b.id ? .6 : 1 }}>
+                            {fileBusy === b.id ? 'Opening…' : 'View'}
+                          </button>
+                        : <span style={{ color: C.text3, fontSize: '12px' }}>—</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'calendar' && tableCard('620px', (
+          <>
+            <thead><tr>
+              <th style={th}>Booked</th><th style={th}>Customer</th><th style={th}>Reg</th><th style={th}>Status</th><th style={th}>Completed</th>
+            </tr></thead>
+            <tbody>
+              {jobs.length === 0 && empty(5, 'No bookings.')}
+              {jobs.slice().sort((a, b) => new Date(b.bookedDate || 0) - new Date(a.bookedDate || 0)).map(j => (
+                <tr key={j.id}>
+                  <td style={td}>{j.bookedDate ? fmtD(j.bookedDate) : '—'}</td>
+                  <td style={td}>{j.custName || '—'}</td>
+                  <td style={td}>{j.reg || '—'}</td>
+                  <td style={td}>{j.status || '—'}</td>
+                  <td style={td}>{j.completeDate ? fmtD(j.completeDate) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </>
+        ))}
+
+        {tab === 'reports' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['quarter', 'This Quarter'], ['year', 'This Year'], ['custom', 'Custom']].map(([k, lbl]) => (
+                <button key={k} onClick={() => setDatePreset(k)} style={{
+                  background: datePreset === k ? `${C.accent}1a` : 'transparent',
+                  color: datePreset === k ? C.accent : C.text3,
+                  border: `1px solid ${datePreset === k ? C.accent + '55' : C.border}`,
+                  borderRadius: '8px', padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                }}>{lbl}</button>
+              ))}
+            </div>
+            {datePreset === 'custom' && (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div><div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>From</div>
+                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} /></div>
+                <div><div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>To</div>
+                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} /></div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {kpi('Revenue (ex VAT)', gbp(repRevenue))}
+              {kpi('Cost of sales', gbp(repCost))}
+              {kpi('Gross profit', gbp(repProfit))}
+              {kpi('Margin', `${repMargin}%`)}
+            </div>
+
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>
+              CSV exports over {datePreset === 'custom' ? (customFrom && customTo ? rangeLabel : 'the chosen range') : rangeLabel} — the same reports your client can export.
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button style={repBtn} onClick={exportSales}>Sales report</button>
+              <button style={repBtn} onClick={exportProfit}>Profit &amp; loss</button>
+              <button style={repBtn} onClick={exportVat}>VAT summary</button>
+              <button style={repBtn} onClick={exportCustomers}>Customer report</button>
             </div>
           </div>
         )}

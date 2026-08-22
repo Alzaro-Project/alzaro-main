@@ -35,6 +35,7 @@ const TABS = [
   { key: 'vat',          label: 'VAT',          icon: 'ti-receipt-tax' },
   { key: 'subscription', label: 'Subscription', icon: 'ti-credit-card' },
   { key: 'users',        label: 'Users',        icon: 'ti-users' },
+  { key: 'accountant',   label: 'Accountant',   icon: 'ti-book' },
 ]
 
 const TIERS = [
@@ -561,6 +562,8 @@ export default function Settings() {
 
         {/* ==================== SUBSCRIPTION TAB ==================== */}
         {activeTab === 'users' && <UsersTab />}
+
+        {activeTab === 'accountant' && <AccountantTab />}
 
         {activeTab === 'subscription' && (
           <SubscriptionTab tier={tier} setTier={setTier} />
@@ -1126,6 +1129,166 @@ function UStaffPassword({ row, flash, onChanged }) {
           <span style={{ fontSize: '11.5px', color: 'var(--text3)' }}>They joined with an Alzaro login they already had, so only they can change its password.</span>
         </div>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// ACCOUNTANT TAB  (view-only books access for the client's accountant)
+// ============================================================
+// Mirrors the SoloOps/TyreOps AccountantTab in GarageOps' own theming (the
+// uInp/uBtn kit above). Any trial/active tier can invite — no seat gate (this
+// differs from UsersTab, which is Silver/Gold-only). The permission keys match
+// api/accountant.js PRODUCTS.garageops and the accountant RLS in migration 015.
+import { getAccountantLink, updateAccountantPermissions, revokeAccountant } from '../lib/db'
+
+// key, label, blurb — the eight visibility toggles an accountant can be granted.
+// The reporting key is 'reports' (VAT & Reports).
+const ACCT_PERMS = [
+  ['dashboard', 'Dashboard',  'Workshop totals and charts'],
+  ['invoices',  'Invoices',   'Invoices and payments'],
+  ['customers', 'Customers',  'The customer list'],
+  ['items',     'Items',      'Parts, services and labour rates'],
+  ['database',  'Database',   'Vehicles, jobs and workshop history'],
+  ['purchases', 'Purchases',  'Parts purchases'],
+  ['calendar',  'Calendar',   'Bookings and the workshop diary'],
+  ['reports',   'VAT & Reports', 'VAT and reporting figures'],
+]
+
+function AccountantTab() {
+  const { garageStatus } = useStore()
+  const [link, setLink] = useState(undefined)   // undefined=loading, null=none
+  const [email, setEmail] = useState('')
+  // Default: everything visible — they were invited to see the books. Any box
+  // can be unticked before or after inviting.
+  const [perms, setPerms] = useState({ dashboard: true, invoices: true, customers: true, items: true, database: true, purchases: true, calendar: true, reports: true })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [notice, setNotice] = useState('')
+  const eligible = ['trial', 'active'].includes((garageStatus || '').toLowerCase())
+
+  const flash = (m) => { setNotice(m); setTimeout(() => setNotice(''), 4000) }
+  const reload = async () => { setLink(await getAccountantLink()) }
+  useEffect(() => { reload() }, [])
+
+  const invite = async () => {
+    setErr('')
+    if (!email.trim()) { setErr('Enter their email address.'); return }
+    setBusy(true)
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const r = await fetch('/api/accountant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess?.session?.access_token || ''}` },
+        body: JSON.stringify({ product: 'garageops', email: email.trim(), permissions: perms }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(j.error || 'Could not send the invite'); return }
+      flash(j.existing_user
+        ? 'Accountant linked — they can sign in to the portal with their existing login'
+        : 'Invite sent — they’ll get an email to set up their portal login')
+      setEmail('')
+      await reload()
+    } catch (e) {
+      setErr('Network error — try again')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const togglePerm = async (k) => {
+    if (!link) { setPerms(p => ({ ...p, [k]: !p[k] })); return }
+    // Live link: flip visibility immediately under RLS.
+    const next = { ...link.permissions, [k]: !(link.permissions?.[k] === true) }
+    const { error } = await updateAccountantPermissions(link.id, next)
+    if (error) { flash('Could not update visibility'); return }
+    setLink({ ...link, permissions: next })
+  }
+
+  const revoke = async () => {
+    if (!window.confirm(`Remove ${link.accountant_email}’s access? They’ll no longer be able to see any of your books. You can invite them (or someone else) again any time.`)) return
+    const { error } = await revokeAccountant(link.id)
+    if (error) { flash('Could not remove access'); return }
+    flash('Accountant access removed')
+    await reload()
+  }
+
+  if (link === undefined) return <div style={{ color: 'var(--text3)', fontSize: '13px' }}>Loading…</div>
+
+  return (
+    <div style={{ display: 'grid', gap: '14px', maxWidth: '760px' }}>
+      {notice && <div style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)', color: 'var(--text)', borderRadius: '8px', padding: '9px 13px', fontSize: '12.5px' }}>{notice}</div>}
+
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px' }}>
+        <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '3px' }}>My accountant</div>
+        <div style={{ color: 'var(--text2)', fontSize: '12.5px', marginBottom: '14px', lineHeight: 1.55 }}>
+          Give your accountant a <b>view-only</b> window on your books. They sign in to a separate
+          accountant portal and can look but never change anything. You choose what they see below,
+          and you can adjust or remove their access at any time.
+        </div>
+
+        {!eligible && (
+          <div style={{ fontSize: '12.5px', color: 'var(--text2)', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 16px' }}>
+            Your subscription needs to be active to link an accountant.
+          </div>
+        )}
+
+        {eligible && !link && (
+          <div style={{ display: 'grid', gap: '11px' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '5px' }}>Accountant’s email</div>
+              <input style={uInp} type="email" placeholder="accountant@example.co.uk" value={email}
+                     onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') invite() }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text2)', marginBottom: '5px' }}>What they can see</div>
+              <div style={{ display: 'grid', gap: '7px' }}>
+                {ACCT_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '12.5px' }}>
+                    <input type="checkbox" checked={perms[k] === true} onChange={() => togglePerm(k)} style={{ marginTop: '2px' }} />
+                    <span><strong>{label}</strong><span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {err && <div style={{ color: '#ef4444', fontSize: '12.5px' }}>{err}</div>}
+            <button style={{ ...uBtn(false), width: 'fit-content', border: 'none' }} disabled={busy} onClick={invite}>{busy ? 'Sending…' : 'Invite accountant'}</button>
+          </div>
+        )}
+
+        {eligible && link && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 800, fontSize: '14px', wordBreak: 'break-all' }}>{link.accountant_email}</span>
+              <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase',
+                color: link.status === 'active' ? 'var(--green)' : 'var(--accent)',
+                background: link.status === 'active' ? 'rgba(61,214,140,.12)' : 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                border: `1px solid ${link.status === 'active' ? 'rgba(61,214,140,.3)' : 'var(--accent)'}`,
+                borderRadius: '20px', padding: '2px 9px' }}>
+                {link.status === 'active' ? 'Active' : 'Invited'}
+              </span>
+              <span style={{ ...uChip, color: 'var(--text3)', background: 'transparent', border: '1px solid var(--border)' }}>View only</span>
+            </div>
+            {link.status !== 'active' && (
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
+                They’ve been emailed a link to set up their portal login.
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', color: 'var(--text3)', margin: '14px 0 8px' }}>What they can see — changes apply immediately</div>
+            <div style={{ display: 'grid', gap: '7px', marginBottom: '16px' }}>
+              {ACCT_PERMS.map(([k, label, blurb]) => (
+                <label key={k} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: 'pointer', fontSize: '12.5px' }}>
+                  <input type="checkbox" checked={link.permissions?.[k] === true} onChange={() => togglePerm(k)} style={{ marginTop: '2px' }} />
+                  <span><strong>{label}</strong><span style={{ color: 'var(--text3)' }}> — {blurb}</span></span>
+                </label>
+              ))}
+            </div>
+
+            <button onClick={revoke} style={{ ...uBtn(true, true), border: '1px solid rgba(239,68,68,.4)' }}>Remove access</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
