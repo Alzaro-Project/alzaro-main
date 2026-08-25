@@ -20,12 +20,12 @@ import Stripe from 'stripe'
 import { priceIdFor, safeTier } from './_billing-config.js'
 
 // Canonical base for success/cancel redirects. We always send users back to the
-// canonical www host (not the request origin, which could be the apex domain or
-// a preview URL) so the post-checkout return is consistent across verticals.
+// canonical apex host (www 301-redirects to apex in vercel.json, so www must
+// never be used for API-facing URLs) so the post-checkout return is consistent.
 // APP_BASE_URL can override for staging.
 function appBaseUrl() {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '')
-  return 'https://www.alzaro.co.uk'
+  return 'https://alzaro.co.uk'
 }
 
 // Verify the given product_members row belongs to the caller. Reads user_id
