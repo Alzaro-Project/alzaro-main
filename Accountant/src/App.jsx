@@ -25,6 +25,27 @@ const inp = { background: C.surface2, border: `1px solid ${C.border}`, borderRad
 const btn = { background: C.accent, color: '#151515', border: 'none', borderRadius: '8px', padding: '11px 18px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', width: '100%' }
 const PRODUCT_LABEL = { soloops: 'SoloOps', tyreops: 'TyreOps', garageops: 'GarageOps', serviceops: 'ServiceOps', propertyops: 'PropertyOps' }
 
+// Responsive rules for the auth screens (login / set-password). Inline styles
+// can't hold media queries, so the handful the card needs are injected once:
+// it fills the viewport and centres on laptop, and on phones it scales down,
+// keeps ≥44px tap targets, uses 16px inputs (no iOS auto-zoom), and never
+// scrolls sideways.
+if (typeof document !== 'undefined' && !document.getElementById('acct-auth-css')) {
+  const st = document.createElement('style')
+  st.id = 'acct-auth-css'
+  st.textContent = `
+    .acct-auth-wrap { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; }
+    .acct-auth-card { box-sizing: border-box; }
+    .acct-auth-card input, .acct-auth-card button { min-height: 44px; box-sizing: border-box; }
+    @media (max-width: 480px) {
+      .acct-auth-wrap { padding: 16px !important; align-items: flex-start !important; padding-top: 7vh !important; }
+      .acct-auth-card { padding: 24px 20px !important; border-radius: 14px !important; }
+      .acct-auth-card input, .acct-auth-card button { font-size: 16px !important; }
+    }
+  `
+  document.head.appendChild(st)
+}
+
 function Brand({ sub }) {
   return (
     <div style={{ textAlign: 'center', marginBottom: '22px' }}>
@@ -38,8 +59,8 @@ function Brand({ sub }) {
 
 function CardShell({ children }) {
   return (
-    <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '18px', padding: '36px', width: '420px', maxWidth: '100%' }}>
+    <div className="acct-auth-wrap" style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', boxSizing: 'border-box' }}>
+      <div className="acct-auth-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '18px', padding: '36px', width: '420px', maxWidth: '100%' }}>
         {children}
       </div>
     </div>
@@ -1311,7 +1332,9 @@ function GarageOpsBooks({ link, onBack }) {
     const rows = [['Invoice #', 'Date', 'Customer', 'Vehicle Reg', 'Items', 'Subtotal', 'VAT', 'Total', 'Status', 'Payment Method']]
     repInvoices.forEach(inv => {
       const subtotal = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-      const v = subtotal * 0.2
+      // Accurate per-invoice VAT (scheme / rate / margin / tier) — the same
+      // calc the invoice list uses, not a flat 20%.
+      const v = calcGarageInvoiceVat(inv.lines, inv.vatScheme, flatRate, tier, inv.vatRate)
       rows.push([inv.id, inv.date, inv.custName, inv.reg || '', inv.lines.length, subtotal.toFixed(2), v.toFixed(2), (subtotal + v).toFixed(2), inv.status, inv.paymentMethod || 'N/A'])
     })
     dlCsv(`Sales_Report_${rangeLabel}.csv`, rows)
@@ -1329,16 +1352,19 @@ function GarageOpsBooks({ link, onBack }) {
     dlCsv(`Profit_Loss_Report_${rangeLabel}.csv`, rows)
   }
   const exportVat = () => {
+    // Output VAT: accurate per-invoice calc (per-invoice vatScheme + vatRate,
+    // margin scheme at gold, flat rate) — the same figure the invoice list
+    // shows, NOT a flat 20% on every line. Input VAT stays the reclaim on stock
+    // sold (new lines) at 20%, which is the only cost-VAT source available.
     let outputVAT = 0, inputVAT = 0
-    repInvoices.forEach(inv => inv.lines.forEach(l => {
-      const lineTotal = l.qty * l.unit
-      outputVAT += lineTotal * 0.2
-      if (l.lineType === 'new' && l.cost) inputVAT += l.qty * l.cost * 0.2
-    }))
+    repInvoices.forEach(inv => {
+      outputVAT += calcGarageInvoiceVat(inv.lines, inv.vatScheme, flatRate, tier, inv.vatRate)
+      inv.lines.forEach(l => { if (l.lineType === 'new' && l.cost) inputVAT += l.qty * l.cost * 0.2 })
+    })
     const rows = [
       ['Category', 'Amount'],
       ['Total Sales (ex VAT)', repRevenue.toFixed(2)],
-      ['Output VAT (20%)', outputVAT.toFixed(2)],
+      ['Output VAT', outputVAT.toFixed(2)],
       ['Stock Cost Sold', repCost.toFixed(2)],
       ['Input VAT Reclaimable', inputVAT.toFixed(2)],
       ['Net VAT Due', (outputVAT - inputVAT).toFixed(2)],
