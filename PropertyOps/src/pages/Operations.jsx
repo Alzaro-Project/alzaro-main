@@ -2383,6 +2383,8 @@ function AccountantTab({ user }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [notice, setNotice] = useState("");
+  const [editing, setEditing] = useState(false);   // editing a live link's visibility
+  const [draft, setDraft] = useState({});           // pending edits, saved on demand
 
   const flash = (m) => { setNotice(m); setTimeout(() => setNotice(""), 4000); };
   const reload = async () => { setLink(await getAccountantLink()); };
@@ -2421,12 +2423,18 @@ function AccountantTab({ user }) {
     }
   };
 
-  const togglePerm = async (k) => {
-    if (!link) { setPerms((p) => ({ ...p, [k]: !p[k] })); return; }
-    const next = { ...link.permissions, [k]: !(link.permissions?.[k] === true) };
-    const { error } = await updateAccountantPermissions(link.id, next);
-    if (error) { flash("Could not update visibility"); return; }
-    setLink({ ...link, permissions: next });
+  // Pre-invite: toggle the local perms (no link yet).
+  const togglePerm = (k) => setPerms((p) => ({ ...p, [k]: !p[k] }));
+
+  // Editing a live link: batch changes into a draft, then Save/Cancel.
+  const startEdit = () => { setDraft({ ...(link.permissions || {}) }); setEditing(true); };
+  const cancelEdit = () => setEditing(false);
+  const saveEdit = async () => {
+    const { error } = await updateAccountantPermissions(link.id, draft);
+    if (error) { flash("Could not save the changes"); return; }
+    setLink({ ...link, permissions: draft });
+    setEditing(false);
+    flash("Access updated");
   };
 
   const revoke = async () => {
@@ -2498,17 +2506,40 @@ function AccountantTab({ user }) {
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "var(--txt-3)", margin: "14px 0 8px" }}>What they can see — changes apply immediately</div>
-            <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
-              {ACCT_PERMS.map(([k, label, blurb]) => (
-                <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
-                  <input type="checkbox" checked={link.permissions?.[k] === true} onChange={() => togglePerm(k)} style={{ marginTop: 2 }} />
-                  <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
-                </label>
-              ))}
-            </div>
-
-            <UBtn ghost danger onClick={revoke}>Remove access</UBtn>
+            {!editing && (
+              <>
+                <div style={{ fontSize: 12, color: "var(--txt-3)", margin: "14px 0 8px" }}>What they can see</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                  {ACCT_PERMS.filter(([k]) => link.permissions?.[k] === true).map(([k, label]) => (
+                    <span key={k} style={chip}>{label}</span>
+                  ))}
+                  {ACCT_PERMS.every(([k]) => link.permissions?.[k] !== true) && (
+                    <span style={{ fontSize: 12.5, color: "var(--txt-3)" }}>No sections shared — hit “Edit access” to choose some.</span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <UBtn ghost onClick={startEdit}>Edit access</UBtn>
+                  <UBtn ghost danger onClick={revoke}>Remove access</UBtn>
+                </div>
+              </>
+            )}
+            {editing && (
+              <>
+                <div style={{ fontSize: 12, color: "var(--txt-3)", margin: "14px 0 8px" }}>What they can see</div>
+                <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
+                  {ACCT_PERMS.map(([k, label, blurb]) => (
+                    <label key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", fontSize: 12.5 }}>
+                      <input type="checkbox" checked={draft[k] === true} onChange={() => setDraft((d) => ({ ...d, [k]: !(d[k] === true) }))} style={{ marginTop: 2 }} />
+                      <span><strong>{label}</strong><span style={{ color: "var(--txt-3)" }}> — {blurb}</span></span>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <UBtn onClick={saveEdit}>Save changes</UBtn>
+                  <UBtn ghost onClick={cancelEdit}>Cancel</UBtn>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

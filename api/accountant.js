@@ -221,33 +221,60 @@ export default async function handler(req, res) {
   let createdViaInvite = false
   let notifyExisting = false
   let recoveryLink = null
+  let alsoShared = false
   if (acctUser) {
     // Email already has an Alzaro login: no Supabase invite goes out, so
     // without this the accountant gets access silently and may never know.
     // Send a courtesy notification AFTER the link row commits (below).
-    // We ALSO mint a recovery link now, so the email can offer a
-    // "set / reset password" button — an existing user who doesn't remember
-    // their password (common for accountants who were once a trial customer)
-    // otherwise hits "Invalid login credentials" with no way forward.
     notifyExisting = true
+
+    // Decide whether this accountant already has a USABLE login. If they do,
+    // we must NOT invite them to reset a password they don't need to touch —
+    // that's the confusing case for an accountant a second client is linking.
+    // Only mint a set-a-password link for a first-time existing auth account
+    // (created earlier but never confirmed / signed in and not yet actively
+    // linked). "Usable" = email confirmed, has signed in before, or already
+    // holds an active accountant_links row from another client.
+    const confirmed = !!(acctUser.email_confirmed_at || acctUser.confirmed_at || acctUser.last_sign_in_at)
+    let hasActiveLink = false
     try {
-      const redirectTo = 'https://alzaro.co.uk/accountant/reset-password'
-      const r = await serviceFetch(
-        `/auth/v1/admin/generate_link`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ type: 'recovery', email, redirect_to: redirectTo }),
-        }
+      const c = await serviceFetch(
+        `/rest/v1/accountant_links?accountant_user_id=eq.${acctUser.id}&status=eq.active&select=id`,
+        { headers: { Prefer: 'count=exact', Range: '0-0' } }
       )
-      const j = await r.json().catch(() => null)
-      // Raw REST puts action_link on the object; the SDK nests under .properties.
-      recoveryLink = j?.action_link || j?.properties?.action_link || null
-      if (!r.ok || !recoveryLink) {
-        console.error('accountant: recovery link failed', r.status, j)
-        // Non-fatal: fall back to the plain portal link below.
-      }
+      const total = Number((c.headers.get('content-range') || '/0').split('/')[1] || 0)
+      hasActiveLink = total >= 1
     } catch (e) {
-      console.error('accountant: recovery link threw', e)
+      // Fail safe: if we can't tell, assume they DO have a usable login and
+      // send the plain notice — a wrong recovery link is what we're removing.
+      console.error('accountant: active-link check threw', e)
+      hasActiveLink = true
+    }
+    const hasUsableLogin = confirmed || hasActiveLink
+    alsoShared = hasUsableLogin
+
+    if (!hasUsableLogin) {
+      // First-time existing auth account: mint a recovery link so the email can
+      // offer a "set your portal password" button. (Non-fatal: falls back to the
+      // plain portal link if minting fails.)
+      try {
+        const redirectTo = 'https://alzaro.co.uk/accountant/reset-password'
+        const r = await serviceFetch(
+          `/auth/v1/admin/generate_link`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ type: 'recovery', email, redirect_to: redirectTo }),
+          }
+        )
+        const j = await r.json().catch(() => null)
+        // Raw REST puts action_link on the object; the SDK nests under .properties.
+        recoveryLink = j?.action_link || j?.properties?.action_link || null
+        if (!r.ok || !recoveryLink) {
+          console.error('accountant: recovery link failed', r.status, j)
+        }
+      } catch (e) {
+        console.error('accountant: recovery link threw', e)
+      }
     }
   }
   if (!acctUser) {
@@ -320,7 +347,7 @@ export default async function handler(req, res) {
     // the platform's purchase/trial emails: a mail hiccup must never fail the
     // link that's already committed.
     if (notifyExisting) {
-      try { await sendAccessNotification(email, bizName, P.label, recoveryLink) }
+      try { await sendAccessNotification(email, bizName, P.label, recoveryLink, alsoShared) }
       catch (e) { console.error('accountant: notify email failed (link still created)', e) }
     }
     return res.status(200).json({ ok: true, link: rows[0], existing_user: !createdViaInvite })
@@ -332,32 +359,52 @@ export default async function handler(req, res) {
 
 // Tells an ALREADY-REGISTERED accountant they've been granted access (brand-new
 // accountants get Supabase's invite email instead, so they're covered).
+// Three shapes, chosen by the caller:
+//   • recoveryLink set  → first-time existing account: offer a set-a-password button.
+//   • alsoShared        → they already have a usable login and another client has
+//                         now shared too: plain "also shared" notice, NO password link.
+//   • neither           → fallback (mint failed): plain notice, existing login.
 // Resend, from the platform address — same channel as purchase confirmations.
-async function sendAccessNotification(to, bizName, productLabel, recoveryLink) {
+async function sendAccessNotification(to, bizName, productLabel, recoveryLink, alsoShared) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) { console.error('accountant notify: RESEND_API_KEY not set; skipping'); return }
   const who = bizName || 'One of your clients'
-  const subject = `${who} has given you access to their books on Alzaro`
   const portalUrl = 'https://alzaro.co.uk/accountant'
-  // Prefer the recovery link (sets OR resets the password, then lands on the
-  // portal). Fall back to the plain sign-in page only if link minting failed.
   const primaryUrl = recoveryLink || portalUrl
-  const primaryLabel = recoveryLink ? 'Set up your portal login' : 'Open the accountant portal'
-  const passwordNote = recoveryLink
-    ? `The button sets your portal password (or resets it if you already have one), then takes you straight in.`
-    : `Sign in with your existing Alzaro login.`
+
+  let subject, heading, intro, primaryLabel, passwordNote
+  if (recoveryLink) {
+    subject = `${who} has given you access to their books on Alzaro`
+    heading = `${who} has shared their books with you`
+    intro = `${who} has given you view-only access to their ${productLabel} books.`
+    primaryLabel = 'Set up your portal login'
+    passwordNote = 'The button sets your portal password (or resets it if you already have one), then takes you straight in.'
+  } else if (alsoShared) {
+    subject = `${who} has also shared their books with you on Alzaro`
+    heading = `${who} has also shared their books with you`
+    intro = `${who} has added you as their accountant, giving you view-only access to their ${productLabel} books. It joins any other clients already in your portal.`
+    primaryLabel = 'Open the accountant portal'
+    passwordNote = 'Sign in with your existing Alzaro login — no new password needed.'
+  } else {
+    subject = `${who} has given you access to their books on Alzaro`
+    heading = `${who} has shared their books with you`
+    intro = `${who} has given you view-only access to their ${productLabel} books.`
+    primaryLabel = 'Open the accountant portal'
+    passwordNote = 'Sign in with your existing Alzaro login.'
+  }
+
   const text =
-    `${who} has given you view-only access to their ${productLabel} books.\n\n` +
+    `${intro}\n\n` +
     `${primaryLabel}: ${primaryUrl}\n\n` +
     `${passwordNote}\n\n` +
-    `You can look through their income, expenses and reports, but nothing can be changed from the accountant portal.\n\n` +
+    `You can look through their records, but nothing can be changed from the accountant portal.\n\n` +
     `— Alzaro`
   const html =
     `<div style="font-family:sans-serif;max-width:520px">` +
-    `<h2 style="margin:0 0 12px">${who} has shared their books with you</h2>` +
+    `<h2 style="margin:0 0 12px">${heading}</h2>` +
     `<p>You now have <b>view-only</b> access to their ${productLabel} records on Alzaro.</p>` +
     `<p><a href="${primaryUrl}" style="display:inline-block;background:#f59e0b;color:#151515;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px">${primaryLabel}</a></p>` +
-    `<p style="color:#666;font-size:13px">${passwordNote} You can view income, expenses and reports — nothing can be changed from the portal.</p>` +
+    `<p style="color:#666;font-size:13px">${passwordNote} You can view their records — nothing can be changed from the portal.</p>` +
     `</div>`
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',

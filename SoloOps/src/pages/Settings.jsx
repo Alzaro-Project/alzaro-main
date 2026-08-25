@@ -920,6 +920,8 @@ function AccountantTab({ memberStatus, flash }) {
   const [perms, setPerms] = React.useState({ dashboard: true, income: true, items: true, expenses: true, reports: true })
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  const [editing, setEditing] = React.useState(false)   // editing a live link's visibility
+  const [draft, setDraft] = React.useState({})          // pending edits, saved on demand
   const eligible = ['trial', 'active'].includes(memberStatus || '')
 
   const reload = React.useCallback(async () => { setLink(await getAccountantLink()) }, [])
@@ -953,13 +955,18 @@ function AccountantTab({ memberStatus, flash }) {
     }
   }
 
-  const togglePerm = async (k) => {
-    if (!link) { setPerms(p => ({ ...p, [k]: !p[k] })); return }
-    // Live link: flip visibility immediately under RLS.
-    const next = { ...link.permissions, [k]: !(link.permissions?.[k] === true) }
-    const { error } = await updateAccountantPermissions(link.id, next)
-    if (error) { flash('Could not update visibility'); return }
-    setLink({ ...link, permissions: next })
+  // Pre-invite: toggle the local perms (no link yet).
+  const togglePerm = (k) => setPerms(p => ({ ...p, [k]: !p[k] }))
+
+  // Editing a live link: batch changes into a draft, then Save/Cancel.
+  const startEdit = () => { setDraft({ ...(link.permissions || {}) }); setEditing(true) }
+  const cancelEdit = () => setEditing(false)
+  const saveEdit = async () => {
+    const { error } = await updateAccountantPermissions(link.id, draft)
+    if (error) { flash('Could not save the changes'); return }
+    setLink({ ...link, permissions: draft })
+    setEditing(false)
+    flash('Access updated')
   }
 
   const revoke = async () => {
@@ -1027,20 +1034,43 @@ function AccountantTab({ memberStatus, flash }) {
             </div>
           )}
 
-          <div style={{ fontSize: '12px', color: 'var(--text3)', margin: '14px 0 8px' }}>What they can see — changes apply immediately</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
-            {ACCT_PERMS.map(([k, label, blurb]) => (
-              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13.5px' }}>
-                <input type="checkbox" checked={link.permissions?.[k] === true} onChange={() => togglePerm(k)} />
-                <span style={{ fontWeight: 600 }}>{label}</span>
-                <span style={{ color: 'var(--text3)', fontSize: '12px' }}>{blurb}</span>
-              </label>
-            ))}
-          </div>
-
-          <button onClick={revoke} style={{ background: 'transparent', color: 'var(--red, #ef4444)', border: '1px solid rgba(239,68,68,.4)', borderRadius: '8px', padding: '9px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-            Remove access
-          </button>
+          {!editing && (
+            <>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', margin: '14px 0 8px' }}>What they can see</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                {ACCT_PERMS.filter(([k]) => link.permissions?.[k] === true).map(([k, label]) => (
+                  <span key={k} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--orange-light)', background: 'var(--orange-subtle)', border: '1px solid rgba(249,115,22,.3)', borderRadius: '999px', padding: '4px 11px' }}>{label}</span>
+                ))}
+                {ACCT_PERMS.every(([k]) => link.permissions?.[k] !== true) && (
+                  <span style={{ fontSize: '12.5px', color: 'var(--text3)' }}>No sections shared — hit “Edit access” to choose some.</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={startEdit} style={btnSec}>Edit access</button>
+                <button onClick={revoke} style={{ background: 'transparent', color: 'var(--red, #ef4444)', border: '1px solid rgba(239,68,68,.4)', borderRadius: '8px', padding: '9px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                  Remove access
+                </button>
+              </div>
+            </>
+          )}
+          {editing && (
+            <>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', margin: '14px 0 8px' }}>What they can see</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {ACCT_PERMS.map(([k, label, blurb]) => (
+                  <label key={k} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13.5px' }}>
+                    <input type="checkbox" checked={draft[k] === true} onChange={() => setDraft(d => ({ ...d, [k]: !(d[k] === true) }))} />
+                    <span style={{ fontWeight: 600 }}>{label}</span>
+                    <span style={{ color: 'var(--text3)', fontSize: '12px' }}>{blurb}</span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={saveEdit} style={btnPri}>Save changes</button>
+                <button onClick={cancelEdit} style={btnSec}>Cancel</button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
