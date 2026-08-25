@@ -9,6 +9,8 @@ export default function TrialGuard({ memberId, children }) {
   const [liveStatus, setLiveStatus] = useState(null)
   const [liveTrialEnds, setLiveTrialEnds] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [buying, setBuying] = useState(null)   // tier key while a checkout is starting
+  const [buyErr, setBuyErr] = useState('')
 
   useEffect(() => {
     if (!memberId) {
@@ -39,6 +41,43 @@ export default function TrialGuard({ memberId, children }) {
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
   }, [memberId])
+
+  // Start a Stripe Checkout for the chosen tier straight from this wall.
+  // Without this an expired-trial user is locked out of Settings by this very
+  // guard, so "View plans" used to loop back here with no way to actually pay.
+  const PLANS = [
+    { key: 'basic',  name: 'Basic',  price: '£5.99'  },
+    { key: 'bronze', name: 'Bronze', price: '£12.99' },
+    { key: 'silver', name: 'Silver', price: '£18.99' },
+    { key: 'gold',   name: 'Gold',   price: '£28.99' },
+  ]
+  const startCheckout = async (tierKey) => {
+    setBuying(tierKey); setBuyErr('')
+    try {
+      const { data } = await sb.auth.getSession()
+      const session = data?.session
+      if (!session?.access_token || !session?.user?.email) throw new Error('Please sign in again to subscribe.')
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: session.user.email,
+          garageId: memberId,
+          product: 'soloops',
+          tier: tierKey,
+        }),
+      })
+      const out = await res.json()
+      if (!res.ok || !out.url) throw new Error(out.error || 'Could not start checkout')
+      window.location.href = out.url
+    } catch (e) {
+      setBuyErr(e.message || 'Could not start checkout')
+      setBuying(null)
+    }
+  }
 
   const signOut = async () => {
     try { await sb.auth.signOut() } catch (e) { /* ignore */ }
@@ -100,15 +139,30 @@ export default function TrialGuard({ memberId, children }) {
             <div style={{ color: 'var(--text2)', marginBottom: '24px', lineHeight: 1.6 }}>
               Your free trial has ended. Subscribe to continue using Alzaro SoloOps and access all your data.
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <a
-                href="/soloops/settings"
-                style={{ background: 'var(--orange)', color: '#000', fontWeight: 700, fontSize: '14px', padding: '13px 24px', borderRadius: '8px', textDecoration: 'none', display: 'inline-block' }}
-              >
-                View plans
-              </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {PLANS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => startCheckout(p.key)}
+                  disabled={!!buying || !memberId}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: p.key === 'silver' ? 'var(--orange)' : 'var(--surface2)',
+                    color: p.key === 'silver' ? '#000' : 'var(--text)',
+                    border: '1px solid var(--border)', borderRadius: '8px',
+                    padding: '12px 18px', fontSize: '14px', fontWeight: 700,
+                    cursor: buying ? 'wait' : 'pointer', opacity: buying && buying !== p.key ? 0.6 : 1,
+                  }}
+                >
+                  <span>{buying === p.key ? 'Opening checkout…' : `Subscribe to ${p.name}`}</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{p.price}/mo</span>
+                </button>
+              ))}
+              {buyErr && (
+                <div style={{ color: '#e5484d', fontSize: '13px' }}>{buyErr}</div>
+              )}
               <div style={{ color: 'var(--text3)', fontSize: '12px' }}>
-                Starting from £5.99/month
+                Cancel any time. Your data is exactly where you left it.
               </div>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '16px' }}>

@@ -22,11 +22,11 @@
 import Stripe from 'stripe'
 
 // Canonical base for the portal return_url. Same rationale as the checkout
-// session: always the canonical www host so the return is consistent across
-// verticals. APP_BASE_URL can override for staging.
+// session: always the canonical apex host (www 301s to apex) so the return is
+// consistent across verticals. APP_BASE_URL can override for staging.
 function appBaseUrl() {
   if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '')
-  return 'https://www.alzaro.co.uk'
+  return 'https://alzaro.co.uk'
 }
 
 // Allow only known vertical route prefixes so the return_url can't be steered
