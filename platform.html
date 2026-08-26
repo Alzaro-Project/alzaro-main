@@ -22,8 +22,16 @@
       --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
       --radius:16px; --radius-sm:8px;
     }
+    html[data-theme="light"]{
+      --bg:#f7f5f2; --surface:#ffffff; --surface2:#f2efea; --surface3:#e8e3db;
+      --border:rgba(0,0,0,.09); --border-light:rgba(0,0,0,.14);
+      --text:#1c1a17; --text2:#57534e; --text3:#8a827a;
+      --orange:#ea6a10; --orange-light:#c2560c; --amber:#b45309;
+      --orange-subtle:rgba(234,106,16,.08);
+      --green:#16a34a; --red:#dc2626; --blue:#2563eb;
+    }
     *{box-sizing:border-box; margin:0; padding:0;}
-    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased;}
+    html,body{background:var(--bg); color:var(--text); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased; transition:background .2s ease, color .2s ease;}
     .mono{font-family:'Fira Code',monospace;}
     ::-webkit-scrollbar{width:8px;height:8px;}
     ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
@@ -58,8 +66,11 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- dedicated auth storage key so platform session is isolated -->
+  <!-- apply saved theme before first paint to avoid a flash -->
   <script>
+    try { document.documentElement.setAttribute('data-theme', localStorage.getItem('alzaro-platform-theme') || 'dark') } catch (e) {}
+  </script>
+  <!-- dedicated auth storage key so platform session is isolated -->  <script>
     const SUPABASE_URL = 'https://cxsaeftacozyphuejuxo.supabase.co'
     window.SB_FN_URL = 'https://cxsaeftacozyphuejuxo.supabase.co/functions/v1'
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4c2FlZnRhY296eXBodWVqdXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODExNTEsImV4cCI6MjA4OTQ1NzE1MX0.hqx-0ZfG3MOHPg_fwVhPGh2CJAWqJd3GqPssWpRKDEo'
@@ -91,6 +102,8 @@ const CHANGELOG = [
     { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
     { type:'added',    text:'Basic tier now available in the tier dropdown.' },
     { type:'added',    text:'Delete account (danger zone) — permanently removes the login and all product data, with a typed DELETE confirmation.' },
+    { type:'added',    text:'Light / dark mode toggle in the header, remembered across visits.' },
+    { type:'fixed',    text:'Switching away and back to the tab no longer resets to the "Loading platform…" screen.' },
     { type:'fixed',    text:'Load failures now show a visible error banner with Retry instead of failing silently.' },
   ]},
   { version:'2026-08-14', date:'14/08/2026', product:'SoloOps', title:'Slimmer SoloOps', items:[
@@ -164,6 +177,16 @@ function useIsMobile() {
 
 function Platform() {
   const isMobile = useIsMobile()
+  // theme: 'dark' | 'light', remembered across visits
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('alzaro-platform-theme') || 'dark' } catch { return 'dark' }
+  })
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try { localStorage.setItem('alzaro-platform-theme', theme) } catch {}
+  }, [theme])
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+
   const [session, setSession] = useState(undefined)
   const [allowed, setAllowed] = useState(undefined) // undefined=checking, false=denied, true=admin
   const [loading, setLoading] = useState(true)
@@ -207,14 +230,30 @@ function Platform() {
 
   useEffect(() => {
     window.sb.auth.getSession().then(({ data }) => setSession(data.session || null))
-    const { data: sub } = window.sb.auth.onAuthStateChange((_e, s) => setSession(s))
+    // Only react to a genuine change of signed-in user. Supabase also fires
+    // this on tab refocus (TOKEN_REFRESHED / SIGNED_IN with the same user),
+    // which would otherwise re-trigger the full-screen loader every time you
+    // switch back to the tab. Compare user ids and ignore no-op events.
+    const { data: sub } = window.sb.auth.onAuthStateChange((event, s) => {
+      if (event === 'TOKEN_REFRESHED') return // silent token refresh — keep everything as-is
+      setSession(prev => {
+        const prevId = prev && prev.user ? prev.user.id : null
+        const nextId = s && s.user ? s.user.id : null
+        if (prevId === nextId) return prev // same user (or still logged out) — no change
+        return s
+      })
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  // verify admin + load all users
+  // verify admin + load all users — runs once per real login, keyed on user id
+  const checkedFor = React.useRef(null)
   useEffect(() => {
     if (session === undefined) return
-    if (session === null) { setAllowed(undefined); setLoading(false); return }
+    const uid = session && session.user ? session.user.id : null
+    if (uid === null) { checkedFor.current = null; setAllowed(undefined); setLoading(false); return }
+    if (checkedFor.current === uid) return // already verified this user; don't re-loop on refocus
+    checkedFor.current = uid
     const run = async () => {
       setLoading(true)
       const { data: isAdmin, error } = await window.sb.rpc('is_platform_admin')
@@ -484,6 +523,7 @@ function Platform() {
           <div style={{ color:'var(--text3)', fontSize:'13px' }}>{session.user.email}</div>
         </div>
         <div className="hdr-actions">
+          <button onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={btnSec}>{theme === 'dark' ? '☀' : '☾'}</button>
           <button onClick={loadUsers} disabled={refreshing} style={{...btnSec, opacity: refreshing?0.6:1}}>{refreshing ? '↻ …' : '↻ Refresh'}</button>
           <button onClick={()=>setShowAdmins(true)} style={{...btnSec, color:'var(--orange-light)', borderColor:'rgba(249,115,22,.3)'}}>+ Admins</button>
           <button onClick={signOut} style={btnSec}>Sign out</button>
