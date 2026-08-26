@@ -29,8 +29,10 @@ function appBaseUrl() {
 }
 
 // Verify the given product_members row belongs to the caller. Reads user_id
-// with the service-role key (bypasses RLS). Returns null when ownership is
-// confirmed, or an { status, error } object to return to the client.
+// (plus the stored Stripe ids, needed for the existing-subscriber path) with
+// the service-role key (bypasses RLS). Returns { err, row }:
+//   err = null when ownership is confirmed, else { status, error } to return.
+//   row = { stripe_customer_id, stripe_subscription_id } when confirmed.
 //   - row not found            -> 404 (nothing to bill)
 //   - user_id mismatch         -> 403 (fail closed)
 //   - can't verify (no key /   -> 403 (fail closed rather than allow)
@@ -39,23 +41,39 @@ async function verifyOwnership({ supabaseUrl, garageId, product, callerId }) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!key || !callerId) {
     console.error('Ownership check: missing service-role key or caller id; refusing')
-    return { status: 403, error: 'Unable to verify account ownership' }
+    return { err: { status: 403, error: 'Unable to verify account ownership' } }
   }
   try {
     const url =
       `${supabaseUrl}/rest/v1/product_members` +
       `?id=eq.${encodeURIComponent(garageId)}` +
       `&product=eq.${encodeURIComponent(product)}` +
-      `&select=user_id`
+      `&select=user_id,stripe_customer_id,stripe_subscription_id`
     const r = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
-    if (!r.ok) return { status: 403, error: 'Unable to verify account ownership' }
+    if (!r.ok) return { err: { status: 403, error: 'Unable to verify account ownership' } }
     const rows = await r.json()
-    if (!rows?.length) return { status: 404, error: 'Account not found' }
-    if (rows[0].user_id !== callerId) return { status: 403, error: 'This account does not belong to you' }
-    return null
+    if (!rows?.length) return { err: { status: 404, error: 'Account not found' } }
+    if (rows[0].user_id !== callerId) return { err: { status: 403, error: 'This account does not belong to you' } }
+    return { err: null, row: rows[0] }
   } catch (e) {
     console.error('Ownership check failed:', e)
-    return { status: 403, error: 'Unable to verify account ownership' }
+    return { err: { status: 403, error: 'Unable to verify account ownership' } }
+  }
+}
+
+// A stored stripe_subscription_id alone is NOT proof of a live subscription —
+// cancelled accounts keep a stale value. Verify liveness against the Stripe
+// API. Statuses that mean "there is a real subscription to modify": active,
+// trialing, past_due (past_due should update via the portal, not stack a
+// second sub). canceled / incomplete_expired / retrieval failure -> not live.
+async function liveSubscription(stripe, subscriptionId) {
+  if (!subscriptionId) return null
+  try {
+    const sub = await stripe.subscriptions.retrieve(subscriptionId)
+    return ['active', 'trialing', 'past_due'].includes(sub?.status) ? sub : null
+  } catch (e) {
+    // Unknown / deleted subscription id -> treat as no live subscription.
+    return null
   }
 }
 
@@ -104,7 +122,7 @@ export default async function handler(req, res) {
     // Without this, any logged-in user could start a checkout against another
     // account's product_members row by guessing its id. Uses the service-role
     // key to read the row's user_id (bypasses RLS). Fails closed on mismatch.
-    const ownerErr = await verifyOwnership({ supabaseUrl, garageId, product, callerId })
+    const { err: ownerErr, row: memberRow } = await verifyOwnership({ supabaseUrl, garageId, product, callerId })
     if (ownerErr) return res.status(ownerErr.status).json({ error: ownerErr.error })
     // --- End ownership check ---
 
@@ -124,6 +142,45 @@ export default async function handler(req, res) {
     const base = appBaseUrl()
     const settingsPath = `/${product}/settings`
 
+    // --- Existing subscriber? Route to the Billing Portal, NEVER a new
+    // checkout (Bug #14: checkout always CREATES a subscription, so an active
+    // subscriber changing plans ended up paying for two at once). Liveness is
+    // verified against Stripe — a stale stored id on a cancelled account still
+    // gets a fresh checkout as it should. ---
+    const existingSub = await liveSubscription(stripe, memberRow?.stripe_subscription_id)
+    if (existingSub) {
+      const returnUrl = `${base}${settingsPath}?billing=updated`
+      const portalCustomer =
+        (typeof existingSub.customer === 'string' ? existingSub.customer : existingSub.customer?.id) ||
+        memberRow?.stripe_customer_id
+      try {
+        // Deep-link straight into the plan-change flow for THIS subscription.
+        // Requires the Customer Portal configuration to allow subscription
+        // updates with our prices (Stripe Dashboard -> Settings -> Billing ->
+        // Customer portal).
+        const flow = await stripe.billingPortal.sessions.create({
+          customer: portalCustomer,
+          return_url: returnUrl,
+          flow_data: {
+            type: 'subscription_update',
+            subscription_update: { subscription: existingSub.id },
+          },
+        })
+        return res.status(200).json({ url: flow.url, portal: true })
+      } catch (e) {
+        // Portal config may not allow the update flow yet — fall back to a
+        // plain portal session so the user can still manage the existing
+        // subscription. Never fall back to checkout: that recreates Bug #14.
+        console.error('Portal update-flow failed, falling back to plain portal:', e.message)
+        const plain = await stripe.billingPortal.sessions.create({
+          customer: portalCustomer,
+          return_url: returnUrl,
+        })
+        return res.status(200).json({ url: plain.url, portal: true })
+      }
+    }
+    // --- End existing-subscriber routing ---
+
     // Put the lookup keys on BOTH the session and the subscription so the
     // webhook can find the product_members row from either event shape.
     const metadata = {
@@ -133,10 +190,26 @@ export default async function handler(req, res) {
       tier: resolvedTier,
     }
 
+    // Reuse the stored Stripe customer when we have one (e.g. a returning
+    // customer whose old subscription was cancelled). `customer_email` on its
+    // own creates a brand-new Stripe customer object on EVERY checkout, which
+    // is how duplicate customers piled up. Verify the stored id still exists
+    // and isn't deleted; otherwise fall back to customer_email.
+    let existingCustomerId = null
+    if (memberRow?.stripe_customer_id) {
+      try {
+        const cust = await stripe.customers.retrieve(memberRow.stripe_customer_id)
+        if (cust && !cust.deleted) existingCustomerId = cust.id
+      } catch (e) {
+        // Unknown id (e.g. from a deleted customer or an old test-mode run) —
+        // ignore and let checkout create a fresh customer.
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      customer_email: email,
+      ...(existingCustomerId ? { customer: existingCustomerId } : { customer_email: email }),
       client_reference_id: String(garageId),
       metadata,
       subscription_data: { metadata },
