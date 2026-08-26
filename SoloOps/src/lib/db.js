@@ -256,6 +256,20 @@ export async function loadSettings(uid) {
     .from('soloops_settings').select(SETTINGS_COLS).eq('user_id', uid).maybeSingle()
   return data || null
 }
+// Decrypt the caller's OWN stored SMTP password via the SECURITY DEFINER RPC.
+// The RPC is scoped to auth.uid() so no other account's password can ever come
+// back. Used by Settings so the owner can see and change their saved password
+// (PropertyOps pattern) — returns null when nothing is stored or the RPC isn't
+// deployed, and callers treat that as "not saved yet".
+export async function getSmtpSecret() {
+  try {
+    const { data, error } = await sb.rpc('soloops_smtp_secret')
+    if (error) return null
+    return (typeof data === 'string' && data) ? data : null
+  } catch (e) {
+    return null
+  }
+}
 export async function saveSettings(record) {
   return sb.from('soloops_settings').upsert(record, { onConflict: 'user_id' })
 }
