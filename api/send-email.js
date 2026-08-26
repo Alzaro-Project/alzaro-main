@@ -57,7 +57,14 @@ function defaultSender(product) {
   return PRODUCT_SENDER[String(product || '')] || 'Alzaro'
 }
 
-const SMTP_COLS = 'smtp_host,smtp_port,smtp_secure,smtp_user,smtp_pass,smtp_from_name,smtp_from_email,smtp_reply_to'
+// NOTE: smtp_pass is deliberately NOT in this list. The staff migrations
+// (soloops 008 §5, garage 013 §5) REVOKE column-level SELECT on smtp_pass /
+// smtp_pass_enc from the authenticated role — and PostgREST rejects the WHOLE
+// query if any selected column is revoked. Including it here made every
+// requireSmtp send fail with "Email not configured" even for fully configured
+// accounts. The password comes from the secret RPC below; the plaintext
+// fallback is a separate best-effort read so a revoke can't sink the config.
+const SMTP_COLS = 'smtp_host,smtp_port,smtp_secure,smtp_user,smtp_from_name,smtp_from_email,smtp_reply_to'
 
 function resolveSupabaseUrl() {
   return (
@@ -226,11 +233,21 @@ export default async function handler(req, res) {
       // Password: prefer the encrypted-at-rest value via the decrypt RPC; fall
       // back to the plaintext column when the encryption migration isn't in place
       // yet (keeps the rollout seamless). Never accepted from the request body.
+      // The plaintext read is a SEPARATE request on purpose: on databases where
+      // the staff migrations revoked SELECT on smtp_pass, this read simply
+      // returns null instead of poisoning the main config read above.
       let smtpPass = null
       if (map.secretRpc) {
         smtpPass = await callSecretRpc({ supabaseUrl, anonKey: supabaseAnonKey, token, fn: map.secretRpc })
       }
-      if (!smtpPass) smtpPass = cfg.smtp_pass || null
+      if (!smtpPass) {
+        const passRow = await readOwnSettings({
+          supabaseUrl, anonKey: supabaseAnonKey, token,
+          table: map.table, userId, cols: 'smtp_pass',
+          productFilter: map.productFilter,
+        })
+        smtpPass = passRow?.smtp_pass || null
+      }
       if (!smtpPass) {
         return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
       }
