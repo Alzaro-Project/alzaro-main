@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Alzaro — Platform Admin</title>
   <meta name="description" content="Alzaro platform admin — all users across every vertical." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -29,8 +29,31 @@
     ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:8px;}
     a{color:inherit;text-decoration:none;}
     select{font-family:'Manrope',sans-serif;}
+    input,button{font-family:'Manrope',sans-serif;}
     .fade-in{animation:fade .5s ease both;}
     @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+    @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+
+    /* ---------- responsive layout ---------- */
+    .page{max-width:1180px;margin:0 auto;padding:28px;padding-bottom:calc(28px + env(safe-area-inset-bottom));}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:16px;}
+    .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+    .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+    .toolbar .search{flex:1;min-width:200px;}
+    .hdr-actions{display:flex;gap:10px;flex-wrap:wrap;}
+    .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:16px;}
+    .prod-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;}
+
+    @media (max-width:720px){
+      .page{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom));}
+      .stat-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+      .chip-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;}
+      .chip-row::-webkit-scrollbar{display:none;}
+      .chip-row button{flex-shrink:0;}
+      .hdr-actions button{padding:10px 14px !important;}
+      .prod-grid{grid-template-columns:1fr;}
+      .card-pad{padding:14px !important;}
+    }
   </style>
 </head>
 <body>
@@ -63,6 +86,12 @@ const { useState, useEffect } = React
 //   title:'…', items:[{type:'added|improved|fixed|removed', text:'…'}] }
 // ============================================================
 const CHANGELOG = [
+  { version:'2026-08-26', date:'26/08/2026', product:'Platform', title:'Admin panel refresh', items:[
+    { type:'improved', text:'Mobile layout — users show as tap-to-expand cards on phones; table stays on desktop.' },
+    { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
+    { type:'added',    text:'Basic tier now available in the tier dropdown.' },
+    { type:'fixed',    text:'Load failures now show a visible error banner with Retry instead of failing silently.' },
+  ]},
   { version:'2026-08-14', date:'14/08/2026', product:'SoloOps', title:'Slimmer SoloOps', items:[
     { type:'removed',  text:'Banking, Mileage, Documents and Tax pages removed from the app — all underlying data kept; tax now lives inside Reports.' },
     { type:'improved', text:'Dashboard chart follows the selected period (today / week / month / quarter / year / custom range).' },
@@ -106,6 +135,12 @@ const VERTICALS = {
 // button is hidden rather than opening a 404.
 const SUPPORT_READY = ['soloops', 'tyreops', 'garageops', 'serviceops', 'propertyops']
 
+// Tier options per product. TyreOps has the extra Basic tier; the rest are
+// bronze/silver/gold. Falls back to DEFAULT_TIERS for unknown products.
+const DEFAULT_TIERS = ['bronze', 'silver', 'gold']
+const TIERS_BY_PRODUCT = { tyreops: ['basic', 'bronze', 'silver', 'gold'] }
+const tiersFor = product => TIERS_BY_PRODUCT[product] || DEFAULT_TIERS
+
 const gbp = n => (n === null || n === undefined) ? '—' : new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(n)
 const fmtNum = n => (n === null || n === undefined) ? '—' : n.toLocaleString('en-GB')
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'
@@ -114,16 +149,40 @@ const card = { background:'var(--surface)', border:'1px solid var(--border)', bo
 const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:700, fontSize:'13px', padding:'9px 14px', borderRadius:'10px', border:'1px solid var(--border-light)', cursor:'pointer' }
 const td = { padding:'13px 14px', borderBottom:'1px solid var(--border)', fontSize:'13.5px', verticalAlign:'middle' }
 
+// Tracks the <720px breakpoint so the user list can switch table ⇄ cards.
+function useIsMobile() {
+  const [m, setM] = useState(window.matchMedia('(max-width: 720px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 720px)')
+    const fn = e => setM(e.matches)
+    mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn)
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn) }
+  }, [])
+  return m
+}
+
 function Platform() {
+  const isMobile = useIsMobile()
   const [session, setSession] = useState(undefined)
   const [allowed, setAllowed] = useState(undefined) // undefined=checking, false=denied, true=admin
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadErr, setLoadErr] = useState('') // visible error when the user list fails to load
   const [users, setUsers] = useState([])
   const [filter, setFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all') // all | active | disabled
+  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(null) // user_id currently toggling
   const [planBusy, setPlanBusy] = useState(null) // user_id+product currently saving plan
   const [expanded, setExpanded] = useState(null) // user_id currently expanded
   const [showAdmins, setShowAdmins] = useState(false)
+  const [toast, setToast] = useState('') // transient error/info message
+
+  const showToast = (msg) => {
+    setToast(msg)
+    clearTimeout(showToast._t)
+    showToast._t = setTimeout(() => setToast(''), 4500)
+  }
 
   // call the admin-users edge function with the current session token
   const callFn = async (body) => {
@@ -167,9 +226,16 @@ function Platform() {
   }, [session])
 
   const loadUsers = async () => {
-    const res = await callFn({ action: 'list' })
-    if (res && res.users) setUsers(res.users)
-    else if (res && res.error) console.error('load failed:', res.error)
+    setLoadErr('')
+    setRefreshing(true)
+    try {
+      const res = await callFn({ action: 'list' })
+      if (res && res.users) setUsers(res.users)
+      else setLoadErr((res && res.error) || 'The server returned no data.')
+    } catch (e) {
+      setLoadErr('Network error — check your connection and try again.')
+    }
+    setRefreshing(false)
   }
 
   const doLogin = async () => {
@@ -186,9 +252,9 @@ function Platform() {
     const disable = !u.is_disabled
     if (disable && !confirm(`Disable ${u.email}? They will be blocked from logging in to all Alzaro products. This is reversible.`)) return
     setBusy(u.user_id)
-    const res = await callFn({ action: disable ? 'disable' : 'enable', user_id: u.user_id })
+    const res = await callFn({ action: disable ? 'disable' : 'enable', user_id: u.user_id }).catch(() => ({ error: 'Network error' }))
     setBusy(null)
-    if (res && res.error) { alert('Failed: ' + res.error); return }
+    if (res && res.error) { showToast('Failed: ' + res.error); return }
     await loadUsers()
   }
 
@@ -230,9 +296,9 @@ function Platform() {
   // update tier/status for one vertical
   const setPlan = async (u, product, patch) => {
     setPlanBusy(u.user_id + product)
-    const res = await callFn({ action: 'set-plan', user_id: u.user_id, product, ...patch })
+    const res = await callFn({ action: 'set-plan', user_id: u.user_id, product, ...patch }).catch(() => ({ error: 'Network error' }))
     setPlanBusy(null)
-    if (res && res.error) { alert('Failed: ' + res.error); return }
+    if (res && res.error) { showToast('Failed: ' + res.error); return }
     await loadUsers()
   }
 
@@ -250,8 +316,8 @@ function Platform() {
             Alzaro <span style={{color:'var(--orange)'}}>Platform</span>
           </div>
           <div style={{ color:'var(--text3)', fontSize:'13px', marginBottom:'22px' }}>Admin access only</div>
-          <Field label="Email" value={email} onChange={setEmail} type="email" onEnter={doLogin} />
-          <Field label="Password" value={pw} onChange={setPw} type="password" onEnter={doLogin} />
+          <Field label="Email" value={email} onChange={setEmail} type="email" onEnter={doLogin} autoComplete="username" />
+          <Field label="Password" value={pw} onChange={setPw} type="password" onEnter={doLogin} autoComplete="current-password" />
           {loginErr && <div style={{ color:'var(--red)', fontSize:'13px', margin:'4px 0 12px' }}>{loginErr}</div>}
           <button onClick={doLogin} disabled={loggingIn}
             style={{ width:'100%', background:'linear-gradient(135deg, var(--orange), var(--amber))', color:'#fff', fontWeight:800, fontSize:'14px', padding:'12px', borderRadius:'10px', border:'none', cursor:'pointer', marginTop:'6px', opacity: loggingIn?0.6:1 }}>
@@ -284,27 +350,128 @@ function Platform() {
     return acc
   }, {})
 
-  const shown = filter === 'all'
-    ? users
-    : users.filter(u => (u.verticals || '').includes(filter))
+  // filter: vertical chip → status → search (email or any company name)
+  const q = search.trim().toLowerCase()
+  const shown = users.filter(u => {
+    if (filter !== 'all' && !(u.verticals || '').includes(filter)) return false
+    if (statusFilter === 'active' && u.is_disabled) return false
+    if (statusFilter === 'disabled' && !u.is_disabled) return false
+    if (q) {
+      const companies = (u.memberships || []).map(m => m.company_name || '').join(' ').toLowerCase()
+      if (!(u.email || '').toLowerCase().includes(q) && !companies.includes(q)) return false
+    }
+    return true
+  })
+
+  // Shared expanded-detail block, used by both the desktop table row and the
+  // mobile card so behaviour stays identical.
+  const ExpandedDetail = ({ u }) => (
+    <div>
+      <div className="detail-grid">
+        <Detail label="Joined" value={fmtDate(u.created_at)} />
+        <Detail label="Last logged in" value={u.last_sign_in_at ? fmtDateTime(u.last_sign_in_at) : 'Never'} />
+        <Detail label="Email confirmed" value={u.email_confirmed_at ? fmtDate(u.email_confirmed_at) : 'No'} />
+        <Detail label="Account" value={u.is_disabled ? 'Disabled' : 'Active'} color={u.is_disabled?'var(--red)':'var(--green)'} />
+      </div>
+      <div style={{ fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, marginBottom:'10px' }}>Products ({(u.memberships||[]).length})</div>
+      <div className="prod-grid">
+        {(u.memberships||[]).map((m,i) => {
+          const meta = VERTICALS[m.product] || { label:m.product, color:'var(--text3)' }
+          return (
+            <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'14px' }}>
+              <div style={{ fontWeight:800, color:meta.color, marginBottom:'10px' }}>{meta.label}</div>
+              <Row k="Company" v={m.company_name || '—'} />
+              <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
+              {m.usage && (
+                <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+                  <Metric label="Customers" value={fmtNum(m.usage.customers)} />
+                  {m.usage.inventory !== null && <Metric label="Inventory" value={fmtNum(m.usage.inventory)} />}
+                  <Metric label="Invoices" value={fmtNum(m.usage.invoices)} />
+                  {m.usage.revenue !== null && <Metric label="Revenue" value={gbp(m.usage.revenue)} color="var(--green)" />}
+                </div>
+              )}
+              <div style={{ marginTop:'10px', display:'grid', gap:'8px' }}>
+                <PlanSelect label="Tier" value={m.tier || 'bronze'} options={tiersFor(m.product)}
+                  disabled={planBusy===u.user_id+m.product}
+                  onChange={val=>setPlan(u, m.product, { tier: val })} />
+                <PlanSelect label="Status" value={m.status || 'trial'} options={['trial','active','suspended','disabled']}
+                  disabled={planBusy===u.user_id+m.product}
+                  onChange={val=>setPlan(u, m.product, { status: val })} />
+              </div>
+              {SUPPORT_READY.includes(m.product) ? (
+                <button
+                  onClick={async (e)=>{
+                    e.stopPropagation()
+                    setSupportBusy(u.user_id + m.product)
+                    const failure = await openClientPortal(u, m.product)
+                    setSupportBusy(null)
+                    if (failure) showToast('Could not open the portal: ' + failure)
+                  }}
+                  disabled={u.is_disabled || supportBusy === u.user_id + m.product}
+                  title={u.is_disabled ? 'Enable the account first' : `Open ${m.product} as ${u.email}`}
+                  style={{ ...btnSec, width:'100%', marginTop:'10px', padding:'10px', color: u.is_disabled ? 'var(--text3)' : 'var(--orange-light)', borderColor: u.is_disabled ? 'var(--border)' : 'rgba(249,115,22,.35)', cursor: u.is_disabled ? 'not-allowed' : 'pointer', opacity: (u.is_disabled || supportBusy === u.user_id + m.product) ? 0.5 : 1 }}>
+                  {supportBusy === u.user_id + m.product ? 'Opening…' : 'View client portal ↗'}
+                </button>
+              ) : (
+                <div style={{ marginTop:'10px', fontSize:'11.5px', color:'var(--text3)', textAlign:'center' }}>
+                  Portal access not enabled for {meta.label} yet
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  const VerticalChips = ({ u }) => (
+    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
+      {(u.verticals||'').split(', ').filter(Boolean).map(v => {
+        const meta = VERTICALS[v] || { label:v, color:'var(--text3)' }
+        return <span key={v} style={{ fontSize:'11px', fontWeight:700, padding:'3px 8px', borderRadius:'6px', background:'var(--surface2)', color:meta.color, border:'1px solid var(--border-light)' }}>{meta.label}</span>
+      })}
+    </div>
+  )
+
+  const DisableBtn = ({ u, full }) => (
+    <button
+      onClick={(e)=>{ e.stopPropagation(); toggleDisabled(u) }}
+      disabled={busy===u.user_id}
+      style={{
+        ...btnSec, padding: full ? '10px' : '7px 13px', width: full ? '100%' : undefined,
+        color: u.is_disabled ? 'var(--green)' : 'var(--red)',
+        borderColor: u.is_disabled ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)',
+        opacity: busy===u.user_id ? 0.5 : 1
+      }}>
+      {busy===u.user_id ? '…' : (u.is_disabled ? 'Enable' : 'Disable')}
+    </button>
+  )
 
   return (
-    <div style={{ maxWidth:'1180px', margin:'0 auto', padding:'28px' }} className="fade-in">
+    <div className="page fade-in">
       {/* header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'24px', flexWrap:'wrap', gap:'12px' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
         <div>
           <div style={{ fontSize:'22px', fontWeight:800 }}>Alzaro <span style={{color:'var(--orange)'}}>Platform</span> · Admin</div>
           <div style={{ color:'var(--text3)', fontSize:'13px' }}>{session.user.email}</div>
         </div>
-        <div style={{ display:'flex', gap:'10px' }}>
-          <button onClick={loadUsers} style={btnSec}>↻ Refresh</button>
+        <div className="hdr-actions">
+          <button onClick={loadUsers} disabled={refreshing} style={{...btnSec, opacity: refreshing?0.6:1}}>{refreshing ? '↻ …' : '↻ Refresh'}</button>
           <button onClick={()=>setShowAdmins(true)} style={{...btnSec, color:'var(--orange-light)', borderColor:'rgba(249,115,22,.3)'}}>+ Admins</button>
           <button onClick={signOut} style={btnSec}>Sign out</button>
         </div>
       </div>
 
+      {/* load error banner */}
+      {loadErr && (
+        <div style={{ background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:'12px', padding:'12px 14px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+          <span style={{ color:'var(--red)', fontSize:'13.5px', fontWeight:600, flex:1, minWidth:'180px' }}>Couldn't load users: {loadErr}</span>
+          <button onClick={loadUsers} style={{...btnSec, padding:'7px 13px'}}>Retry</button>
+        </div>
+      )}
+
       {/* stat cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'16px', marginBottom:'16px' }}>
+      <div className="stat-grid">
         <Stat label="Total users" value={total} />
         <Stat label="Disabled" value={disabledCount} color={disabledCount? 'var(--red)':'var(--text)'} />
         {Object.entries(VERTICALS).map(([k,v]) =>
@@ -312,8 +479,8 @@ function Platform() {
         )}
       </div>
 
-      {/* filter chips */}
-      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'16px' }}>
+      {/* vertical filter chips */}
+      <div className="chip-row">
         <Chip active={filter==='all'} onClick={()=>setFilter('all')}>All ({total})</Chip>
         {Object.entries(VERTICALS).map(([k,v]) =>
           <Chip key={k} active={filter===k} onClick={()=>setFilter(k)} color={v.color}>
@@ -322,14 +489,66 @@ function Platform() {
         )}
       </div>
 
-      {/* users table */}
-      <div style={card}>
+      {/* search + status filter */}
+      <div className="toolbar">
+        <input
+          className="search"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          placeholder="Search email or company…"
+          style={{ background:'var(--surface)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 13px', color:'var(--text)', fontSize:'14px' }}
+        />
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}
+          style={{ background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 10px', fontSize:'13.5px', fontWeight:600, cursor:'pointer' }}>
+          <option value="all">All statuses</option>
+          <option value="active">Active only</option>
+          <option value="disabled">Disabled only</option>
+        </select>
+      </div>
+
+      {/* users */}
+      <div style={card} className="card-pad">
         <div style={{ fontWeight:700, marginBottom:'16px' }}>
-          {filter==='all' ? 'All users' : VERTICALS[filter].label + ' users'}
+          {filter==='all' ? 'Users' : VERTICALS[filter].label + ' users'}
+          <span style={{ color:'var(--text3)', fontWeight:600, fontSize:'13px', marginLeft:'8px' }}>{shown.length} of {total}</span>
         </div>
+
         {shown.length===0 ? (
-          <div style={{ color:'var(--text3)', padding:'24px', textAlign:'center' }}>No users.</div>
+          <div style={{ color:'var(--text3)', padding:'24px', textAlign:'center' }}>
+            {q || statusFilter !== 'all' ? 'No users match this search or filter.' : 'No users.'}
+          </div>
+        ) : isMobile ? (
+          /* ---------- mobile: tap-to-expand cards ---------- */
+          <div style={{ display:'grid', gap:'10px' }}>
+            {shown.map(u => {
+              const open = expanded === u.user_id
+              return (
+                <div key={u.user_id} style={{ background: open ? 'var(--surface2)' : 'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', opacity: u.is_disabled ? 0.6 : 1 }}>
+                  <div onClick={()=>setExpanded(open ? null : u.user_id)} style={{ padding:'13px 14px', cursor:'pointer' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+                      <span style={{ fontSize:'14px', fontWeight:700, wordBreak:'break-all' }}>{u.email}</span>
+                      <span style={{ color:'var(--text3)', flexShrink:0 }}>{open ? '▾' : '▸'}</span>
+                    </div>
+                    <VerticalChips u={u} />
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'10px' }}>
+                      {u.is_disabled
+                        ? <span style={{ color:'var(--red)', fontWeight:700, fontSize:'12px' }}>● Disabled</span>
+                        : <span style={{ color:'var(--green)', fontWeight:700, fontSize:'12px' }}>● Active</span>}
+                      <span style={{ color:'var(--text3)', fontSize:'12px' }}>Joined {fmtDate(u.created_at)}</span>
+                    </div>
+                  </div>
+                  {open && (
+                    <div style={{ padding:'0 14px 14px', borderTop:'1px solid var(--border)', paddingTop:'14px' }}>
+                      <ExpandedDetail u={u} />
+                      <div style={{ marginTop:'12px' }}><DisableBtn u={u} full /></div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         ) : (
+          /* ---------- desktop: table ---------- */
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'720px' }}>
               <thead><tr>
@@ -347,91 +566,19 @@ function Platform() {
                     style={{ opacity: u.is_disabled ? 0.55 : 1, cursor:'pointer', background: open ? 'var(--surface2)' : 'transparent' }}>
                     <td style={{...td, width:'30px', color:'var(--text3)'}}>{open ? '▾' : '▸'}</td>
                     <td style={td}>{u.email}</td>
-                    <td style={td}>
-                      <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-                        {(u.verticals||'').split(', ').filter(Boolean).map(v => {
-                          const meta = VERTICALS[v] || { label:v, color:'var(--text3)' }
-                          return <span key={v} style={{ fontSize:'11px', fontWeight:700, padding:'3px 8px', borderRadius:'6px', background:'var(--surface2)', color:meta.color, border:'1px solid var(--border-light)' }}>{meta.label}</span>
-                        })}
-                      </div>
-                    </td>
+                    <td style={td}><VerticalChips u={u} /></td>
                     <td style={{...td, color:'var(--text3)'}}>{fmtDate(u.created_at)}</td>
                     <td style={td}>
                       {u.is_disabled
                         ? <span style={{ color:'var(--red)', fontWeight:700, fontSize:'12px' }}>● Disabled</span>
                         : <span style={{ color:'var(--green)', fontWeight:700, fontSize:'12px' }}>● Active</span>}
                     </td>
-                    <td style={{...td, textAlign:'right'}}>
-                      <button
-                        onClick={(e)=>{ e.stopPropagation(); toggleDisabled(u) }}
-                        disabled={busy===u.user_id}
-                        style={{
-                          ...btnSec, padding:'7px 13px',
-                          color: u.is_disabled ? 'var(--green)' : 'var(--red)',
-                          borderColor: u.is_disabled ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)',
-                          opacity: busy===u.user_id ? 0.5 : 1
-                        }}>
-                        {busy===u.user_id ? '…' : (u.is_disabled ? 'Enable' : 'Disable')}
-                      </button>
-                    </td>
+                    <td style={{...td, textAlign:'right'}}><DisableBtn u={u} /></td>
                   </tr>
                   {open && (
                     <tr>
-                      <td colSpan={6} style={{ padding:'0 14px 18px', background:'var(--surface2)', borderBottom:'1px solid var(--border)' }}>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'14px', marginBottom:'16px' }}>
-                          <Detail label="Joined" value={fmtDate(u.created_at)} />
-                          <Detail label="Last logged in" value={u.last_sign_in_at ? fmtDateTime(u.last_sign_in_at) : 'Never'} />
-                          <Detail label="Email confirmed" value={u.email_confirmed_at ? fmtDate(u.email_confirmed_at) : 'No'} />
-                          <Detail label="Account" value={u.is_disabled ? 'Disabled' : 'Active'} color={u.is_disabled?'var(--red)':'var(--green)'} />
-                        </div>
-                        <div style={{ fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, marginBottom:'10px' }}>Products ({(u.memberships||[]).length})</div>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'10px' }}>
-                          {(u.memberships||[]).map((m,i) => {
-                            const meta = VERTICALS[m.product] || { label:m.product, color:'var(--text3)' }
-                            return (
-                              <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'14px' }}>
-                                <div style={{ fontWeight:800, color:meta.color, marginBottom:'10px' }}>{meta.label}</div>
-                                <Row k="Company" v={m.company_name || '—'} />
-                                <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
-                                {m.usage && (
-                                  <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
-                                    <Metric label="Customers" value={fmtNum(m.usage.customers)} />
-                                    {m.usage.inventory !== null && <Metric label="Inventory" value={fmtNum(m.usage.inventory)} />}
-                                    <Metric label="Invoices" value={fmtNum(m.usage.invoices)} />
-                                    {m.usage.revenue !== null && <Metric label="Revenue" value={gbp(m.usage.revenue)} color="var(--green)" />}
-                                  </div>
-                                )}
-                                <div style={{ marginTop:'10px', display:'grid', gap:'8px' }}>
-                                  <PlanSelect label="Tier" value={m.tier || 'bronze'} options={['bronze','silver','gold']}
-                                    disabled={planBusy===u.user_id+m.product}
-                                    onChange={val=>setPlan(u, m.product, { tier: val })} />
-                                  <PlanSelect label="Status" value={m.status || 'trial'} options={['trial','active','suspended','disabled']}
-                                    disabled={planBusy===u.user_id+m.product}
-                                    onChange={val=>setPlan(u, m.product, { status: val })} />
-                                </div>
-                                {SUPPORT_READY.includes(m.product) ? (
-                                  <button
-                                    onClick={async (e)=>{
-                                      e.stopPropagation()
-                                      setSupportBusy(u.user_id + m.product)
-                                      const failure = await openClientPortal(u, m.product)
-                                      setSupportBusy(null)
-                                      if (failure) alert('Could not open the portal: ' + failure)
-                                    }}
-                                    disabled={u.is_disabled || supportBusy === u.user_id + m.product}
-                                    title={u.is_disabled ? 'Enable the account first' : `Open ${m.product} as ${u.email}`}
-                                    style={{ ...btnSec, width:'100%', marginTop:'10px', padding:'9px', color: u.is_disabled ? 'var(--text3)' : 'var(--orange-light)', borderColor: u.is_disabled ? 'var(--border)' : 'rgba(249,115,22,.35)', cursor: u.is_disabled ? 'not-allowed' : 'pointer', opacity: (u.is_disabled || supportBusy === u.user_id + m.product) ? 0.5 : 1 }}>
-                                    {supportBusy === u.user_id + m.product ? 'Opening…' : 'View client portal ↗'}
-                                  </button>
-                                ) : (
-                                  <div style={{ marginTop:'10px', fontSize:'11.5px', color:'var(--text3)', textAlign:'center' }}>
-                                    Portal access not enabled for {meta.label} yet
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
+                      <td colSpan={6} style={{ padding:'14px 14px 18px', background:'var(--surface2)', borderBottom:'1px solid var(--border)' }}>
+                        <ExpandedDetail u={u} />
                       </td>
                     </tr>
                   )}
@@ -446,6 +593,13 @@ function Platform() {
       <Changelog />
 
       {showAdmins && <AdminModal callFn={callFn} onClose={()=>{ setShowAdmins(false); loadUsers() }} />}
+
+      {/* transient error toast */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:'22px', left:'50%', transform:'translateX(-50%)', background:'var(--surface3)', border:'1px solid rgba(239,68,68,.35)', color:'var(--text)', borderRadius:'12px', padding:'11px 16px', fontSize:'13px', fontWeight:600, zIndex:1100, maxWidth:'92vw', boxShadow:'0 8px 24px rgba(0,0,0,.45)', animation:'toastIn .25s ease both' }}>
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
@@ -460,7 +614,7 @@ function Changelog() {
     removed:  { label:'Removed',  color:'var(--text3)',  bg:'var(--surface3)' },
   }
   return (
-    <div style={{...card, marginTop:'16px'}}>
+    <div style={{...card, marginTop:'16px'}} className="card-pad">
       <div style={{ fontWeight:700, marginBottom:'4px' }}>Changelog</div>
       <div style={{ color:'var(--text3)', fontSize:'12.5px', marginBottom:'18px' }}>Product release notes — edit the CHANGELOG list at the top of this file to add entries.</div>
       {CHANGELOG.map(e => (
@@ -487,7 +641,7 @@ function Changelog() {
 
 function Stat({label,value,color}) { return <div style={{...card, padding:'18px'}}><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.6px',fontWeight:600}}>{label}</div><div style={{fontSize:'24px',fontWeight:600,marginTop:'6px',letterSpacing:'-0.5px',color:color||'var(--orange-light)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
-function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600}}>{v}</span></div> }
+function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600,textAlign:'right'}}>{v}</span></div> }
 function Metric({label,value,color}) { return <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px'}}><div style={{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:700,marginBottom:'2px'}}>{label}</div><div style={{fontSize:'15px',fontWeight:700,color:color||'var(--text)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
 function PlanSelect({label,value,options,onChange,disabled}) {
   return (
@@ -495,19 +649,19 @@ function PlanSelect({label,value,options,onChange,disabled}) {
       <span style={{fontSize:'12px',color:'var(--text3)',fontWeight:600}}>{label}</span>
       <select value={value} disabled={disabled}
         onChange={e=>onChange(e.target.value)}
-        style={{ flex:'0 0 110px', background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'8px', padding:'6px 8px', fontSize:'12.5px', fontWeight:600, cursor:disabled?'wait':'pointer', opacity:disabled?0.5:1, textTransform:'capitalize' }}>
+        style={{ flex:'0 0 110px', background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'8px', padding:'8px', fontSize:'12.5px', fontWeight:600, cursor:disabled?'wait':'pointer', opacity:disabled?0.5:1, textTransform:'capitalize' }}>
         {options.map(o => <option key={o} value={o} style={{textTransform:'capitalize'}}>{o}</option>)}
       </select>
     </div>
   )
 }
-function Chip({children,active,onClick,color}) { return <button onClick={onClick} style={{ fontSize:'13px', fontWeight:700, padding:'8px 14px', borderRadius:'10px', cursor:'pointer', background: active?'var(--surface3)':'var(--surface)', color: active?(color||'var(--text)'):'var(--text2)', border:'1px solid '+(active?'var(--border-light)':'var(--border)') }}>{children}</button> }
-function Field({label,value,onChange,type,onEnter}) {
+function Chip({children,active,onClick,color}) { return <button onClick={onClick} style={{ fontSize:'13px', fontWeight:700, padding:'9px 14px', borderRadius:'10px', cursor:'pointer', background: active?'var(--surface3)':'var(--surface)', color: active?(color||'var(--text)'):'var(--text2)', border:'1px solid '+(active?'var(--border-light)':'var(--border)'), whiteSpace:'nowrap' }}>{children}</button> }
+function Field({label,value,onChange,type,onEnter,autoComplete}) {
   return (
     <div style={{ marginBottom:'14px' }}>
       <label style={{ display:'block', fontSize:'12px', color:'var(--text3)', fontWeight:600, marginBottom:'6px' }}>{label}</label>
       <input
-        type={type||'text'} value={value}
+        type={type||'text'} value={value} autoComplete={autoComplete}
         onChange={e=>onChange(e.target.value)}
         onKeyDown={e=>{ if(e.key==='Enter' && onEnter) onEnter() }}
         style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 13px', color:'var(--text)', fontSize:'14px', fontFamily:'Manrope, sans-serif' }}
@@ -524,17 +678,25 @@ function AdminModal({ callFn, onClose }) {
   const [msg, setMsg] = useState('')
   const [working, setWorking] = useState(false)
 
+  // Esc closes the modal
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [])
+
   const load = async () => {
     setLoading(true)
-    const res = await callFn({ action: 'list-admins' })
+    const res = await callFn({ action: 'list-admins' }).catch(() => null)
     if (res && res.admins) setAdmins(res.admins)
+    else if (res && res.error) setMsg(res.error)
     setLoading(false)
   }
   useEffect(() => { load() }, [])
 
   const add = async () => {
     setMsg(''); setWorking(true)
-    const res = await callFn({ action: 'add-admin', email: email.trim(), password: pw })
+    const res = await callFn({ action: 'add-admin', email: email.trim(), password: pw }).catch(() => ({ error: 'Network error' }))
     setWorking(false)
     if (res && res.error) { setMsg(res.error); return }
     setMsg(res.created ? 'New admin login created and granted.' : 'Existing user granted admin.')
@@ -544,7 +706,7 @@ function AdminModal({ callFn, onClose }) {
   const remove = async (e) => {
     if (!confirm(`Remove admin access for ${e}? Their login stays, but they lose /platform access.`)) return
     setWorking(true)
-    const res = await callFn({ action: 'remove-admin', email: e })
+    const res = await callFn({ action: 'remove-admin', email: e }).catch(() => ({ error: 'Network error' }))
     setWorking(false)
     if (res && res.error) { setMsg(res.error); return }
     await load()
@@ -552,7 +714,7 @@ function AdminModal({ callFn, onClose }) {
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ ...card, width:'100%', maxWidth:'460px', maxHeight:'85vh', overflowY:'auto' }} className="fade-in">
+      <div onClick={e=>e.stopPropagation()} style={{ ...card, width:'100%', maxWidth:'460px', maxHeight:'85vh', overflowY:'auto' }} className="fade-in card-pad">
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px' }}>
           <div style={{ fontSize:'18px', fontWeight:800 }}>Platform admins</div>
           <button onClick={onClose} style={{ ...btnSec, padding:'6px 12px' }}>✕</button>
@@ -562,10 +724,10 @@ function AdminModal({ callFn, onClose }) {
         {loading ? <div style={{color:'var(--text3)',fontSize:'13px'}}>Loading…</div> : (
           <div style={{ display:'grid', gap:'8px', marginBottom:'22px' }}>
             {admins.map(a => (
-              <div key={a.email} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', padding:'10px 12px' }}>
-                <span style={{ fontSize:'13.5px' }}>{a.email}</span>
+              <div key={a.email} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:'10px', padding:'10px 12px', gap:'8px' }}>
+                <span style={{ fontSize:'13.5px', wordBreak:'break-all' }}>{a.email}</span>
                 <button onClick={()=>remove(a.email)} disabled={working}
-                  style={{ ...btnSec, padding:'5px 10px', color:'var(--red)', borderColor:'rgba(239,68,68,.3)' }}>Remove</button>
+                  style={{ ...btnSec, padding:'5px 10px', color:'var(--red)', borderColor:'rgba(239,68,68,.3)', flexShrink:0 }}>Remove</button>
               </div>
             ))}
           </div>
