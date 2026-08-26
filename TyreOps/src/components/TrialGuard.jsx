@@ -8,6 +8,8 @@ export default function TrialGuard({ children }) {
   const [liveStatus, setLiveStatus] = useState(null)
   const [liveTrialEnds, setLiveTrialEnds] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [buying, setBuying] = useState(null)   // tier key while a checkout is starting
+  const [buyErr, setBuyErr] = useState('')
 
   // Fetch fresh status from Supabase on mount and periodically
   useEffect(() => {
@@ -40,6 +42,38 @@ export default function TrialGuard({ children }) {
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
   }, [garageId])
+
+  // Start a Stripe Checkout for the chosen tier straight from this wall.
+  // The app (and its Settings billing page) sits behind this very guard, so an
+  // expired-trial user previously had no self-serve way to subscribe.
+  const PLANS = [
+    { key: 'basic',  name: 'Basic',  price: '£5.99'  },
+    { key: 'bronze', name: 'Bronze', price: '£12.99' },
+    { key: 'silver', name: 'Silver', price: '£18.99' },
+    { key: 'gold',   name: 'Gold',   price: '£28.99' },
+  ]
+  const startCheckout = async (tierKey) => {
+    setBuying(tierKey); setBuyErr('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const email = user?.email || session?.user?.email
+      if (!session?.access_token || !email) throw new Error('Please sign in again to subscribe.')
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email, garageId, product: 'tyreops', tier: tierKey }),
+      })
+      const out = await res.json()
+      if (!res.ok || !out.url) throw new Error(out.error || 'Could not start checkout')
+      window.location.href = out.url
+    } catch (e) {
+      setBuyErr(e.message || 'Could not start checkout')
+      setBuying(null)
+    }
+  }
 
   // If no user, let the router handle redirect to login
   if (!user) return children
@@ -112,24 +146,30 @@ export default function TrialGuard({ children }) {
             <div style={{ color: 'var(--text2)', marginBottom: '24px', lineHeight: 1.6 }}>
               Your 14-day free trial has ended. Subscribe to continue using TyreOps and access all your data.
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <a 
-                href="mailto:support@alzaro.co.uk?subject=TyreOps Subscription"
-                style={{ 
-                  background: 'var(--accent)', 
-                  color: '#000', 
-                  fontWeight: 700, 
-                  fontSize: '14px', 
-                  padding: '13px 24px', 
-                  borderRadius: '8px', 
-                  textDecoration: 'none',
-                  display: 'inline-block'
-                }}
-              >
-                Subscribe Now
-              </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {PLANS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => startCheckout(p.key)}
+                  disabled={!!buying || !garageId}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: p.key === 'silver' ? 'var(--accent)' : 'var(--surface3)',
+                    color: p.key === 'silver' ? '#000' : 'var(--text)',
+                    border: '1px solid var(--border)', borderRadius: '8px',
+                    padding: '12px 18px', fontSize: '14px', fontWeight: 700,
+                    cursor: buying ? 'wait' : 'pointer', opacity: buying && buying !== p.key ? 0.6 : 1,
+                  }}
+                >
+                  <span>{buying === p.key ? 'Opening checkout…' : `Subscribe to ${p.name}`}</span>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{p.price}/mo</span>
+                </button>
+              ))}
+              {buyErr && (
+                <div style={{ color: '#e5484d', fontSize: '13px' }}>{buyErr}</div>
+              )}
               <div style={{ color: 'var(--text3)', fontSize: '12px' }}>
-                Starting from £8/month
+                Cancel any time. Your data is exactly where you left it.
               </div>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '16px' }}>
