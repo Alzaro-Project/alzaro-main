@@ -90,6 +90,7 @@ const CHANGELOG = [
     { type:'improved', text:'Mobile layout — users show as tap-to-expand cards on phones; table stays on desktop.' },
     { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
     { type:'added',    text:'Basic tier now available in the tier dropdown.' },
+    { type:'added',    text:'Delete account (danger zone) — permanently removes the login and all product data, with a typed DELETE confirmation.' },
     { type:'fixed',    text:'Load failures now show a visible error banner with Retry instead of failing silently.' },
   ]},
   { version:'2026-08-14', date:'14/08/2026', product:'SoloOps', title:'Slimmer SoloOps', items:[
@@ -258,6 +259,21 @@ function Platform() {
     await loadUsers()
   }
 
+  // permanently delete an account + all product data (server-side, service role)
+  const [deleteBusy, setDeleteBusy] = useState(null)
+  const deleteUser = async (u) => {
+    if (!confirm(`Permanently delete ${u.email}?\n\nThis removes their login and ALL their data in every Alzaro product. This cannot be undone.`)) return
+    const typed = prompt(`Type DELETE to confirm wiping ${u.email}:`)
+    if (typed !== 'DELETE') { if (typed !== null) showToast('Not deleted — you must type DELETE exactly.'); return }
+    setDeleteBusy(u.user_id)
+    const res = await callFn({ action: 'delete-user', user_id: u.user_id }).catch(() => ({ error: 'Network error' }))
+    setDeleteBusy(null)
+    if (res && res.error) { showToast('Failed: ' + res.error); return }
+    setExpanded(null)
+    showToast(`${u.email} deleted.`)
+    await loadUsers()
+  }
+
   // ---- support access ("View client portal") ----------------------------
   // Opens the customer's own app as them, so we can finish a setup for them or
   // reproduce a fault they've reported. Sessions are still recorded in
@@ -365,7 +381,7 @@ function Platform() {
 
   // Shared expanded-detail block, used by both the desktop table row and the
   // mobile card so behaviour stays identical.
-  const ExpandedDetail = ({ u }) => (
+  const ExpandedDetail = ({ u, showDisable }) => (
     <div>
       <div className="detail-grid">
         <Detail label="Joined" value={fmtDate(u.created_at)} />
@@ -420,6 +436,18 @@ function Platform() {
             </div>
           )
         })}
+      </div>
+
+      {/* danger zone */}
+      <div style={{ marginTop:'16px', paddingTop:'14px', borderTop:'1px solid rgba(239,68,68,.2)', display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
+        <span style={{ fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--red)', fontWeight:700, flex:1, minWidth:'120px' }}>Danger zone</span>
+        {showDisable && <DisableBtn u={u} />}
+        <button
+          onClick={(e)=>{ e.stopPropagation(); deleteUser(u) }}
+          disabled={deleteBusy === u.user_id}
+          style={{ ...btnSec, padding:'9px 14px', background:'rgba(239,68,68,.1)', color:'var(--red)', borderColor:'rgba(239,68,68,.35)', opacity: deleteBusy === u.user_id ? 0.5 : 1 }}>
+          {deleteBusy === u.user_id ? 'Deleting…' : 'Delete account'}
+        </button>
       </div>
     </div>
   )
@@ -539,8 +567,7 @@ function Platform() {
                   </div>
                   {open && (
                     <div style={{ padding:'0 14px 14px', borderTop:'1px solid var(--border)', paddingTop:'14px' }}>
-                      <ExpandedDetail u={u} />
-                      <div style={{ marginTop:'12px' }}><DisableBtn u={u} full /></div>
+                      <ExpandedDetail u={u} showDisable />
                     </div>
                   )}
                 </div>
