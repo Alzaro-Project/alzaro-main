@@ -24,18 +24,26 @@ export function mergeCategories(custom) {
 // make logging them slower than it is today. So this is a combobox — the saved
 // suppliers from Clients drop down on focus and filter as you type, but any
 // free text is still accepted and still auto-creates the supplier on save.
-function MerchantPicker({ value, onChange, suppliers, pastMerchants }) {
+function MerchantPicker({ value, onChange, suppliers, pastMerchants, catalogueItems = [], onPickItem }) {
   const [open, setOpen] = React.useState(false)
   const [active, setActive] = React.useState(-1)
   const box = React.useRef(null)
 
-  // Saved suppliers first (they're the real records), then merchants that only
-  // appear on past expenses, so typing history still helps without duplicating.
+  // Expense items from the Items page first — they're the quick-picks the
+  // owner deliberately saved, and picking one also fills category and amount.
+  // Then saved suppliers (the real records), then merchants that only appear
+  // on past expenses, so typing history still helps without duplicating.
+  const itemNames = new Set(catalogueItems.map(it => (it.name || '').toLowerCase()))
   const supplierNames = suppliers.map(s => s.name).filter(Boolean)
-  const seen = new Set(supplierNames.map(n => n.toLowerCase()))
+  const seen = new Set([...itemNames, ...supplierNames.map(n => n.toLowerCase())])
   const options = [
-    ...suppliers.map(s => ({ name: s.name, saved: true, sub: s.email || s.phone || '' })),
-    ...pastMerchants.filter(m => !seen.has(m.toLowerCase())).map(m => ({ name: m, saved: false, sub: '' })),
+    ...catalogueItems.map(it => ({
+      name: it.name, tag: 'Item', item: it,
+      sub: [it.category, it.amount != null ? gbp(it.amount) : null].filter(Boolean).join(' · ')
+    })),
+    ...suppliers.filter(s => s.name && !itemNames.has(s.name.toLowerCase()))
+      .map(s => ({ name: s.name, tag: 'Supplier', sub: s.email || s.phone || '' })),
+    ...pastMerchants.filter(m => !seen.has(m.toLowerCase())).map(m => ({ name: m, tag: 'Past', sub: '' })),
   ]
   const q = (value || '').trim().toLowerCase()
   const shown = q ? options.filter(o => o.name.toLowerCase().includes(q)) : options
@@ -57,12 +65,18 @@ function MerchantPicker({ value, onChange, suppliers, pastMerchants }) {
     return () => document.removeEventListener('keydown', onKey, true)
   }, [open])
 
-  const pick = (name) => { onChange(name); setOpen(false); setActive(-1) }
+  // Picking an item fills merchant + category + amount via onPickItem;
+  // anything else just fills the merchant name as before.
+  const pick = (o) => {
+    if (o.item && onPickItem) onPickItem(o.item)
+    else onChange(o.name)
+    setOpen(false); setActive(-1)
+  }
 
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive(i => Math.min(i + 1, shown.length - 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(i - 1, 0)) }
-    else if (e.key === 'Enter' && open && active >= 0 && shown[active]) { e.preventDefault(); pick(shown[active].name) }
+    else if (e.key === 'Enter' && open && active >= 0 && shown[active]) { e.preventDefault(); pick(shown[active]) }
   }
 
   return (
@@ -84,14 +98,14 @@ function MerchantPicker({ value, onChange, suppliers, pastMerchants }) {
       {open && shown.length > 0 && (
         <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 20, background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: '10px', boxShadow: '0 12px 32px rgba(0,0,0,.45)', maxHeight: '210px', overflowY: 'auto' }}>
           {shown.map((o, i) => (
-            <div key={o.name} onMouseDown={e => { e.preventDefault(); pick(o.name) }} onMouseEnter={() => setActive(i)}
+            <div key={(o.tag || '') + o.name} onMouseDown={e => { e.preventDefault(); pick(o) }} onMouseEnter={() => setActive(i)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '9px 12px', cursor: 'pointer', fontSize: '13.5px', background: i === active ? 'var(--surface2)' : 'transparent', borderBottom: '1px solid var(--border)' }}>
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {o.name}
                 {o.sub && <span style={{ color: 'var(--text3)', fontSize: '11.5px', marginLeft: '8px' }}>{o.sub}</span>}
               </span>
-              <span style={{ flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.4px', color: o.saved ? 'var(--orange-light)' : 'var(--text3)' }}>
-                {o.saved ? 'Supplier' : 'Past'}
+              <span style={{ flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.4px', color: (o.tag === 'Item' || o.tag === 'Supplier') ? 'var(--orange-light)' : 'var(--text3)' }}>
+                {o.tag}
               </span>
             </div>
           ))}
@@ -101,7 +115,7 @@ function MerchantPicker({ value, onChange, suppliers, pastMerchants }) {
   )
 }
 
-export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edit}) {
+export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edit,items}) {
   const [merchant,setMerchant]=useState(edit?.merchant||''); const [category,setCategory]=useState(edit?.category||'Other')
   const [amount,setAmount]=useState(edit?.amount!=null ? String(edit.amount) : ''); const [date,setDate]=useState(edit?.spent_on || new Date().toISOString().slice(0,10))
   const [notes,setNotes]=useState(edit?.notes||'')
@@ -115,6 +129,19 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edi
   const suppliers = (clients||[])
     .filter(c => ['supplier','both'].includes(c.kind||'customer'))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+
+  // Expense items saved on the Items page — the same catalogue idea as the
+  // income form, surfaced at the top of the merchant picker. Picking one
+  // fills merchant, category, and amount (when the item has one saved).
+  const expenseItems = (items||[])
+    .filter(i => i.kind === 'expense')
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+  const pickItem = (it) => {
+    setMerchant(it.name || '')
+    if (it.category) setCategory(it.category)
+    if (it.amount != null) setAmount(String(it.amount))
+    setErr('')
+  }
 
   const suggest = async (m) => {
     setMerchant(m)
@@ -178,8 +205,9 @@ export function ExpenseForm({onClose,onSaved,uid,expenses,categories,clients,edi
   }
   return <Modal title={edit?"Edit expense":"Add expense"} onClose={onClose}>
     {err && <ErrBox m={err} />}
-    <Field label="Supplier / merchant" hint={suppliers.length ? 'pick a supplier or type a new one' : undefined}>
-      <MerchantPicker value={merchant} onChange={suggest} suppliers={suppliers} pastMerchants={pastMerchants} />
+    <Field label="Supplier / merchant" hint={(expenseItems.length || suppliers.length) ? 'pick an item or supplier, or type a new one' : undefined}>
+      <MerchantPicker value={merchant} onChange={suggest} suppliers={suppliers} pastMerchants={pastMerchants}
+        catalogueItems={expenseItems} onPickItem={pickItem} />
     </Field>
     <Field label="Category">
       <select style={inp} value={category} onChange={e=>setCategory(e.target.value)}>
