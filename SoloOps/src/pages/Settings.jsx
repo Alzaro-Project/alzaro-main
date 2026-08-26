@@ -1,6 +1,6 @@
 import React from 'react'
 import { card, inp, noScroll, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
-import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail, getAccountantLink, updateAccountantPermissions, revokeAccountant, getSmtpSecret } from '../lib/db.js'
+import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail, getAccountantLink, updateAccountantPermissions, revokeAccountant, getSmtpSecret, saveSmtpPass } from '../lib/db.js'
 
 const TABS = [
   { key: 'business', label: '🏢 Business' },
@@ -372,25 +372,30 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
     if (smtpReplyTo.trim() && !isEmailish(smtpReplyTo)) {
       return fail('The reply-to address looks invalid.')
     }
-    // Only send smtp_pass when the field has one. Blank ⇒ omit the key
-    // entirely ⇒ the DB trigger keeps the existing encrypted password.
-    const extra = smtpPass ? { smtp_pass: cleanPass() } : {}
-    await persist(extra, 'email')
-    // Keep the password in the field (masked; eye to reveal) instead of wiping
-    // it — the owner asked to see and edit what's saved. Then VERIFY the write
-    // actually landed: read the password back through the decrypt RPC and
-    // compare. A silent save-that-didn't-save is exactly the failure mode this
-    // guards against.
+    // Non-secret fields go through the normal whole-row upsert. The password
+    // deliberately does NOT: migration 016 revokes client SELECT on smtp_pass,
+    // and Postgres refuses an upsert whose ON CONFLICT DO UPDATE touches a
+    // revoked column — the whole save dies and the password silently never
+    // lands. So the password is written by saveSmtpPass() as its own plain
+    // UPDATE (allowed under the revoke), and then VERIFIED by reading it back
+    // through the decrypt RPC. "Verified ✓" means it is really in the
+    // database, encrypted — not just sitting in the form.
+    await persist({}, 'email')
     if (smtpPass) {
+      const clean = cleanPass()
+      const { error: passErr } = await saveSmtpPass(uid, clean)
+      if (passErr) {
+        return fail('Email settings saved, but the password could not be written: ' + (passErr.message || 'unknown error'))
+      }
       const stored = await getSmtpSecret()
-      if (stored === cleanPass()) {
-        setSmtpPass(cleanPass())
+      if (stored === clean) {
+        setSmtpPass(clean)
         setSmtpSaved(true)
         note('Email settings saved — password verified ✓')
       } else if (stored) {
-        fail('Saved, but the stored password does not match what you typed — try saving again.')
+        fail('The stored password does not match what you typed — try saving again.')
       } else {
-        fail('Settings saved, but the password could not be verified as stored — the email encryption SQL may not be active on this database.')
+        fail('Settings saved, but the password could not be verified as stored — run migration 016 (SMTP encryption) in Supabase, then save again.')
       }
     } else {
       setSmtpSaved(true)
