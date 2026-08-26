@@ -15,10 +15,28 @@ import { sb } from './lib/supabase.js'
 
 // ---- tiny style kit (self-contained; dark, neutral, deliberately not any
 // vertical's brand — the portal is cross-vertical) ----------------------------
+// Neutrals are CSS variables so the whole portal can flip between dark and
+// light with one attribute on <html>. Accent / green / red stay literal hex:
+// they read fine on both themes AND the code builds alpha shades by hex
+// concatenation (`${C.accent}44`), which a var() reference can't do.
 const C = {
-  bg: '#0f1115', surface: '#171a21', surface2: '#1e222b', border: '#2a2f3a',
-  text: '#e8eaf0', text2: '#aab0be', text3: '#7a8194', accent: '#f59e0b',
+  bg: 'var(--acct-bg)', surface: 'var(--acct-surface)', surface2: 'var(--acct-surface2)',
+  border: 'var(--acct-border)', text: 'var(--acct-text)', text2: 'var(--acct-text2)',
+  text3: 'var(--acct-text3)', accent: '#f59e0b',
   green: '#22c55e', red: '#ef4444',
+}
+
+// Theme: 'dark' (default) or 'light', persisted per browser. Applied as
+// data-theme on <html> so the CSS variables below re-resolve everywhere,
+// inline styles included.
+const THEME_KEY = 'alzaro-accountant-theme'
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'
+}
+if (typeof document !== 'undefined') {
+  let saved = null
+  try { saved = window.localStorage.getItem(THEME_KEY) } catch (e) {}
+  applyTheme(saved === 'light' ? 'light' : 'dark')
 }
 const page = { minHeight: '100vh', background: C.bg, color: C.text, fontFamily: 'Manrope, sans-serif' }
 const inp = { background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '11px 14px', color: C.text, fontSize: '14px', outline: 'none', width: '100%', boxSizing: 'border-box' }
@@ -34,6 +52,37 @@ if (typeof document !== 'undefined' && !document.getElementById('acct-auth-css')
   const st = document.createElement('style')
   st.id = 'acct-auth-css'
   st.textContent = `
+    :root, [data-theme="dark"] {
+      --acct-bg: #0f1115; --acct-surface: #171a21; --acct-surface2: #1e222b;
+      --acct-border: #2a2f3a; --acct-text: #e8eaf0; --acct-text2: #aab0be;
+      --acct-text3: #7a8194;
+      color-scheme: dark;
+    }
+    [data-theme="light"] {
+      --acct-bg: #f4f5f7; --acct-surface: #ffffff; --acct-surface2: #eef0f4;
+      --acct-border: #d9dde5; --acct-text: #1b1e26; --acct-text2: #4b5263;
+      --acct-text3: #737a8c;
+      color-scheme: light;
+    }
+    html, body { margin: 0; padding: 0; background: var(--acct-bg); }
+    input::placeholder { color: var(--acct-text3); }
+    /* Tables already sit in overflow-x wrappers; make touch scrolling smooth
+       and keep tap targets comfortable on phones. */
+    table { -webkit-overflow-scrolling: touch; }
+    @media (max-width: 640px) {
+      main { padding-left: 14px !important; padding-right: 14px !important; }
+      header > div { padding-left: 14px !important; padding-right: 14px !important; }
+      table { font-size: 13px; }
+    }
+    .acct-theme-fab {
+      position: fixed; right: 16px; bottom: 16px; z-index: 50;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--acct-surface); color: var(--acct-text);
+      border: 1px solid var(--acct-border);
+      font-size: 18px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,.25);
+    }
     .acct-auth-wrap { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; }
     .acct-auth-card { box-sizing: border-box; }
     .acct-auth-card input, .acct-auth-card button { min-height: 44px; box-sizing: border-box; }
@@ -2610,9 +2659,31 @@ function PropertyOpsBooks({ link, onBack }) {
   )
 }
 
+// Floating dark/light toggle — one control on every screen (login included)
+// instead of a copy in each of the six headers.
+function ThemeToggle() {
+  const [theme, setTheme] = useState(() =>
+    (typeof document !== 'undefined' && document.documentElement.dataset.theme) || 'dark'
+  )
+  const flip = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    applyTheme(next)
+    try { window.localStorage.setItem(THEME_KEY, next) } catch (e) {}
+  }
+  return (
+    <button className="acct-theme-fab" onClick={flip}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label="Toggle dark / light mode">
+      {theme === 'dark' ? '☀️' : '🌙'}
+    </button>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter basename="/accountant">
+      <ThemeToggle />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
