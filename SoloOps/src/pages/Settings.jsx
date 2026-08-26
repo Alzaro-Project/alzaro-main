@@ -1,6 +1,6 @@
 import React from 'react'
 import { card, inp, noScroll, btnPri, btnSec, isEmailish } from '../components/UI.jsx'
-import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail, getAccountantLink, updateAccountantPermissions, revokeAccountant } from '../lib/db.js'
+import { updateUser, updateAccessName, uploadFile, signedUrl, loadSettings, saveSettings, getMember, getSession, listStaff, updateStaffPermissions, removeStaff, resetPasswordForEmail, getAccountantLink, updateAccountantPermissions, revokeAccountant, getSmtpSecret } from '../lib/db.js'
 
 const TABS = [
   { key: 'business', label: '🏢 Business' },
@@ -144,6 +144,15 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
         setEmailFooter(s?.email_footer || '')
         // Host + user present ⇒ the server has a password stored for this row.
         setSmtpSaved(!!(s?.smtp_host && s?.smtp_user))
+        // Load the stored SMTP password into the form so it is VISIBLE in
+        // Settings (owner's choice — PropertyOps pattern, replaces the earlier
+        // write-only design). The decrypt RPC returns ONLY the calling user's
+        // own password, it stays encrypted at rest, and the field is masked by
+        // default with the eye icon to reveal.
+        try {
+          const secret = await getSmtpSecret()
+          if (alive && secret) { setSmtpPass(p => p || secret); setSmtpSaved(true) }
+        } catch (e) { /* RPC missing — field stays blank, save still works */ }
       } catch (e) {
         // first run, no row yet — defaults stand
       } finally {
@@ -363,19 +372,36 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
     if (smtpReplyTo.trim() && !isEmailish(smtpReplyTo)) {
       return fail('The reply-to address looks invalid.')
     }
-    // Only send smtp_pass when the user actually typed one. Blank ⇒ omit the key
+    // Only send smtp_pass when the field has one. Blank ⇒ omit the key
     // entirely ⇒ the DB trigger keeps the existing encrypted password.
     const extra = smtpPass ? { smtp_pass: cleanPass() } : {}
     await persist(extra, 'email')
-    setSmtpPass('')          // never keep the secret in component state
-    setSmtpSaved(true)
+    // Keep the password in the field (masked; eye to reveal) instead of wiping
+    // it — the owner asked to see and edit what's saved. Then VERIFY the write
+    // actually landed: read the password back through the decrypt RPC and
+    // compare. A silent save-that-didn't-save is exactly the failure mode this
+    // guards against.
+    if (smtpPass) {
+      const stored = await getSmtpSecret()
+      if (stored === cleanPass()) {
+        setSmtpPass(cleanPass())
+        setSmtpSaved(true)
+        note('Email settings saved — password verified ✓')
+      } else if (stored) {
+        fail('Saved, but the stored password does not match what you typed — try saving again.')
+      } else {
+        fail('Settings saved, but the password could not be verified as stored — the email encryption SQL may not be active on this database.')
+      }
+    } else {
+      setSmtpSaved(true)
+    }
   }
 
   // Tests the details as typed, against the real mail server, BEFORE saving.
   const testSmtp = async () => {
     if (!smtpHost.trim() || !smtpUser.trim() || !smtpPass) {
       setSmtpTest('error')
-      setSmtpTestMsg("Enter the host, username and password to run a test. (For security the saved password isn't shown — re-enter it here to test.)")
+      setSmtpTestMsg('Enter the host, username and password to run a test.')
       return
     }
     setSmtpTest('testing'); setSmtpTestMsg('')
@@ -548,8 +574,8 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
             <div style={{ fontSize:'15px', fontWeight:800, marginBottom:'4px' }}>Send invoices from your own email</div>
             <div style={{ fontSize:'13px', color:'var(--text3)', lineHeight:1.5 }}>
               Invoices go out from your address, not ours — so replies come straight back to you
-              and your clients see your name in their inbox. Your password is encrypted and is
-              never shown again once saved.
+              and your clients see your name in their inbox. Your password is stored encrypted;
+              only you can view it here, using the eye icon.
             </div>
           </div>
 
@@ -589,7 +615,7 @@ export default function Settings({ session, member, signOut, flash, onBizChange 
           </div>
 
           <div style={field}>
-            <div style={lbl}>Password {smtpSaved && <span style={{ fontWeight:500, color:'var(--text3)' }}>— leave blank to keep the saved one</span>}</div>
+            <div style={lbl}>Password {smtpSaved && !smtpPass && <span style={{ fontWeight:500, color:'var(--text3)' }}>— leave blank to keep the saved one</span>}</div>
             <PasswordInput width="100%" value={smtpPass} onChange={v=>{setSmtpPass(v); setSmtpTest(null)}} placeholder={smtpSaved ? '••••••••  (saved)' : 'App password'} />
             {PASS_HELP[smtpProvider] && (
               <div style={{ fontSize:'12px', color:'var(--text3)', marginTop:'6px', lineHeight:1.5 }}>
