@@ -270,6 +270,30 @@ export async function getSmtpSecret() {
     return null
   }
 }
+// Save ONLY the SMTP password, as a plain UPDATE on the caller's own row —
+// NOT part of the whole-row upsert. This matters: migration 016 revokes
+// client SELECT on smtp_pass, and Postgres refuses an upsert's
+// ON CONFLICT DO UPDATE when a revoked column appears in it (reading
+// EXCLUDED.smtp_pass needs SELECT). A plain UPDATE only needs UPDATE
+// privilege, which the client keeps. The BEFORE trigger then encrypts the
+// value into smtp_pass_enc and nulls the plaintext. `.select('user_id')`
+// (a readable column) tells us whether a row actually existed to update.
+export async function saveSmtpPass(uid, pass) {
+  const { data, error } = await sb
+    .from('soloops_settings')
+    .update({ smtp_pass: pass, updated_at: new Date().toISOString() })
+    .eq('user_id', uid)
+    .select('user_id')
+  if (error) return { error }
+  if (!data || data.length === 0) {
+    // First-time setup: no settings row yet — create one carrying the password.
+    const { error: insErr } = await sb.from('soloops_settings').insert({
+      user_id: uid, smtp_pass: pass, updated_at: new Date().toISOString(),
+    })
+    if (insErr) return { error: insErr }
+  }
+  return { error: null }
+}
 export async function saveSettings(record) {
   return sb.from('soloops_settings').upsert(record, { onConflict: 'user_id' })
 }
