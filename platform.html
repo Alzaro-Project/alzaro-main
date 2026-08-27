@@ -102,6 +102,7 @@ const CHANGELOG = [
     { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
     { type:'added',    text:'Basic tier now available in the tier dropdown.' },
     { type:'added',    text:'Delete account (danger zone) — permanently removes the login and all product data, with a typed DELETE confirmation.' },
+    { type:'added',    text:'Trial extension — edit any client\'s trial end date per product, with quick +7 / +14 / +30 day buttons.' },
     { type:'added',    text:'Light / dark mode toggle in the header, remembered across visits.' },
     { type:'fixed',    text:'Switching away and back to the tab no longer resets to the "Loading platform…" screen.' },
     { type:'fixed',    text:'Load failures now show a visible error banner with Retry instead of failing silently.' },
@@ -436,7 +437,10 @@ function Platform() {
             <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'12px', padding:'14px' }}>
               <div style={{ fontWeight:800, color:meta.color, marginBottom:'10px' }}>{meta.label}</div>
               <Row k="Company" v={m.company_name || '—'} />
-              <Row k="Trial ends" v={m.trial_ends ? fmtDate(m.trial_ends) : '—'} />
+              <TrialEditor
+                value={m.trial_ends}
+                busy={planBusy===u.user_id+m.product}
+                onSave={val=>setPlan(u, m.product, { trial_ends: val })} />
               {m.usage && (
                 <div style={{ marginTop:'10px', paddingTop:'10px', borderTop:'1px solid var(--border)', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
                   <Metric label="Customers" value={fmtNum(m.usage.customers)} />
@@ -710,6 +714,47 @@ function Stat({label,value,color}) { return <div style={{...card, padding:'18px'
 function Detail({label,value,color}) { return <div><div style={{fontSize:'11px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:600,marginBottom:'3px'}}>{label}</div><div style={{fontSize:'14px',fontWeight:600,color:color||'var(--text)'}}>{value}</div></div> }
 function Row({k,v}) { return <div style={{display:'flex',justifyContent:'space-between',fontSize:'12.5px',padding:'3px 0'}}><span style={{color:'var(--text3)'}}>{k}</span><span style={{color:'var(--text2)',fontWeight:600,textAlign:'right'}}>{v}</span></div> }
 function Metric({label,value,color}) { return <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'8px 10px'}}><div style={{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.5px',fontWeight:700,marginBottom:'2px'}}>{label}</div><div style={{fontSize:'15px',fontWeight:700,color:color||'var(--text)',fontFamily:'Fira Code, monospace'}}>{value}</div></div> }
+// Editable trial end date with quick-extend buttons. Saves via set-plan.
+function TrialEditor({ value, onSave, busy }) {
+  const toInput = d => d ? new Date(d).toISOString().slice(0,10) : ''
+  const [val, setVal] = useState(toInput(value))
+  useEffect(() => { setVal(toInput(value)) }, [value])
+  const dirty = val !== toInput(value)
+
+  // extend from the current trial end if it's in the future, else from today
+  const extend = (days) => {
+    const base = value && new Date(value) > new Date() ? new Date(value) : new Date()
+    base.setDate(base.getDate() + days)
+    const iso = base.toISOString().slice(0,10)
+    setVal(iso)
+    onSave(iso)
+  }
+
+  const quick = { fontSize:'11px', fontWeight:700, padding:'5px 8px', borderRadius:'6px', border:'1px solid var(--border-light)', background:'var(--surface2)', color:'var(--text2)', cursor:'pointer' }
+
+  return (
+    <div style={{ padding:'6px 0' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', marginBottom:'6px' }}>
+        <span style={{ fontSize:'12.5px', color:'var(--text3)' }}>Trial ends</span>
+        <input type="date" value={val} disabled={busy}
+          onChange={e=>setVal(e.target.value)}
+          style={{ background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'8px', padding:'6px 8px', fontSize:'12.5px', fontWeight:600, fontFamily:'Manrope, sans-serif', colorScheme: document.documentElement.getAttribute('data-theme')==='light'?'light':'dark', opacity:busy?0.5:1 }} />
+      </div>
+      <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
+        <button style={quick} disabled={busy} onClick={()=>extend(7)}>+7d</button>
+        <button style={quick} disabled={busy} onClick={()=>extend(14)}>+14d</button>
+        <button style={quick} disabled={busy} onClick={()=>extend(30)}>+30d</button>
+        {dirty && (
+          <button disabled={busy} onClick={()=>onSave(val || null)}
+            style={{ ...quick, marginLeft:'auto', color:'var(--orange-light)', borderColor:'rgba(249,115,22,.4)' }}>
+            {busy ? 'Saving…' : 'Save date'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PlanSelect({label,value,options,onChange,disabled}) {
   return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
