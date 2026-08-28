@@ -707,6 +707,74 @@ function currentQuarterYear() {
 }
 
 // ============================================================
+// Small generic correction modal for a single record (used for
+// purchase batches and customers). Same rules as invoice edits:
+// only reachable when the client's can_edit toggle is on, and
+// RLS (migration 019) enforces it server-side regardless.
+// ============================================================
+function RecordEditModal({ title, subtitle, fields, values, onSave, onClose }) {
+  const [d, setD] = useState(() => ({ ...values }))
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setErr('')
+    const failure = await onSave(d)
+    setSaving(false)
+    if (failure) {
+      setErr('Could not save: ' + failure + (failure.includes('policy') || failure.includes('security') || failure.includes('permission') ? ' — has the client enabled editing for you?' : ''))
+      return
+    }
+    onClose()
+  }
+
+  const lab = { fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, marginBottom: '3px' }
+  const inp = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 10px', color: C.text, fontSize: '13px', width: '100%', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const bt = { fontSize: '12.5px', fontWeight: 700, padding: '8px 14px', borderRadius: '9px', border: `1px solid ${C.border}`, background: C.surface, color: C.text, cursor: 'pointer' }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900, padding: '16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '16px', width: '100%', maxWidth: '420px', maxHeight: '88vh', overflowY: 'auto', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800 }}>{title}</div>
+          <button onClick={onClose} style={bt}>✕</button>
+        </div>
+        {subtitle && <div style={{ fontSize: '12px', color: C.text3, marginBottom: '12px' }}>{subtitle}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '11px', marginTop: subtitle ? 0 : '10px' }}>
+          {fields.map(f => (
+            <div key={f.key}>
+              <div style={lab}>{f.label}</div>
+              <input
+                type={f.type || 'text'}
+                step={f.type === 'number' ? '0.01' : undefined}
+                min={f.type === 'number' ? '0' : undefined}
+                style={inp}
+                value={d[f.key] ?? ''}
+                onChange={e => setD({ ...d, [f.key]: e.target.value })}
+              />
+            </div>
+          ))}
+        </div>
+        {err && <div style={{ color: C.red, fontSize: '12.5px', marginTop: '12px' }}>{err}</div>}
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+          <button onClick={onClose} disabled={saving} style={bt}>Cancel</button>
+          <button onClick={save} disabled={saving}
+            style={{ ...bt, background: C.accent, color: '#111', borderColor: 'transparent', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
 // Invoice detail + correction modal (TyreOps).
 // Read view for everyone; when the client has switched on
 // "Allow invoice corrections" (accountant_links.can_edit) the
@@ -909,6 +977,8 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, onClose, on
 function TyreOpsBooks({ link, onBack }) {
   const perms = link.permissions || {}
   const canEdit = link.can_edit === true && perms.invoices === true
+  const canEditPurchases = link.can_edit === true && perms.purchases === true
+  const canEditCustomers = link.can_edit === true && perms.customers === true
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState(null)
   const [tier, setTier] = useState(null)
@@ -916,6 +986,7 @@ function TyreOpsBooks({ link, onBack }) {
   const [invoices, setInvoices] = useState([])
   const [accountId, setAccountId] = useState(null)
   const [sel, setSel] = useState(null) // invoice open in the detail modal
+  const [editRec, setEditRec] = useState(null) // { kind: 'batch'|'customer', row } being corrected
   const [batches, setBatches] = useState([])
   const [skus, setSkus] = useState([])
   const [usedTyres, setUsedTyres] = useState([])
@@ -1172,6 +1243,51 @@ function TyreOpsBooks({ link, onBack }) {
           />
         )}
 
+        {editRec && editRec.kind === 'batch' && (
+          <RecordEditModal
+            title="Correct purchase"
+            subtitle={`${editRec.row.supplier || 'Unknown supplier'} · qty ${editRec.row.qty}`}
+            fields={[
+              { key: 'date', label: 'Date', type: 'date' },
+              { key: 'supplier', label: 'Supplier' },
+              { key: 'ref', label: 'Reference' },
+              { key: 'cost', label: 'Cost per tyre (£)', type: 'number' },
+            ]}
+            values={{ date: editRec.row.date || '', supplier: editRec.row.supplier || '', ref: editRec.row.ref || '', cost: editRec.row.cost }}
+            onSave={async (d) => {
+              const patch = { date: d.date || null, supplier: d.supplier || null, ref: d.ref || null, cost: Number(d.cost) || 0 }
+              const { error } = await sb.from('batches').update(patch).eq('id', editRec.row.id).eq('account_id', accountId)
+              if (error) return error.message
+              setBatches(prev => prev.map(x => x.id === editRec.row.id ? { ...x, ...patch } : x))
+              return null
+            }}
+            onClose={() => setEditRec(null)}
+          />
+        )}
+
+        {editRec && editRec.kind === 'customer' && (
+          <RecordEditModal
+            title="Correct customer"
+            subtitle={editRec.row.name || ''}
+            fields={[
+              { key: 'name', label: 'Name' },
+              { key: 'email', label: 'Email', type: 'email' },
+              { key: 'phone', label: 'Phone' },
+              { key: 'reg', label: 'Reg' },
+              { key: 'vehicle', label: 'Vehicle' },
+            ]}
+            values={{ name: editRec.row.name || '', email: editRec.row.email || '', phone: editRec.row.phone || '', reg: editRec.row.reg || '', vehicle: editRec.row.vehicle || '' }}
+            onSave={async (d) => {
+              const patch = { name: d.name || null, email: d.email || null, phone: d.phone || null, reg: d.reg || null, vehicle: d.vehicle || null }
+              const { error } = await sb.from('customers').update(patch).eq('id', editRec.row.id).eq('account_id', accountId)
+              if (error) return error.message
+              setCustomers(prev => prev.map(x => x.id === editRec.row.id ? { ...x, ...patch } : x))
+              return null
+            }}
+            onClose={() => setEditRec(null)}
+          />
+        )}
+
         {tab === 'inventory' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             <div>
@@ -1241,7 +1357,10 @@ function TyreOpsBooks({ link, onBack }) {
                   const qty = Number(b.qty) || 0
                   const totalCost = qty * (Number(b.cost) || 0)
                   return (
-                    <tr key={b.id}>
+                    <tr key={b.id}
+                      onClick={canEditPurchases ? () => setEditRec({ kind: 'batch', row: b }) : undefined}
+                      title={canEditPurchases ? 'Correct this purchase' : undefined}
+                      style={canEditPurchases ? { cursor: 'pointer' } : undefined}>
                       <td style={td}>{fmtD(b.date)}</td>
                       <td style={td}>{b.supplier || '—'}</td>
                       <td style={td}>{b.ref || '—'}</td>
@@ -1251,7 +1370,7 @@ function TyreOpsBooks({ link, onBack }) {
                       <td style={{ ...td, textAlign: 'right', color: C.green, fontVariantNumeric: 'tabular-nums' }}>{gbp(totalCost * 0.2)}</td>
                       <td style={{ ...td, textAlign: 'right' }}>
                         {b.invoiceUrl
-                          ? <button onClick={() => viewPurchaseFile(b)} disabled={fileBusy === b.id}
+                          ? <button onClick={(e) => { e.stopPropagation(); viewPurchaseFile(b) }} disabled={fileBusy === b.id}
                               style={{ background: 'transparent', color: C.accent, border: `1px solid ${C.accent}55`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: fileBusy === b.id ? .6 : 1 }}>
                               {fileBusy === b.id ? 'Opening…' : 'View'}
                             </button>
@@ -1274,7 +1393,10 @@ function TyreOpsBooks({ link, onBack }) {
               <tbody>
                 {customers.length === 0 && <tr><td style={td} colSpan={5}><span style={{ color: C.text3 }}>No customers.</span></td></tr>}
                 {customers.map(c => (
-                  <tr key={c.id}>
+                  <tr key={c.id}
+                    onClick={canEditCustomers ? () => setEditRec({ kind: 'customer', row: c }) : undefined}
+                    title={canEditCustomers ? 'Correct this customer' : undefined}
+                    style={canEditCustomers ? { cursor: 'pointer' } : undefined}>
                     <td style={td}>{c.name || '—'}</td>
                     <td style={td}>{c.email || '—'}</td>
                     <td style={td}>{c.phone || '—'}</td>
