@@ -1722,7 +1722,7 @@ function AccountantTab() {
   // Owner-controlled invoice editing (off = view only). Confirm on enable.
   const toggleCanEdit = async () => {
     const enabling = link.can_edit !== true
-    if (enabling && !window.confirm(`Allow ${link.accountant_email} to edit your invoices? They’ll be able to correct amounts, VAT, dates, payment status and line items from their portal. You can switch this off again at any time.`)) return
+    if (enabling && !window.confirm(`Allow ${link.accountant_email} to make corrections? They’ll be able to fix mistakes on your invoices, purchases and customer records from their portal. Stock and VAT figures stay read-only. You can switch this off again at any time.`)) return
     const { error } = await setAccountantCanEdit(link.id, enabling)
     if (error) { flash('Could not update editing access'); return }
     setLink({ ...link, can_edit: enabling })
@@ -1784,7 +1784,7 @@ function AccountantTab() {
                 {link.status === 'active' ? 'Active' : 'Invited'}
               </span>
               <span style={{ ...uChip, color: link.can_edit === true ? 'var(--accent)' : 'var(--text3)', background: 'transparent', border: `1px solid ${link.can_edit === true ? 'var(--accent)' : 'var(--border)'}` }}>
-                {link.can_edit === true ? 'Can edit invoices' : 'View only'}
+                {link.can_edit === true ? 'Can make corrections' : 'View only'}
               </span>
             </div>
             {link.status !== 'active' && (
@@ -1814,8 +1814,8 @@ function AccountantTab() {
                   <label style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: link.status === 'active' ? 'pointer' : 'not-allowed', fontSize: '12.5px', opacity: link.status === 'active' ? 1 : 0.55 }}>
                     <input type="checkbox" checked={link.can_edit === true} disabled={link.status !== 'active'} onChange={toggleCanEdit} style={{ marginTop: '2px' }} />
                     <span>
-                      <strong>Allow invoice corrections</strong>
-                      <span style={{ color: 'var(--text3)' }}> — lets them fix mistakes on your invoices (amounts, VAT, dates, payment status, line items) from their portal. Off = strictly view only.</span>
+                      <strong>Allow corrections</strong>
+                      <span style={{ color: 'var(--text3)' }}> — lets them fix mistakes on your invoices, purchases and customer records (amounts, VAT, dates, details) from their portal. Off = strictly view only. Stock, dashboard and VAT figures always stay read-only.</span>
                       {link.status !== 'active' && <span style={{ color: 'var(--text3)' }}> Available once they’ve accepted the invite.</span>}
                     </span>
                   </label>
