@@ -4,6 +4,56 @@ import { useStore, TIER_ORDER } from '../store/useStore'
 import { PageHeader } from '../components/UI'
 import GlobalSearch from '../components/GlobalSearch'
 import WelcomeBanner from '../components/WelcomeBanner'
+import { getAccountantNotes, resolveAccountantNote } from '../lib/db'
+
+// ============================================================
+// Accountant requests — open correction notes flagged by the
+// garage's accountant (migration 020). Shown until resolved.
+// ============================================================
+function AccountantNotesBanner() {
+  const garageId = useStore(s => s.garageId)
+  const [notes, setNotes] = useState([])
+  const [busy, setBusy] = useState(null)
+
+  useEffect(() => {
+    if (!garageId) return
+    let alive = true
+    getAccountantNotes(garageId).then(n => { if (alive) setNotes(n) })
+    return () => { alive = false }
+  }, [garageId])
+
+  if (!notes.length) return null
+
+  const resolve = async (id) => {
+    setBusy(id)
+    const { error } = await resolveAccountantNote(id)
+    setBusy(null)
+    if (!error) setNotes(prev => prev.filter(n => n.id !== id))
+  }
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: '14px', padding: '14px 16px', marginBottom: '20px' }}>
+      <div style={{ fontWeight: 800, fontSize: '13.5px', marginBottom: '4px' }}>
+        Your accountant has flagged {notes.length === 1 ? 'something' : `${notes.length} things`} for you
+      </div>
+      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
+        Fix each item in the app (or check it's right), then mark it resolved so your accountant knows.
+      </div>
+      {notes.map(n => (
+        <div key={n.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '9px 0', borderTop: '1px solid var(--border)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '13px', lineHeight: 1.45 }}>{n.message}</div>
+            {n.invoice_id && <div style={{ fontSize: '11.5px', color: 'var(--text3)', marginTop: '2px' }}>Invoice {n.invoice_id}</div>}
+          </div>
+          <button onClick={() => resolve(n.id)} disabled={busy === n.id}
+            style={{ fontSize: '11.5px', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', cursor: 'pointer', flexShrink: 0, opacity: busy === n.id ? 0.5 : 1 }}>
+            {busy === n.id ? '…' : 'Mark resolved'}
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const PERIODS = [
   { key: 'today', label: 'Today' },
@@ -191,6 +241,8 @@ export default function Dashboard() {
       <PageHeader title="Dashboard" subtitle={`${settings?.name || 'Your Garage'} — ${dashPeriod === 'custom' ? `${customFrom} → ${customTo}` : PERIODS.find(p => p.key === dashPeriod)?.label}`} />
 
       <WelcomeBanner />
+
+      <AccountantNotesBanner />
 
       {/* Global Search Bar */}
       <div style={{ marginBottom: '20px' }}>
