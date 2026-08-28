@@ -106,6 +106,9 @@ export default function VATReport() {
             vatOnSales += lineTotal * 0.2
           } else if (inv.vatScheme === 'flatrate') {
             vatOnSales += lineTotal * ((settings.flatRate || 8.5) / 100)
+          } else if (inv.vatScheme === 'custom') {
+            // per-invoice rate set via the accountant portal
+            vatOnSales += lineTotal * ((Number(inv.vatRate) || 0) / 100)
           }
 
           // Calculate Input VAT (only on stock sold, not services)
