@@ -641,7 +641,7 @@ function ClientBooks() {
 // Per-line + per-invoice VAT, byte-for-byte the same formula as TyreOps'
 // Invoices.jsx calcVAT (margin scheme uses margin × 0.2 there — deliberately
 // different from the VAT report's margin ÷ 6).
-function calcInvoiceVat(lines, scheme, flatRate, tier) {
+function calcInvoiceVat(lines, scheme, flatRate, tier, vatRate) {
   let vat = 0
   ;(lines || []).forEach(l => {
     const lt = l.qty * l.unit
@@ -649,12 +649,13 @@ function calcInvoiceVat(lines, scheme, flatRate, tier) {
     if (l.lineType === 'used' && l.marginScheme && tier === 'gold') vat += margin * 0.2
     else if (scheme === 'standard') vat += lt * 0.2
     else if (scheme === 'flatrate') vat += lt * (flatRate / 100)
+    else if (scheme === 'custom') vat += lt * ((Number(vatRate) || 0) / 100)
   })
   return vat
 }
 const invoiceSubtotal = (lines) => (lines || []).reduce((a, l) => a + l.qty * l.unit, 0)
 const invoiceTotal = (inv, flatRate, tier) =>
-  invoiceSubtotal(inv.lines) + calcInvoiceVat(inv.lines, inv.vatScheme, flatRate, tier)
+  invoiceSubtotal(inv.lines) + calcInvoiceVat(inv.lines, inv.vatScheme, flatRate, tier, inv.vatRate)
 
 // Faithful replica of TyreOps/src/pages/VATReport.jsx's period computation.
 // isGold gates the margin scheme; flatRate feeds the flat-rate branch; batches
@@ -858,7 +859,8 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAd
   const [err, setErr] = useState('')
   const blank = () => ({
     date: inv.date || '', due: inv.due || '', status: inv.status || 'sent',
-    vatScheme: inv.vatScheme || 'standard', paymentMethod: inv.paymentMethod || '',
+    vatScheme: inv.vatScheme || 'standard', vatRate: inv.vatRate != null ? inv.vatRate : 20,
+    paymentMethod: inv.paymentMethod || '',
     paidAt: inv.paidAt ? String(inv.paidAt).slice(0, 10) : '',
     lines: (inv.lines || []).map(l => ({ ...l })),
   })
@@ -882,7 +884,9 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAd
       // 1) invoice header
       const patch = {
         date: d.date || null, due: d.due || null, status: d.status,
-        vat_scheme: d.vatScheme, payment_method: d.paymentMethod || null,
+        vat_scheme: d.vatScheme,
+        vat_rate: d.vatScheme === 'custom' ? (Number(d.vatRate) || 0) : null,
+        payment_method: d.paymentMethod || null,
         paid_at: d.paidAt || null,
       }
       const { error: e1 } = await sb.from('invoices')
@@ -902,7 +906,8 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAd
 
       const updated = {
         ...inv, date: d.date || null, due: d.due || null, status: d.status,
-        vatScheme: d.vatScheme, paymentMethod: d.paymentMethod || null, paidAt: d.paidAt || null,
+        vatScheme: d.vatScheme, vatRate: d.vatScheme === 'custom' ? (Number(d.vatRate) || 0) : null,
+        paymentMethod: d.paymentMethod || null, paidAt: d.paidAt || null,
         lines: d.lines.map(l => ({ ...l, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0 })),
       }
       onSaved(updated)
@@ -916,11 +921,11 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAd
 
   const view = editing ? d : {
     date: inv.date, due: inv.due, status: inv.status, vatScheme: inv.vatScheme,
-    paymentMethod: inv.paymentMethod, paidAt: inv.paidAt, lines: inv.lines || [],
+    vatRate: inv.vatRate, paymentMethod: inv.paymentMethod, paidAt: inv.paidAt, lines: inv.lines || [],
   }
   const calcLines = view.lines.map(l => ({ ...l, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0 }))
   const sub = invoiceSubtotal(calcLines)
-  const vat = calcInvoiceVat(calcLines, view.vatScheme, flatRate, tier)
+  const vat = calcInvoiceVat(calcLines, view.vatScheme, flatRate, tier, view.vatRate)
 
   const lab = { fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, marginBottom: '3px' }
   const val = { fontSize: '13.5px', fontWeight: 600 }
@@ -966,12 +971,20 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAd
           </Field2>
           <Field2 label="VAT scheme">
             {editing ? (
-              <select style={inp} value={d.vatScheme} onChange={e => setD({ ...d, vatScheme: e.target.value })}>
-                <option value="standard">standard</option>
-                <option value="flatrate">flat rate</option>
-                <option value="none">no VAT</option>
-              </select>
-            ) : <div style={val}>{view.vatScheme || '—'}</div>}
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <select style={inp} value={d.vatScheme} onChange={e => setD({ ...d, vatScheme: e.target.value })}>
+                  <option value="standard">standard</option>
+                  <option value="flatrate">flat rate</option>
+                  <option value="custom">custom %</option>
+                  <option value="none">no VAT</option>
+                </select>
+                {d.vatScheme === 'custom' && (
+                  <input type="number" min="0" max="100" step="0.5" title="VAT %"
+                    style={{ ...inp, width: '74px', flexShrink: 0 }}
+                    value={d.vatRate} onChange={e => setD({ ...d, vatRate: e.target.value })} />
+                )}
+              </div>
+            ) : <div style={val}>{view.vatScheme === 'custom' ? `custom (${Number(view.vatRate) || 0}%)` : (view.vatScheme || '—')}</div>}
           </Field2>
           <Field2 label="Payment method">
             {editing ? <input style={inp} value={d.paymentMethod} placeholder="card / cash / transfer…" onChange={e => setD({ ...d, paymentMethod: e.target.value })} />
@@ -1096,6 +1109,10 @@ function TyreOpsBooks({ link, onBack }) {
   const cur = currentQuarterYear()
   const [quarter, setQuarter] = useState(cur.quarter)
   const [year, setYear] = useState(cur.year)
+  // custom VAT period (used when quarter === 'custom')
+  const toISO = dt => dt.toISOString().slice(0, 10)
+  const [vatFrom, setVatFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return toISO(d) })
+  const [vatTo, setVatTo] = useState(() => toISO(new Date()))
 
   // Follow-ups is intentionally not shown in the portal yet.
   const TABS = [
@@ -1145,7 +1162,7 @@ function TyreOpsBooks({ link, onBack }) {
       if (needInvoices) {
         try {
           const { data: invs } = await sb.from('invoices')
-            .select('id, cust_name, cust_email, reg, date, due, status, vat_scheme, payment_method, paid_at')
+            .select('id, cust_name, cust_email, reg, date, due, status, vat_scheme, vat_rate, payment_method, paid_at')
             .eq('account_id', accountId).is('deleted_at', null).order('date', { ascending: false })
           const ids = (invs || []).map(i => i.id)
           const linesByInv = {}
@@ -1163,6 +1180,7 @@ function TyreOpsBooks({ link, onBack }) {
           const mapped = (invs || []).map(i => ({
             id: i.id, custName: i.cust_name, custEmail: i.cust_email, reg: i.reg,
             date: i.date, due: i.due, status: i.status, vatScheme: i.vat_scheme,
+            vatRate: i.vat_rate != null ? Number(i.vat_rate) : null,
             paymentMethod: i.payment_method, paidAt: i.paid_at, lines: linesByInv[i.id] || [],
           }))
           if (alive) setInvoices(mapped)
@@ -1221,12 +1239,20 @@ function TyreOpsBooks({ link, onBack }) {
   const inPeriod = (dateStr) => {
     const d = new Date(dateStr)
     if (isNaN(d)) return false
+    if (quarter === 'custom') {
+      const t = d.getTime()
+      return (!vatFrom || t >= new Date(vatFrom + 'T00:00:00').getTime())
+          && (!vatTo || t <= new Date(vatTo + 'T23:59:59').getTime())
+    }
     const mm = d.getMonth() + 1
     return d.getFullYear() === parseInt(year, 10) && mm >= mFrom && mm <= mTo
   }
   const vat = computeVatReport(invoices, batches, { flatRate, isGold, inPeriod })
+  // Only offer years that actually have data (always incl. this year)
   const currentYear = new Date().getFullYear()
-  const vatYears = [currentYear, currentYear - 1, currentYear - 2].map(String)
+  const vatYears = Array.from(new Set(
+    [currentYear, ...invoices.map(i => new Date(i.date).getFullYear()).filter(y => !isNaN(y))]
+  )).sort((a, b) => b - a).map(String)
 
   const th = { textAlign: 'left', fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, padding: '8px 10px', borderBottom: `1px solid ${C.border}` }
   const td = { fontSize: '13px', padding: '9px 10px', borderBottom: `1px solid ${C.border}`, verticalAlign: 'top' }
@@ -1317,7 +1343,7 @@ function TyreOpsBooks({ link, onBack }) {
                 {invoices.length === 0 && <tr><td style={td} colSpan={8}><span style={{ color: C.text3 }}>No invoices.</span></td></tr>}
                 {invoices.map(i => {
                   const sub = invoiceSubtotal(i.lines)
-                  const v = calcInvoiceVat(i.lines, i.vatScheme, flatRate, tier)
+                  const v = calcInvoiceVat(i.lines, i.vatScheme, flatRate, tier, i.vatRate)
                   return (
                     <tr key={i.id} onClick={() => setSel(i)} title="Open invoice details"
                       style={{ cursor: 'pointer' }}
@@ -1526,20 +1552,34 @@ function TyreOpsBooks({ link, onBack }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>Quarter</div>
+                <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>Period</div>
                 <select value={quarter} onChange={e => setQuarter(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }}>
                   <option value="Q1">Q1 (Jan–Mar)</option>
                   <option value="Q2">Q2 (Apr–Jun)</option>
                   <option value="Q3">Q3 (Jul–Sep)</option>
                   <option value="Q4">Q4 (Oct–Dec)</option>
+                  <option value="custom">Custom range</option>
                 </select>
               </div>
-              <div>
-                <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>Year</div>
-                <select value={year} onChange={e => setYear(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }}>
-                  {vatYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
+              {quarter === 'custom' ? (
+                <>
+                  <div>
+                    <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>From</div>
+                    <input type="date" value={vatFrom} onChange={e => setVatFrom(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>To</div>
+                    <input type="date" value={vatTo} onChange={e => setVatTo(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }} />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '11px', color: C.text3, marginBottom: '4px' }}>Year</div>
+                  <select value={year} onChange={e => setYear(e.target.value)} style={{ ...inp, width: 'auto', padding: '8px 10px', fontSize: '12.5px' }}>
+                    {vatYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
