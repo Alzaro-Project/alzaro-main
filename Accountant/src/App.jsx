@@ -707,6 +707,76 @@ function currentQuarterYear() {
 }
 
 // ============================================================
+// Correction requests card — the accountant flags things for
+// the client to fix ("guide them"), instead of / as well as
+// editing directly. Clients see open notes in their app and
+// mark them resolved; the accountant can also resolve, reopen
+// or delete their own notes here.
+// ============================================================
+function NotesCard({ notes, onAdd, onResolve, onReopen, onDelete, invoiceId, compact }) {
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const shown = invoiceId ? notes.filter(n => n.invoice_id === invoiceId) : notes
+  const open = shown.filter(n => n.status === 'open')
+  const resolved = shown.filter(n => n.status !== 'open')
+
+  const add = async () => {
+    setBusy(true); setErr('')
+    const failure = await onAdd(msg, invoiceId)
+    setBusy(false)
+    if (failure) { setErr(failure); return }
+    setMsg('')
+  }
+
+  const inp = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 10px', color: C.text, fontSize: '13px', width: '100%', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const sm = { fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '7px', border: `1px solid ${C.border}`, background: 'transparent', color: C.text2, cursor: 'pointer' }
+
+  const NoteRow = ({ n }) => (
+    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.4px', padding: '2px 7px', borderRadius: '6px', flexShrink: 0, marginTop: '2px',
+        color: n.status === 'open' ? C.accent : C.green, border: `1px solid ${n.status === 'open' ? C.accent : C.green}55` }}>
+        {n.status === 'open' ? 'Open' : 'Resolved'}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', lineHeight: 1.45 }}>{n.message}</div>
+        <div style={{ fontSize: '11px', color: C.text3, marginTop: '2px' }}>
+          {n.invoice_id && !invoiceId ? `Invoice ${n.invoice_id} · ` : ''}{fmtD(String(n.created_at).slice(0, 10))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+        {n.status === 'open'
+          ? <button style={sm} onClick={() => onResolve(n.id)}>Resolve</button>
+          : <button style={sm} onClick={() => onReopen(n.id)}>Reopen</button>}
+        <button style={{ ...sm, color: C.red, borderColor: `${C.red}55` }} onClick={() => onDelete(n.id)}>✕</button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ background: compact ? 'transparent' : C.surface, border: compact ? 'none' : `1px solid ${C.border}`, borderRadius: '14px', padding: compact ? 0 : '14px 16px', marginBottom: compact ? 0 : '14px' }}>
+      <div style={{ fontSize: '12.5px', fontWeight: 800, marginBottom: '8px' }}>
+        {invoiceId ? 'Notes on this invoice' : 'Notes for your client'}
+        {open.length > 0 && <span style={{ color: C.accent, marginLeft: '6px' }}>{open.length} open</span>}
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: shown.length ? '4px' : 0 }}>
+        <input style={inp} value={msg} disabled={busy}
+          placeholder={invoiceId ? 'Flag something on this invoice for your client…' : 'Ask your client to fix or check something…'}
+          onChange={e => setMsg(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && msg.trim()) add() }} />
+        <button onClick={add} disabled={busy || !msg.trim()}
+          style={{ fontSize: '12.5px', fontWeight: 700, padding: '8px 14px', borderRadius: '9px', border: 'none', background: C.accent, color: '#111', cursor: 'pointer', flexShrink: 0, opacity: busy || !msg.trim() ? 0.5 : 1 }}>
+          {busy ? '…' : 'Add note'}
+        </button>
+      </div>
+      {err && <div style={{ color: C.red, fontSize: '12px', marginBottom: '6px' }}>{err}</div>}
+      {open.map(n => <NoteRow key={n.id} n={n} />)}
+      {resolved.slice(0, invoiceId ? 3 : 5).map(n => <NoteRow key={n.id} n={n} />)}
+    </div>
+  )
+}
+
+// ============================================================
 // Small generic correction modal for a single record (used for
 // purchase batches and customers). Same rules as invoice edits:
 // only reachable when the client's can_edit toggle is on, and
@@ -782,7 +852,7 @@ function RecordEditModal({ title, subtitle, fields, values, onSave, onClose }) {
 // and line descriptions/quantities/prices. RLS (migration 018)
 // enforces this server-side — the Edit button is just UI.
 // ============================================================
-function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, onClose, onSaved }) {
+function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, notes, onAddNote, onResolveNote, onReopenNote, onDeleteNote, onClose, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -966,9 +1036,15 @@ function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, onClose, on
 
         {!canEdit && (
           <div style={{ fontSize: '11.5px', color: C.text3, marginTop: '12px' }}>
-            View only — your client can enable invoice corrections from their Settings → Accountant tab.
+            View only — your client can enable corrections from their Settings → Accountant tab. You can still flag things below.
           </div>
         )}
+
+        {/* flag things for the client on this invoice */}
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: `1px solid ${C.border}` }}>
+          <NotesCard compact invoiceId={inv.id} notes={notes || []}
+            onAdd={onAddNote} onResolve={onResolveNote} onReopen={onReopenNote} onDelete={onDeleteNote} />
+        </div>
       </div>
     </div>
   )
@@ -987,6 +1063,28 @@ function TyreOpsBooks({ link, onBack }) {
   const [accountId, setAccountId] = useState(null)
   const [sel, setSel] = useState(null) // invoice open in the detail modal
   const [editRec, setEditRec] = useState(null) // { kind: 'batch'|'customer', row } being corrected
+  const [notes, setNotes] = useState([]) // accountant_notes for this client
+
+  // flag something for the client (optionally tied to an invoice)
+  const addNote = async (message, invoiceId) => {
+    const msg = (message || '').trim()
+    if (!msg || !accountId) return 'Write a message first'
+    const { data, error } = await sb.from('accountant_notes')
+      .insert({ account_id: accountId, product: 'tyreops', invoice_id: invoiceId || null, message: msg })
+      .select('id, invoice_id, message, status, created_at, resolved_at').single()
+    if (error) return error.message
+    setNotes(prev => [data, ...prev])
+    return null
+  }
+  const setNoteStatus = async (id, status) => {
+    const patch = { status, resolved_at: status === 'resolved' ? new Date().toISOString() : null }
+    const { error } = await sb.from('accountant_notes').update(patch).eq('id', id)
+    if (!error) setNotes(prev => prev.map(n => n.id === id ? { ...n, ...patch } : n))
+  }
+  const deleteNote = async (id) => {
+    const { error } = await sb.from('accountant_notes').delete().eq('id', id)
+    if (!error) setNotes(prev => prev.filter(n => n.id !== id))
+  }
   const [batches, setBatches] = useState([])
   const [skus, setSkus] = useState([])
   const [usedTyres, setUsedTyres] = useState([])
@@ -1020,6 +1118,16 @@ function TyreOpsBooks({ link, onBack }) {
       if (!alive) return
       setTier(memberTier)
       setAccountId(accountId)
+      // correction requests / guidance notes for this client
+      if (accountId) {
+        try {
+          const { data: n } = await sb.from('accountant_notes')
+            .select('id, invoice_id, message, status, created_at, resolved_at')
+            .eq('account_id', accountId).eq('product', 'tyreops')
+            .order('created_at', { ascending: false })
+          if (alive) setNotes(n || [])
+        } catch { /* fail open */ }
+      }
       setTab(TABS[0]?.[0] || null)
       if (!accountId) { setReady(true); return }
 
@@ -1196,6 +1304,8 @@ function TyreOpsBooks({ link, onBack }) {
         )}
 
         {tab === 'invoices' && (
+          <div>
+            <NotesCard notes={notes} onAdd={addNote} onResolve={id => setNoteStatus(id, 'resolved')} onReopen={id => setNoteStatus(id, 'open')} onDelete={deleteNote} />
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '14px', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
               <thead><tr>
@@ -1230,11 +1340,14 @@ function TyreOpsBooks({ link, onBack }) {
               </tbody>
             </table>
           </div>
+          </div>
         )}
 
         {sel && (
           <TyreInvoiceModal
             inv={sel} canEdit={canEdit} accountId={accountId} flatRate={flatRate} tier={tier}
+            notes={notes} onAddNote={addNote}
+            onResolveNote={id => setNoteStatus(id, 'resolved')} onReopenNote={id => setNoteStatus(id, 'open')} onDeleteNote={deleteNote}
             onClose={() => setSel(null)}
             onSaved={(updated) => {
               setInvoices(prev => prev.map(x => x.id === updated.id ? updated : x))
