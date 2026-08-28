@@ -605,6 +605,27 @@ export async function updateAccountantPermissions(id, permissions) {
 export async function setAccountantCanEdit(id, can_edit) {
   return supabase.from('accountant_links').update({ can_edit: can_edit === true }).eq('id', id)
 }
+
+// ---- Accountant notes (migration 020) --------------------------------------
+// Correction requests the accountant has flagged for this garage. The client
+// reads open ones and marks them resolved; creating notes happens in the
+// accountant portal.
+export async function getAccountantNotes(garageId) {
+  try {
+    const { data, error } = await supabase
+      .from('accountant_notes')
+      .select('id, invoice_id, message, status, created_at')
+      .eq('account_id', garageId).eq('product', 'tyreops')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+    if (error) return []
+    return data || []
+  } catch { return [] }
+}
+export async function resolveAccountantNote(id) {
+  return supabase.from('accountant_notes')
+    .update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
+}
 export async function revokeAccountant(id) {
   return supabase.from('accountant_links').delete().eq('id', id)
 }
