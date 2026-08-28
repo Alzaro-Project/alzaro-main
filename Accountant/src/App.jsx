@@ -258,7 +258,7 @@ function Clients() {
     // were the accountant.
     const { data, error } = await sb
       .from('accountant_links')
-      .select('id, client_id, product, client_name, permissions, status, created_at')
+      .select('id, client_id, product, client_name, permissions, status, created_at, can_edit')
       .eq('accountant_user_id', u?.user?.id || '00000000-0000-0000-0000-000000000000')
       .order('created_at', { ascending: true })
     setLinks(error ? [] : (data || []))
@@ -377,7 +377,7 @@ function ClientBooks() {
       const { data: u } = await sb.auth.getUser()
       const { data, error } = await sb
         .from('accountant_links')
-        .select('id, client_id, product, client_name, permissions, status')
+        .select('id, client_id, product, client_name, permissions, status, can_edit')
         .eq('id', linkId)
         .eq('accountant_user_id', u?.user?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle()
@@ -706,13 +706,216 @@ function currentQuarterYear() {
   return { quarter: q, year: String(now.getFullYear()) }
 }
 
+// ============================================================
+// Invoice detail + correction modal (TyreOps).
+// Read view for everyone; when the client has switched on
+// "Allow invoice corrections" (accountant_links.can_edit) the
+// accountant can fix dates, status, payment info, VAT scheme
+// and line descriptions/quantities/prices. RLS (migration 018)
+// enforces this server-side — the Edit button is just UI.
+// ============================================================
+function TyreInvoiceModal({ inv, canEdit, accountId, flatRate, tier, onClose, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const blank = () => ({
+    date: inv.date || '', due: inv.due || '', status: inv.status || 'sent',
+    vatScheme: inv.vatScheme || 'standard', paymentMethod: inv.paymentMethod || '',
+    paidAt: inv.paidAt ? String(inv.paidAt).slice(0, 10) : '',
+    lines: (inv.lines || []).map(l => ({ ...l })),
+  })
+  const [d, setD] = useState(blank)
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [])
+
+  const startEdit = () => { setD(blank()); setErr(''); setEditing(true) }
+
+  const setLine = (idx, patch) => setD(prev => ({
+    ...prev, lines: prev.lines.map((l, i) => i === idx ? { ...l, ...patch } : l),
+  }))
+
+  const save = async () => {
+    setSaving(true); setErr('')
+    try {
+      // 1) invoice header
+      const patch = {
+        date: d.date || null, due: d.due || null, status: d.status,
+        vat_scheme: d.vatScheme, payment_method: d.paymentMethod || null,
+        paid_at: d.paidAt || null,
+      }
+      const { error: e1 } = await sb.from('invoices')
+        .update(patch).eq('id', inv.id).eq('account_id', accountId)
+      if (e1) throw new Error(e1.message)
+
+      // 2) changed lines only
+      for (let i = 0; i < d.lines.length; i++) {
+        const nl = d.lines[i], ol = inv.lines[i] || {}
+        if (!nl.lineId) continue
+        if (nl.desc === ol.desc && Number(nl.qty) === Number(ol.qty) && Number(nl.unit) === Number(ol.unit)) continue
+        const { error: e2 } = await sb.from('invoice_lines')
+          .update({ line_desc: nl.desc, qty: Number(nl.qty) || 0, unit: Number(nl.unit) || 0 })
+          .eq('id', nl.lineId).eq('account_id', accountId)
+        if (e2) throw new Error(e2.message)
+      }
+
+      const updated = {
+        ...inv, date: d.date || null, due: d.due || null, status: d.status,
+        vatScheme: d.vatScheme, paymentMethod: d.paymentMethod || null, paidAt: d.paidAt || null,
+        lines: d.lines.map(l => ({ ...l, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0 })),
+      }
+      onSaved(updated)
+      setEditing(false)
+    } catch (e) {
+      const msg = String(e.message || 'unknown error')
+      setErr('Could not save: ' + msg + (msg.includes('policy') || msg.includes('security') || msg.includes('permission') ? ' — has the client enabled editing for you?' : ''))
+    }
+    setSaving(false)
+  }
+
+  const view = editing ? d : {
+    date: inv.date, due: inv.due, status: inv.status, vatScheme: inv.vatScheme,
+    paymentMethod: inv.paymentMethod, paidAt: inv.paidAt, lines: inv.lines || [],
+  }
+  const calcLines = view.lines.map(l => ({ ...l, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0 }))
+  const sub = invoiceSubtotal(calcLines)
+  const vat = calcInvoiceVat(calcLines, view.vatScheme, flatRate, tier)
+
+  const lab = { fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, marginBottom: '3px' }
+  const val = { fontSize: '13.5px', fontWeight: 600 }
+  const inp = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '7px 9px', color: C.text, fontSize: '13px', width: '100%', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const bt = { fontSize: '12.5px', fontWeight: 700, padding: '8px 14px', borderRadius: '9px', border: `1px solid ${C.border}`, background: C.surface, color: C.text, cursor: 'pointer' }
+  const mth = { textAlign: 'left', fontSize: '10.5px', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: C.text3, padding: '7px 8px', borderBottom: `1px solid ${C.border}` }
+  const mtd = { fontSize: '13px', padding: '8px', borderBottom: `1px solid ${C.border}`, verticalAlign: 'middle' }
+
+  const Field2 = ({ label, children }) => (
+    <div style={{ minWidth: '130px', flex: '1 1 130px' }}><div style={lab}>{label}</div>{children}</div>
+  )
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900, padding: '16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '88vh', overflowY: 'auto', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px' }}>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 800 }}>Invoice {inv.id}</div>
+            <div style={{ fontSize: '12.5px', color: C.text3 }}>{inv.custName || '—'}{inv.custEmail ? ` · ${inv.custEmail}` : ''}{inv.reg ? ` · ${inv.reg}` : ''}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            {canEdit && !editing && <button onClick={startEdit} style={{ ...bt, color: C.accent, borderColor: C.accent }}>Edit</button>}
+            <button onClick={onClose} style={bt}>✕</button>
+          </div>
+        </div>
+
+        {/* header fields */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <Field2 label="Date">
+            {editing ? <input type="date" style={inp} value={d.date} onChange={e => setD({ ...d, date: e.target.value })} />
+              : <div style={val}>{fmtD(view.date)}</div>}
+          </Field2>
+          <Field2 label="Due">
+            {editing ? <input type="date" style={inp} value={d.due} onChange={e => setD({ ...d, due: e.target.value })} />
+              : <div style={val}>{fmtD(view.due)}</div>}
+          </Field2>
+          <Field2 label="Status">
+            {editing ? (
+              <select style={inp} value={d.status} onChange={e => setD({ ...d, status: e.target.value })}>
+                {['draft', 'sent', 'paid', 'overdue'].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            ) : <div style={{ ...val, textTransform: 'uppercase', fontSize: '11.5px', letterSpacing: '.4px', color: view.status === 'paid' ? C.green : view.status === 'overdue' ? C.red : C.text2 }}>{view.status}</div>}
+          </Field2>
+          <Field2 label="VAT scheme">
+            {editing ? (
+              <select style={inp} value={d.vatScheme} onChange={e => setD({ ...d, vatScheme: e.target.value })}>
+                <option value="standard">standard</option>
+                <option value="flatrate">flat rate</option>
+                <option value="none">no VAT</option>
+              </select>
+            ) : <div style={val}>{view.vatScheme || '—'}</div>}
+          </Field2>
+          <Field2 label="Payment method">
+            {editing ? <input style={inp} value={d.paymentMethod} placeholder="card / cash / transfer…" onChange={e => setD({ ...d, paymentMethod: e.target.value })} />
+              : <div style={val}>{view.paymentMethod || '—'}</div>}
+          </Field2>
+          <Field2 label="Paid on">
+            {editing ? <input type="date" style={inp} value={d.paidAt} onChange={e => setD({ ...d, paidAt: e.target.value })} />
+              : <div style={val}>{view.paidAt ? fmtD(String(view.paidAt).slice(0, 10)) : '—'}</div>}
+          </Field2>
+        </div>
+
+        {/* lines */}
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: '12px', overflowX: 'auto', marginBottom: '14px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '440px' }}>
+            <thead><tr>
+              <th style={mth}>Description</th>
+              <th style={{ ...mth, width: '64px', textAlign: 'right' }}>Qty</th>
+              <th style={{ ...mth, width: '92px', textAlign: 'right' }}>Unit £</th>
+              <th style={{ ...mth, width: '92px', textAlign: 'right' }}>Total</th>
+            </tr></thead>
+            <tbody>
+              {view.lines.length === 0 && <tr><td style={mtd} colSpan={4}><span style={{ color: C.text3 }}>No lines.</span></td></tr>}
+              {view.lines.map((l, i) => (
+                <tr key={l.lineId || i}>
+                  <td style={mtd}>
+                    {editing && l.lineId ? <input style={inp} value={l.desc || ''} onChange={e => setLine(i, { desc: e.target.value })} />
+                      : <span>{l.desc || '—'}{l.lineType === 'used' && l.marginScheme ? <span style={{ color: C.text3, fontSize: '11px' }}> (margin)</span> : null}</span>}
+                  </td>
+                  <td style={{ ...mtd, textAlign: 'right' }}>
+                    {editing && l.lineId ? <input type="number" min="0" step="1" style={{ ...inp, textAlign: 'right' }} value={l.qty} onChange={e => setLine(i, { qty: e.target.value })} />
+                      : <span style={{ fontVariantNumeric: 'tabular-nums' }}>{l.qty}</span>}
+                  </td>
+                  <td style={{ ...mtd, textAlign: 'right' }}>
+                    {editing && l.lineId ? <input type="number" min="0" step="0.01" style={{ ...inp, textAlign: 'right' }} value={l.unit} onChange={e => setLine(i, { unit: e.target.value })} />
+                      : <span style={{ fontVariantNumeric: 'tabular-nums' }}>{gbp(l.unit)}</span>}
+                  </td>
+                  <td style={{ ...mtd, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{gbp((Number(l.qty) || 0) * (Number(l.unit) || 0))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* totals */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '22px', fontSize: '13.5px', marginBottom: editing || err ? '14px' : 0 }}>
+          <div><span style={{ color: C.text3 }}>Subtotal </span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{gbp(sub)}</b></div>
+          <div><span style={{ color: C.text3 }}>VAT </span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{gbp(vat)}</b></div>
+          <div><span style={{ color: C.text3 }}>Total </span><b style={{ fontVariantNumeric: 'tabular-nums' }}>{gbp(sub + vat)}</b></div>
+        </div>
+
+        {err && <div style={{ color: C.red, fontSize: '12.5px', marginBottom: '10px' }}>{err}</div>}
+
+        {editing && (
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button onClick={() => { setEditing(false); setErr('') }} disabled={saving} style={bt}>Cancel</button>
+            <button onClick={save} disabled={saving}
+              style={{ ...bt, background: C.accent, color: '#111', borderColor: 'transparent', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        )}
+
+        {!canEdit && (
+          <div style={{ fontSize: '11.5px', color: C.text3, marginTop: '12px' }}>
+            View only — your client can enable invoice corrections from their Settings → Accountant tab.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TyreOpsBooks({ link, onBack }) {
   const perms = link.permissions || {}
+  const canEdit = link.can_edit === true && perms.invoices === true
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState(null)
   const [tier, setTier] = useState(null)
   const [flatRate, setFlatRate] = useState(8.5)
   const [invoices, setInvoices] = useState([])
+  const [accountId, setAccountId] = useState(null)
+  const [sel, setSel] = useState(null) // invoice open in the detail modal
   const [batches, setBatches] = useState([])
   const [skus, setSkus] = useState([])
   const [usedTyres, setUsedTyres] = useState([])
@@ -745,6 +948,7 @@ function TyreOpsBooks({ link, onBack }) {
       } catch { /* fail open */ }
       if (!alive) return
       setTier(memberTier)
+      setAccountId(accountId)
       setTab(TABS[0]?.[0] || null)
       if (!accountId) { setReady(true); return }
 
@@ -768,11 +972,11 @@ function TyreOpsBooks({ link, onBack }) {
           const linesByInv = {}
           if (ids.length) {
             const { data: lines } = await sb.from('invoice_lines')
-              .select('invoice_id, line_desc, qty, unit, cost, batch_id, used_id, line_type, margin_scheme')
+              .select('id, invoice_id, line_desc, qty, unit, cost, batch_id, used_id, line_type, margin_scheme')
               .in('invoice_id', ids)
             ;(lines || []).forEach(l => {
               ;(linesByInv[l.invoice_id] || (linesByInv[l.invoice_id] = [])).push({
-                desc: l.line_desc, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0, cost: Number(l.cost) || 0,
+                lineId: l.id, desc: l.line_desc, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0, cost: Number(l.cost) || 0,
                 batchId: l.batch_id, usedId: l.used_id, lineType: l.line_type, marginScheme: l.margin_scheme === true,
               })
             })
@@ -934,7 +1138,10 @@ function TyreOpsBooks({ link, onBack }) {
                   const sub = invoiceSubtotal(i.lines)
                   const v = calcInvoiceVat(i.lines, i.vatScheme, flatRate, tier)
                   return (
-                    <tr key={i.id}>
+                    <tr key={i.id} onClick={() => setSel(i)} title="Open invoice details"
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.surface2 || 'rgba(255,255,255,.03)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={td}>{i.id}</td>
                       <td style={td}>{i.custName || '—'}</td>
                       <td style={td}>{i.reg || '—'}</td>
@@ -952,6 +1159,17 @@ function TyreOpsBooks({ link, onBack }) {
               </tbody>
             </table>
           </div>
+        )}
+
+        {sel && (
+          <TyreInvoiceModal
+            inv={sel} canEdit={canEdit} accountId={accountId} flatRate={flatRate} tier={tier}
+            onClose={() => setSel(null)}
+            onSaved={(updated) => {
+              setInvoices(prev => prev.map(x => x.id === updated.id ? updated : x))
+              setSel(updated)
+            }}
+          />
         )}
 
         {tab === 'inventory' && (
