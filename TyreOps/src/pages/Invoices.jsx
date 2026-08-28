@@ -184,7 +184,7 @@ function NumberInput({ value, onChangeNumber, integer = false, min, fallback = 0
   )
 }
 
-function calcVAT(lines, scheme, flatRate, tier) {
+function calcVAT(lines, scheme, flatRate, tier, vatRate) {
   let vat = 0
   lines.forEach(l => {
     const lt = l.qty * l.unit
@@ -195,6 +195,9 @@ function calcVAT(lines, scheme, flatRate, tier) {
       vat += lt * 0.2
     } else if (scheme === 'flatrate') {
       vat += lt * (flatRate / 100)
+    } else if (scheme === 'custom') {
+      // set by the accountant portal: per-invoice rate in vat_rate
+      vat += lt * ((Number(vatRate) || 0) / 100)
     }
   })
   return vat
@@ -573,7 +576,7 @@ function PaymentModal({ invoice, onClose, onConfirm }) {
 function EmailSendingModal({ invoice, settings, tier, onClose, onSuccess }) {
   const totals = useMemo(() => {
     const subtotal = invoice.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-    const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold')
+    const vat = calcVAT(invoice.lines, invoice.vatScheme, settings.flatRate, tier || 'gold', invoice.vatRate)
     return { subtotal, vat, total: subtotal + vat }
   }, [invoice, settings.flatRate, tier])
 
@@ -1103,7 +1106,7 @@ export default function Invoices() {
   // Legacy Gmail compose fallback
   const sendGmailFallback = (inv) => {
     const s = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-    const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier)
+    const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier, inv.vatRate)
     const body = `Dear ${inv.custName},\n\nInvoice ${inv.id} from ${settings.name}\nDate: ${inv.date} | Due: ${inv.due}\nReg: ${inv.reg || 'N/A'}\n\nItems:\n${inv.lines.map(l => `- ${l.desc} x${l.qty} @ £${l.unit.toFixed(2)} = £${(l.qty * l.unit).toFixed(2)}`).join('\n')}\n\nSubtotal: £${s.toFixed(2)}\nVAT: £${v.toFixed(2)}\nTOTAL: £${(s + v).toFixed(2)}\n\nThank you,\n${settings.name}\n${settings.phone}`
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inv.custEmail || '')}&su=${encodeURIComponent(`Invoice ${inv.id} from ${settings.name}`)}&body=${encodeURIComponent(body)}`, '_blank')
   }
@@ -1153,7 +1156,7 @@ export default function Invoices() {
                 <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text3)', padding: '24px' }}>No invoices found</td></tr>
               ) : filtered.map(inv => {
                 const s = inv.lines.reduce((a, l) => a + l.qty * l.unit, 0)
-                const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier)
+                const v = calcVAT(inv.lines, inv.vatScheme, settings.flatRate, tier, inv.vatRate)
                 return (
                   <tr key={inv.id} style={{ cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>{inv.id}</td>
@@ -1546,7 +1549,7 @@ export default function Invoices() {
             </table>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
               <div style={{ width: '220px' }}>
-                {(() => { const s = viewInv.lines.reduce((a, l) => a + l.qty * l.unit, 0); const v = calcVAT(viewInv.lines, viewInv.vatScheme, settings.flatRate, tier); return [['Subtotal', s], ['VAT', v], ['Total', s + v]].map(([l, val], i) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: i === 2 ? '14px' : '12px', fontWeight: i === 2 ? 700 : 400, color: i < 2 ? 'var(--text2)' : 'var(--text)', borderTop: i === 2 ? '1px solid var(--border)' : 'none' }}><span>{l}</span><span style={{ fontFamily: 'DM Mono, monospace' }}>£{val.toFixed(2)}</span></div>) })()}
+                {(() => { const s = viewInv.lines.reduce((a, l) => a + l.qty * l.unit, 0); const v = calcVAT(viewInv.lines, viewInv.vatScheme, settings.flatRate, tier, viewInv.vatRate); return [['Subtotal', s], ['VAT', v], ['Total', s + v]].map(([l, val], i) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: i === 2 ? '14px' : '12px', fontWeight: i === 2 ? 700 : 400, color: i < 2 ? 'var(--text2)' : 'var(--text)', borderTop: i === 2 ? '1px solid var(--border)' : 'none' }}><span>{l}</span><span style={{ fontFamily: 'DM Mono, monospace' }}>£{val.toFixed(2)}</span></div>) })()}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
