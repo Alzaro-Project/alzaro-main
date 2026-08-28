@@ -1640,7 +1640,7 @@ function UStaffPassword({ row, flash, onChanged }) {
 // kit above, --accent). Any trial/active tier can invite — no seat gate (this
 // differs from UsersTab, which is Silver/Gold-only). The permission keys match
 // api/accountant.js PRODUCTS.tyreops and the accountant RLS in migration 015.
-import { getAccountantLink, updateAccountantPermissions, revokeAccountant } from '../lib/db'
+import { getAccountantLink, updateAccountantPermissions, revokeAccountant, setAccountantCanEdit } from '../lib/db'
 
 // key, label, blurb — the seven visibility toggles an accountant can be granted.
 // The reporting key is 'vat' (the VAT Report), not 'reports'.
@@ -1719,6 +1719,16 @@ function AccountantTab() {
     await reload()
   }
 
+  // Owner-controlled invoice editing (off = view only). Confirm on enable.
+  const toggleCanEdit = async () => {
+    const enabling = link.can_edit !== true
+    if (enabling && !window.confirm(`Allow ${link.accountant_email} to edit your invoices? They’ll be able to correct amounts, VAT, dates, payment status and line items from their portal. You can switch this off again at any time.`)) return
+    const { error } = await setAccountantCanEdit(link.id, enabling)
+    if (error) { flash('Could not update editing access'); return }
+    setLink({ ...link, can_edit: enabling })
+    flash(enabling ? 'Invoice editing enabled' : 'Back to view only')
+  }
+
   if (link === undefined) return <div style={{ color: 'var(--text3)', fontSize: '13px' }}>Loading…</div>
 
   return (
@@ -1728,9 +1738,9 @@ function AccountantTab() {
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px' }}>
         <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: '3px' }}>My accountant</div>
         <div style={{ color: 'var(--text2)', fontSize: '12.5px', marginBottom: '14px', lineHeight: 1.55 }}>
-          Give your accountant a <b>view-only</b> window on your books. They sign in to a separate
-          accountant portal and can look but never change anything. You choose what they see below,
-          and you can adjust or remove their access at any time.
+          Give your accountant a window on your books. They sign in to a separate accountant portal.
+          By default access is <b>view-only</b> — you can optionally let them correct invoices below.
+          You choose what they see, and you can adjust or remove their access at any time.
         </div>
 
         {!eligible && (
@@ -1773,7 +1783,9 @@ function AccountantTab() {
                 borderRadius: '20px', padding: '2px 9px' }}>
                 {link.status === 'active' ? 'Active' : 'Invited'}
               </span>
-              <span style={{ ...uChip, color: 'var(--text3)', background: 'transparent', border: '1px solid var(--border)' }}>View only</span>
+              <span style={{ ...uChip, color: link.can_edit === true ? 'var(--accent)' : 'var(--text3)', background: 'transparent', border: `1px solid ${link.can_edit === true ? 'var(--accent)' : 'var(--border)'}` }}>
+                {link.can_edit === true ? 'Can edit invoices' : 'View only'}
+              </span>
             </div>
             {link.status !== 'active' && (
               <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '10px' }}>
@@ -1795,6 +1807,18 @@ function AccountantTab() {
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button onClick={startEdit} style={uBtn(true)}>Edit access</button>
                   <button onClick={revoke} style={{ ...uBtn(true, true), border: '1px solid rgba(239,68,68,.4)' }}>Remove access</button>
+                </div>
+
+                {/* Owner-controlled invoice editing (migration 018) */}
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', cursor: link.status === 'active' ? 'pointer' : 'not-allowed', fontSize: '12.5px', opacity: link.status === 'active' ? 1 : 0.55 }}>
+                    <input type="checkbox" checked={link.can_edit === true} disabled={link.status !== 'active'} onChange={toggleCanEdit} style={{ marginTop: '2px' }} />
+                    <span>
+                      <strong>Allow invoice corrections</strong>
+                      <span style={{ color: 'var(--text3)' }}> — lets them fix mistakes on your invoices (amounts, VAT, dates, payment status, line items) from their portal. Off = strictly view only.</span>
+                      {link.status !== 'active' && <span style={{ color: 'var(--text3)' }}> Available once they’ve accepted the invite.</span>}
+                    </span>
+                  </label>
                 </div>
               </>
             )}
