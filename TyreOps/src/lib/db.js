@@ -586,7 +586,7 @@ export async function getAccountantLink() {
   try {
     const { data, error } = await supabase
       .from('accountant_links')
-      .select('id, accountant_email, permissions, status, created_at')
+      .select('id, accountant_email, permissions, status, created_at, can_edit')
       .eq('product', 'tyreops')
       .limit(1)
       .maybeSingle()
@@ -598,6 +598,12 @@ export async function getAccountantLink() {
 }
 export async function updateAccountantPermissions(id, permissions) {
   return supabase.from('accountant_links').update({ permissions }).eq('id', id)
+}
+// Owner-controlled write access (migration 018). Off = view only; on = the
+// accountant can correct invoices from the portal. RLS scopes this to the
+// client's own link row.
+export async function setAccountantCanEdit(id, can_edit) {
+  return supabase.from('accountant_links').update({ can_edit: can_edit === true }).eq('id', id)
 }
 export async function revokeAccountant(id) {
   return supabase.from('accountant_links').delete().eq('id', id)
