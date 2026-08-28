@@ -373,6 +373,7 @@ export async function getInvoices(garageId) {
     ...inv,
     custId: inv.cust_id, custName: inv.cust_name, custEmail: inv.cust_email,
     vatScheme: inv.vat_scheme,
+    vatRate: inv.vat_rate != null ? Number(inv.vat_rate) : null,
     paymentMethod: inv.payment_method,
     paidAt: inv.paid_at,
     lines: (lines || []).filter(l => l.invoice_id === inv.id).map(l => ({
