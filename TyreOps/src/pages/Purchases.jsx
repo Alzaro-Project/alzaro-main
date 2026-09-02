@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { deletePurchaseInvoice, getInvoiceSignedUrl } from '../lib/db'
 
 export default function Purchases() {
-  const { skus, batches, usedTyres, tier, addBatch, addUsedTyre, updateBatch, deleteBatch, updateUsedTyre, deleteUsedTyre, garageId } = useStore()
+  const { skus, batches, usedTyres, tier, addPurchase, addUsedTyre, updateBatch, deleteBatch, updateUsedTyre, deleteUsedTyre, garageId } = useStore()
   const [search, setSearch] = useState('')
   const [showBatch, setShowBatch] = useState(false)
   const [showUsed, setShowUsed] = useState(false)
@@ -111,6 +111,25 @@ export default function Purchases() {
     )
   })
 
+  // Group multi-line purchases (batches sharing a purchaseId) so they render
+  // as one block: a header row for the invoice, then one row per tyre line.
+  // Single batches and used tyres are their own one-row group.
+  const grouped = []
+  const byPurchase = {}
+  for (const r of filtered) {
+    if (r.type === 'new' && r.purchaseId) {
+      if (!byPurchase[r.purchaseId]) {
+        byPurchase[r.purchaseId] = { purchaseId: r.purchaseId, rows: [] }
+        grouped.push(byPurchase[r.purchaseId])
+      }
+      byPurchase[r.purchaseId].rows.push(r)
+    } else {
+      grouped.push({ purchaseId: null, rows: [r] })
+    }
+  }
+  // A "group" with only one line is just a normal batch — render it flat
+  for (const g of grouped) if (g.rows.length === 1) g.purchaseId = null
+
   const totalSpend = allRecords.reduce((a, r) => a + (r.totalCost || 0), 0)
   const activeBatches = batches.filter(b => b.remaining > 0).length
 
@@ -118,7 +137,7 @@ export default function Purchases() {
     <div>
       <PageHeader title="Purchase History" subtitle="All supplier batches and part-exchange records">
         {isSilverPlus && <Btn variant="teal" onClick={() => setShowUsed(true)}>♻ Add Used</Btn>}
-        <Btn variant="primary" onClick={() => setShowBatch(true)}>+ Purchase Batch</Btn>
+        <Btn variant="primary" onClick={() => setShowBatch(true)}>+ New Purchase</Btn>
       </PageHeader>
 
       {/* Global Search */}
@@ -172,48 +191,77 @@ export default function Purchases() {
                 <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text3)', padding: '24px' }}>
                   {search ? 'No records match your filter' : 'No purchase records yet'}
                 </td></tr>
-              ) : filtered.map(r => (
-                <tr key={r.id} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{r.date}</td>
-                  <td style={{ padding: '10px', fontWeight: 600, fontSize: '12px' }}>{r.tyreLabel}</td>
-                  <td style={{ padding: '10px' }}><Badge variant={r.type === 'used' ? 'teal' : 'blue'}>{r.type === 'used' ? '♻ Used' : 'New'}</Badge></td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>{r.qty}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{(r.cost || 0).toFixed(2)}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{(r.totalCost || 0).toFixed(2)}</td>
-                  <td style={{ padding: '10px', fontSize: '11px' }}>{r.supplier || '—'}</td>
-                  <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
-                    {r.invoiceUrl ? (
-                      <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); openInvoice(r.invoiceUrl) }}
-                        title="View supplier invoice"
-                        style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}
-                      >
-                        📄 {r.ref && r.ref !== '—' ? r.ref : 'Invoice'}
-                      </a>
-                    ) : (
-                      <span style={{ color: 'var(--text2)' }}>{r.ref || '—'}</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
-                    <span style={{ display: 'inline-flex', gap: '6px' }}>
-                      {r.type === 'new' && (
-                        <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
+              ) : grouped.map(g => {
+                const rows = g.rows.map(r => (
+                  <tr key={r.id} onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = 'var(--surface2)')} onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => td.style.background = '')}>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>{g.purchaseId ? <span style={{ color: 'var(--text3)', paddingLeft: '14px' }}>↳</span> : r.date}</td>
+                    <td style={{ padding: '10px', fontWeight: 600, fontSize: '12px' }}>{r.tyreLabel}</td>
+                    <td style={{ padding: '10px' }}><Badge variant={r.type === 'used' ? 'teal' : 'blue'}>{r.type === 'used' ? '♻ Used' : 'New'}</Badge></td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>{r.qty}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace' }}>£{(r.cost || 0).toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>£{(r.totalCost || 0).toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontSize: '11px' }}>{g.purchaseId ? '' : (r.supplier || '—')}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
+                      {g.purchaseId ? '' : r.invoiceUrl ? (
+                        <a
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); openInvoice(r.invoiceUrl) }}
+                          title="View supplier invoice"
+                          style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}
+                        >
+                          📄 {r.ref && r.ref !== '—' ? r.ref : 'Invoice'}
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--text2)' }}>{r.ref || '—'}</span>
                       )}
-                      <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
-                      <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', gap: '6px' }}>
+                        {r.type === 'new' && (
+                          <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
+                        )}
+                        <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
+                        <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
+                      </span>
+                    </td>
+                  </tr>
+                ))
+                if (!g.purchaseId) return rows
+                // Multi-line purchase: header row with the shared invoice details,
+                // then one indented row per tyre line.
+                const head = g.rows[0]
+                const totalQty = g.rows.reduce((a, r) => a + (r.qty || 0), 0)
+                const total = g.rows.reduce((a, r) => a + (r.totalCost || 0), 0)
+                return [
+                  <tr key={'ph-' + g.purchaseId} style={{ background: 'var(--surface2)' }}>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--text2)', borderTop: '1px solid var(--border)' }}>{head.date}</td>
+                    <td colSpan={2} style={{ padding: '10px', fontWeight: 700, fontSize: '12px', borderTop: '1px solid var(--border)' }}>
+                      📦 Purchase · {g.rows.length} tyre lines
+                    </td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', borderTop: '1px solid var(--border)' }}>{totalQty}</td>
+                    <td style={{ padding: '10px', borderTop: '1px solid var(--border)' }}></td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', color: 'var(--accent)', fontWeight: 600, borderTop: '1px solid var(--border)' }}>£{total.toFixed(2)}</td>
+                    <td style={{ padding: '10px', fontSize: '11px', borderTop: '1px solid var(--border)' }}>{head.supplier || '—'}</td>
+                    <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px', borderTop: '1px solid var(--border)' }}>
+                      {head.invoiceUrl ? (
+                        <a href="#" onClick={(e) => { e.preventDefault(); openInvoice(head.invoiceUrl) }} title="View supplier invoice" style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}>
+                          📄 {head.ref && head.ref !== '—' ? head.ref : 'Invoice'}
+                        </a>
+                      ) : <span style={{ color: 'var(--text2)' }}>{head.ref || '—'}</span>}
+                    </td>
+                    <td style={{ padding: '10px', borderTop: '1px solid var(--border)' }}></td>
+                  </tr>,
+                  ...rows,
+                ]
+              })}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {/* Add Batch Modal */}
-      {showBatch && <BatchModal skus={skus} preSkuId="" garageId={garageId} onClose={() => setShowBatch(false)} onSave={(data) => {
-        addBatch({ id: 'B' + Date.now(), ...data, remaining: data.qty })
+      {/* New Purchase Modal — one invoice, one or more tyre lines */}
+      {showBatch && <PurchaseModal skus={skus} garageId={garageId} onClose={() => setShowBatch(false)} onSave={(shared, lines) => {
+        addPurchase(shared, lines)
         setShowBatch(false)
       }} />}
 
@@ -224,7 +272,7 @@ export default function Purchases() {
       }} />}
 
       {/* Edit Batch Modal */}
-      {editingBatch && <BatchModal skus={skus} preSkuId="" garageId={garageId} initial={editingBatch} onClose={() => setEditingBatch(null)} onSave={(data) => {
+      {editingBatch && <BatchModal skus={skus} preSkuId="" garageId={garageId} initial={editingBatch} lineOf={editingBatch.purchaseId ? batches.filter(b => b.purchaseId === editingBatch.purchaseId).length : 1} onClose={() => setEditingBatch(null)} onSave={(data) => {
         const sold = editingBatch.qty - editingBatch.remaining
         if (data.qty < sold) {
           alert(`Quantity can't go below ${sold} — that many have already been sold from this batch.`)
@@ -234,6 +282,13 @@ export default function Purchases() {
         // invoiceUrl: null = no change (keep existing), '' = removed, string = new upload
         if (updates.invoiceUrl === null || updates.invoiceUrl === undefined) delete updates.invoiceUrl
         updateBatch(editingBatch.id, updates)
+        // Shared invoice details apply to every line of the same purchase
+        if (editingBatch.purchaseId) {
+          const sharedPatch = { date: updates.date, supplier: updates.supplier, ref: updates.ref }
+          if (updates.invoiceUrl !== undefined) sharedPatch.invoiceUrl = updates.invoiceUrl
+          batches.filter(b => b.purchaseId === editingBatch.purchaseId && b.id !== editingBatch.id)
+            .forEach(b => updateBatch(b.id, sharedPatch))
+        }
         setEditingBatch(null)
       }} />}
 
@@ -244,8 +299,8 @@ export default function Purchases() {
       }} />}
 
       {/* Restock (+ Stock) Modal — new batch, prefilled with same tyre & supplier */}
-      {restock && <BatchModal skus={skus} preSkuId={restock.skuId} garageId={garageId} initial={{ skuId: restock.skuId, supplier: restock.supplier }} onClose={() => setRestock(null)} onSave={(data) => {
-        addBatch({ id: 'B' + Date.now(), ...data, remaining: data.qty })
+      {restock && <PurchaseModal skus={skus} garageId={garageId} preLines={[{ skuId: restock.skuId, qty: '', cost: '' }]} preSupplier={restock.supplier} onClose={() => setRestock(null)} onSave={(shared, lines) => {
+        addPurchase(shared, lines)
         setRestock(null)
       }} />}
       {pendingDelete && <UndoToast message={pendingDelete.label} onUndo={undoDelete} />}
@@ -391,7 +446,7 @@ function SkuCombo({ skus, value, onChange, inputStyle }) {
   )
 }
 
-function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
+function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial, lineOf = 1 }) {
   const [form, setForm] = useState(initial ? {
     skuId: initial.skuId || '',
     date: initial.date || new Date().toISOString().split('T')[0],
@@ -473,7 +528,12 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
   }
 
   return (
-    <Modal title="Purchase Stock Batch" onClose={onClose} onSave={handleSave} saveDisabled={uploading} saveText={uploading ? 'Uploading...' : 'Save Batch'}>
+    <Modal title={initial ? 'Edit Purchase Line' : 'Purchase Stock Batch'} onClose={onClose} onSave={handleSave} saveDisabled={uploading} saveText={uploading ? 'Uploading...' : 'Save Batch'}>
+      {lineOf > 1 && (
+        <div style={{ fontSize: '11px', color: 'var(--text2)', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', marginBottom: '12px' }}>
+          📦 This is one of <strong>{lineOf}</strong> lines on the same purchase. Date, supplier, ref and invoice file are shared — changing them here updates every line.
+        </div>
+      )}
       <Field label="Select Tyre SKU">
         <SkuCombo skus={skus} value={form.skuId} onChange={(id) => f('skuId', id)} inputStyle={inputStyle} />
       </Field>
@@ -509,6 +569,154 @@ function BatchModal({ skus, preSkuId, garageId, onClose, onSave, initial }) {
                 <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Replace</button>
                 <button onClick={() => { if (confirm('Remove this invoice? It will be deleted when you save.')) setExistingInvoice(null) }} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>Remove</button>
               </span>
+            </div>
+          ) : (
+            <div onClick={() => fileInputRef.current?.click()} style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', cursor: 'pointer', border: '2px dashed var(--border)' }}>
+              <span>📄</span>
+              <span style={{ color: 'var(--text2)' }}>Click to upload PDF or image</span>
+            </div>
+          )}
+        </Field>
+        {uploadError && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>{uploadError}</div>}
+      </div>
+    </Modal>
+  )
+}
+
+// ============================================================
+// PurchaseModal — one supplier invoice, many tyre lines.
+// Shared: date, supplier, ref, notes, invoice file. Lines: SKU / qty / cost.
+// On save, each line becomes its own FIFO batch tagged with one purchaseId.
+// ============================================================
+function PurchaseModal({ skus, garageId, onClose, onSave, preLines, preSupplier }) {
+  const today = new Date().toISOString().split('T')[0]
+  const [shared, setShared] = useState({ date: today, supplier: preSupplier || '', ref: '', notes: '' })
+  const [lines, setLines] = useState(preLines?.length ? preLines : [{ skuId: '', qty: '', cost: '' }])
+  const [invoiceFile, setInvoiceFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef(null)
+
+  const allBatches = useStore(s => s.batches)
+  const supplierOptions = [...new Set(allBatches.map(b => b.supplier).filter(Boolean))].sort()
+
+  const sh = (k, v) => setShared(prev => ({ ...prev, [k]: v }))
+  const setLine = (i, k, v) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [k]: v } : l))
+  const addLine = () => setLines(prev => [...prev, { skuId: '', qty: '', cost: '' }])
+  const removeLine = (i) => setLines(prev => prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i))
+
+  const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
+
+  const lineTotal = l => (parseInt(l.qty) || 0) * (parseFloat(l.cost) || 0)
+  const totalQty = lines.reduce((a, l) => a + (parseInt(l.qty) || 0), 0)
+  const total = lines.reduce((a, l) => a + lineTotal(l), 0)
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) { setUploadError('Please upload a PDF or image file (JPG, PNG, WebP)'); return }
+    if (file.size > 5 * 1024 * 1024) { setUploadError('File too large. Maximum size is 5MB'); return }
+    setInvoiceFile(file)
+    setUploadError('')
+  }
+
+  const uploadInvoice = async () => {
+    if (!invoiceFile || !garageId) return null
+    setUploading(true)
+    try {
+      const fileExt = invoiceFile.name.split('.').pop()
+      const fileName = `${garageId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const { error } = await supabase.storage.from('purchase-invoices').upload(fileName, invoiceFile)
+      if (error) throw error
+      setUploading(false)
+      return fileName
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setUploadError('Upload failed. Please try again.')
+      setUploading(false)
+      return null
+    }
+  }
+
+  const handleSave = async () => {
+    const bad = lines.findIndex(l => !l.skuId || !(parseInt(l.qty) > 0) || l.cost === '' || isNaN(parseFloat(l.cost)))
+    if (bad !== -1) return alert(`Line ${bad + 1}: select a tyre and enter quantity and cost.`)
+    // Same SKU twice on one invoice is almost always a mistake — merge? No: warn.
+    const ids = lines.map(l => l.skuId)
+    const dup = ids.find((id, i) => ids.indexOf(id) !== i)
+    if (dup && !confirm('The same tyre appears on more than one line. Save anyway as separate batches?')) return
+
+    let invoiceUrl = null
+    if (invoiceFile) {
+      invoiceUrl = await uploadInvoice()
+      if (invoiceUrl === null) return
+    }
+    onSave(
+      { ...shared, invoiceUrl },
+      lines.map(l => ({ skuId: l.skuId, qty: parseInt(l.qty), cost: parseFloat(l.cost) }))
+    )
+  }
+
+  return (
+    <Modal title="New Purchase" wide onClose={onClose} onSave={handleSave} saveDisabled={uploading} saveText={uploading ? 'Uploading...' : `Save ${lines.length > 1 ? `${lines.length} lines` : 'Purchase'}`}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }} className="form-grid-2">
+        <Field label="Date"><input style={inputStyle} type="date" value={shared.date} onChange={e => sh('date', e.target.value)} /></Field>
+        <Field label="Supplier">
+          <input style={inputStyle} list="supplier-history" value={shared.supplier} onChange={e => sh('supplier', e.target.value)} placeholder="Aldridge Tyres Ltd" />
+          <datalist id="supplier-history">
+            {supplierOptions.map(s => <option key={s} value={s} />)}
+          </datalist>
+        </Field>
+        <Field label="Invoice Ref"><input style={inputStyle} value={shared.ref} onChange={e => sh('ref', e.target.value)} placeholder="ALD-2025-0123" /></Field>
+      </div>
+
+      {/* Tyre lines */}
+      <div style={{ marginTop: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text2)' }}>Tyres on this invoice</label>
+          <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{lines.length} line{lines.length === 1 ? '' : 's'}</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px 28px', gap: '6px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text3)', fontFamily: 'DM Mono, monospace', padding: '0 2px 4px' }}>
+          <span>Tyre</span><span>Qty</span><span>Cost/ea</span><span style={{ textAlign: 'right' }}>Total</span><span></span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {lines.map((l, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px 28px', gap: '6px', alignItems: 'center' }}>
+              <SkuCombo skus={skus} value={l.skuId} onChange={(id) => setLine(i, 'skuId', id)} inputStyle={inputStyle} />
+              <input style={inputStyle} type="number" min="1" value={l.qty} onChange={e => setLine(i, 'qty', e.target.value)} placeholder="4" />
+              <input style={inputStyle} type="number" step="0.01" value={l.cost} onChange={e => setLine(i, 'cost', e.target.value)} placeholder="85.00" />
+              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '12px', textAlign: 'right', color: 'var(--accent)', whiteSpace: 'nowrap' }}>£{lineTotal(l).toFixed(2)}</div>
+              <button
+                onClick={() => removeLine(i)}
+                disabled={lines.length === 1}
+                title="Remove line"
+                style={{ background: 'none', border: 'none', color: lines.length === 1 ? 'var(--text3)' : 'var(--red)', cursor: lines.length === 1 ? 'default' : 'pointer', fontSize: '14px', padding: 0 }}
+              >✕</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+          <button onClick={addLine} style={{ background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: '8px', padding: '7px 12px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            ➕ Add another tyre
+          </button>
+          <div style={{ fontSize: '12px', color: 'var(--text2)' }}>
+            {totalQty} tyre{totalQty === 1 ? '' : 's'} · <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--accent)', fontWeight: 600 }}>£{total.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '12px' }}>
+        <Field label="Notes"><input style={inputStyle} value={shared.notes} onChange={e => sh('notes', e.target.value)} placeholder="Optional notes..." /></Field>
+      </div>
+
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+        <Field label="Purchase Invoice (optional — attached to every line)">
+          <input ref={fileInputRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
+          {invoiceFile ? (
+            <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}>
+              <span style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '6px' }}>✓ {invoiceFile.name}</span>
+              <button onClick={() => setInvoiceFile(null)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}>✕</button>
             </div>
           ) : (
             <div onClick={() => fileInputRef.current?.click()} style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px', cursor: 'pointer', border: '2px dashed var(--border)' }}>
@@ -582,10 +790,10 @@ function UsedModal({ onClose, onSave, initial }) {
   )
 }
 
-function Modal({ title, children, onClose, onSave, hideActions, saveDisabled, saveText }) {
+function Modal({ title, children, onClose, onSave, hideActions, saveDisabled, saveText, wide }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: '500px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
+      <div className="modal-content" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', width: wide ? '680px' : '500px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '26px' }}>
         <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '19px', fontWeight: 700, marginBottom: '18px' }}>{title}</div>
         {children}
         {!hideActions && (
