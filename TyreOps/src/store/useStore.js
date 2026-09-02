@@ -445,7 +445,8 @@ export const useStore = create(
               if (String(b.id).startsWith('temp-')) continue
               try {
                 await db.deleteBatch(b.id)
-                if (b.invoiceUrl) await db.deletePurchaseInvoice(b.invoiceUrl)
+                const stillUsed = b.invoiceUrl && get().batches.some(x => x.id !== b.id && x.invoiceUrl === b.invoiceUrl)
+                if (b.invoiceUrl && !stillUsed) await db.deletePurchaseInvoice(b.invoiceUrl)
               } catch (e) {
                 console.error('Failed to delete batch during SKU force-delete:', e)
               }
@@ -480,6 +481,46 @@ export const useStore = create(
         }
       },
 
+      // Multi-line purchase: one supplier invoice, several tyres. Every line
+      // becomes its own FIFO batch; they share purchaseId, date, supplier,
+      // ref, notes and the invoice file. `shared` = { date, supplier, ref,
+      // notes, invoiceUrl }, `lines` = [{ skuId, qty, cost }].
+      addPurchase: async (shared, lines) => {
+        const garageId = get().garageId
+        const purchaseId = 'P' + Date.now() + Math.floor(Math.random() * 1000)
+        const optimistic = lines.map((l, i) => ({
+          id: `temp-${Date.now()}-${i}`,
+          skuId: l.skuId,
+          qty: l.qty,
+          cost: l.cost,
+          remaining: l.qty,
+          damaged: 0,
+          date: shared.date,
+          supplier: shared.supplier,
+          ref: shared.ref,
+          notes: shared.notes,
+          invoiceUrl: shared.invoiceUrl || null,
+          purchaseId,
+        }))
+        set(s => ({ batches: [...s.batches, ...optimistic] }))
+
+        if (garageId) {
+          try {
+            const saved = await db.insertBatches(garageId, optimistic)
+            // Swap temp ids for real ids, matching by insertion order
+            set(s => {
+              const idMap = {}
+              optimistic.forEach((o, i) => { if (saved[i]) idMap[o.id] = saved[i].id })
+              return { batches: s.batches.map(b => idMap[b.id] ? { ...b, id: idMap[b.id] } : b) }
+            })
+          } catch (err) {
+            console.error('Failed to save purchase:', err)
+            showToast('Failed to save purchase. It may not persist.')
+          }
+        }
+        return purchaseId
+      },
+
       updateBatch: async (id, updates) => {
         set(s => ({ batches: s.batches.map(b => b.id === id ? { ...b, ...updates } : b) }))
 
@@ -507,8 +548,11 @@ export const useStore = create(
         if (garageId && !String(id).startsWith('temp-')) {
           try {
             await db.deleteBatch(id)
-            // Best-effort cleanup of the attached invoice file
-            if (batch?.invoiceUrl) await db.deletePurchaseInvoice(batch.invoiceUrl)
+            // Best-effort cleanup of the attached invoice file — but only if
+            // no other batch (e.g. another line of the same purchase) still
+            // points at the same file.
+            const stillUsed = batch?.invoiceUrl && get().batches.some(b => b.id !== id && b.invoiceUrl === batch.invoiceUrl)
+            if (batch?.invoiceUrl && !stillUsed) await db.deletePurchaseInvoice(batch.invoiceUrl)
           } catch (err) {
             console.error('Failed to delete batch:', err)
             showToast('Failed to delete stock batch.')
