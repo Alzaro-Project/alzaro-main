@@ -43,6 +43,16 @@ export default function Inventory() {
   const [preSkuId, setPreSkuId] = useState('')
   const [viewingBatch, setViewingBatch] = useState(null)
   const [showCSVImport, setShowCSVImport] = useState(false)
+  // "Hide zero stock" toggle — the list always contains every SKU ever
+  // created (so old sizes can be reordered); this just collapses the
+  // out-of-stock ones. Remembered per browser.
+  const [hideZero, setHideZero] = useState(() => {
+    try { return localStorage.getItem('tyreops_hide_zero') === '1' } catch { return false }
+  })
+  const toggleHideZero = () => setHideZero(v => {
+    try { localStorage.setItem('tyreops_hide_zero', v ? '0' : '1') } catch {}
+    return !v
+  })
 
   // Pending delete with Undo — the item disappears immediately but isn't
   // really deleted until the toast expires. Undo cancels it completely.
@@ -80,8 +90,10 @@ export default function Inventory() {
     if (sk.id === pendingDelete?.id) return false
     if (search && !skuLabel(sk).toLowerCase().includes(search.toLowerCase())) return false
     if (tab === 'low' && getTotalStock(sk.id) > sk.alert) return false
+    if (hideZero && tab !== 'low' && getTotalStock(sk.id) === 0) return false
     return true
   })
+  const zeroCount = skus.filter(sk => sk.id !== pendingDelete?.id && getTotalStock(sk.id) === 0).length
 
   const filteredUsed = usedTyres.filter(u => {
     if (u.id === pendingDelete?.id) return false
@@ -177,8 +189,22 @@ export default function Inventory() {
 
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>Stock List</div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tyres..." style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '200px', maxWidth: '100%' }} />
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>
+            Stock List
+            <span style={{ fontWeight: 500, letterSpacing: 0, textTransform: 'none', color: 'var(--text3)', marginLeft: '8px' }}>{skus.length} SKU{skus.length === 1 ? '' : 's'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {tab !== 'low' && tab !== 'used' && (
+              <label
+                title="Hide tyres with no stock left"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', color: hideZero ? 'var(--text)' : 'var(--text2)', background: hideZero ? 'var(--surface3)' : 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px' }}
+              >
+                <input type="checkbox" checked={hideZero} onChange={toggleHideZero} style={{ margin: 0, accentColor: 'var(--accent)' }} />
+                Hide zero stock{zeroCount > 0 ? ` (${zeroCount})` : ''}
+              </label>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tyres..." style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '200px', maxWidth: '100%' }} />
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -295,7 +321,7 @@ export default function Inventory() {
 
               {filteredSKUs.length === 0 && filteredUsed.length === 0 && (
                 <tr><td colSpan={11} style={{ textAlign: 'center', color: 'var(--text3)', padding: '30px' }}>
-                  {search ? 'No tyres match your search' : 'No tyres in inventory. Add your first SKU!'}
+                  {search ? 'No tyres match your search' : (hideZero && zeroCount > 0 && tab !== 'used') ? `All ${zeroCount} tyres are out of stock — untick "Hide zero stock" to see them` : 'No tyres in inventory. Add your first SKU!'}
                 </td></tr>
               )}
             </tbody>
