@@ -235,7 +235,15 @@ export default async function handler(req, res) {
         productFilter: map.productFilter,
       })
       if (!cfg || !cfg.smtp_host || !cfg.smtp_user) {
-        return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+        // Distinct message per failure so this can actually be debugged: the
+        // settings row itself couldn't be read (query failed / no row / empty
+        // host+user) — different from "password unreadable" below.
+        console.error('send-email cfg read failed:', JSON.stringify(cfg))
+        return res.status(400).json({
+          error: cfg
+            ? '[v2] Your email settings row was found but the SMTP host/username are empty. Fill them in under Settings → Email and save.'
+            : '[v2] Could not read your email settings from the database (settings query failed). This is a server-side read problem, not missing settings.',
+        })
       }
       // Password: prefer the encrypted-at-rest value via the decrypt RPC; fall
       // back to the plaintext column when the encryption migration isn't in place
@@ -262,7 +270,7 @@ export default async function handler(req, res) {
         // Host + user exist but the password can't be read — say so, rather
         // than the misleading "not configured", so it can actually be debugged.
         return res.status(400).json({
-          error: `Your email settings are saved but the password could not be read (${rpcProblem || 'no password stored'}). Re-enter your password in Settings → Email and save.`,
+          error: `[v2] Your email settings are saved but the password could not be read (${rpcProblem || 'no password stored'}). Re-enter your password in Settings → Email and save.`,
         })
       }
       // Gmail-only normalisation: Google displays App Passwords as
