@@ -77,13 +77,25 @@ function resolveSupabaseUrl() {
 // Read one row from a settings table scoped to the caller (their own token, so
 // RLS returns only their row — no service-role needed, ownership is inherent).
 async function readOwnSettings({ supabaseUrl, anonKey, token, table, userId, cols, productFilter }) {
-  const url =
+  const base =
     `${supabaseUrl}/rest/v1/${table}` +
     `?user_id=eq.${encodeURIComponent(userId)}` +
     (productFilter ? `&product=eq.${encodeURIComponent(productFilter)}` : '') +
-    `&select=${cols}&limit=1`
-  const r = await fetch(url, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
-  if (!r.ok) return null
+    `&limit=1`
+  let r = await fetch(`${base}&select=${cols}`, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
+  if (!r.ok) {
+    // A named-column select is rejected wholesale if ANY column in the list is
+    // missing from this table (or its SELECT grant was revoked). The app reads
+    // this same table with select=* successfully, so retry that way and let
+    // the caller pick out whichever smtp_* fields exist.
+    const body = await r.text().catch(() => '')
+    console.error(`readOwnSettings(${table}) named-column select failed HTTP ${r.status}: ${body.slice(0, 300)} — retrying with select=*`)
+    r = await fetch(`${base}&select=*`, { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } })
+    if (!r.ok) {
+      console.error(`readOwnSettings(${table}) select=* also failed HTTP ${r.status}`)
+      return null
+    }
+  }
   const rows = await r.json().catch(() => [])
   return rows?.[0] || null
 }
