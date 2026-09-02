@@ -183,6 +183,17 @@ export const useStore = create(
 
             // Best-effort cleanup of recycle-bin items older than 30 days
             db.purgeExpiredDeleted(data.garage.id).catch(() => {})
+
+            // The SMTP password is encrypted at rest, so it doesn't come back
+            // with the settings row. Fetch the decrypted value via the
+            // owner-only RPC so the Settings form can show it (same behaviour
+            // as SoloOps/PropertyOps). Staff logins get null and skip this.
+            try {
+              const { data: pass } = await supabase.rpc('tyreops_smtp_secret')
+              if (typeof pass === 'string' && pass) {
+                set(s2 => ({ settings: { ...s2.settings, smtpPass: pass, smtpPassSaved: true } }))
+              }
+            } catch { /* RPC absent or no access - field stays blank */ }
           }
         } catch (err) {
           console.error('Failed to load garage data:', err)
