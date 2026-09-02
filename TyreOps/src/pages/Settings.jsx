@@ -154,7 +154,11 @@ export default function Settings() {
   const testSmtpConnection = async () => {
     if (!draft.smtpHost || !draft.smtpUser || !draft.smtpPass) {
       setSmtpTestStatus('error')
-      setSmtpTestError('Fill in the SMTP host, username and password first.')
+      setSmtpTestError(
+        (!draft.smtpPass && settings.smtpPassSaved)
+          ? 'Your saved password is encrypted and can\'t be shown here — re-enter it in the password box to run a test. (Sending invoices works without this.)'
+          : 'Fill in the SMTP host, username and password first.'
+      )
       return
     }
 
@@ -548,7 +552,7 @@ export default function Settings() {
                       type={showSmtpPassword ? 'text' : 'password'}
                       value={draft.smtpPass || ''} 
                       onChange={e => setField({ smtpPass: e.target.value.replace(/\s+/g, '') })} 
-                      placeholder="••••••••••••"
+                      placeholder={settings.smtpPassSaved ? '•••••••• saved — leave blank to keep' : '••••••••••••'}
                     />
                     <button
                       type="button"
@@ -568,6 +572,11 @@ export default function Settings() {
                       {showSmtpPassword ? '🙈' : '👁️'}
                     </button>
                   </div>
+                  {settings.smtpPassSaved && !draft.smtpPass && (
+                    <div style={{ fontSize: '10.5px', color: 'var(--text3)', marginTop: '4px' }}>
+                      🔒 A password is saved (encrypted — it can't be displayed). Only type here to change it.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -615,6 +624,9 @@ export default function Settings() {
                   {smtpTestStatus === 'testing' ? '⏳ Connecting...' : 
                    smtpTestStatus === 'success' ? '✓ Connected!' :
                    smtpTestStatus === 'error' ? '✗ Failed — try again' : '🔌 Test Connection'}
+                </Btn>
+                <Btn variant="primary" onClick={saveSettings} disabled={saveStatus === 'saving'}>
+                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? '✓ Saved' : '💾 Save Changes'}
                 </Btn>
                 <span style={{ fontSize: '11px', color: 'var(--text3)' }}>
                   Connects to your email server and sends a test email from {draft.smtpUser || 'your address'}
