@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { VERSION, CHANGELOG } from '../version.js'
 
 const TYPE_META = {
@@ -21,7 +22,10 @@ export default function VersionBadge({ footer = false }) {
         style={footer ? footerStyle : topStyle}>
         v{VERSION}
       </button>
-      {open && (
+      {/* Portal to <body>: the sidebar has a CSS transform (mobile slide-in),
+          which traps position:fixed children inside it — the popup was
+          rendering squashed inside the sidebar instead of centered on screen */}
+      {open && createPortal(
         <div onClick={() => setOpen(false)}
           style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center',
             justifyContent:'center', zIndex:400, padding:'20px' }}>
@@ -56,7 +60,8 @@ export default function VersionBadge({ footer = false }) {
               })}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
