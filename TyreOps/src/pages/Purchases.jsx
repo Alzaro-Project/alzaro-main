@@ -13,6 +13,11 @@ export default function Purchases() {
   const [editingBatch, setEditingBatch] = useState(null)
   const [editingUsed, setEditingUsed] = useState(null)
   const [restock, setRestock] = useState(null)
+  const [dupUsed, setDupUsed] = useState(null) // "buy similar" for used tyres
+  // Table filters
+  const [typeFilter, setTypeFilter] = useState('all') // all | new | used
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   // Open a private invoice by minting a short-lived signed URL on demand.
   const openInvoice = async (pathOrUrl) => {
@@ -49,6 +54,17 @@ export default function Purchases() {
   const handleRestock = (r) => {
     const b = batches.find(x => x.id === r.id)
     if (b) setRestock({ skuId: b.skuId, supplier: b.supplier || '' })
+  }
+
+  // ♻ Similar: log another used tyre like this one — opens the used-tyre
+  // form prefilled with the same brand/model/size, today's date, blank source
+  const handleDupUsed = (r) => {
+    const u = usedTyres.find(x => x.id === r.id)
+    if (u) setDupUsed({
+      brand: u.brand, model: u.model, w: u.w, p: u.p, r: u.r,
+      sell: u.sell, cost: 0, sourceCust: '', notes: '',
+      date: new Date().toISOString().split('T')[0],
+    })
   }
 
   const handleEdit = (r) => {
@@ -99,8 +115,11 @@ export default function Purchases() {
   ].sort((a, b) => new Date(b.date) - new Date(a.date))
     .filter(r => r.id !== pendingDelete?.id)
 
-  // Filter records by search
+  // Filter records by type, date range and search text
   const filtered = allRecords.filter(r => {
+    if (typeFilter !== 'all' && r.type !== typeFilter) return false
+    if (dateFrom && r.date < dateFrom) return false
+    if (dateTo && r.date > dateTo) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -110,6 +129,7 @@ export default function Purchases() {
       r.date?.includes(q)
     )
   })
+  const filtersActive = typeFilter !== 'all' || dateFrom || dateTo || search
 
   // Group multi-line purchases (batches sharing a purchaseId) so they render
   // as one block: a header row for the invoice, then one row per tyre line.
@@ -129,6 +149,8 @@ export default function Purchases() {
   }
   // A "group" with only one line is just a normal batch — render it flat
   for (const g of grouped) if (g.rows.length === 1) g.purchaseId = null
+
+  const filterInputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', color: 'var(--text)', fontSize: '12px', outline: 'none' }
 
   const totalSpend = allRecords.reduce((a, r) => a + (r.totalCost || 0), 0)
   const activeBatches = batches.filter(b => b.remaining > 0).length
@@ -161,24 +183,40 @@ export default function Purchases() {
 
       <Card>
         {/* Page filter */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.8px', textTransform: 'uppercase', color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>Purchase Records</div>
-          <input 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            placeholder="Filter records..." 
-            style={{ 
-              background: 'var(--surface2)', 
-              border: '1px solid var(--border)', 
-              borderRadius: '8px', 
-              padding: '6px 10px', 
-              color: 'var(--text)', 
-              fontSize: '12px', 
-              outline: 'none', 
-              width: '200px' 
-            }} 
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Type filter */}
+            <div style={{ display: 'inline-flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px', gap: '2px' }}>
+              {[['all', 'All'], ['new', 'New'], ['used', '♻ Used']].map(([key, label]) => (
+                <div key={key} onClick={() => setTypeFilter(key)} style={{
+                  padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                  background: typeFilter === key ? 'var(--surface3)' : 'transparent',
+                  color: typeFilter === key ? 'var(--text)' : 'var(--text2)',
+                }}>{label}</div>
+              ))}
+            </div>
+            {/* Date range */}
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="From date" style={filterInputStyle} />
+            <span style={{ color: 'var(--text3)', fontSize: '11px' }}>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="To date" style={filterInputStyle} />
+            {/* Text search */}
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tyre, supplier, ref..."
+              style={{ ...filterInputStyle, width: '160px' }}
+            />
+            {filtersActive && (
+              <button onClick={() => { setTypeFilter('all'); setDateFrom(''); setDateTo(''); setSearch('') }} title="Clear filters" style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: '4px' }}>✕ Clear</button>
+            )}
+          </div>
         </div>
+        {filtersActive && (
+          <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '8px' }}>
+            Showing {filtered.length} of {allRecords.length} records
+          </div>
+        )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
@@ -203,22 +241,17 @@ export default function Purchases() {
                     <td style={{ padding: '10px', fontSize: '11px' }}>{g.purchaseId ? '' : (r.supplier || '—')}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px' }}>
                       {g.purchaseId ? '' : r.invoiceUrl ? (
-                        <a
-                          href="#"
-                          onClick={(e) => { e.preventDefault(); openInvoice(r.invoiceUrl) }}
-                          title="View supplier invoice"
-                          style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}
-                        >
-                          📄 {r.ref && r.ref !== '—' ? r.ref : 'Invoice'}
-                        </a>
+                        <InvoiceBtn pathOrUrl={r.invoiceUrl} refText={r.ref} onOpen={openInvoice} />
                       ) : (
                         <span style={{ color: 'var(--text2)' }}>{r.ref || '—'}</span>
                       )}
                     </td>
                     <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
                       <span style={{ display: 'inline-flex', gap: '6px' }}>
-                        {r.type === 'new' && (
+                        {r.type === 'new' ? (
                           <Btn sm variant="success" onClick={() => handleRestock(r)}>+ Stock</Btn>
+                        ) : (
+                          <Btn sm variant="teal" onClick={() => handleDupUsed(r)}>♻ Similar</Btn>
                         )}
                         <Btn sm variant="ghost" onClick={() => handleEdit(r)}>✏️</Btn>
                         <Btn sm variant="danger" onClick={() => handleDelete(r)}>🗑</Btn>
@@ -244,9 +277,7 @@ export default function Purchases() {
                     <td style={{ padding: '10px', fontSize: '11px', borderTop: '1px solid var(--border)' }}>{head.supplier || '—'}</td>
                     <td style={{ padding: '10px', fontFamily: 'DM Mono, monospace', fontSize: '10px', borderTop: '1px solid var(--border)' }}>
                       {head.invoiceUrl ? (
-                        <a href="#" onClick={(e) => { e.preventDefault(); openInvoice(head.invoiceUrl) }} title="View supplier invoice" style={{ color: 'var(--blue)', textDecoration: 'underline', fontWeight: 600 }}>
-                          📄 {head.ref && head.ref !== '—' ? head.ref : 'Invoice'}
-                        </a>
+                        <InvoiceBtn pathOrUrl={head.invoiceUrl} refText={head.ref} onOpen={openInvoice} />
                       ) : <span style={{ color: 'var(--text2)' }}>{head.ref || '—'}</span>}
                     </td>
                     <td style={{ padding: '10px', borderTop: '1px solid var(--border)' }}></td>
@@ -292,6 +323,12 @@ export default function Purchases() {
         setEditingBatch(null)
       }} />}
 
+      {/* Buy Similar Used Tyre Modal */}
+      {dupUsed && <UsedModal initial={dupUsed} onClose={() => setDupUsed(null)} onSave={(data) => {
+        addUsedTyre({ id: 'U' + Date.now(), ...data, sold: false })
+        setDupUsed(null)
+      }} />}
+
       {/* Edit Used Tyre Modal */}
       {editingUsed && <UsedModal initial={editingUsed} onClose={() => setEditingUsed(null)} onSave={(data) => {
         updateUsedTyre(editingUsed.id, data)
@@ -307,6 +344,26 @@ export default function Purchases() {
     </div>
   )
 }
+function InvoiceBtn({ pathOrUrl, refText, onOpen }) {
+  return (
+    <button
+      onClick={() => onOpen(pathOrUrl)}
+      title="View supplier invoice"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        background: 'var(--blue2, rgba(96,165,250,.12))', color: 'var(--blue)',
+        border: '1px solid rgba(96,165,250,.3)', borderRadius: '7px',
+        padding: '4px 9px', fontSize: '10px', fontWeight: 700,
+        fontFamily: 'DM Mono, monospace', cursor: 'pointer', whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(96,165,250,.22)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'var(--blue2, rgba(96,165,250,.12))'}
+    >
+      📄 {refText && refText !== '—' ? refText : 'Invoice'}
+    </button>
+  )
+}
+
 // ============================================================
 // SkuCombo — type to filter existing tyre SKUs, or add a new one inline.
 // Replaces the plain <select>. Keeps batches attached to a real SKU record
