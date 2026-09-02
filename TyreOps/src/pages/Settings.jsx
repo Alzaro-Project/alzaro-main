@@ -162,15 +162,24 @@ export default function Settings() {
     setSmtpTestError('')
 
     try {
+      // /api/test-smtp requires a logged-in session — without the Bearer
+      // token it returns 401 "Not authenticated"
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        setSmtpTestStatus('error')
+        setSmtpTestError('Your session has expired — sign out and back in, then try again.')
+        return
+      }
       const res = await fetch('/api/test-smtp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           host: draft.smtpHost,
           port: draft.smtpPort || 587,
           secure: !!draft.smtpSecure,
           user: draft.smtpUser,
-          pass: draft.smtpPass,
+          pass: (draft.smtpPass || '').replace(/\s+/g, ''),
           fromName: draft.smtpFromName || draft.name || '',
         }),
       })
@@ -538,7 +547,7 @@ export default function Settings() {
                       style={{ ...inputStyle, paddingRight: '40px' }} 
                       type={showSmtpPassword ? 'text' : 'password'}
                       value={draft.smtpPass || ''} 
-                      onChange={e => setField({ smtpPass: e.target.value })} 
+                      onChange={e => setField({ smtpPass: e.target.value.replace(/\s+/g, '') })} 
                       placeholder="••••••••••••"
                     />
                     <button
