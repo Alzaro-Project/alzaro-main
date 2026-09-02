@@ -99,11 +99,18 @@ async function callSecretRpc({ supabaseUrl, anonKey, token, fn }) {
       headers: { apikey: anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: '{}',
     })
-    if (!r.ok) return null
+    if (!r.ok) {
+      const body = await r.text().catch(() => '')
+      console.error(`secret RPC ${fn} failed: HTTP ${r.status} ${body.slice(0, 300)}`)
+      return { error: `decrypt function returned HTTP ${r.status}` }
+    }
     const v = await r.json().catch(() => null)
-    return (typeof v === 'string' && v) ? v : null // RPC returns a scalar text
-  } catch {
-    return null
+    if (typeof v === 'string' && v) return v // RPC returns a scalar text
+    console.error(`secret RPC ${fn} returned no password (value: ${JSON.stringify(v)})`)
+    return { error: 'decrypt function returned an empty password' }
+  } catch (e) {
+    console.error(`secret RPC ${fn} threw:`, e)
+    return { error: 'decrypt function unreachable' }
   }
 }
 
@@ -237,8 +244,11 @@ export default async function handler(req, res) {
       // the staff migrations revoked SELECT on smtp_pass, this read simply
       // returns null instead of poisoning the main config read above.
       let smtpPass = null
+      let rpcProblem = ''
       if (map.secretRpc) {
-        smtpPass = await callSecretRpc({ supabaseUrl, anonKey: supabaseAnonKey, token, fn: map.secretRpc })
+        const got = await callSecretRpc({ supabaseUrl, anonKey: supabaseAnonKey, token, fn: map.secretRpc })
+        if (typeof got === 'string') smtpPass = got
+        else if (got && got.error) rpcProblem = got.error
       }
       if (!smtpPass) {
         const passRow = await readOwnSettings({
@@ -249,7 +259,11 @@ export default async function handler(req, res) {
         smtpPass = passRow?.smtp_pass || null
       }
       if (!smtpPass) {
-        return res.status(400).json({ error: 'Email not configured. Set up your business email in Settings → Email before sending.' })
+        // Host + user exist but the password can't be read — say so, rather
+        // than the misleading "not configured", so it can actually be debugged.
+        return res.status(400).json({
+          error: `Your email settings are saved but the password could not be read (${rpcProblem || 'no password stored'}). Re-enter your password in Settings → Email and save.`,
+        })
       }
       // Gmail-only normalisation: Google displays App Passwords as
       // "xxxx xxxx xxxx xxxx" and users paste them that way. Newer app builds
