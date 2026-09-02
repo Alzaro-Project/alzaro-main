@@ -158,6 +158,9 @@ export const useStore = create(
                 smtpSecure: data.garage.smtp_secure || false,
                 smtpUser: data.garage.smtp_user || '',
                 smtpPass: data.garage.smtp_pass || '',
+                // Password is encrypted at rest (smtp_pass_enc) and can never
+                // be read back into the browser — this flag says one is saved.
+                smtpPassSaved: !!(data.garage.smtp_pass_enc || data.garage.smtp_pass),
                 smtpProvider: data.garage.smtp_provider || 'custom',
                 smtpFromName: data.garage.smtp_from_name || '',
                 smtpFromEmail: data.garage.smtp_from_email || '',
@@ -239,7 +242,9 @@ export const useStore = create(
       // SETTINGS
       // --------------------------------------------------------
       updateSettings: async (updates) => {
-        set(s => ({ settings: { ...s.settings, ...updates } }))
+        const patch = { ...updates }
+        if (patch.smtpPass) patch.smtpPassSaved = true
+        set(s => ({ settings: { ...s.settings, ...patch } }))
 
         const garageId = get().garageId
         if (garageId) {
@@ -259,7 +264,11 @@ export const useStore = create(
             if (updates.smtpPort !== undefined) dbUpdates.smtp_port = updates.smtpPort
             if (updates.smtpSecure !== undefined) dbUpdates.smtp_secure = updates.smtpSecure
             if (updates.smtpUser !== undefined) dbUpdates.smtp_user = updates.smtpUser
-            if (updates.smtpPass !== undefined) dbUpdates.smtp_pass = updates.smtpPass
+            // Empty password means "keep the saved one" — the encrypted-at-rest
+            // password can't be read back into the form, so the field reloads
+            // blank. Writing '' here would ENCRYPT AN EMPTY STRING and wipe the
+            // real password (this exact bug ate a user's Gmail app password).
+            if (updates.smtpPass !== undefined && updates.smtpPass !== '') dbUpdates.smtp_pass = updates.smtpPass
             if (updates.smtpProvider !== undefined) dbUpdates.smtp_provider = updates.smtpProvider
             if (updates.smtpFromName !== undefined) dbUpdates.smtp_from_name = updates.smtpFromName
             if (updates.smtpFromEmail !== undefined) dbUpdates.smtp_from_email = updates.smtpFromEmail
