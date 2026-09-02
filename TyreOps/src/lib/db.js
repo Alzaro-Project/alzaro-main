@@ -197,10 +197,35 @@ export async function insertBatch(garageId, batch) {
     ref: batch.ref,
     notes: batch.notes,
     invoice_url: batch.invoiceUrl || null,
-    damaged: batch.damaged || 0
+    damaged: batch.damaged || 0,
+    purchase_id: batch.purchaseId || null
   }).select().single()
   if (error) throw error
   return data
+}
+
+// Insert several batches in one round-trip. Used for multi-line purchases:
+// every line becomes its own FIFO batch, all sharing the same purchase_id,
+// date, supplier, ref and invoice file. Returns rows in insertion order.
+export async function insertBatches(garageId, batches) {
+  if (!batches?.length) return []
+  const rows = batches.map(batch => ({
+    account_id: garageId,
+    sku_id: batch.skuId,
+    date: batch.date,
+    qty: batch.qty,
+    remaining: batch.qty,
+    cost: batch.cost,
+    supplier: batch.supplier,
+    ref: batch.ref,
+    notes: batch.notes,
+    invoice_url: batch.invoiceUrl || null,
+    damaged: batch.damaged || 0,
+    purchase_id: batch.purchaseId || null
+  }))
+  const { data, error } = await supabase.from('batches').insert(rows).select()
+  if (error) throw error
+  return data || []
 }
 
 export async function updateBatch(id, updates) {
@@ -208,6 +233,10 @@ export async function updateBatch(id, updates) {
   if (updates.invoiceUrl !== undefined) {
     dbUpdates.invoice_url = updates.invoiceUrl
     delete dbUpdates.invoiceUrl
+  }
+  if (updates.purchaseId !== undefined) {
+    dbUpdates.purchase_id = updates.purchaseId
+    delete dbUpdates.purchaseId
   }
   const { error } = await supabase.from('batches').update(dbUpdates).eq('id', id)
   if (error) throw error
@@ -457,6 +486,7 @@ export async function loadAllGarageData(email) {
       remaining: b.remaining,
       invoiceUrl: b.invoice_url,
       damaged: b.damaged || 0,
+      purchaseId: b.purchase_id || null,
     }))
 
     return {
@@ -504,7 +534,7 @@ export async function loadAllGarageDataAsStaff() {
     return {
       garage,
       skus,
-      batches: batches.map(b => ({ ...b, skuId: b.sku_id, remaining: b.remaining, invoiceUrl: b.invoice_url, damaged: b.damaged || 0 })),
+      batches: batches.map(b => ({ ...b, skuId: b.sku_id, remaining: b.remaining, invoiceUrl: b.invoice_url, damaged: b.damaged || 0, purchaseId: b.purchase_id || null })),
       usedTyres,
       customers,
       invoices,
