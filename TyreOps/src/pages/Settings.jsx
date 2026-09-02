@@ -552,7 +552,7 @@ export default function Settings() {
                       type={showSmtpPassword ? 'text' : 'password'}
                       value={draft.smtpPass || ''} 
                       onChange={e => setField({ smtpPass: e.target.value.replace(/\s+/g, '') })} 
-                      placeholder={settings.smtpPassSaved ? '•••••••• saved — leave blank to keep' : '••••••••••••'}
+                      placeholder="••••••••••••"
                     />
                     <button
                       type="button"
@@ -574,7 +574,7 @@ export default function Settings() {
                   </div>
                   {settings.smtpPassSaved && !draft.smtpPass && (
                     <div style={{ fontSize: '10.5px', color: 'var(--text3)', marginTop: '4px' }}>
-                      🔒 A password is saved (encrypted — it can't be displayed). Only type here to change it.
+                      🔒 A password is saved — leaving this blank keeps it.
                     </div>
                   )}
                 </div>
