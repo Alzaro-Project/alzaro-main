@@ -267,7 +267,7 @@ function Dashboard({ user, signOut, staff }) {
       <aside style={{ width: 240, background: "var(--panel)", borderRight: "0.5px solid var(--line)", display: "flex", flexDirection: "column", overflowY: "auto",
         ...(isMobile
           ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 90, transform: navOpen ? "translateX(0)" : "translateX(-105%)", transition: "transform .25s ease", boxShadow: navOpen ? "0 0 40px rgba(0,0,0,.5)" : "none" }
-          : { width: 210, position: "sticky", top: 0, height: "100vh" }) }}>
+          : { width: 210, position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50 }) }}>
         {/* logo */}
         <div style={{ padding: "18px 16px 14px", borderBottom: "0.5px solid var(--line)" }}>
           <div className="brand" style={{ fontSize: 16, fontWeight: 700 }}>Alzaro<span style={{ color: "var(--brand)" }}>PropOps</span></div>
@@ -358,7 +358,7 @@ function Dashboard({ user, signOut, staff }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: isMobile ? "14px 12px" : "18px 22px", maxWidth: 1180, minWidth: 0 }}>
+      <main style={{ flex: 1, padding: isMobile ? "14px 12px" : "18px 22px", maxWidth: 1180, minWidth: 0, marginLeft: isMobile ? 0 : 210 }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
           {isMobile && (
             <div onClick={() => setNavOpen(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: 8, background: "var(--panel-2)", border: "0.5px solid var(--line)", cursor: "pointer", flexShrink: 0 }}>
