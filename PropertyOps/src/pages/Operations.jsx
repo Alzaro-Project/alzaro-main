@@ -117,7 +117,7 @@ export function MaintenancePage({ user, go }) {
 
   const save = async () => {
     if (savingRef.current) return; // guard against double-click double-insert
-    if (!form.title.trim()) { setErr(isJob ? "Job title is required." : "Description is required."); return; }
+    if (!form.title.trim()) { setErr("Description is required."); return; }
     if (isCustomCat && !customCat.trim()) { setErr("Give your custom category a name."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
@@ -202,7 +202,7 @@ export function MaintenancePage({ user, go }) {
         <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit expense" : "New expense"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10 }}>
-            <label style={{ ...fld, gridColumn: isMobile ? "auto" : "span 2" }}>{isJob ? "Issue / job title" : "Description"}<input style={inp} placeholder={isJob ? "e.g. Boiler not firing" : "e.g. October mortgage payment"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={{ ...fld, gridColumn: isMobile ? "auto" : "span 2" }}>Description<input style={inp} placeholder={isJob ? "e.g. Boiler not firing" : "e.g. October mortgage payment"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
             <label style={fld}>Category<select style={inp} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATS.map((x) => <option key={x}>{x}</option>)}<option>Custom…</option></select></label>
             {isCustomCat && <label style={fld}>Custom category name<input style={inp} placeholder="e.g. Gardening" value={customCat} onChange={(e) => setCustomCat(e.target.value)} /></label>}
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
