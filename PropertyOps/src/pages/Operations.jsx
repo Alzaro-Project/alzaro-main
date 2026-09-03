@@ -151,6 +151,8 @@ export function MaintenancePage({ user, go }) {
     }
     savingRef.current = false; setSaving(false);
     if (error) { setErr(friendlyError(error)); return; }
+    // Insurance (incl. custom categories mentioning it) → offer the compliance follow-up.
+    if (String(payload.category || "").toLowerCase().includes("insurance")) setCompPrompt({ property_id: form.property_id || "" });
     setForm(blank); setAdding(false); setEditId(null); setReceiptFile(null);
     if (receiptRef.current) receiptRef.current.value = "";
     refresh();
@@ -162,6 +164,28 @@ export function MaintenancePage({ user, go }) {
     const { data, error } = await db.storage.from("documents").createSignedUrl(j.receipt_path, 300);
     if (error || !data?.signedUrl) { setErr(friendlyError(error, "opening the receipt")); return; }
     window.open(data.signedUrl, "_blank", "noopener");
+  };
+
+  // Insurance → compliance nudge. Logging an insurance expense offers to
+  // record the matching certificate (type + expiry) so renewals get tracked.
+  const [compPrompt, setCompPrompt] = useState(null); // { property_id }
+  const [compForm, setCompForm] = useState(null);
+  const [compSaving, setCompSaving] = useState(false);
+  const COMP_TYPES = ["Buildings Insurance", "Gas Safety", "EICR", "EPC", "Smoke Alarm", "Carbon Monoxide", "Legionella Risk", "PAT Testing", "HMO Licence", "Fire Risk Assessment"];
+  const completeCompliance = async () => {
+    if (!compForm || compSaving) return;
+    if (!compForm.expiry_date) { setErr("Expiry date is required — it's what compliance tracks."); return; }
+    if (compForm.start_date && new Date(compForm.expiry_date) < new Date(compForm.start_date)) { setErr("Expiry date can't be before the start date."); return; }
+    if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
+    setErr(""); setCompSaving(true);
+    const { error } = await db.from("prop_compliance").insert([{
+      type: compForm.type, property_id: compForm.property_id || null, property: propLabel(properties, compForm.property_id),
+      reference: compForm.reference || "", start_date: compForm.start_date || null, expiry_date: compForm.expiry_date, user_id: user.id,
+    }]);
+    setCompSaving(false);
+    if (error) { setErr(friendlyError(error)); return; }
+    setCompPrompt(null); setCompForm(null);
+    go && go("compliance");
   };
 
   const confirm = useConfirm();
@@ -184,8 +208,9 @@ export function MaintenancePage({ user, go }) {
     refresh();
   };
 
-  const inp = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "9px 12px", color: "var(--txt)", fontSize: 12.5, fontFamily: "Inter", outline: "none", width: "100%" };
-  const fld = { display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--txt-3)" };
+  // Roomier inputs + darker labels — the compact ones were hard to see.
+  const inp = { background: "var(--panel-2)", border: "1px solid var(--line-2, var(--line))", borderRadius: 9, padding: "12px 14px", color: "var(--txt)", fontSize: 13.5, fontFamily: "Inter", outline: "none", width: "100%" };
+  const fld = { display: "flex", flexDirection: "column", gap: 5, fontSize: 11.5, fontWeight: 500, color: "var(--txt-2)" };
   const open = (rows || []).filter((m) => m.status !== "Completed").length;
 
   return (
@@ -197,6 +222,32 @@ export function MaintenancePage({ user, go }) {
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
+
+      {/* Insurance → compliance nudge: banner first, then the mini certificate form. */}
+      {compPrompt && !compForm && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, color: "var(--txt)", background: "var(--brand-soft, rgba(139,127,232,.12))", border: "0.5px solid var(--brand)", padding: "11px 14px", borderRadius: 10, marginBottom: 14 }}>
+          <i className="ti ti-shield-check" style={{ fontSize: 17, color: "var(--brand)", flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 180 }}>Insurance expense saved — bring your compliance up to date? Log the certificate and its expiry date so renewals are tracked automatically.</span>
+          <span onClick={() => setCompForm({ type: "Buildings Insurance", property_id: compPrompt.property_id, reference: "", start_date: "", expiry_date: "" })}><Btn icon="ti-shield-plus" label="Complete your compliance" primary /></span>
+          <i className="ti ti-x" onClick={() => setCompPrompt(null)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Not now" />
+        </div>
+      )}
+      {compForm && (
+        <div style={{ background: "var(--panel-2)", border: "0.5px solid var(--brand)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: "var(--txt)", marginBottom: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}><i className="ti ti-shield-check" style={{ color: "var(--brand)", fontSize: 16 }} />Complete your compliance</div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10 }}>
+            <label style={fld}>Certificate type<select style={inp} value={compForm.type} onChange={(e) => setCompForm({ ...compForm, type: e.target.value })}>{COMP_TYPES.map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Property<select style={inp} value={compForm.property_id} onChange={(e) => setCompForm({ ...compForm, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
+            <label style={fld}>Reference / policy no. (optional)<input style={inp} placeholder="e.g. POL-123456" value={compForm.reference} onChange={(e) => setCompForm({ ...compForm, reference: e.target.value })} /></label>
+            <label style={fld}>Start date (optional)<input style={inp} type="date" value={compForm.start_date} onChange={(e) => setCompForm({ ...compForm, start_date: e.target.value })} /></label>
+            <label style={fld}>Expiry date<input style={inp} type="date" value={compForm.expiry_date} onChange={(e) => setCompForm({ ...compForm, expiry_date: e.target.value })} /></label>
+          </div>
+          <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
+            <span onClick={compSaving ? undefined : completeCompliance} style={{ opacity: compSaving ? 0.6 : 1, cursor: compSaving ? "default" : "pointer" }}><Btn icon="ti-shield-check" label={compSaving ? "Saving…" : "Complete your compliance"} primary /></span>
+            <span onClick={() => { setCompForm(null); setCompPrompt(null); }} style={{ fontSize: 12, color: "var(--txt-3)", cursor: "pointer" }}>Not now</span>
+          </div>
+        </div>
+      )}
 
       {adding && (
         <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
@@ -833,9 +884,10 @@ const data = rows || [];
       </div>
 
       {adding && (
-        <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
+        <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: "13px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 10, fontWeight: 500 }}>{editId ? "Edit payment" : "New payment"}</div>
+          {/* 4 columns so the whole form fits without scrolling on desktop. */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: 9 }}>
             <label style={fld}>
               <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>Tenant
                 <span onClick={() => { setAddTenant((v) => !v); setTErr(""); setTForm(tBlank); }} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer", color: "var(--brand)", fontSize: 10.5, fontWeight: 600 }}><i className={`ti ${addTenant ? "ti-x" : "ti-user-plus"}`} style={{ fontSize: 12 }} />{addTenant ? "Close" : "Add tenant"}</span>
@@ -874,15 +926,15 @@ const data = rows || [];
             <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
           </div>
 
-          <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 8 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
-          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update payment" : "Save payment")} primary /></span></div>
+          <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 7 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
+          <div style={{ marginTop: 9 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update payment" : "Save payment")} primary /></span></div>
         </div>
       )}
 
      {/* Filter tabs */}
       {rows && (
         <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-          {["All", "Pending", "Future", "Sent", "Part paid", "Paid", "Overdue"].map((f) => (
+          {["Pending", "Future", "Sent", "Part paid", "Paid", "Overdue", "All"].map((f) => (
             <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
           ))}
         </div>
