@@ -171,6 +171,7 @@ export function MaintenancePage({ user, go }) {
   const [compPrompt, setCompPrompt] = useState(null); // { property_id }
   const [compForm, setCompForm] = useState(null);
   const [compSaving, setCompSaving] = useState(false);
+  const [compDone, setCompDone] = useState(false);
   const COMP_TYPES = ["Buildings Insurance", "Gas Safety", "EICR", "EPC", "Smoke Alarm", "Carbon Monoxide", "Legionella Risk", "PAT Testing", "HMO Licence", "Fire Risk Assessment"];
   const completeCompliance = async () => {
     if (!compForm || compSaving) return;
@@ -184,8 +185,8 @@ export function MaintenancePage({ user, go }) {
     }]);
     setCompSaving(false);
     if (error) { setErr(friendlyError(error)); return; }
-    setCompPrompt(null); setCompForm(null);
-    go && go("compliance");
+    // Don't yank the user off to Compliance mid-flow — offer it instead.
+    setCompPrompt(null); setCompForm(null); setCompDone(true);
   };
 
   const confirm = useConfirm();
@@ -230,6 +231,14 @@ export function MaintenancePage({ user, go }) {
           <span style={{ flex: 1, minWidth: 180 }}>Insurance expense saved — bring your compliance up to date? Log the certificate and its expiry date so renewals are tracked automatically.</span>
           <span onClick={() => setCompForm({ type: "Buildings Insurance", property_id: compPrompt.property_id, reference: "", start_date: "", expiry_date: "" })}><Btn icon="ti-shield-plus" label="Complete your compliance" primary /></span>
           <i className="ti ti-x" onClick={() => setCompPrompt(null)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Not now" />
+        </div>
+      )}
+      {compDone && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, color: "var(--green)", background: "var(--green-soft)", border: "0.5px solid var(--green)", padding: "10px 14px", borderRadius: 10, marginBottom: 14 }}>
+          <i className="ti ti-circle-check" style={{ fontSize: 16, flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 140 }}>Certificate saved to Compliance — renewals will be tracked.</span>
+          <span onClick={() => { setCompDone(false); go && go("compliance"); }}><Btn icon="ti-shield-check" label="Go to Compliance" primary /></span>
+          <i className="ti ti-x" onClick={() => setCompDone(false)} style={{ fontSize: 15, color: "var(--txt-3)", cursor: "pointer" }} title="Dismiss" />
         </div>
       )}
       {compForm && (
