@@ -326,7 +326,9 @@ function Dashboard({ user, signOut, staff }) {
             {query && <i className="ti ti-x" onClick={() => setQuery("")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} />}
           </div>
           {q && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 10, boxShadow: "0 12px 40px rgba(0,0,0,.4)", zIndex: 95, maxHeight: 320, overflow: "auto" }}>
+            /* In normal flow (not absolute) so the sidebar's own scrolling can
+               never clip the results — every option stays reachable. */
+            <div style={{ marginTop: 6, background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 10, maxHeight: 300, overflow: "auto" }}>
               {results.length === 0 ? (
                 <div style={{ padding: "14px", fontSize: 12, color: "var(--txt-3)" }}>No matches for "{query}".</div>
               ) : results.slice(0, 12).map((r, i) => (
