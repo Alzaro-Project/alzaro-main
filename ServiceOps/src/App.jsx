@@ -96,12 +96,18 @@ function Dashboard({ user, signOut, staff }) {
   const [range, setRange] = useState("This Month");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
-  const [light, setLight] = useState(false);
+  const [light, setLight] = useState(() => {
+    try { return localStorage.getItem("svc-theme") === "light"; } catch { return false; }
+  });
   const [search, setSearch] = useState("");
   const [showNotif, setShowNotif] = useState(false);
   const [hits, setHits] = useState({ customers: [], jobs: [], invoices: [], quotes: [], properties: [] });
   const [notifs, setNotifs] = useState([]);
-  const toggleTheme = () => setLight((v) => { document.body.classList.toggle("light", !v); return !v; });
+  useEffect(() => {
+    document.body.classList.toggle("light", light);
+    try { localStorage.setItem("svc-theme", light ? "light" : "dark"); } catch { /* ignore */ }
+  }, [light]);
+  const toggleTheme = () => setLight((v) => !v);
 
   // notifications: overdue invoices + certs expiring within 30 days
   useEffect(() => {
