@@ -14,6 +14,9 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" rel="stylesheet" />
   </head>
   <body>
+    <script>
+      try { if (localStorage.getItem("svc-theme") === "light") document.body.classList.add("light"); } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="./src/main.jsx"></script>
   </body>

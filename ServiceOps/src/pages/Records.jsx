@@ -10,6 +10,77 @@ const DOC_BUCKET = "svc-documents";
 // Default any new-record date field to today (YYYY-MM-DD). User can change it.
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// ---- Animated revenue bar chart (TyreOps-style) ----
+// Bars grow from 0 height on mount with a per-bar stagger; hovering a column
+// dims the others, shows a collected/outstanding tooltip and glows the bars.
+// Mirrors TyreOps' PLChart but on ServiceOps data + tokens.
+function RevenueChart({ series, maxVal, labelEvery }) {
+  const [mounted, setMounted] = useState(false);
+  const [hov, setHov] = useState(null);
+  useEffect(() => { const t = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(t); }, []);
+  // height as a % of the plot area; keep a sliver visible for tiny non-zero values
+  const h = (v) => mounted ? `${Math.max((v / maxVal) * 100, v > 0 ? 2 : 0.5)}%` : "0%";
+  const n = series.length;
+
+  return (
+    <div style={{ position: "relative" }}>
+      {hov !== null && (
+        <div style={{
+          position: "absolute", top: -6, left: `${(hov + 0.5) * (100 / n)}%`, transform: "translateX(-50%)",
+          background: "var(--surface3)", border: "0.5px solid var(--line-2)", borderRadius: 8,
+          padding: "7px 10px", zIndex: 10, pointerEvents: "none", whiteSpace: "nowrap",
+          boxShadow: "0 6px 18px rgba(0,0,0,.3)", fontSize: 11, fontFamily: "'DM Mono',monospace",
+        }}>
+          <div style={{ color: "var(--txt-2)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 3 }}>{series[hov].label}</div>
+          <div style={{ color: "var(--brand)" }}>Collected {gbp(series[hov].coll)}</div>
+          <div style={{ color: "var(--amber)" }}>Outstanding {gbp(series[hov].out)}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 120, position: "relative" }}>
+        {/* dashed gridlines */}
+        {[0.25, 0.5, 0.75].map((g) => (
+          <div key={g} style={{ position: "absolute", left: 0, right: 0, bottom: `${g * 100}%`, borderTop: "1px dashed var(--line)", opacity: 0.5, pointerEvents: "none" }} />
+        ))}
+
+        {series.map((s, i) => (
+          <div key={s.key}
+            onMouseEnter={() => setHov(i)}
+            onMouseLeave={() => setHov(null)}
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              height: "100%", justifyContent: "flex-end", cursor: "default",
+              opacity: hov === null || hov === i ? 1 : 0.35, transition: "opacity .15s",
+            }}>
+            <div style={{ width: "100%", display: "flex", gap: 2, alignItems: "flex-end", flex: 1 }}>
+              <div style={{
+                flex: 1, borderRadius: "3px 3px 0 0", height: h(s.coll),
+                background: "linear-gradient(180deg, var(--brand), color-mix(in srgb, var(--brand) 45%, transparent))",
+                transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70}ms`,
+                boxShadow: hov === i ? "0 0 12px color-mix(in srgb, var(--brand) 45%, transparent)" : "none",
+              }} />
+              <div style={{
+                flex: 1, borderRadius: "3px 3px 0 0", height: h(s.out),
+                background: "linear-gradient(180deg, var(--amber), color-mix(in srgb, var(--amber) 40%, transparent))",
+                transition: `height .6s cubic-bezier(.2,.8,.3,1) ${i * 70 + 40}ms`,
+                boxShadow: hov === i ? "0 0 12px color-mix(in srgb, var(--amber) 45%, transparent)" : "none",
+              }} />
+            </div>
+            <div style={{ fontSize: 9, height: 11, lineHeight: "11px", color: hov === i ? "var(--txt)" : "var(--txt-3)", fontWeight: hov === i ? 700 : 400, whiteSpace: "nowrap" }}>
+              {i % labelEvery === 0 ? s.label : ""}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 8 }}>
+        <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--brand)" }} />Collected</span>
+        <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--amber)" }} />Outstanding</span>
+      </div>
+    </div>
+  );
+}
+
 // ---- Dashboard ----
 function WelcomeBanner({ d, go, user }) {
   const SUCCESS = "#22c55e";
@@ -199,28 +270,7 @@ function DashboardPage({ range, rangeFrom, rangeTo, go, user }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, marginBottom: 12 }}>
         <TiltPanel index={4} accent="var(--brand)" title={`Revenue — ${chartTitle}`} action="View invoices →" onAction={() => go("invoicing")}>
-          <svg viewBox="0 0 380 140" style={{ width: "100%", height: 120 }}>
-            <line x1="0" y1="108" x2="380" y2="108" stroke="var(--line)" strokeWidth="1" />
-            {series.map((s, i) => {
-              const n = series.length;
-              const slot = 356 / n;
-              const bw = Math.max(2.5, Math.min(16, slot * 0.36));
-              const gap = Math.min(2, bw * 0.15 + 0.5);
-              const x = 12 + i * slot + (slot - (bw * 2 + gap)) / 2;
-              const ch = Math.round((s.coll / maxVal) * 80); const oh = Math.round((s.out / maxVal) * 80);
-              return (
-                <g key={s.key}>
-                  <rect x={x} y={108 - ch} width={bw} height={ch} rx={Math.min(2, bw / 2)} fill="var(--brand)" />
-                  <rect x={x + bw + gap} y={108 - oh} width={bw} height={oh} rx={Math.min(2, bw / 2)} fill="var(--amber)" />
-                  {i % labelEvery === 0 && <text x={12 + i * slot + slot / 2} y="124" fontSize="9" fill="var(--txt-3)" textAnchor="middle">{s.label}</text>}
-                </g>
-              );
-            })}
-          </svg>
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 6 }}>
-            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--brand)" }} />Collected</span>
-            <span style={{ fontSize: 10.5, color: "var(--txt-2)", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--amber)" }} />Outstanding</span>
-          </div>
+          <RevenueChart series={series} maxVal={maxVal} labelEvery={labelEvery} />
         </TiltPanel>
         <TiltPanel index={5} accent="var(--amber)" title="Certificates expiring" action="View all" onAction={() => go("certificates")}>
           {expiring.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt-3)" }}>No certificates due in the next 90 days.</div> : expiring.map((c, i) => {
