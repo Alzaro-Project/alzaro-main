@@ -203,6 +203,9 @@ export function MaintenancePage({ user, go }) {
 
   const [dragId, setDragId] = useState(null);
   const [dragOver, setDragOver] = useState(null);
+  // Completed jobs live in a collapsed dropdown below the board — done work
+  // shouldn't take up a whole column forever.
+  const [showCompleted, setShowCompleted] = useState(false);
   const moveTo = async (j, status) => {
     if (!j || !status || j.status === status || !j.id || !DB_READY) return;
     await db.from("prop_maintenance").update({ status }).eq("id", j.id);
@@ -300,8 +303,8 @@ export function MaintenancePage({ user, go }) {
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading jobs…</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 11 }}>
-          {stages.map((s) => {
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 11 }}>
+          {stages.slice(0, 3).map((s) => {
             const jobs = (rows || []).filter((m) => m.status === s && (!m.category || m.category === "Maintenance"));
             return (
               <div key={s}
@@ -359,6 +362,45 @@ export function MaintenancePage({ user, go }) {
           })}
         </div>
       )}
+
+      {/* Completed jobs — collapsed by default; header doubles as a drop target
+          so dragging a card onto it still completes the job. */}
+      {rows && (() => {
+        const doneJobs = (rows || []).filter((m) => m.status === "Completed" && (!m.category || m.category === "Maintenance"));
+        return (
+          <div style={{ marginTop: 18 }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver("Completed"); }}
+            onDragLeave={() => setDragOver((v) => v === "Completed" ? null : v)}
+            onDrop={(e) => { e.preventDefault(); const j = (rows || []).find((x) => String(x.id) === String(dragId)); moveTo(j, "Completed"); setDragId(null); setDragOver(null); setShowCompleted(true); }}>
+            <div onClick={() => setShowCompleted((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: dragOver === "Completed" ? "var(--brand-soft, rgba(139,127,232,.14))" : "var(--panel-2)", border: dragOver === "Completed" ? "1px dashed var(--brand)" : "0.5px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
+              <i className={`ti ${showCompleted ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} />
+              <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase", fontWeight: 600 }}>Completed</span>
+              <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{doneJobs.length}</span>
+              <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--txt-3)" }}>{dragOver === "Completed" ? "Drop to complete" : isMobile ? "" : "Drag a card here to complete it"}</span>
+            </div>
+            {showCompleted && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                {doneJobs.length === 0 && <div style={{ fontSize: 11, color: "var(--txt-3)", textAlign: "center", padding: "14px 0", border: "1px dashed var(--line)", borderRadius: 10 }}>No completed jobs yet.</div>}
+                {doneJobs.map((j) => (
+                  <div key={j.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{j.title}</div>
+                      <div style={{ fontSize: 11, color: "var(--txt-3)" }}>{propLabel(properties, j.property_id) || j.property || "No property"}{j.contractor ? " · " + j.contractor : ""}</div>
+                    </div>
+                    {(j.cost !== null && j.cost !== undefined && j.cost !== "") && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{gbp(j.cost)}</span>}
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <i className="ti ti-arrow-back-up" onClick={() => moveTo(j, "In Progress")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Reopen (back to In Progress)" />
+                      {j.receipt_path && <i className="ti ti-receipt" onClick={() => viewReceipt(j)} style={{ fontSize: 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />}
+                      <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                      <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Non-maintenance expenses (mortgage, insurance, …) — a simple list
           rather than kanban cards, since they have no job workflow. */}
@@ -1114,7 +1156,7 @@ const data = rows || [];
           return sort.dir === "asc" ? cmp : -cmp;
         });
         return (
-        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "tenant" }, { label: "Property", sortKey: "property" }, { label: "Subtotal", sortKey: "subtotal" }, { label: "VAT", sortKey: "vat" }, { label: "Total", sortKey: "total" }, { label: "Paid", sortKey: "paid" }, { label: "Outstanding", sortKey: "outstanding" }, { label: "Due date", sortKey: "due_date" }, { label: "Status", sortKey: "status" }, "Actions"]}>
+        <Table sort={sort} onSort={onSort} cols={["", { label: "Tenant", sortKey: "tenant" }, { label: "Property", sortKey: "property" }, { label: "Total", sortKey: "total" }, { label: "Paid", sortKey: "paid" }, { label: "Outstanding", sortKey: "outstanding" }, { label: "Due date", sortKey: "due_date" }, { label: "Status", sortKey: "status" }, "Actions"]}>
           {shown.map((p, i) => {
             const isOpen = expandedId === (p.id || i);
             const pid = p.property_id;
@@ -1131,8 +1173,6 @@ const data = rows || [];
                   <Td><i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 15, color: "var(--txt-3)" }} /></Td>
                   <Td><span style={{ fontWeight: 500 }}>{p.tenant}</span></Td>
                   <Td color="var(--txt-2)">{propName}</Td>
-                  <Td color="var(--txt-2)">{vatApplies ? money(b.sub) : money(b.total)}</Td>
-                  <Td color="var(--txt-2)">{vatApplies ? money(b.vat) : "—"}</Td>
                   <Td><span style={{ fontWeight: 600 }}>{money(b.total)}</span></Td>
                   <Td color={paidOf(p) ? "var(--green)" : "var(--txt-3)"}>{paidOf(p) ? money(paidOf(p)) : "—"}</Td>
                   <Td><span style={{ fontWeight: outstandingOf(p) ? 600 : 400, color: outstandingOf(p) ? "var(--amber)" : "var(--txt-3)" }}>{outstandingOf(p) ? money(outstandingOf(p)) : "—"}</span></Td>
@@ -1149,8 +1189,17 @@ const data = rows || [];
                 </tr>
                 {isOpen && (
                   <tr>
-                    <td colSpan={11} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
+                    <td colSpan={9} style={{ padding: 0, borderBottom: "0.5px solid var(--line)" }}>
                       <div className="fade-in" style={{ background: "var(--bg)", padding: "16px 20px" }}>
+                        {/* VAT breakdown lives here now — folded out of the main
+                            columns so the ledger fits without side-scrolling. */}
+                        {vatApplies && (
+                          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--txt-2)", marginBottom: 12, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "8px 13px", width: "fit-content" }}>
+                            <span>Subtotal <b style={{ color: "var(--txt)" }}>{money(b.sub)}</b></span>
+                            <span>VAT <b style={{ color: "var(--txt)" }}>{money(b.vat)}</b></span>
+                            <span>Total <b style={{ color: "var(--txt)" }}>{money(b.total)}</b></span>
+                          </div>
+                        )}
                         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
                           <DetailBox title="Tenant(s)" icon="ti-users" empty={pT.length === 0} emptyText={pid ? "No tenants on this property." : "No property linked."} onClick={() => go && go("tenants")}>
                             {pT.map((t, j) => <DetailRow key={j} main={t.name} sub={t.rent ? gbp(t.rent) + " pcm" : ""} pill={t.rent_status} tone={t.rent_status === "Overdue" ? "red" : "green"} />)}
