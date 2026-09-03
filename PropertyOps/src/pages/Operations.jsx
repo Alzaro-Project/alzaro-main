@@ -49,7 +49,11 @@ export function MaintenancePage({ user, go }) {
   // (mortgage, insurance, …) listed under the board instead of on it.
   const EXPENSE_CATS = ["Maintenance", "Mortgage", "Insurance", "Utilities", "Letting fees", "Ground rent / service charge", "Other"];
   const catTone = { Maintenance: "blue", Mortgage: "red", Insurance: "amber", Utilities: "green", "Letting fees": "blue", "Ground rent / service charge": "amber", Other: "blue" };
-  const blank = { title: "", category: "Maintenance", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
+  const blank = { title: "", category: "Maintenance", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "", notes: "" };
+  // Other-expenses list: category/property filters + which row is expanded.
+  const [expCatFilter, setExpCatFilter] = useState("All");
+  const [expPropFilter, setExpPropFilter] = useState("All");
+  const [expandedExp, setExpandedExp] = useState(null);
   const [form, setForm] = useState(blank);
   // "Custom…" in the category dropdown reveals a free-text field, so users can
   // track categories we didn't think of (ground works, gardening, whatever).
@@ -110,7 +114,7 @@ export function MaintenancePage({ user, go }) {
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); setCustomCat(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; };
   const openEdit = (j) => {
     const known = !j.category || EXPENSE_CATS.includes(j.category);
-    setForm({ title: j.title || "", category: known ? (j.category || "Maintenance") : "Custom…", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" });
+    setForm({ title: j.title || "", category: known ? (j.category || "Maintenance") : "Custom…", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "", notes: j.notes || "" });
     setCustomCat(known ? "" : j.category);
     setEditId(j.id); setAdding(true); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; scrollToForm();
   };
@@ -126,7 +130,7 @@ export function MaintenancePage({ user, go }) {
     // contractor/priority workflow, so they never count as "open" or sit on
     // the kanban board — they live in the expense list below it instead.
     const payload = { ...form, category: isCustomCat ? customCat.trim() : form.category, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
-    if (!isJob) { payload.status = "Completed"; payload.contractor = ""; }
+    if (!isJob) payload.status = "Completed"; // contractor doubles as Supplier on non-job expenses
     let error, savedId = editId;
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
     else {
@@ -270,7 +274,7 @@ export function MaintenancePage({ user, go }) {
             {isCustomCat && <label style={fld}>Custom category name<input style={inp} placeholder="e.g. Gardening" value={customCat} onChange={(e) => setCustomCat(e.target.value)} /></label>}
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Cost (£)<input style={inp} type="number" step="0.01" placeholder="e.g. 120.00" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
-            {isJob && <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>}
+            <label style={fld}>{isJob ? "Contractor" : "Supplier (optional)"}<input style={inp} placeholder={isJob ? "e.g. GasPro Ltd" : "e.g. Aviva, British Gas"} value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
             {isJob && <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>}
             {isJob && <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>}
             <label style={fld}>Receipt (optional)
@@ -281,6 +285,7 @@ export function MaintenancePage({ user, go }) {
               </span>
               <input ref={receiptRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={(e) => setReceiptFile(e.target.files[0] || null)} />
             </label>
+            <label style={{ ...fld, gridColumn: isMobile ? "auto" : "1 / -1" }}>Notes (optional)<textarea rows={2} style={{ ...inp, resize: "vertical", minHeight: 44 }} placeholder="Anything worth remembering — policy details, what was covered, renewal reminders…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
           </div>
           <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update expense" : "Save expense")} primary /></span></div>
         </div>
@@ -402,43 +407,84 @@ export function MaintenancePage({ user, go }) {
         );
       })()}
 
-      {/* Non-maintenance expenses (mortgage, insurance, …) — a simple list
-          rather than kanban cards, since they have no job workflow. */}
+      {/* Non-maintenance expenses (mortgage, insurance, …) — expandable rows
+          with category/property filters, like the Properties table. */}
       {(() => {
-        const others = (rows || []).filter((m) => m.category && m.category !== "Maintenance")
+        const allOthers = (rows || []).filter((m) => m.category && m.category !== "Maintenance");
+        if (!allOthers.length) return null;
+        const cats = ["All", ...Array.from(new Set(allOthers.map((m) => m.category)))];
+        const others = allOthers
+          .filter((m) => expCatFilter === "All" || m.category === expCatFilter)
+          .filter((m) => expPropFilter === "All" || (expPropFilter === "none" ? !m.property_id : String(m.property_id) === String(expPropFilter)))
           .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-        if (!others.length) return null;
-        const total = others.reduce((s, m) => s + (+m.cost || 0), 0);
+        const total = others.reduce((s2, m) => s2 + (+m.cost || 0), 0);
+        const selStyle = { background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "6px 9px", color: "var(--txt)", fontSize: 11.5, fontFamily: "Inter", outline: "none" };
+        const dLabel = { fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--txt-3)", marginBottom: 2 };
+        const dVal = { fontSize: 12.5, color: "var(--txt)" };
         return (
           <div style={{ marginTop: 22 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 9, padding: "0 2px" }}>
               <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>Other expenses</span>
-              <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{others.length} · {gbp(total)}</span>
+              <select style={selStyle} value={expCatFilter} onChange={(e) => setExpCatFilter(e.target.value)}>{cats.map((c) => <option key={c} value={c}>{c === "All" ? "All categories" : c}</option>)}</select>
+              <select style={selStyle} value={expPropFilter} onChange={(e) => setExpPropFilter(e.target.value)}>
+                <option value="All">All properties</option>
+                <option value="none">No property</option>
+                {properties.map((pp) => <option key={pp.id} value={pp.id}>{pp.address}</option>)}
+              </select>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--txt-3)" }}>{others.length} · {gbp(total)}</span>
             </div>
+            {others.length === 0 && <div style={{ fontSize: 12, color: "var(--txt-3)", textAlign: "center", padding: "18px 0", border: "1px dashed var(--line)", borderRadius: 10 }}>Nothing matches those filters.</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {others.map((m) => (
-                <div key={m.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "11px 13px", display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? 8 : 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                    <Pill text={m.category} tone={catTone[m.category] || "blue"} />
-                    {isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{m.title}</div>
-                    <div style={{ fontSize: 11, color: "var(--txt-3)" }}>
-                      {propLabel(properties, m.property_id) || m.property || "No property"}
-                      {m.created_at ? " · " + new Date(m.created_at).toLocaleDateString("en-GB") : ""}
+              {others.map((m) => {
+                const isOpen = expandedExp === m.id;
+                return (
+                  <div key={m.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+                    <div onClick={() => setExpandedExp(isOpen ? null : m.id)} style={{ padding: "11px 13px", display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? 8 : 10, cursor: "pointer" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <i className={`ti ${isOpen ? "ti-chevron-down" : "ti-chevron-right"}`} style={{ fontSize: 14, color: "var(--txt-3)" }} />
+                          <Pill text={m.category} tone={catTone[m.category] || "blue"} />
+                        </span>
+                        {isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500 }}>{m.title}</div>
+                        <div style={{ fontSize: 11, color: "var(--txt-3)" }}>
+                          {propLabel(properties, m.property_id) || m.property || "No property"}
+                          {m.contractor ? " · " + m.contractor : ""}
+                          {m.created_at ? " · " + new Date(m.created_at).toLocaleDateString("en-GB") : ""}
+                        </div>
+                      </div>
+                      {!isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
+                      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: isMobile ? 16 : 10, alignItems: "center", justifyContent: isMobile ? "flex-end" : "flex-start", borderTop: isMobile ? "0.5px solid var(--line)" : "none", paddingTop: isMobile ? 8 : 0 }}>
+                        {m.receipt_path
+                          ? <i className="ti ti-receipt" onClick={() => viewReceipt(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />
+                          : <i className="ti ti-receipt-off" style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)" }} title="No receipt — edit to attach one" />}
+                        <i className="ti ti-pencil" onClick={() => openEdit(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                        <i className="ti ti-trash" onClick={() => remove(m.id)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                      </div>
                     </div>
+                    {isOpen && (
+                      <div className="fade-in" style={{ borderTop: "0.5px solid var(--line)", background: "var(--bg)", padding: "13px 16px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12 }}>
+                          <div><div style={dLabel}>Category</div><div style={dVal}>{m.category}</div></div>
+                          <div><div style={dLabel}>Property</div><div style={dVal}>{propLabel(properties, m.property_id) || m.property || "—"}</div></div>
+                          <div><div style={dLabel}>Supplier</div><div style={dVal}>{m.contractor || "—"}</div></div>
+                          <div><div style={dLabel}>Date added</div><div style={dVal}>{m.created_at ? new Date(m.created_at).toLocaleDateString("en-GB") : "—"}</div></div>
+                          <div><div style={dLabel}>Cost</div><div style={{ ...dVal, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</div></div>
+                          <div><div style={dLabel}>Receipt</div><div style={dVal}>{m.receipt_path ? <span onClick={() => viewReceipt(m)} style={{ color: "var(--green)", cursor: "pointer", textDecoration: "underline" }}>View receipt</span> : "None attached"}</div></div>
+                        </div>
+                        {m.notes && (
+                          <div style={{ marginTop: 12 }}>
+                            <div style={dLabel}>Notes</div>
+                            <div style={{ fontSize: 12.5, color: "var(--txt-2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.notes}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {!isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
-                  <div style={{ display: "flex", gap: isMobile ? 16 : 10, alignItems: "center", justifyContent: isMobile ? "flex-end" : "flex-start", borderTop: isMobile ? "0.5px solid var(--line)" : "none", paddingTop: isMobile ? 8 : 0 }}>
-                    {m.receipt_path
-                      ? <i className="ti ti-receipt" onClick={() => viewReceipt(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />
-                      : <i className="ti ti-receipt-off" style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)" }} title="No receipt — edit to attach one" />}
-                    <i className="ti ti-pencil" onClick={() => openEdit(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
-                    <i className="ti ti-trash" onClick={() => remove(m.id)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
