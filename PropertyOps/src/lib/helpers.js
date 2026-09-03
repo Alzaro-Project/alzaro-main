@@ -33,7 +33,7 @@ export const NAV = [
   { id: "properties", label: "Properties", icon: "ti-building-estate", min: "basic" },
   { id: "tenants", label: "Tenants", icon: "ti-users", min: "basic" },
   { id: "finance", label: "Finance", icon: "ti-coin", min: "silver" },
-  { id: "maintenance", label: "Maintenance", icon: "ti-tools", min: "bronze" },
+  { id: "maintenance", label: "Expenses", icon: "ti-receipt", min: "bronze" },
   { id: "compliance", label: "Compliance", icon: "ti-shield-check", min: "silver" },
   { id: "documents", label: "Documents", icon: "ti-folder", min: "gold" },
   { id: "reports", label: "Reports", icon: "ti-chart-bar", min: "silver" },
@@ -218,7 +218,7 @@ export function buildReport(name, d) {
       const due = d.pays.reduce((s, p) => s + (p.amount || 0), 0);
       const maintCost = d.maint.reduce((s, m) => s + (+m.cost || 0), 0);
       const net = collected - maintCost;
-      return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Maintenance expenses", "-" + gbpc(maintCost)], ["Net (collected − expenses)", gbpc(net)], ["Properties", d.props.length]] };
+      return { cols: ["Line", "Amount"], rows: [["Rent collected", gbpc(collected)], ["Rent due (all)", gbpc(due)], ["Outstanding", gbpc(due - collected)], ["Expenses (incl. maintenance)", "-" + gbpc(maintCost)], ["Net (collected − expenses)", gbpc(net)], ["Properties", d.props.length]] };
     }
     case "Compliance audit":
       return { cols: ["Type", "Property", "Reference", "Expiry date"], rows: d.comp.map((c) => [c.type, c.property || "—", c.reference || "—", ukDate(c.expiry_date)]) };
