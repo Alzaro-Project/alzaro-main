@@ -653,13 +653,13 @@ function SKUModal({ sku, currentQty, onClose, onSave, onShowCSVImport }) {
   
   return (
     <Modal title={sku ? 'Edit Tyre SKU' : 'New Tyre SKU'} onClose={onClose} onSave={() => {
-      if (!form.brand || !form.model) return alert('Brand and model required')
+      if (!form.brand) return alert('Brand is required')
       const w = parseInt(form.w), p = parseInt(form.p), r = parseInt(form.r)
       if (isNaN(w) || isNaN(p) || isNaN(r)) return alert('Width, profile and rim are required — enter all three size numbers (e.g. 225 / 45 / 18)')
       const sell = parseFloat(form.sell)
       if (isNaN(sell) || sell < 0) return alert('Sell price is required')
       const alertLevel = parseInt(form.alert)
-      const base = { brand: form.brand, model: form.model, w, p, r, sell, alert: isNaN(alertLevel) ? 2 : alertLevel, season: form.season }
+      const base = { brand: form.brand, model: (form.model || '').trim(), w, p, r, sell, alert: isNaN(alertLevel) ? 2 : alertLevel, season: form.season }
 
       if (sku) {
         // Edit mode — pass the (possibly changed) quantity separately
@@ -698,7 +698,7 @@ function SKUModal({ sku, currentQty, onClose, onSave, onShowCSVImport }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
         <BrandField value={form.brand} onChange={v => f('brand', v)} />
-        <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
+        <Field label="Model (optional)"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="e.g. Pilot Sport 4" /></Field>
       </div>
       <div style={{ marginBottom: '12px' }}>
         <SizeQuickFill w={form.w} p={form.p} r={form.r} onPick={(w, p, r) => setForm(prev => ({ ...prev, w, p, r }))} />
@@ -1233,12 +1233,12 @@ function UsedModal({ tyre, onClose, onSave }) {
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   return (
     <Modal title={tyre ? 'Edit Used / Part-Ex Tyre' : 'Add Used / Part-Ex Tyre'} onClose={onClose} onSave={() => {
-      if (!form.brand || !form.model) return alert('Brand and model required')
-      onSave({ ...form, w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
+      if (!form.brand) return alert('Brand is required')
+      onSave({ ...form, model: (form.model || '').trim(), w: parseInt(form.w), p: parseInt(form.p), r: parseInt(form.r), tread: parseFloat(form.tread), cost: parseFloat(form.cost) || 0, sell: parseFloat(form.sell) })
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }} className="form-grid-2">
         <BrandField value={form.brand} onChange={v => f('brand', v)} />
-        <Field label="Model"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="Pilot Sport 4" /></Field>
+        <Field label="Model (optional)"><input style={inputStyle} value={form.model} onChange={e => f('model', e.target.value)} placeholder="e.g. Pilot Sport 4" /></Field>
       </div>
       <div style={{ marginBottom: '12px' }}>
         <SizeQuickFill w={form.w} p={form.p} r={form.r} onPick={(w, p, r) => setForm(prev => ({ ...prev, w, p, r }))} />
