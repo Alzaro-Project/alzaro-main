@@ -160,7 +160,6 @@ export default function Inventory() {
     <div>
       <PageHeader title="Tyre Inventory" subtitle="FIFO batch tracking · New & used stock">
         <Btn variant="secondary" onClick={exportCSV}>📤 Export CSV</Btn>
-        <Btn variant="primary" onClick={() => { setEditingSKU(null); setShowSKU(true) }}>+ New SKU</Btn>
       </PageHeader>
 
       {/* Global Search */}
@@ -327,15 +326,77 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
+
+        {/* Add buttons — moved below the list: they're mostly used during
+            setup, so day-to-day the top of the page stays clean. */}
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+          <Btn variant="secondary" onClick={() => { setEditingUsed(null); setShowUsed(true) }}>♻ Add Used / Part-Ex</Btn>
+          <Btn variant="primary" onClick={() => { setEditingSKU(null); setShowSKU(true) }}>+ New SKU</Btn>
+        </div>
       </Card>
 
       {/* Add/Edit SKU Modal */}
       {showSKU && <SKUModal 
         sku={editingSKU} 
+        currentQty={editingSKU ? getTotalStock(editingSKU.id) : 0}
         onClose={() => setShowSKU(false)} 
-        onSave={(data) => {
-          if (editingSKU) updateSKU(editingSKU.id, data)
-          else addSKU({ id: 'SK' + Date.now(), ...data })
+        onSave={async (data) => {
+          // Pull the quantity bits out; everything else is plain SKU fields.
+          const { openQty, openCost, newQty, ...skuData } = data
+
+          if (editingSKU) {
+            updateSKU(editingSKU.id, skuData)
+
+            // Quantity edited? Adjust stock without breaking FIFO:
+            //  - increase → add an adjustment batch at the current FIFO cost
+            //  - decrease → remove from the NEWEST batches first, so the
+            //    oldest (FIFO) cost layers are preserved
+            if (typeof newQty === 'number' && !isNaN(newQty)) {
+              const current = getTotalStock(editingSKU.id)
+              const delta = newQty - current
+              if (delta > 0) {
+                addBatch({
+                  id: 'B' + Date.now(),
+                  skuId: editingSKU.id,
+                  date: new Date().toISOString().split('T')[0],
+                  qty: delta,
+                  cost: getFIFOCost(editingSKU.id) || 0,
+                  remaining: delta,
+                  supplier: 'Stock adjustment',
+                  ref: '',
+                  notes: 'Quantity edited on SKU form',
+                })
+              } else if (delta < 0) {
+                let toRemove = -delta
+                const newestFirst = batches
+                  .filter(b => b.skuId === editingSKU.id && b.remaining > 0)
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                for (const b of newestFirst) {
+                  if (toRemove <= 0) break
+                  const take = Math.min(b.remaining, toRemove)
+                  updateBatch(b.id, { remaining: b.remaining - take })
+                  toRemove -= take
+                }
+              }
+            }
+          } else {
+            const newId = await addSKU({ id: 'SK' + Date.now(), ...skuData })
+            // If an opening quantity was given, create the first stock batch
+            // so the tyre shows real stock immediately (same pattern as CSV import).
+            if (newId && openQty > 0) {
+              addBatch({
+                id: 'B' + Date.now(),
+                skuId: newId,
+                date: new Date().toISOString().split('T')[0],
+                qty: openQty,
+                cost: openCost || 0,
+                remaining: openQty,
+                supplier: 'Opening stock',
+                ref: '',
+                notes: 'Added with new SKU',
+              })
+            }
+          }
           setShowSKU(false)
         }}
         onShowCSVImport={() => {
@@ -535,12 +596,12 @@ function SizeQuickFill({ w, p, r, onPick }) {
   }
 
   return (
-    <Field label="Quick size (optional)">
+    <Field label="Tyre Size — all car sizes">
       <div ref={boxRef} style={{ position: 'relative' }}>
         <input
-          style={inputStyle}
+          style={{ ...inputStyle, paddingRight: '28px' }}
           value={open ? query : current}
-          placeholder="Search e.g. 225/45R18"
+          placeholder="Select or search a size…"
           onFocus={() => { setOpen(true); setQuery('') }}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onKeyDown={e => {
@@ -548,6 +609,8 @@ function SizeQuickFill({ w, p, r, onPick }) {
             else if (e.key === 'Escape') setOpen(false)
           }}
         />
+        {/* Dropdown chevron so it reads as a picker, not just a search box */}
+        <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text3)', fontSize: '10px' }}>▾</span>
         {open && (
           <div style={{
             position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
@@ -576,8 +639,15 @@ function SizeQuickFill({ w, p, r, onPick }) {
   )
 }
 
-function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
-  const [form, setForm] = useState(sku || { brand: '', model: '', w: '', p: '', r: '', sell: '', alert: 2, season: 'allseason' })
+function SKUModal({ sku, currentQty, onClose, onSave, onShowCSVImport }) {
+  const [form, setForm] = useState(sku
+    ? {
+        brand: sku.brand ?? '', model: sku.model ?? '',
+        w: sku.w ?? '', p: sku.p ?? '', r: sku.r ?? '',
+        sell: sku.sell ?? '', alert: sku.alert ?? 2, season: sku.season || 'allseason',
+        qty: currentQty ?? 0, // editable live stock quantity
+      }
+    : { brand: '', model: '', w: '', p: '', r: '', sell: '', alert: 2, season: 'allseason', openQty: '', openCost: '' })
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
   const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 11px', color: 'var(--text)', fontSize: '12px', outline: 'none', width: '100%' }
   
@@ -589,7 +659,20 @@ function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
       const sell = parseFloat(form.sell)
       if (isNaN(sell) || sell < 0) return alert('Sell price is required')
       const alertLevel = parseInt(form.alert)
-      onSave({ ...form, w, p, r, sell, alert: isNaN(alertLevel) ? 2 : alertLevel })
+      const base = { brand: form.brand, model: form.model, w, p, r, sell, alert: isNaN(alertLevel) ? 2 : alertLevel, season: form.season }
+
+      if (sku) {
+        // Edit mode — pass the (possibly changed) quantity separately
+        const newQty = parseInt(form.qty)
+        if (isNaN(newQty) || newQty < 0) return alert('Quantity must be 0 or more')
+        onSave({ ...base, newQty })
+      } else {
+        // New mode — optional opening stock
+        const openQty = parseInt(form.openQty) || 0
+        const openCost = parseFloat(form.openCost) || 0
+        if (openQty < 0) return alert('Opening quantity must be 0 or more')
+        onSave({ ...base, openQty, openCost })
+      }
     }}>
       {/* CSV Import option - only show when adding new SKU */}
       {!sku && onShowCSVImport && (
@@ -636,6 +719,34 @@ function SKUModal({ sku, onClose, onSave, onShowCSVImport }) {
           <option value="winter">Winter</option>
         </select>
       </Field>
+
+      {/* Quantity */}
+      <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+        {sku ? (
+          <>
+            <Field label="Quantity in stock">
+              <input style={inputStyle} type="number" min="0" value={form.qty} onChange={e => f('qty', e.target.value)} />
+            </Field>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>
+              Changing this adjusts your stock batches automatically — increases are added at the current FIFO cost, decreases come off the newest batch first.
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }} className="form-grid-2">
+              <Field label="Opening Quantity (optional)">
+                <input style={inputStyle} type="number" min="0" value={form.openQty} onChange={e => f('openQty', e.target.value)} placeholder="0" />
+              </Field>
+              <Field label="Cost per tyre (£)">
+                <input style={inputStyle} type="number" step="0.01" min="0" value={form.openCost} onChange={e => f('openCost', e.target.value)} placeholder="85.00" />
+              </Field>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '6px' }}>
+              If you enter a quantity, the first stock batch is created for you automatically.
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   )
 }
