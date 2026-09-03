@@ -51,6 +51,10 @@ export function MaintenancePage({ user, go }) {
   const catTone = { Maintenance: "blue", Mortgage: "red", Insurance: "amber", Utilities: "green", "Letting fees": "blue", "Ground rent / service charge": "amber", Other: "blue" };
   const blank = { title: "", category: "Maintenance", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
   const [form, setForm] = useState(blank);
+  // "Custom…" in the category dropdown reveals a free-text field, so users can
+  // track categories we didn't think of (ground works, gardening, whatever).
+  const [customCat, setCustomCat] = useState("");
+  const isCustomCat = form.category === "Custom…";
   const isJob = form.category === "Maintenance";
   // Receipt picked on the add/edit form — uploaded to the "documents" bucket
   // on save, path stored on the row, and mirrored into the Documents vault.
@@ -103,19 +107,25 @@ export function MaintenancePage({ user, go }) {
     setRows(data || []);
   };
 
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; };
-  const openEdit = (j) => { setForm({ title: j.title || "", category: j.category || "Maintenance", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; scrollToForm(); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); setCustomCat(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; };
+  const openEdit = (j) => {
+    const known = !j.category || EXPENSE_CATS.includes(j.category);
+    setForm({ title: j.title || "", category: known ? (j.category || "Maintenance") : "Custom…", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" });
+    setCustomCat(known ? "" : j.category);
+    setEditId(j.id); setAdding(true); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; scrollToForm();
+  };
 
   const save = async () => {
     if (savingRef.current) return; // guard against double-click double-insert
     if (!form.title.trim()) { setErr(isJob ? "Job title is required." : "Description is required."); return; }
+    if (isCustomCat && !customCat.trim()) { setErr("Give your custom category a name."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     savingRef.current = true; setSaving(true);
     // Non-maintenance expenses aren't jobs: park them as Completed with no
     // contractor/priority workflow, so they never count as "open" or sit on
     // the kanban board — they live in the expense list below it instead.
-    const payload = { ...form, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
+    const payload = { ...form, category: isCustomCat ? customCat.trim() : form.category, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
     if (!isJob) { payload.status = "Completed"; payload.contractor = ""; }
     let error, savedId = editId;
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
@@ -191,22 +201,21 @@ export function MaintenancePage({ user, go }) {
       {adding && (
         <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit expense" : "New expense"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 10 }}>
-            <label style={fld}>{isJob ? "Issue / job title" : "Description"}<input style={inp} placeholder={isJob ? "e.g. Boiler not firing" : "e.g. October mortgage payment"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label style={fld}>Category<select style={inp} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATS.map((x) => <option key={x}>{x}</option>)}</select></label>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10 }}>
+            <label style={{ ...fld, gridColumn: isMobile ? "auto" : "span 2" }}>{isJob ? "Issue / job title" : "Description"}<input style={inp} placeholder={isJob ? "e.g. Boiler not firing" : "e.g. October mortgage payment"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={fld}>Category<select style={inp} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATS.map((x) => <option key={x}>{x}</option>)}<option>Custom…</option></select></label>
+            {isCustomCat && <label style={fld}>Custom category name<input style={inp} placeholder="e.g. Gardening" value={customCat} onChange={(e) => setCustomCat(e.target.value)} /></label>}
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
             <label style={fld}>Cost (£)<input style={inp} type="number" step="0.01" placeholder="e.g. 120.00" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
             {isJob && <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>}
             {isJob && <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>}
             {isJob && <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>}
             <label style={fld}>Receipt (optional)
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span onClick={() => receiptRef.current && receiptRef.current.click()} style={{ ...inp, width: "auto", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7, color: receiptFile ? "var(--txt)" : "var(--txt-3)" }}>
-                  <i className="ti ti-paperclip" style={{ fontSize: 14, color: "var(--brand)" }} />
-                  {receiptFile ? receiptFile.name : "Attach a receipt…"}
-                </span>
-                {receiptFile && <i className="ti ti-x" onClick={() => { setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; }} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Remove" />}
-              </div>
+              <span onClick={() => receiptRef.current && receiptRef.current.click()} style={{ ...inp, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, border: "1px dashed var(--line-2, var(--line))", background: "var(--panel)", color: receiptFile ? "var(--txt)" : "var(--txt-3)", minWidth: 0 }}>
+                <i className={`ti ${receiptFile ? "ti-file-check" : "ti-paperclip"}`} style={{ fontSize: 14, color: receiptFile ? "var(--green)" : "var(--brand)", flexShrink: 0 }} />
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{receiptFile ? receiptFile.name : "Attach a receipt (image or PDF)…"}</span>
+                {receiptFile && <i className="ti ti-x" onClick={(e) => { e.stopPropagation(); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; }} style={{ fontSize: 14, color: "var(--txt-3)", flexShrink: 0 }} title="Remove" />}
+              </span>
               <input ref={receiptRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={(e) => setReceiptFile(e.target.files[0] || null)} />
             </label>
           </div>
@@ -306,8 +315,11 @@ export function MaintenancePage({ user, go }) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {others.map((m) => (
-                <div key={m.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <Pill text={m.category} tone={catTone[m.category] || "blue"} />
+                <div key={m.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "11px 13px", display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? 8 : 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <Pill text={m.category} tone={catTone[m.category] || "blue"} />
+                    {isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
+                  </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 500 }}>{m.title}</div>
                     <div style={{ fontSize: 11, color: "var(--txt-3)" }}>
@@ -315,13 +327,13 @@ export function MaintenancePage({ user, go }) {
                       {m.created_at ? " · " + new Date(m.created_at).toLocaleDateString("en-GB") : ""}
                     </div>
                   </div>
-                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {!isMobile && <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>}
+                  <div style={{ display: "flex", gap: isMobile ? 16 : 10, alignItems: "center", justifyContent: isMobile ? "flex-end" : "flex-start", borderTop: isMobile ? "0.5px solid var(--line)" : "none", paddingTop: isMobile ? 8 : 0 }}>
                     {m.receipt_path
-                      ? <i className="ti ti-receipt" onClick={() => viewReceipt(m)} style={{ fontSize: 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />
-                      : <i className="ti ti-receipt-off" style={{ fontSize: 14, color: "var(--txt-3)" }} title="No receipt — edit to attach one" />}
-                    <i className="ti ti-pencil" onClick={() => openEdit(m)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
-                    <i className="ti ti-trash" onClick={() => remove(m.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                      ? <i className="ti ti-receipt" onClick={() => viewReceipt(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />
+                      : <i className="ti ti-receipt-off" style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)" }} title="No receipt — edit to attach one" />}
+                    <i className="ti ti-pencil" onClick={() => openEdit(m)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                    <i className="ti ti-trash" onClick={() => remove(m.id)} style={{ fontSize: isMobile ? 16 : 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
                   </div>
                 </div>
               ))}
@@ -1193,8 +1205,8 @@ export function DocumentsPage({ user }) {
       )}
 
       {preview && (
-        <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 60 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 820, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
+        <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "max(16px, env(safe-area-inset-top)) 16px 16px", zIndex: 60 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "0.5px solid var(--line-2)", borderRadius: 14, width: "100%", maxWidth: 820, maxHeight: "min(88vh, 100%)", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: "0.5px solid var(--line)" }}>
               <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{preview.name}</div><div style={{ fontSize: 11, color: "var(--txt-3)" }}>{preview.category}{(propLabel(properties, preview.property_id) || preview.property) ? " · " + (propLabel(properties, preview.property_id) || preview.property) : ""}</div></div>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
@@ -1204,9 +1216,9 @@ export function DocumentsPage({ user }) {
             </div>
             <div style={{ flex: 1, overflow: "auto", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
               {preview.kind === "pdf" ? (
-                <iframe src={preview.url} title="preview" style={{ width: "100%", height: "75vh", border: "none" }} />
+                <iframe src={preview.url} title="preview" style={{ width: "100%", height: "min(72vh, 100%)", minHeight: 300, border: "none" }} />
               ) : preview.kind === "image" ? (
-                <img src={preview.url} alt={preview.name} style={{ maxWidth: "100%", maxHeight: "75vh", objectFit: "contain" }} />
+                <img src={preview.url} alt={preview.name} style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain", display: "block" }} />
               ) : (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <i className="ti ti-file-unknown" style={{ fontSize: 40, color: "var(--txt-3)" }} />
