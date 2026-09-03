@@ -682,7 +682,7 @@ export function FinancePage({ user, go }) {
   };
 
   const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", paid_amount: p.paid_amount ?? "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
+  const openEdit = (p) => { const ns = String(p.status || "").toLowerCase(); const status = ns === "paid" ? "Paid" : ns === "overdue" ? "Overdue" : ns === "sent" ? "Sent" : ns === "part paid" ? "Part paid" : "Pending"; setForm({ tenant: p.tenant || "", property_id: p.property_id || "", amount: p.amount || "", paid_amount: p.paid_amount ?? "", due_date: p.due_date || "", billing_date: p.billing_date || "", invoice_no: p.invoice_no || "", status }); setEditId(p.id); setAdding(true); setErr(""); scrollToForm(); };
 
   // Rent for a property (from the full property rows, which include rent).
   const rentForProp = (pid) => { const p = fullProps.find((x) => String(x.id) === String(pid)); return p && p.rent ? p.rent : ""; };
@@ -996,7 +996,9 @@ const data = rows || [];
             </label>
             <label style={fld}>Billing date (optional, DD/MM/YYYY)<input style={inp} type="date" value={form.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} /></label>
             <label style={fld}>Due date (DD/MM/YYYY)<input style={inp} type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
-            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["Pending", "Sent", "Part paid", "Paid", "Overdue"].map((x) => <option key={x}>{x}</option>)}</select>
+              {form.status === "Part paid" && <span style={{ fontSize: 10.5, color: "var(--amber)", marginTop: 4 }}>Enter the partial sum in "Amount paid" — the Part paid badge comes from that.</span>}
+            </label>
           </div>
 
           <div style={{ fontSize: 10.5, color: "var(--txt-3)", marginTop: 7 }}>An invoice number is generated automatically. "Pending" invoices count toward Expected; use "Mark received" in the ledger when paid.</div>
@@ -1037,6 +1039,7 @@ const data = rows || [];
                     onClick={busy || bulkRaising ? undefined : () => confirm.ask({
                       title: `Raise all ${monthLabel(m)} invoices?`,
                       message: `${list.length} invoice${list.length === 1 ? "" : "s"} totalling ${gbp(total)} will be created in the ledger as Pending. You can still raise them one by one below instead.`,
+                      confirmLabel: "Raise all", tone: "primary", icon: "ti-files",
                       onConfirm: () => raiseMonth(m, list),
                     })}
                     style={{ opacity: bulkRaising && !busy ? 0.5 : 1 }}>
