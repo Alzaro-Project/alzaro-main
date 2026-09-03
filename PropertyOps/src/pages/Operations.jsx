@@ -44,8 +44,18 @@ export function MaintenancePage({ user, go }) {
   // list renders the form at the top, which would otherwise be off-screen.
   const scrollToForm = () => { setTimeout(() => { try { formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 60); };
   const properties = usePropertyList();
-  const blank = { title: "", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
+  // Expense categories. "Maintenance" behaves as before (kanban job with
+  // contractor/priority/status); everything else is a simple expense line
+  // (mortgage, insurance, …) listed under the board instead of on it.
+  const EXPENSE_CATS = ["Maintenance", "Mortgage", "Insurance", "Utilities", "Letting fees", "Ground rent / service charge", "Other"];
+  const catTone = { Maintenance: "blue", Mortgage: "red", Insurance: "amber", Utilities: "green", "Letting fees": "blue", "Ground rent / service charge": "amber", Other: "blue" };
+  const blank = { title: "", category: "Maintenance", property_id: "", priority: "Medium", contractor: "", status: "Reported", cost: "" };
   const [form, setForm] = useState(blank);
+  const isJob = form.category === "Maintenance";
+  // Receipt picked on the add/edit form — uploaded to the "documents" bucket
+  // on save, path stored on the row, and mirrored into the Documents vault.
+  const receiptRef = useRef(null);
+  const [receiptFile, setReceiptFile] = useState(null);
 
   // Attach a contractor report / invoice straight from a job card. The file
   // lands in the shared Documents vault (category Invoices, tagged to the
@@ -93,27 +103,60 @@ export function MaintenancePage({ user, go }) {
     setRows(data || []);
   };
 
-  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); };
-  const openEdit = (j) => { setForm({ title: j.title || "", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); scrollToForm(); };
+  const openAdd = () => { setForm(blank); setEditId(null); setAdding(!adding); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; };
+  const openEdit = (j) => { setForm({ title: j.title || "", category: j.category || "Maintenance", property_id: j.property_id || "", priority: j.priority || "Medium", contractor: j.contractor || "", status: j.status || "Reported", cost: j.cost ?? "" }); setEditId(j.id); setAdding(true); setErr(""); setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; scrollToForm(); };
 
   const save = async () => {
     if (savingRef.current) return; // guard against double-click double-insert
-    if (!form.title.trim()) { setErr("Job title is required."); return; }
+    if (!form.title.trim()) { setErr(isJob ? "Job title is required." : "Description is required."); return; }
     if (!DB_READY) { setErr("Add your Supabase keys to save for real."); return; }
     setErr("");
     savingRef.current = true; setSaving(true);
+    // Non-maintenance expenses aren't jobs: park them as Completed with no
+    // contractor/priority workflow, so they never count as "open" or sit on
+    // the kanban board — they live in the expense list below it instead.
     const payload = { ...form, cost: form.cost === "" ? null : +form.cost, property_id: form.property_id || null, property: propLabel(properties, form.property_id) };
-    let error;
+    if (!isJob) { payload.status = "Completed"; payload.contractor = ""; }
+    let error, savedId = editId;
     if (editId) ({ error } = await db.from("prop_maintenance").update(payload).eq("id", editId));
-    else ({ error } = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]));
+    else {
+      const res = await db.from("prop_maintenance").insert([{ ...payload, user_id: user.id }]).select("id");
+      error = res.error; savedId = res.data && res.data[0] && res.data[0].id;
+    }
+    if (!error && receiptFile && savedId) {
+      // Upload the receipt to the shared "documents" bucket, remember its path
+      // on the expense row, and mirror it into the Documents vault so it's
+      // findable there too. A failed upload never loses the saved expense.
+      try {
+        const path = `${user.id}/receipts/${Date.now()}_${receiptFile.name}`;
+        const { error: upErr } = await db.storage.from("documents").upload(path, receiptFile);
+        if (upErr) throw upErr;
+        await db.from("prop_maintenance").update({ receipt_path: path }).eq("id", savedId);
+        await db.from("prop_documents").insert([{
+          name: `${form.title.trim()} — receipt — ${receiptFile.name}`,
+          category: "Invoices", file_path: path, size_kb: Math.round(receiptFile.size / 1024),
+          property_id: form.property_id || null, user_id: user.id,
+        }]);
+      } catch (e2) { setErr("Saved, but the receipt upload failed: " + friendlyError(e2, "uploading the receipt")); }
+    }
     savingRef.current = false; setSaving(false);
     if (error) { setErr(friendlyError(error)); return; }
-    setForm(blank); setAdding(false); setEditId(null); refresh();
+    setForm(blank); setAdding(false); setEditId(null); setReceiptFile(null);
+    if (receiptRef.current) receiptRef.current.value = "";
+    refresh();
+  };
+
+  // Open a saved receipt in a new tab via a short-lived signed URL.
+  const viewReceipt = async (j) => {
+    if (!j.receipt_path || !DB_READY) return;
+    const { data, error } = await db.storage.from("documents").createSignedUrl(j.receipt_path, 300);
+    if (error || !data?.signedUrl) { setErr(friendlyError(error, "opening the receipt")); return; }
+    window.open(data.signedUrl, "_blank", "noopener");
   };
 
   const confirm = useConfirm();
   const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_maintenance").delete().eq("id", id); refresh(); } };
-  const remove = (id) => confirm.ask({ title: "Delete this job?", message: "This maintenance job will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
+  const remove = (id) => confirm.ask({ title: "Delete this expense?", message: "This expense will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
   const move = async (j, dir) => {
     const idx = stages.indexOf(j.status);
@@ -139,24 +182,35 @@ export function MaintenancePage({ user, go }) {
     <div className="fade-in">
       <input ref={upFileRef} type="file" style={{ display: "none" }} onChange={onUpPick} />
       <ConfirmDialog {...confirm.props} />
-      <PageHead title="Maintenance" sub={rows ? `${open} open job${open === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
-        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "New job"} primary /></span>} />
+      <PageHead title="Expenses" sub={rows ? `${open} open job${open === 1 ? "" : "s"} · ${(rows || []).filter((m) => m.category && m.category !== "Maintenance").length} other expense${(rows || []).filter((m) => m.category && m.category !== "Maintenance").length === 1 ? "" : "s"}${DB_READY ? "" : " (demo)"}` : "Loading…"}
+        right={<span onClick={openAdd}><Btn icon={adding ? "ti-x" : "ti-plus"} label={adding ? "Cancel" : "Add expense"} primary /></span>} />
 
       {!DB_READY && <div style={{ fontSize: 11.5, color: "var(--amber)", background: "var(--amber-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>Demo mode — add your keys in supabase.js to use the live database.</div>}
       {err && <div style={{ fontSize: 11.5, color: "var(--red)", background: "var(--red-soft)", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>{err}</div>}
 
       {adding && (
         <div ref={formRef} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)", padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit job" : "New maintenance job"}</div>
+          <div style={{ fontSize: 12, color: "var(--txt-2)", marginBottom: 12, fontWeight: 500 }}>{editId ? "Edit expense" : "New expense"}</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 10 }}>
-            <label style={fld}>Issue / job title<input style={inp} placeholder="e.g. Boiler not firing" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={fld}>{isJob ? "Issue / job title" : "Description"}<input style={inp} placeholder={isJob ? "e.g. Boiler not firing" : "e.g. October mortgage payment"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label style={fld}>Category<select style={inp} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{EXPENSE_CATS.map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Property<select style={inp} value={form.property_id} onChange={(e) => setForm({ ...form, property_id: e.target.value })}><option value="">— none —</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.address}</option>)}</select></label>
-            <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>
-            <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>
             <label style={fld}>Cost (£)<input style={inp} type="number" step="0.01" placeholder="e.g. 120.00" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></label>
-            <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>
+            {isJob && <label style={fld}>Contractor<input style={inp} placeholder="e.g. GasPro Ltd" value={form.contractor} onChange={(e) => setForm({ ...form, contractor: e.target.value })} /></label>}
+            {isJob && <label style={fld}>Priority<select style={inp} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>{["High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></label>}
+            {isJob && <label style={fld}>Status<select style={inp} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select></label>}
+            <label style={fld}>Receipt (optional)
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span onClick={() => receiptRef.current && receiptRef.current.click()} style={{ ...inp, width: "auto", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7, color: receiptFile ? "var(--txt)" : "var(--txt-3)" }}>
+                  <i className="ti ti-paperclip" style={{ fontSize: 14, color: "var(--brand)" }} />
+                  {receiptFile ? receiptFile.name : "Attach a receipt…"}
+                </span>
+                {receiptFile && <i className="ti ti-x" onClick={() => { setReceiptFile(null); if (receiptRef.current) receiptRef.current.value = ""; }} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Remove" />}
+              </div>
+              <input ref={receiptRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={(e) => setReceiptFile(e.target.files[0] || null)} />
+            </label>
           </div>
-          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update job" : "Save job")} primary /></span></div>
+          <div style={{ marginTop: 12 }}><span onClick={saving ? undefined : save} style={{ opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}><Btn icon="ti-device-floppy" label={saving ? "Saving…" : (editId ? "Update expense" : "Save expense")} primary /></span></div>
         </div>
       )}
 
@@ -179,7 +233,7 @@ export function MaintenancePage({ user, go }) {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 11 }}>
           {stages.map((s) => {
-            const jobs = (rows || []).filter((m) => m.status === s);
+            const jobs = (rows || []).filter((m) => m.status === s && (!m.category || m.category === "Maintenance"));
             return (
               <div key={s}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(s); }}
@@ -221,6 +275,7 @@ export function MaintenancePage({ user, go }) {
                           <div style={{ display: "flex", gap: 10 }}>
                             <i className="ti ti-pencil" onClick={() => openEdit(j)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
                             <i className="ti ti-trash" onClick={() => remove(j.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                            {j.receipt_path && <i className="ti ti-receipt" onClick={() => viewReceipt(j)} style={{ fontSize: 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />}
                             <i className={`ti ${upJob && upJob.id === j.id ? "ti-loader" : "ti-upload"}`} onClick={() => startUpload(j)} style={{ fontSize: 14, color: "var(--brand)", cursor: upJob ? "default" : "pointer" }} title="Attach report or invoice" />
                             <i className="ti ti-folder" onClick={() => go && go("documents")} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="View documents" />
                           </div>
@@ -235,6 +290,45 @@ export function MaintenancePage({ user, go }) {
           })}
         </div>
       )}
+
+      {/* Non-maintenance expenses (mortgage, insurance, …) — a simple list
+          rather than kanban cards, since they have no job workflow. */}
+      {(() => {
+        const others = (rows || []).filter((m) => m.category && m.category !== "Maintenance")
+          .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        if (!others.length) return null;
+        const total = others.reduce((s, m) => s + (+m.cost || 0), 0);
+        return (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9, padding: "0 2px" }}>
+              <span style={{ fontSize: 11, letterSpacing: 0.5, color: "var(--txt-2)", textTransform: "uppercase" }}>Other expenses</span>
+              <span style={{ fontSize: 11, color: "var(--txt-3)" }}>{others.length} · {gbp(total)}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {others.map((m) => (
+                <div key={m.id} style={{ background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <Pill text={m.category} tone={catTone[m.category] || "blue"} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{m.title}</div>
+                    <div style={{ fontSize: 11, color: "var(--txt-3)" }}>
+                      {propLabel(properties, m.property_id) || m.property || "No property"}
+                      {m.created_at ? " · " + new Date(m.created_at).toLocaleDateString("en-GB") : ""}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>{(m.cost !== null && m.cost !== undefined && m.cost !== "") ? gbp(m.cost) : "—"}</span>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    {m.receipt_path
+                      ? <i className="ti ti-receipt" onClick={() => viewReceipt(m)} style={{ fontSize: 14, color: "var(--green)", cursor: "pointer" }} title="View receipt" />
+                      : <i className="ti ti-receipt-off" style={{ fontSize: 14, color: "var(--txt-3)" }} title="No receipt — edit to attach one" />}
+                    <i className="ti ti-pencil" onClick={() => openEdit(m)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Edit" />
+                    <i className="ti ti-trash" onClick={() => remove(m.id)} style={{ fontSize: 14, color: "var(--txt-3)", cursor: "pointer" }} title="Delete" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2364,7 +2458,7 @@ const ACCT_PERMS = [
   ["properties",  "Properties",  "The property list"],
   ["tenants",     "Tenants",     "Tenants and tenancies"],
   ["finance",     "Finance",     "Rent payments and arrears"],
-  ["maintenance", "Maintenance", "Maintenance jobs"],
+  ["maintenance", "Expenses", "Expenses & maintenance jobs"],
   ["compliance",  "Compliance",  "Certificates and deadlines"],
   ["documents",   "Documents",   "Uploaded documents"],
   ["reports",     "Reports",     "Portfolio reports"],
