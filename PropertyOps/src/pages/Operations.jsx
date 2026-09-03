@@ -522,7 +522,9 @@ export function FinancePage({ user, go }) {
   const blank = { tenant: "", property_id: "", amount: "", paid_amount: "", due_date: "", billing_date: "", invoice_no: "", status: "Pending" };
   const [form, setForm] = useState(blank);
   const [emailPayment, setEmailPayment] = useState(null);
-  const [filter, setFilter] = useState("All");
+  // Pending is the default view — the working list of invoices needing action.
+  // "All" grows forever, so it lives on the far left for when it's wanted.
+  const [filter, setFilter] = useState("Pending");
   // Payment-ledger sort. Click a column header to sort; click again to flip
   // direction. Default: due date, soonest first.
   const [sort, setSort] = useState({ key: "due_date", dir: "asc" });
@@ -727,7 +729,7 @@ export function FinancePage({ user, go }) {
     const { error } = await db.from("prop_payments").insert([{
       tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
       amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
-      status: "Sent", user_id: user.id,
+      status: "Pending", user_id: user.id,
     }]);
     raisingRef.current = false;
     setRaising(null);
@@ -735,10 +737,38 @@ export function FinancePage({ user, go }) {
     // Confirm it landed in the ledger — raising moves a projected invoice into
     // the real payment list (visible under All / Sent), so the row leaving the
     // Future tab is expected, not "nothing happening".
-    setRaisedMsg(`Invoice raised for ${proj.property}${proj.tenant ? " · " + proj.tenant : ""} (${ukDate(proj.due_date)}) — now in the ledger under Sent.`);
+    setRaisedMsg(`Invoice raised for ${proj.property}${proj.tenant ? " · " + proj.tenant : ""} (${ukDate(proj.due_date)}) — now in the ledger under Pending. Tick it off there when the money lands.`);
     setTimeout(() => setRaisedMsg(""), 5000);
     refresh();
   };
+
+  // Raise every projected invoice for one month in a single click. Inserts run
+  // sequentially (kind to Supabase, and lets us show live progress); each lands
+  // in the ledger as Pending, ready to be marked received when the rent arrives.
+  const [bulkRaising, setBulkRaising] = useState(null); // { month, done, total }
+  const raiseMonth = async (month, list) => {
+    if (!DB_READY || raisingRef.current) return;
+    raisingRef.current = true;
+    setBulkRaising({ month, done: 0, total: list.length });
+    let ok = 0, fail = 0;
+    for (let i = 0; i < list.length; i++) {
+      const proj = list[i];
+      const invoiceNo = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}${i}`;
+      const { error } = await db.from("prop_payments").insert([{
+        tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
+        amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
+        status: "Pending", user_id: user.id,
+      }]);
+      if (error) fail++; else ok++;
+      setBulkRaising({ month, done: i + 1, total: list.length });
+    }
+    raisingRef.current = false;
+    setBulkRaising(null);
+    setRaisedMsg(`${ok} invoice${ok === 1 ? "" : "s"} raised for ${monthLabel(month)}${fail ? ` (${fail} failed — try those again)` : ""} — now in the ledger under Pending. Tick each off when the money lands.`);
+    setTimeout(() => setRaisedMsg(""), 7000);
+    refresh();
+  };
+  const monthLabel = (m) => { const [y, mo] = String(m).split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" }); };
 
   const confirm = useConfirm();
   const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
@@ -852,7 +882,7 @@ const data = rows || [];
      {/* Filter tabs */}
       {rows && (
         <div style={{ display: "flex", gap: 4, background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: 4, marginBottom: 14, width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
-          {["All", "Pending", "Sent", "Part paid", "Paid", "Overdue", "Future"].map((f) => (
+          {["All", "Pending", "Future", "Sent", "Part paid", "Paid", "Overdue"].map((f) => (
             <div key={f} onClick={() => setFilter(f)} style={{ padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all .15s", background: filter === f ? "var(--brand)" : "transparent", color: filter === f ? "#fff" : "var(--txt-2)" }}>{f}</div>
           ))}
         </div>
@@ -867,18 +897,43 @@ const data = rows || [];
       {filter === "Future" && (() => {
         const proj = buildProjection();
         if (proj.length === 0) return <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 30, textAlign: "center", background: "var(--panel-2)", border: "0.5px solid var(--line)", borderRadius: "var(--radius)" }}>No upcoming invoices. Set a rent and invoice day on your Let properties to project recurring invoices here.</div>;
+        // Group projections by month for one-click "raise the whole month".
+        const byMonth = {};
+        proj.forEach((r) => { (byMonth[r.month] = byMonth[r.month] || []).push(r); });
         return (
-          <Table cols={["Property", "Tenant", "Amount", "Invoice date", ""]}>
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {Object.keys(byMonth).sort().map((m) => {
+                const list = byMonth[m];
+                const total = list.reduce((s, r) => s + (+r.amount || 0), 0);
+                const busy = bulkRaising && bulkRaising.month === m;
+                return (
+                  <span key={m}
+                    onClick={busy || bulkRaising ? undefined : () => confirm.ask({
+                      title: `Raise all ${monthLabel(m)} invoices?`,
+                      message: `${list.length} invoice${list.length === 1 ? "" : "s"} totalling ${gbp(total)} will be created in the ledger as Pending. You can still raise them one by one below instead.`,
+                      onConfirm: () => raiseMonth(m, list),
+                    })}
+                    style={{ opacity: bulkRaising && !busy ? 0.5 : 1 }}>
+                    <Btn icon={busy ? "ti-loader" : "ti-files"} primary
+                      label={busy ? `Raising ${bulkRaising.done}/${bulkRaising.total}…` : `Raise all — ${monthLabel(m)} (${list.length} · ${gbp(total)})`} />
+                  </span>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--txt-3)", marginBottom: 10 }}>Or raise them one at a time below.</div>
+            <Table cols={["Property", "Tenant", "Amount", "Invoice date", ""]}>
             {proj.map((r, i) => (
               <tr key={i}>
                 <Td><span style={{ fontWeight: 500 }}>{r.property}</span></Td>
                 <Td color="var(--txt-2)">{r.tenant || "—"}</Td>
                 <Td>{gbp(r.amount)}</Td>
                 <Td color="var(--txt-2)">{ukDate(r.due_date)}</Td>
-                <Td>{DB_READY ? <span onClick={raising === r.property_id + r.month ? undefined : () => raiseInvoice(r)} style={{ opacity: raising === r.property_id + r.month ? 0.6 : 1 }}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
+                <Td>{DB_READY ? <span onClick={raising === r.property_id + r.month || bulkRaising ? undefined : () => raiseInvoice(r)} style={{ opacity: raising === r.property_id + r.month || bulkRaising ? 0.6 : 1 }}><Btn icon="ti-file-plus" label={raising === r.property_id + r.month ? "Raising…" : "Raise"} primary /></span> : null}</Td>
               </tr>
             ))}
           </Table>
+          </>
         );
       })()}
 
