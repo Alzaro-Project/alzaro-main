@@ -20,13 +20,21 @@ const PAGES = {
   reports: ReportsPage, settings: SettingsPage,
 };
 
+// URL slugs — internal page ids stay stable ("maintenance") but the address
+// bar shows the friendlier name. Old /maintenance links keep working and get
+// normalised to /expenses on load.
+const SLUG_OF = { maintenance: "expenses" };
+const PAGE_OF = { expenses: "maintenance" };
+const toSlug = (page) => SLUG_OF[page] || page;
+const toPage = (seg) => PAGE_OF[seg] || seg;
+
 function Dashboard({ user, signOut, staff }) {
   const isMobile = useIsMobile();
   const [navOpen, setNavOpen] = useState(false);
   const [active, setActive] = useState(() => {
     // Derive the starting page from the URL, e.g. /propertyops/reports -> "reports".
     try {
-      const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+      const seg = toPage(window.location.pathname.replace(/\/+$/, "").split("/").pop());
       const known = ["dashboard", ...Object.keys(PAGES)];
       return known.includes(seg) ? seg : "dashboard";
     } catch (e) { return "dashboard"; }
@@ -62,22 +70,25 @@ function Dashboard({ user, signOut, staff }) {
     setQuery("");
     setShowNotif(false);
     if (push && typeof window !== "undefined") {
-      const url = `${BASE}/${page}`;
+      const url = `${BASE}/${toSlug(page)}`;
       if (window.location.pathname !== url) window.history.pushState({ page }, "", url);
     }
   };
   useEffect(() => {
     const onPop = () => {
-      const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+      const seg = toPage(window.location.pathname.replace(/\/+$/, "").split("/").pop());
       const known = ["dashboard", ...Object.keys(PAGES)];
       setActive(known.includes(seg) ? seg : "dashboard");
     };
     window.addEventListener("popstate", onPop);
-    // Normalise the address bar on first load (e.g. /propertyops or /register
-    // becomes /propertyops/<active>) without adding a history entry.
-    const seg = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+    // Normalise the address bar on first load (e.g. /propertyops, /register or
+    // the old /maintenance become the canonical slug) without adding history.
+    const raw = window.location.pathname.replace(/\/+$/, "").split("/").pop();
+    const page = toPage(raw);
     const known = ["dashboard", ...Object.keys(PAGES)];
-    if (!known.includes(seg)) window.history.replaceState({ page: active }, "", `${BASE}/${active}`);
+    const target = known.includes(page) ? page : active;
+    const canonical = `${BASE}/${toSlug(target)}`;
+    if (window.location.pathname !== canonical) window.history.replaceState({ page: target }, "", canonical);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
