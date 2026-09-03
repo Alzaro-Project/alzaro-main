@@ -12,15 +12,17 @@ import { downloadCSV, toneVar, useIsMobile } from "../lib/helpers.js";
 //   <ConfirmDialog {...confirm.props} />
 //   onClick={() => confirm.ask({ title, message, confirmLabel, onConfirm })}
 export function useConfirm() {
-  const [state, setState] = useState({ open: false, title: "", message: "", confirmLabel: "Delete", onConfirm: null });
-  const ask = ({ title, message, confirmLabel, onConfirm }) =>
-    setState({ open: true, title: title || "Are you sure?", message: message || "", confirmLabel: confirmLabel || "Delete", onConfirm });
+  const [state, setState] = useState({ open: false, title: "", message: "", confirmLabel: "Delete", tone: "danger", icon: "", onConfirm: null });
+  // tone: "danger" (red, warning triangle — deletions) or "primary" (brand
+  // colour, calmer icon — constructive confirmations like raising invoices).
+  const ask = ({ title, message, confirmLabel, tone, icon, onConfirm }) =>
+    setState({ open: true, title: title || "Are you sure?", message: message || "", confirmLabel: confirmLabel || "Delete", tone: tone || "danger", icon: icon || "", onConfirm });
   const close = () => setState((s) => ({ ...s, open: false, onConfirm: null }));
   const confirm = async () => { const fn = state.onConfirm; close(); if (fn) await fn(); };
   return { props: { ...state, onCancel: close, onConfirm: confirm }, ask };
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel, onConfirm, onCancel }) {
+export function ConfirmDialog({ open, title, message, confirmLabel, tone = "danger", icon, onConfirm, onCancel }) {
   if (!open) return null;
   const overlay = { position: "fixed", inset: 0, background: "rgba(15,16,22,.55)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
   const panel = { background: "var(--panel)", border: "0.5px solid var(--line)", borderRadius: 14, padding: "22px 22px 18px", width: 400, maxWidth: "95vw", boxShadow: "0 24px 60px rgba(0,0,0,.3)" };
@@ -29,13 +31,13 @@ export function ConfirmDialog({ open, title, message, confirmLabel, onConfirm, o
     <div style={overlay} onClick={onCancel}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <i className="ti ti-alert-triangle" style={{ fontSize: 20, color: "var(--red)" }} />
+          <i className={`ti ${icon || (tone === "primary" ? "ti-circle-check" : "ti-alert-triangle")}`} style={{ fontSize: 20, color: tone === "primary" ? "var(--brand)" : "var(--red)" }} />
           <div style={{ fontSize: 15, fontWeight: 700 }}>{title}</div>
         </div>
         {message && <div style={{ fontSize: 13, color: "var(--txt-2)", lineHeight: 1.5, marginBottom: 18 }}>{message}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <div onClick={onCancel} style={{ ...btn, background: "var(--panel-2)", color: "var(--txt)" }}>Cancel</div>
-          <div onClick={onConfirm} style={{ ...btn, background: "var(--red)", color: "#fff", border: "none" }}>{confirmLabel}</div>
+          <div onClick={onConfirm} style={{ ...btn, background: tone === "primary" ? "var(--brand)" : "var(--red)", color: "#fff", border: "none" }}>{confirmLabel}</div>
         </div>
       </div>
     </div>
