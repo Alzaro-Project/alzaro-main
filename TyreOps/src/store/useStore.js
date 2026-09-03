@@ -318,13 +318,18 @@ export const useStore = create(
             set(s => ({
               skus: s.skus.map(sk => sk.id === tempId ? { ...sk, id: saved.id } : sk)
             }))
+            // Return the real DB id so callers (e.g. the New SKU form) can
+            // attach an opening-stock batch to the right SKU straight away.
+            return saved.id
           } catch (err) {
             console.error('Failed to save SKU:', err)
             // Roll back the optimistic row so the UI matches reality
             set(s => ({ skus: s.skus.filter(sk => sk.id !== tempId) }))
             showToast('Failed to save tyre — it was not added. ' + (err?.message || ''))
+            return null
           }
         }
+        return tempId
       },
 
       bulkAddSKUs: async (skusArray) => {
