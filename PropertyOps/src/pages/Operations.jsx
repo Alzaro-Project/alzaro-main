@@ -729,7 +729,41 @@ export function FinancePage({ user, go }) {
 
   // Marking received settles the whole invoice, so paid_amount matches the
   // total — otherwise a part-paid row would still show an outstanding balance.
-  const markReceived = async (p) => { if (p.id && DB_READY) { await db.from("prop_payments").update({ status: "Paid", paid_amount: +p.amount || 0 }).eq("id", p.id); refresh(); } };
+  // Session undo/redo for the risky one-click actions (mark received, raise,
+  // delete). Each entry carries forward() and backward() so both directions
+  // work; the stacks live in memory only, so a page refresh clears them.
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const pushUndo = (a) => { setUndoStack((st) => [...st.slice(-19), a]); setRedoStack([]); };
+  const doUndo = async () => {
+    if (undoBusy || !undoStack.length || !DB_READY) return;
+    const a = undoStack[undoStack.length - 1];
+    setUndoBusy(true); setErr("");
+    try { await a.backward(); setUndoStack((st) => st.slice(0, -1)); setRedoStack((st) => [...st, a]); }
+    catch (e2) { setErr(friendlyError(e2, "undoing that")); }
+    setUndoBusy(false); refresh();
+  };
+  const doRedo = async () => {
+    if (undoBusy || !redoStack.length || !DB_READY) return;
+    const a = redoStack[redoStack.length - 1];
+    setUndoBusy(true); setErr("");
+    try { await a.forward(); setRedoStack((st) => st.slice(0, -1)); setUndoStack((st) => [...st, a]); }
+    catch (e2) { setErr(friendlyError(e2, "redoing that")); }
+    setUndoBusy(false); refresh();
+  };
+
+  const markReceived = async (p) => {
+    if (!p.id || !DB_READY) return;
+    const prev = { status: p.status, paid_amount: p.paid_amount };
+    await db.from("prop_payments").update({ status: "Paid", paid_amount: +p.amount || 0 }).eq("id", p.id);
+    pushUndo({
+      label: `Marked ${p.invoice_no || p.tenant || "invoice"} received`,
+      forward: async () => { await db.from("prop_payments").update({ status: "Paid", paid_amount: +p.amount || 0 }).eq("id", p.id); },
+      backward: async () => { await db.from("prop_payments").update(prev).eq("id", p.id); },
+    });
+    refresh();
+  };
 
   // Build forward projection of rent invoices from Let properties' rent + invoice_day
   const buildProjection = () => {
@@ -777,14 +811,22 @@ export function FinancePage({ user, go }) {
     raisingRef.current = true;
     setRaising(proj.property_id + proj.month);
     const invoiceNo = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
-    const { error } = await db.from("prop_payments").insert([{
+    const rowData = {
       tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
       amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
       status: "Pending", user_id: user.id,
-    }]);
+    };
+    const res = await db.from("prop_payments").insert([rowData]).select("id");
+    const error = res.error;
     raisingRef.current = false;
     setRaising(null);
     if (error) { setErr(friendlyError(error)); return; }
+    const st = { ids: (res.data || []).map((r) => r.id) };
+    pushUndo({
+      label: `Raised invoice for ${proj.property}`,
+      forward: async () => { const r2 = await db.from("prop_payments").insert([rowData]).select("id"); st.ids = (r2.data || []).map((r) => r.id); },
+      backward: async () => { if (st.ids.length) await db.from("prop_payments").delete().in("id", st.ids); },
+    });
     // Confirm it landed in the ledger — raising moves a projected invoice into
     // the real payment list (visible under All / Sent), so the row leaving the
     // Future tab is expected, not "nothing happening".
@@ -802,17 +844,25 @@ export function FinancePage({ user, go }) {
     raisingRef.current = true;
     setBulkRaising({ month, done: 0, total: list.length });
     let ok = 0, fail = 0;
+    const rowsData = [];
+    const st = { ids: [] };
     for (let i = 0; i < list.length; i++) {
       const proj = list[i];
       const invoiceNo = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}${i}`;
-      const { error } = await db.from("prop_payments").insert([{
+      const rowData = {
         tenant: proj.tenant, property_id: proj.property_id, property: proj.property,
         amount: proj.amount, due_date: proj.due_date, invoice_no: invoiceNo,
         status: "Pending", user_id: user.id,
-      }]);
-      if (error) fail++; else ok++;
+      };
+      const res = await db.from("prop_payments").insert([rowData]).select("id");
+      if (res.error) fail++; else { ok++; rowsData.push(rowData); st.ids.push(...(res.data || []).map((r) => r.id)); }
       setBulkRaising({ month, done: i + 1, total: list.length });
     }
+    if (ok) pushUndo({
+      label: `Raised ${ok} invoice${ok === 1 ? "" : "s"} for ${monthLabel(month)}`,
+      forward: async () => { const r2 = await db.from("prop_payments").insert(rowsData).select("id"); st.ids = (r2.data || []).map((r) => r.id); },
+      backward: async () => { if (st.ids.length) await db.from("prop_payments").delete().in("id", st.ids); },
+    });
     raisingRef.current = false;
     setBulkRaising(null);
     setRaisedMsg(`${ok} invoice${ok === 1 ? "" : "s"} raised for ${monthLabel(month)}${fail ? ` (${fail} failed — try those again)` : ""} — now in the ledger under Pending. Tick each off when the money lands.`);
@@ -822,7 +872,21 @@ export function FinancePage({ user, go }) {
   const monthLabel = (m) => { const [y, mo] = String(m).split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" }); };
 
   const confirm = useConfirm();
-  const doRemove = async (id) => { if (id && DB_READY) { await db.from("prop_payments").delete().eq("id", id); refresh(); } };
+  const doRemove = async (id) => {
+    if (!id || !DB_READY) return;
+    const snap = (rows || []).find((r) => String(r.id) === String(id));
+    await db.from("prop_payments").delete().eq("id", id);
+    if (snap) {
+      const { id: _drop, ...rowData } = snap;
+      const st = { id };
+      pushUndo({
+        label: `Deleted ${snap.invoice_no || snap.tenant || "invoice"}`,
+        forward: async () => { await db.from("prop_payments").delete().eq("id", st.id); },
+        backward: async () => { const r2 = await db.from("prop_payments").insert([rowData]).select("id"); st.id = r2.data && r2.data[0] && r2.data[0].id; },
+      });
+    }
+    refresh();
+  };
   const remove = (id) => confirm.ask({ title: "Delete this invoice?", message: "This invoice/payment record will be permanently deleted. This can't be undone.", onConfirm: () => doRemove(id) });
 
 const data = rows || [];
@@ -989,7 +1053,19 @@ const data = rows || [];
         );
       })()}
 
-      <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase", marginBottom: 11 }}>Payment ledger</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 11 }}>
+        <div style={{ fontSize: 11, letterSpacing: 1, color: "var(--txt-2)", textTransform: "uppercase" }}>Payment ledger</div>
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+          <span onClick={doUndo} title={undoStack.length ? `Undo: ${undoStack[undoStack.length - 1].label}` : "Nothing to undo"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, padding: "6px 11px", borderRadius: 8, border: "0.5px solid var(--line)", background: "var(--panel-2)", color: "var(--txt-2)", cursor: undoStack.length && !undoBusy ? "pointer" : "default", opacity: undoStack.length && !undoBusy ? 1 : 0.45 }}>
+            <i className={`ti ${undoBusy ? "ti-loader" : "ti-arrow-back-up"}`} style={{ fontSize: 14 }} />Undo
+          </span>
+          <span onClick={doRedo} title={redoStack.length ? `Redo: ${redoStack[redoStack.length - 1].label}` : "Nothing to redo"}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, padding: "6px 11px", borderRadius: 8, border: "0.5px solid var(--line)", background: "var(--panel-2)", color: "var(--txt-2)", cursor: redoStack.length && !undoBusy ? "pointer" : "default", opacity: redoStack.length && !undoBusy ? 1 : 0.45 }}>
+            <i className="ti ti-arrow-forward-up" style={{ fontSize: 14 }} />Redo
+          </span>
+        </div>
+      </div>
       {rows === null ? (
         <div style={{ color: "var(--txt-3)", fontSize: 13, padding: 20 }}>Loading payments…</div>
       ) : data.length === 0 ? (
