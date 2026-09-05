@@ -102,6 +102,7 @@ const CHANGELOG = [
     { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
     { type:'added',    text:'Basic tier now available in the tier dropdown.' },
     { type:'added',    text:'Delete account (danger zone) — permanently removes the login and all product data, with a typed DELETE confirmation.' },
+    { type:'added',    text:'Last-online shown in the user list and per-product plan on the vertical chips.' },
     { type:'added',    text:'Trial extension — edit any client\'s trial end date per product, with quick +7 / +14 / +30 day buttons.' },
     { type:'added',    text:'Light / dark mode toggle in the header, remembered across visits.' },
     { type:'fixed',    text:'Switching away and back to the tab no longer resets to the "Loading platform…" screen.' },
@@ -160,6 +161,17 @@ const gbp = n => (n === null || n === undefined) ? '—' : new Intl.NumberFormat
 const fmtNum = n => (n === null || n === undefined) ? '—' : n.toLocaleString('en-GB')
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'
 const fmtDateTime = d => d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'
+// "2h ago" style for the last-online column
+const timeAgo = d => {
+  if (!d) return 'Never'
+  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000)
+  if (s < 60) return 'Just now'
+  const m = Math.floor(s / 60); if (m < 60) return m + 'm ago'
+  const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'
+  const days = Math.floor(h / 24); if (days < 30) return days + 'd ago'
+  const mo = Math.floor(days / 30); if (mo < 12) return mo + 'mo ago'
+  return Math.floor(mo / 12) + 'y ago'
+}
 const card = { background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'16px', padding:'22px' }
 const btnSec = { background:'var(--surface2)', color:'var(--text)', fontWeight:700, fontSize:'13px', padding:'9px 14px', borderRadius:'10px', border:'1px solid var(--border-light)', cursor:'pointer' }
 const td = { padding:'13px 14px', borderBottom:'1px solid var(--border)', fontSize:'13.5px', verticalAlign:'middle' }
@@ -497,9 +509,13 @@ function Platform() {
 
   const VerticalChips = ({ u }) => (
     <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
-      {(u.verticals||'').split(', ').filter(Boolean).map(v => {
-        const meta = VERTICALS[v] || { label:v, color:'var(--text3)' }
-        return <span key={v} style={{ fontSize:'11px', fontWeight:700, padding:'3px 8px', borderRadius:'6px', background:'var(--surface2)', color:meta.color, border:'1px solid var(--border-light)' }}>{meta.label}</span>
+      {(u.memberships || []).map((m, i) => {
+        const meta = VERTICALS[m.product] || { label:m.product, color:'var(--text3)' }
+        return (
+          <span key={i} style={{ fontSize:'11px', fontWeight:700, padding:'3px 8px', borderRadius:'6px', background:'var(--surface2)', color:meta.color, border:'1px solid var(--border-light)' }}>
+            {meta.label}{m.tier ? <span style={{ color:'var(--text3)', fontWeight:600 }}> · {m.tier}</span> : null}
+          </span>
+        )
       })}
     </div>
   )
@@ -606,7 +622,7 @@ function Platform() {
                       {u.is_disabled
                         ? <span style={{ color:'var(--red)', fontWeight:700, fontSize:'12px' }}>● Disabled</span>
                         : <span style={{ color:'var(--green)', fontWeight:700, fontSize:'12px' }}>● Active</span>}
-                      <span style={{ color:'var(--text3)', fontSize:'12px' }}>Joined {fmtDate(u.created_at)}</span>
+                      <span style={{ color:'var(--text3)', fontSize:'12px' }}>Online {timeAgo(u.last_sign_in_at)} · Joined {fmtDate(u.created_at)}</span>
                     </div>
                   </div>
                   {open && (
@@ -623,7 +639,7 @@ function Platform() {
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'720px' }}>
               <thead><tr>
-                {['','Email','Verticals','Joined','Status',''].map((h,i)=>(
+                {['','Email','Products · plan','Joined','Last online','Status',''].map((h,i)=>(
                   <th key={i} style={{ textAlign:'left', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'var(--text3)', fontWeight:700, padding:'0 14px 12px', borderBottom:'1px solid var(--border)' }}>{h}</th>
                 ))}
               </tr></thead>
@@ -639,6 +655,7 @@ function Platform() {
                     <td style={td}>{u.email}</td>
                     <td style={td}><VerticalChips u={u} /></td>
                     <td style={{...td, color:'var(--text3)'}}>{fmtDate(u.created_at)}</td>
+                    <td style={{...td, color:'var(--text2)'}} title={u.last_sign_in_at ? fmtDateTime(u.last_sign_in_at) : 'Never logged in'}>{timeAgo(u.last_sign_in_at)}</td>
                     <td style={td}>
                       {u.is_disabled
                         ? <span style={{ color:'var(--red)', fontWeight:700, fontSize:'12px' }}>● Disabled</span>
@@ -648,7 +665,7 @@ function Platform() {
                   </tr>
                   {open && (
                     <tr>
-                      <td colSpan={6} style={{ padding:'14px 14px 18px', background:'var(--surface2)', borderBottom:'1px solid var(--border)' }}>
+                      <td colSpan={7} style={{ padding:'14px 14px 18px', background:'var(--surface2)', borderBottom:'1px solid var(--border)' }}>
                         <ExpandedDetail u={u} />
                       </td>
                     </tr>
