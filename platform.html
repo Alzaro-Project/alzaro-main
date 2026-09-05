@@ -152,10 +152,10 @@ const VERTICALS = {
 // button is hidden rather than opening a 404.
 const SUPPORT_READY = ['soloops', 'tyreops', 'garageops', 'serviceops', 'propertyops']
 
-// Tier options per product. TyreOps has the extra Basic tier; the rest are
-// bronze/silver/gold. Falls back to DEFAULT_TIERS for unknown products.
-const DEFAULT_TIERS = ['bronze', 'silver', 'gold']
-const TIERS_BY_PRODUCT = { tyreops: ['basic', 'bronze', 'silver', 'gold'] }
+// Tier options — every vertical now supports the Basic tier
+// (TIER_ORDER includes 'basic' in all five apps).
+const DEFAULT_TIERS = ['basic', 'bronze', 'silver', 'gold']
+const TIERS_BY_PRODUCT = {}
 const tiersFor = product => TIERS_BY_PRODUCT[product] || DEFAULT_TIERS
 
 const gbp = n => (n === null || n === undefined) ? '—' : new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(n)
