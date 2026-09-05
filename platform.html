@@ -102,6 +102,7 @@ const CHANGELOG = [
     { type:'added',    text:'Search box (email or company) and Active/Disabled filter above the user list.' },
     { type:'added',    text:'Basic tier now available in the tier dropdown.' },
     { type:'added',    text:'Delete account (danger zone) — permanently removes the login and all product data, with a typed DELETE confirmation.' },
+    { type:'added',    text:'Plan filter and sort options (newest, oldest, recently online, A\u2013Z) on the user list.' },
     { type:'added',    text:'Last-online shown in the user list and per-product plan on the vertical chips.' },
     { type:'added',    text:'Trial extension — edit any client\'s trial end date per product, with quick +7 / +14 / +30 day buttons.' },
     { type:'added',    text:'Light / dark mode toggle in the header, remembered across visits.' },
@@ -208,6 +209,8 @@ function Platform() {
   const [users, setUsers] = useState([])
   const [filter, setFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all') // all | active | disabled
+  const [planFilter, setPlanFilter] = useState('all') // all | basic | bronze | silver | gold
+  const [sortBy, setSortBy] = useState('newest') // newest | oldest | recent-online | email
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(null) // user_id currently toggling
   const [planBusy, setPlanBusy] = useState(null) // user_id+product currently saving plan
@@ -424,11 +427,21 @@ function Platform() {
     if (filter !== 'all' && !(u.verticals || '').includes(filter)) return false
     if (statusFilter === 'active' && u.is_disabled) return false
     if (statusFilter === 'disabled' && !u.is_disabled) return false
+    if (planFilter !== 'all') {
+      // when a vertical chip is picked, match the plan on THAT product; otherwise any product
+      const ms = (u.memberships || []).filter(m => filter === 'all' || m.product === filter)
+      if (!ms.some(m => (m.tier || '') === planFilter)) return false
+    }
     if (q) {
       const companies = (u.memberships || []).map(m => m.company_name || '').join(' ').toLowerCase()
       if (!(u.email || '').toLowerCase().includes(q) && !companies.includes(q)) return false
     }
     return true
+  }).sort((a, b) => {
+    if (sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at)
+    if (sortBy === 'recent-online') return new Date(b.last_sign_in_at || 0) - new Date(a.last_sign_in_at || 0)
+    if (sortBy === 'email') return (a.email || '').localeCompare(b.email || '')
+    return new Date(b.created_at) - new Date(a.created_at) // newest
   })
 
   // Shared expanded-detail block, used by both the desktop table row and the
@@ -592,6 +605,21 @@ function Platform() {
           <option value="active">Active only</option>
           <option value="disabled">Disabled only</option>
         </select>
+        <select value={planFilter} onChange={e=>setPlanFilter(e.target.value)}
+          style={{ background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 10px', fontSize:'13.5px', fontWeight:600, cursor:'pointer' }}>
+          <option value="all">All plans</option>
+          <option value="basic">Basic</option>
+          <option value="bronze">Bronze</option>
+          <option value="silver">Silver</option>
+          <option value="gold">Gold</option>
+        </select>
+        <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+          style={{ background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border-light)', borderRadius:'10px', padding:'11px 10px', fontSize:'13.5px', fontWeight:600, cursor:'pointer' }}>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="recent-online">Recently online</option>
+          <option value="email">Email A–Z</option>
+        </select>
       </div>
 
       {/* users */}
@@ -603,7 +631,7 @@ function Platform() {
 
         {shown.length===0 ? (
           <div style={{ color:'var(--text3)', padding:'24px', textAlign:'center' }}>
-            {q || statusFilter !== 'all' ? 'No users match this search or filter.' : 'No users.'}
+            {q || statusFilter !== 'all' || planFilter !== 'all' ? 'No users match these filters.' : 'No users.'}
           </div>
         ) : isMobile ? (
           /* ---------- mobile: tap-to-expand cards ---------- */
